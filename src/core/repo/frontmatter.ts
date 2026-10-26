@@ -120,14 +120,9 @@ export function extractFreeSections(
   const normalized = (s: string) => s.trim().toLowerCase();
   const set = new Set(known.map(normalized));
 
-  const sections: MiscSection[] = [];
-  const re = /^##[ \t]+(.+)$([\s\S]*?)(?=^##[ \t]|$(?![\s\S]))/gm;
-  for (const m of body.matchAll(re)) {
-    if (!set.has(normalized(m[1]))) {
-      sections.push({ title: m[1].trim(), body: m[2].trim() });
-    }
-  }
-  return sections;
+  return splitAtHeadings(body, "##").filter(
+    (s) => !set.has(normalized(s.title)),
+  );
 }
 
 /**
@@ -175,7 +170,38 @@ export function extractSubsections(
   const out = new Map<string, string>();
   if (!section) return out;
 
-  const re = /^###[ \t]+(.+)$([\s\S]*?)(?=^###[ \t]|$(?![\s\S]))/gm;
-  for (const m of section.matchAll(re)) out.set(m[1].trim(), m[2].trim());
+  for (const s of splitAtHeadings(section, "###")) out.set(s.title, s.body);
   return out;
+}
+
+/**
+ * Splits a text at the headings of one level: each heading's title, and the text up to the next heading of that level, both trimmed.
+ *
+ * Read line by line rather than by a regular expression: one that stops at the next heading scans ahead from every line, and SonarCloud flags its backtracking (S8786).
+ */
+function splitAtHeadings(text: string, marker: "##" | "###"): MiscSection[] {
+  const sections: MiscSection[] = [];
+  let current: { title: string; lines: string[] } | null = null;
+  const close = () => {
+    if (current)
+      sections.push({
+        title: current.title,
+        body: current.lines.join("\n").trim(),
+      });
+  };
+
+  for (const line of text.split("\n")) {
+    // A Windows line ending is not part of the title.
+    const after = line.replace(/\r$/, "").slice(marker.length);
+    // `##` followed by a space or a tab: `###` is not a level-2 heading.
+    if (!line.startsWith(marker) || !/^[ \t]/.test(after)) {
+      current?.lines.push(line);
+      continue;
+    }
+    close();
+    // A heading without a title ends the section before it, and opens none.
+    current = after.length > 1 ? { title: after.trim(), lines: [] } : null;
+  }
+  close();
+  return sections;
 }
