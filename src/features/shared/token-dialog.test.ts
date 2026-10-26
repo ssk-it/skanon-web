@@ -1,6 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TokenService } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject, resetInjection } from "../../core/injection";
 import TokenDialog from "./TokenDialog.vue";
 
@@ -172,5 +173,46 @@ describe("TokenDialog and the passkey", () => {
       "Read-only",
     ]);
     expect(view.text()).toContain("roadmap");
+  });
+});
+
+describe("TokenDialog, in English", () => {
+  beforeEach(() => {
+    resetInjection();
+    inject(LocaleService).choice.set("en");
+  });
+
+  it("speaks English, from the dialog to the creation help", async () => {
+    const view = mount(TokenDialog);
+    await flushPromises();
+    const text = view.text();
+    for (const english of [
+      "Sign in to GitHub",
+      "Personal access token",
+      "This token applies to",
+      "How to create a token?",
+      "Create a token",
+      "the token creation page",
+      "To read",
+      "Cancel",
+      "Save",
+    ])
+      expect(text).toContain(english);
+    for (const french of [
+      "Connexion à GitHub",
+      "Jeton d’accès personnel",
+      "Comment créer un jeton ?",
+      "Pour consulter",
+      "Annuler",
+      "Enregistrer",
+    ])
+      expect(text).not.toContain(french);
+  });
+
+  it("names the scopes in English", async () => {
+    const view = mount(TokenDialog);
+    await flushPromises();
+    await view.find("[role=combobox]").trigger("click");
+    expect(document.body.textContent).toContain("all other repos");
   });
 });

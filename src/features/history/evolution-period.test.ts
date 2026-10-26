@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { GithubClient } from "../../core/github/github-client";
 import { provideHttpTesting } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject, provide } from "../../core/injection";
 import { ComparisonService } from "../../core/repo/comparison.service";
 import { RepoConfig } from "../../core/repo/repo-config";
@@ -102,13 +103,14 @@ describe("The last visit", () => {
 describe("Evolution on opening", () => {
   let calls: Array<{ departure: Date; arrival: Date }>;
   let visit: Date | null;
+  let failure: unknown;
 
   async function mountView(): Promise<VueWrapper> {
     provideHttpTesting();
     provide(ComparisonService, {
       compare: async (_d: unknown, departure: Date, arrival: Date) => {
         calls.push({ departure, arrival });
-        throw new Error("pas de comparaison dans ce test");
+        throw failure;
       },
     });
     provide(GithubClient, { firstCommitDate: async () => null });
@@ -133,6 +135,7 @@ describe("Evolution on opening", () => {
   beforeEach(() => {
     calls = [];
     visit = null;
+    failure = new Error("pas de comparaison dans ce test");
   });
 
   it("compares the last thirty days right away on the first visit, and says so", async () => {
@@ -202,5 +205,50 @@ describe("Evolution on opening", () => {
     expect(el.querySelector("form.bornes")).not.toBeNull();
     // choosing dates triggers nothing until one has compared
     expect(calls.length).toBe(1);
+  });
+
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("names its periods in English", async () => {
+      const el = await stable(await mountView());
+
+      expect(el.querySelector("h1")?.textContent).toBe("What has changed");
+      const labels = [...el.querySelectorAll(".periodes button")].map((b) =>
+        b.textContent?.trim(),
+      );
+      expect(labels).toEqual([
+        "7 days",
+        "30 days",
+        "3 months",
+        "Choose dates…",
+      ]);
+      expect(el.querySelector(".periode-retenue")?.textContent).toContain(
+        "The last 30 days",
+      );
+      expect(el.querySelector(".periodes")?.getAttribute("aria-label")).toBe(
+        "Period",
+      );
+    });
+
+    it("dates the last visit in English", async () => {
+      visit = new Date("2026-09-10T08:00:00Z");
+      const el = await stable(await mountView());
+
+      const said = el.querySelector(".periode-retenue")?.textContent ?? "";
+      expect(said).toContain("Since your last visit");
+      expect(said).toContain("September 2026");
+      expect(said).not.toContain("septembre");
+    });
+
+    it("says in English that the comparison failed", async () => {
+      failure = "refusée";
+      const el = await stable(await mountView());
+
+      expect(el.querySelector(".erreur")?.textContent).toContain(
+        "The comparison failed.",
+      );
+      expect(el.querySelector(".erreur")?.textContent).toContain("Sign in");
+    });
   });
 });

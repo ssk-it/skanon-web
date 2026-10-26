@@ -1,6 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { ThemeService } from "../../core/ui/theme.service";
 import RenderedMarkdown from "./RenderedMarkdown.vue";
@@ -28,6 +29,7 @@ describe("rendering component", () => {
     expect(html).toContain("Un texte.");
     // And the failure says so, rather than leaving a gap one would take for a scoping that wrote nothing at that place.
     expect(html).toContain("pc-diagramme-erreur");
+    expect(html).toContain("Ce diagramme n’a pas pu être dessiné");
   });
 
   it("follows the application's effective theme", async () => {
@@ -41,5 +43,18 @@ describe("rendering component", () => {
     // The theme is read in the rendering effect: a toggle reruns it. Without that, the diagrams already displayed would stay in the old theme.
     expect(theme.effective()).toBe("sombre");
     expect(view.html()).toContain("Un texte.");
+  });
+});
+
+describe("rendering component, in English", () => {
+  beforeEach(() => inject(LocaleService).choice.set("en"));
+
+  it("says in English that a diagram could not be drawn", async () => {
+    const view = mount(RenderedMarkdown, { props: { text: TEXT } });
+    await flushPromises();
+    await new Promise((r) => setTimeout(r, 300));
+
+    expect(view.html()).toContain("This diagram could not be drawn");
+    expect(view.html()).not.toContain("Ce diagramme");
   });
 });

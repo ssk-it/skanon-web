@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { TokenService } from "../../core/github/token.service";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
-import ExternalLink from "../../ui/ExternalLink.vue";
 import UiButton from "../../ui/UiButton.vue";
 import UiIcon from "../../ui/UiIcon.vue";
+import { repoAccessHelpMessages } from "./repo-access-help.messages";
+import RichText from "./RichText.vue";
 
 /**
  * How to give a token access to the repo it does not open.
@@ -17,6 +19,7 @@ const props = defineProps<{ repoRef: { owner: string; repo: string } }>();
 const emit = defineEmits<{ replace: [] }>();
 
 const tokens = inject(TokenService);
+const t = useMessages(repoAccessHelpMessages);
 
 const fullName = computed(() => `${props.repoRef.owner}/${props.repoRef.repo}`);
 
@@ -28,90 +31,38 @@ const classic = computed(() => tokens.value()?.startsWith("ghp_") ?? false);
 
 <template>
   <section class="aide-acces-depot aide">
-    <h3>Donner au jeton l’accès à {{ fullName }}</h3>
+    <h3>{{ t().title(fullName) }}</h3>
 
     <template v-if="classic">
-      <p class="intro">
-        Le jeton enregistré est un jeton classique : il ouvre d’emblée tous les
-        dépôts auxquels votre compte GitHub a accès.
-      </p>
+      <p class="intro">{{ t().classicIntro }}</p>
       <ol class="etapes">
-        <li>
-          Vérifier que votre compte GitHub voit bien
-          <strong>{{ fullName }}</strong> en l’ouvrant sur github.com. Sinon,
-          demander l’accès à un administrateur de
-          <strong>{{ repoRef.owner }}</strong
-          >.
+        <li
+          v-for="(step, i) in t().classicSteps(fullName, repoRef.owner)"
+          :key="i"
+        >
+          <RichText :parts="step" />
         </li>
-        <li>
-          Si <strong>{{ repoRef.owner }}</strong> impose une authentification
-          unique, ouvrir
-          <ExternalLink href="https://github.com/settings/tokens"
-            >la page des jetons classiques
-            <UiIcon name="open_in_new" /></ExternalLink
-          >, puis <strong>Configure SSO</strong> en regard du jeton, et
-          <strong>Authorize</strong> pour cette organisation.
-        </li>
-        <li>Revenir ici et réessayer.</li>
       </ol>
     </template>
     <template v-else>
       <ol class="etapes">
-        <li>
-          Ouvrir
-          <ExternalLink
-            href="https://github.com/settings/personal-access-tokens"
-            >la page des jetons d’accès <UiIcon name="open_in_new"
-          /></ExternalLink>
-          sur GitHub, et cliquer sur le jeton utilisé ici — « Skanon » s’il a
-          été nommé comme le conseille l’aide à la création. S’il est marqué
-          <strong>Expired</strong>, en créer un nouveau.
-        </li>
-        <li>
-          Vérifier son <strong>Resource owner</strong> : ce doit être
-          <strong>{{ repoRef.owner }}</strong
-          >. Un jeton ne couvre qu’un seul propriétaire, qui ne se change plus
-          après la création. Si c’en est un autre, créer un nouveau jeton pour
-          <strong>{{ repoRef.owner }}</strong>
-          et le déclarer ici pour cette organisation : l’ancien reste valable
-          pour ses propres dépôts.
-        </li>
-        <li>
-          Cliquer sur <strong>Edit</strong>. Sous
-          <strong>Repository access</strong>, si
-          <strong>Only select repositories</strong> est coché, ajouter
-          <strong>{{ fullName }}</strong> à la liste. Ne pas basculer sur
-          <strong>All repositories</strong> pour autant : le jeton ouvrirait
-          tout le reste.
-        </li>
-        <li>
-          Sous <strong>Permissions → Repository permissions</strong>, vérifier
-          que <strong>Contents</strong> est au moins en
-          <strong>Read-only</strong> — en <strong>Read and write</strong>, avec
-          <strong>Pull requests</strong>, pour rédiger —, et
-          <strong>Issues</strong> en <strong>Read-only</strong>, pour la
-          roadmap.
-        </li>
-        <li>
-          Cliquer sur <strong>Update</strong> en bas de page, puis revenir ici
-          et réessayer. Le jeton garde sa valeur : rien à ressaisir.
+        <li
+          v-for="(step, i) in t().fineGrainedSteps(fullName, repoRef.owner)"
+          :key="i"
+        >
+          <RichText :parts="step" />
         </li>
       </ol>
 
       <div class="note">
         <UiIcon name="schedule" />
-        <p>
-          Si <strong>{{ repoRef.owner }}</strong> soumet les jetons à
-          approbation, la page des jetons l’indique par
-          <strong>Pending</strong> en regard de l’organisation. Le jeton n’ouvre
-          rien avant qu’un de ses administrateurs l’ait approuvé.
-        </p>
+        <p><RichText :parts="t().approval(repoRef.owner)" /></p>
       </div>
     </template>
 
     <UiButton @click="emit('replace')">
       <UiIcon name="key" />
-      Enregistrer un autre jeton
+      {{ t().another }}
     </UiButton>
   </section>
 </template>
@@ -146,27 +97,27 @@ h3 {
   line-height: 1.55;
   color: var(--mat-sys-on-surface-variant);
 }
-strong {
+/* The phrases are drawn by `RichText`: their strong words and links are reached through it. */
+.aide-acces-depot :deep(strong) {
   color: var(--mat-sys-on-surface);
   font-weight: 600;
 }
 .etapes li::marker {
   color: var(--mat-sys-outline);
 }
-a {
+.aide-acces-depot :deep(a) {
   color: var(--mat-sys-primary);
   text-decoration: none;
   white-space: nowrap;
-
-  &:hover {
-    text-decoration: underline;
-  }
-  .material-symbols-outlined {
-    font-size: 13px;
-    width: 13px;
-    height: 13px;
-    vertical-align: -1px;
-  }
+}
+.aide-acces-depot :deep(a:hover) {
+  text-decoration: underline;
+}
+.aide-acces-depot :deep(a .material-symbols-outlined) {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  vertical-align: -1px;
 }
 .note {
   display: flex;

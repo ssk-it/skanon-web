@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
+import { architectureMessages } from "./architecture.messages";
 
 /**
  * The entry into what describes how the product is built.
@@ -14,6 +16,7 @@ import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
  */
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
+const t = inject(LocaleService).messages(architectureMessages);
 
 const components = computed(() => store.listArchitectureByKind("composant"));
 const flows = computed(() => store.listArchitectureByKind("flux"));
@@ -43,35 +46,27 @@ const empty = computed(
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
       <header class="entete">
-        <p class="type">Architecture</p>
-        <h1>Comment le produit est construit</h1>
+        <p class="type">{{ t().kind }}</p>
+        <h1>{{ t().title }}</h1>
       </header>
 
       <!-- The top-bar entry does not depend on the content: this is therefore where absence is handled. An empty list reads as much as "this project describes nothing" as "loading failed", and it is the second reading that sticks. Saying what the view would hold removes both. -->
       <section v-if="empty" class="vide-instruit">
-        <h2>Ce projet ne décrit pas encore son architecture</h2>
-        <p class="intro">Cette vue accueille quatre natures de documents :</p>
+        <h2>{{ t().emptyTitle }}</h2>
+        <p class="intro">{{ t().emptyIntro }}</p>
         <dl>
-          <dt>Composants</dt>
-          <dd>
-            ce qui existe — une application, un cluster, un espace de stockage.
-          </dd>
-          <dt>Flux</dt>
-          <dd>ce qui s’échange entre eux, quand, et dans quel sens.</dd>
-          <dt>Contexte</dt>
-          <dd>la vue d’ensemble, en un seul document.</dd>
-          <dt>Décisions d’architecture</dt>
-          <dd>
-            pourquoi le produit est construit ainsi, et ce qui a été écarté.
-          </dd>
+          <dt>{{ t().components }}</dt>
+          <dd>{{ t().componentsWhat }}</dd>
+          <dt>{{ t().flows }}</dt>
+          <dd>{{ t().flowsWhat }}</dd>
+          <dt>{{ t().context }}</dt>
+          <dd>{{ t().contextWhat }}</dd>
+          <dt>{{ t().decisionsLong }}</dt>
+          <dd>{{ t().decisionsWhat }}</dd>
         </dl>
-        <p class="amorce">
-          Rien ne s’écrit ici directement : un document d’architecture naît d’un
-          cadrage dont un impact le vise, et se relit avec lui. C’est ce qui le
-          distingue d’une page de wiki que plus rien ne rattache à une décision.
-        </p>
+        <p class="amorce">{{ t().emptyStart }}</p>
         <RouterLink class="action" :to="links.path('cadrages', 'nouveau')">
-          Ouvrir un cadrage
+          {{ t().openScoping }}
         </RouterLink>
       </section>
       <template v-else>
@@ -79,7 +74,7 @@ const empty = computed(
           <RenderedMarkdown class="md" :text="context.statement" />
         </section>
 
-        <h2 class="section">Composants</h2>
+        <h2 class="section">{{ t().components }}</h2>
         <div class="liste">
           <RouterLink
             v-for="d in components"
@@ -88,14 +83,16 @@ const empty = computed(
             :to="links.path('architecture', 'document', d.id)"
           >
             <span class="nom">{{ d.id }}</span>
-            <span class="compte"
-              >{{ store.listFlowsByComponent(d.id).length }} flux</span
-            >
+            <span class="compte">{{
+              t().flowCount(store.listFlowsByComponent(d.id).length)
+            }}</span>
           </RouterLink>
-          <p v-if="!components.length" class="vide">Aucun composant décrit.</p>
+          <p v-if="!components.length" class="vide">
+            {{ t().noComponent }}
+          </p>
         </div>
 
-        <h2 class="section">Flux</h2>
+        <h2 class="section">{{ t().flows }}</h2>
         <div class="liste">
           <RouterLink
             v-for="d in flows"
@@ -104,12 +101,14 @@ const empty = computed(
             :to="links.path('architecture', 'document', d.id)"
           >
             <span class="nom">{{ d.id }}</span>
-            <span class="compte">{{ d.components.length }} composants</span>
+            <span class="compte">{{
+              t().componentCount(d.components.length)
+            }}</span>
           </RouterLink>
-          <p v-if="!flows.length" class="vide">Aucun flux décrit.</p>
+          <p v-if="!flows.length" class="vide">{{ t().noFlow }}</p>
         </div>
 
-        <h2 class="section">Décisions</h2>
+        <h2 class="section">{{ t().decisions }}</h2>
         <div class="liste">
           <RouterLink
             v-for="d in decisions"
@@ -118,10 +117,12 @@ const empty = computed(
             :to="links.path('architecture', 'decision', d.id)"
           >
             <span class="nom">{{ d.id }}</span>
-            <span v-if="d.status === 'abroge'" class="compte">abrogée</span>
+            <span v-if="d.status === 'abroge'" class="compte">{{
+              t().repealed
+            }}</span>
           </RouterLink>
           <p v-if="!decisions.length" class="vide">
-            Aucune décision d’architecture.
+            {{ t().noDecision }}
           </p>
         </div>
       </template>

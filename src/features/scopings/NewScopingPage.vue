@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import { AuthoringService } from "../../core/repo/authoring.service";
@@ -12,6 +13,7 @@ import UiButton from "../../ui/UiButton.vue";
 import UiTextField from "../../ui/UiTextField.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
+import { newScopingMessages } from "./new-scoping.messages";
 
 /**
  * Opening a scoping.
@@ -24,6 +26,7 @@ const authoring = inject(AuthoringService);
 const tokens = inject(TokenService);
 const opener = inject(PLATFORM).opener;
 const router = useRouter();
+const t = inject(LocaleService).messages(newScopingMessages);
 
 const title = ref("");
 const domains = ref("");
@@ -41,10 +44,11 @@ const knownDomains = computed(() => store.domains().map((d) => d.id));
  * A disabled button with no explanation leaves the author searching for which of the four fields blocks it.
  */
 const missing = computed(() => {
+  const m = t();
   const absent = [
-    ["un titre", title.value],
-    ["un objectif", goal.value],
-    ["un parcours", journey.value],
+    [m.aTitle, title.value],
+    [m.aGoal, goal.value],
+    [m.aJourney, journey.value],
   ]
     .filter(([, value]) => !value.trim())
     .map(([name]) => name);
@@ -72,9 +76,7 @@ async function create(): Promise<void> {
     await router.push(links.path("cadrages"));
   } catch (e) {
     error.value =
-      e instanceof GithubError || e instanceof Error
-        ? e.message
-        : "La création du cadrage a échoué.";
+      e instanceof GithubError || e instanceof Error ? e.message : t().failed;
   } finally {
     sending.value = false;
   }
@@ -86,61 +88,54 @@ async function create(): Promise<void> {
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
       <RouterLink class="retour" :to="links.path('cadrages')">
-        <UiIcon name="arrow_back" /> Cadrages
+        <UiIcon name="arrow_back" /> {{ t().back }}
       </RouterLink>
 
       <header class="entete">
-        <p class="type">Nouveau cadrage</p>
+        <p class="type">{{ t().type }}</p>
         <h1>{{ authoring.nextId() }}</h1>
-        <p class="sous-titre">
-          L’identifiant est attribué à la création et ne changera plus, même si
-          le titre est réécrit.
-        </p>
+        <p class="sous-titre">{{ t().subtitle }}</p>
       </header>
 
       <p v-if="!tokens.present()" class="avertissement">
         <UiIcon name="lock" />
-        <span>
-          Écrire dans le dépôt demande une connexion, avec un jeton autorisant
-          l’écriture. Le jeton de lecture seule conseillé pour la consultation
-          ne suffit pas ici.
-        </span>
+        <span>{{ t().tokenNeeded }}</span>
       </p>
 
       <form class="formulaire" @submit.prevent="create()">
         <UiTextField
           v-model="title"
-          label="Titre"
+          :label="t().title"
           name="titre"
-          hint="Ce que ce cadrage change, en une ligne."
+          :hint="t().titleHint"
           :disabled="sending"
         />
 
         <UiTextField
           v-model="domains"
-          label="Domaines"
+          :label="t().domains"
           name="domaines"
-          :hint="`Séparés par des virgules. Connus : ${knownDomains.join(', ')}`"
+          :hint="t().domainsHint(knownDomains.join(', '))"
           :disabled="sending"
         />
 
         <UiTextField
           v-model="goal"
-          label="Objectif"
+          :label="t().goal"
           multiline
           :rows="5"
           name="objectif"
-          hint="Le problème à résoudre, et pourquoi il mérite d’être traité."
+          :hint="t().goalHint"
           :disabled="sending"
         />
 
         <UiTextField
           v-model="journey"
-          label="Parcours utilisateur"
+          :label="t().journey"
           multiline
           :rows="5"
           name="parcours"
-          hint="Ce que fait l’utilisateur, étape par étape."
+          :hint="t().journeyHint"
           :disabled="sending"
         />
 
@@ -148,26 +143,24 @@ async function create(): Promise<void> {
           <UiIcon name="error_outline" /> <span>{{ error }}</span>
         </p>
 
-        <p v-if="missing" class="incomplet">
-          Il manque encore : {{ missing }}.
-        </p>
+        <p v-if="missing" class="incomplet">{{ t().missing(missing) }}</p>
 
         <div class="actions">
-          <UiButton :to="links.path('cadrages')">Annuler</UiButton>
+          <UiButton :to="links.path('cadrages')">{{ t().cancel }}</UiButton>
           <UiButton
             variant="filled"
             type="submit"
             :disabled="sending || !!missing"
           >
-            {{ sending ? "Création…" : "Créer le cadrage" }}
+            {{ sending ? t().creating : t().create }}
           </UiButton>
         </div>
       </form>
 
       <p class="note">
-        La création ouvre une branche
-        <code>cadrage/{{ authoring.nextId() }}</code> et une demande de fusion.
-        Rien n’entre dans le référentiel avant sa livraison.
+        {{ t().noteBefore }}
+        <code>cadrage/{{ authoring.nextId() }}</code>
+        {{ t().noteAfter }}
       </p>
     </template>
   </div>

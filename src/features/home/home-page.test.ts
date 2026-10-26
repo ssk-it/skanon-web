@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import type { RepoRef } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject, provide, resetInjection } from "../../core/injection";
 import {
   KnownReposService,
@@ -182,5 +183,64 @@ describe("« Ouvrir un projet » screen", () => {
     await vi.waitFor(() => expect(dialog.openDialogs()).toHaveLength(1));
     expect(dialog.openDialogs()[0].options.width).toBe("680px");
     expect(dialog.openDialogs()[0].options.maxWidth).toBe("calc(100vw - 32px)");
+  });
+
+  // RG-textes-traduits: the threshold speaks the reader's language; repo and organisation names stay as GitHub gives them.
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("invites to open a project, in English", async () => {
+      const page = await mountView([
+        known("ssk-it/skift-cadrage", true, true),
+        known("ssk-it/skift", false),
+        known("Globex/site", false),
+      ]);
+
+      expect(page.querySelector("h1")?.textContent).toBe("Open a project");
+      expect(page.querySelector(".cadres .marque")?.textContent).toBe(
+        "opened before",
+      );
+      expect(page.querySelector(".oublier")?.getAttribute("aria-label")).toBe(
+        "Remove from the list",
+      );
+      expect(texts(page, "details.autres summary")).toEqual([
+        "Other authorised repos (2)",
+      ]);
+      expect(
+        page.querySelector('input[name="depot"]')?.getAttribute("placeholder"),
+      ).toBe("owner/repo");
+      expect(page.textContent).not.toContain("Ouvrir un projet");
+      expect(page.querySelector("details.autres")?.textContent).not.toContain(
+        "référentiel",
+      );
+    });
+
+    it("offers sign-in as optional, in English", async () => {
+      const page = await mountView([]);
+
+      const signInBlock = page.querySelector(".connexion")!;
+      expect(signInBlock.querySelector("h2")?.textContent).toBe(
+        "Sign in to GitHub, optional",
+      );
+      expect(signInBlock.textContent).toContain(
+        "Public repos are read without signing in.",
+      );
+      expect(signInBlock.textContent).toContain("Enter a token");
+    });
+
+    it("says what form a typed repo takes, in English", async () => {
+      const page = await mountView([]);
+
+      const field = page.querySelector<HTMLInputElement>(
+        'input[name="depot"]',
+      )!;
+      field.value = "pas un dépôt";
+      field.dispatchEvent(new Event("input"));
+      page.querySelector("form")!.dispatchEvent(new Event("submit"));
+      await flushPromises();
+
+      expect(page.textContent).toContain("Expected format: owner/repo");
+      expect(page.textContent).not.toContain("Format attendu");
+    });
   });
 });

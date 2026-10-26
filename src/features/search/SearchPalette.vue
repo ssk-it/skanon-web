@@ -11,24 +11,18 @@ export interface PaletteData {
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { RouterLink, useRouter, type RouteLocationRaw } from "vue-router";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import {
   RESULT_KINDS,
   buildSearchIndex,
   findResults,
-  type ResultKind,
   type SearchResult,
 } from "../../core/repo/search";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import UiIcon from "../../ui/UiIcon.vue";
-
-const GROUP_LABEL: Record<ResultKind, string> = {
-  regle: "Règles de gestion",
-  decision: "Décisions",
-  architecture: "Architecture",
-  cadrage: "Cadrages",
-};
+import { searchPaletteMessages } from "./search-palette.messages";
 
 /**
  * Beyond this, the palette stops helping to choose: it invites narrowing down rather than unrolling a list no one will read.
@@ -56,6 +50,7 @@ const emit = defineEmits<{ close: [] }>();
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
 const router = useRouter();
+const t = useMessages(searchPaletteMessages);
 
 const query = ref("");
 const activeIndex = ref(0);
@@ -78,7 +73,7 @@ const groups = computed<readonly Group[]>(() => {
     const all = specification.filter((r) => r.kind === kind);
     return {
       key: kind,
-      title: GROUP_LABEL[kind],
+      title: t().groups[kind],
       inProgress: false,
       results: all.slice(0, MAX_PER_GROUP),
       hidden: Math.max(0, all.length - MAX_PER_GROUP),
@@ -89,7 +84,7 @@ const groups = computed<readonly Group[]>(() => {
   if (inProgress.length || store.loadingBranches()) {
     list.push({
       key: "en-cours",
-      title: "En cours",
+      title: t().inProgress,
       inProgress: true,
       results: inProgress.slice(0, MAX_PER_GROUP),
       hidden: Math.max(0, inProgress.length - MAX_PER_GROUP),
@@ -159,8 +154,8 @@ function close(): void {
         type="search"
         autocomplete="off"
         spellcheck="false"
-        placeholder="Rechercher une règle, une décision, un cadrage…"
-        aria-label="Rechercher dans le référentiel"
+        :placeholder="t().placeholder"
+        :aria-label="t().fieldLabel"
         role="combobox"
         aria-expanded="true"
         aria-controls="resultats-recherche"
@@ -169,26 +164,21 @@ function close(): void {
         @input="setQuery(($event.target as HTMLInputElement).value)"
         @keydown="onKeydown"
       />
-      <kbd class="echap">Échap</kbd>
+      <kbd class="echap">{{ t().escape }}</kbd>
     </div>
 
     <p v-if="props.data.onPastState" class="etat-courant" role="note">
       <UiIcon name="history" />
-      Les résultats valent pour le référentiel d’aujourd’hui, non pour les dates
-      que vous consultez.
+      {{ t().pastState }}
     </p>
 
     <div
       id="resultats-recherche"
       class="resultats"
       role="listbox"
-      aria-label="Résultats"
+      :aria-label="t().results"
     >
-      <p v-if="!query.trim()" class="aide">
-        Cherche dans le texte entier des règles, des décisions, de
-        l’architecture et des cadrages — l’état actuel du référentiel, et les
-        cadrages en cours.
-      </p>
+      <p v-if="!query.trim()" class="aide">{{ t().help }}</p>
       <template v-else-if="!noResult">
         <section
           v-for="g of groups"
@@ -201,12 +191,9 @@ function close(): void {
           <h3 class="groupe-titre">{{ g.title }}</h3>
           <p v-if="g.inProgress" class="groupe-note">
             <template v-if="store.loadingBranches()">
-              Lecture des branches en cours… d’autres résultats peuvent
-              s’ajouter.
+              {{ t().loadingBranches }}
             </template>
-            <template v-else>
-              Sur leur branche : pas encore dans le référentiel.
-            </template>
+            <template v-else>{{ t().onBranch }}</template>
           </p>
           <RouterLink
             v-for="r of g.results"
@@ -229,26 +216,22 @@ function close(): void {
             <span v-if="r.title" class="titre">{{ r.title }}</span>
             <span v-if="r.excerpt" class="extrait">{{ r.excerpt }}</span>
           </RouterLink>
-          <p v-if="g.hidden" class="masques">
-            {{ g.hidden }} autre{{ g.hidden > 1 ? "s" : "" }} — précisez la
-            recherche.
-          </p>
+          <p v-if="g.hidden" class="masques">{{ t().hidden(g.hidden) }}</p>
         </section>
       </template>
       <p v-else class="vide">
-        Aucun résultat pour « {{ query.trim() }} ». La recherche porte sur les
-        règles, les décisions, l’architecture et les cadrages, y compris les
-        cadrages en cours.
+        {{ t().noResult(query.trim()) }}
         <template v-if="store.loadingBranches()">
-          Les branches sont encore en lecture : un résultat peut encore
-          apparaître.
+          {{ t().branchesStillLoading }}
         </template>
       </p>
     </div>
 
     <p class="pied">
-      <span><kbd>↑</kbd><kbd>↓</kbd> parcourir</span>
-      <span><kbd>Entrée</kbd> ouvrir</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> {{ t().browse }}</span>
+      <span
+        ><kbd>{{ t().enter }}</kbd> {{ t().open }}</span
+      >
     </p>
   </div>
 </template>

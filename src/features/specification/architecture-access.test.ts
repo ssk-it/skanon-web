@@ -7,9 +7,12 @@ import {
   settle,
   type HttpTestingController,
 } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import { createAppRouter } from "../../router";
+import ArchitectureDecisionPage from "./ArchitectureDecisionPage.vue";
+import ArchitectureDocumentPage from "./ArchitectureDocumentPage.vue";
 import ArchitecturePage from "./ArchitecturePage.vue";
 import SpecificationPage from "./SpecificationPage.vue";
 
@@ -194,5 +197,67 @@ describe("Architecture without content", () => {
     expect(el.querySelector(".vide-instruit")).toBeNull();
     expect(el.textContent).toContain("CMP-api");
     expect(el.textContent).toContain("FLX-export-nocturne");
+  });
+});
+
+describe("Architecture in English", () => {
+  beforeEach(() => {
+    http = provideHttpTesting();
+    inject(LocaleService).choice.set("en");
+  });
+
+  it("says in English what the view would hold", async () => {
+    await load(TREE_WITHOUT_ARCHITECTURE);
+    const text = (await mountPage(ArchitecturePage)).textContent ?? "";
+
+    expect(text).toContain(
+      "This project does not describe its architecture yet",
+    );
+    for (const kind of [
+      "Components",
+      "Flows",
+      "Context",
+      "Architecture decisions",
+    ]) {
+      expect(text).toContain(kind);
+    }
+    expect(text).toContain("Open a scoping");
+    expect(text).not.toContain("ne décrit pas encore");
+  });
+
+  it("titles its lists in English", async () => {
+    await load(TREE_WITH_ARCHITECTURE);
+    const text = (await mountPage(ArchitecturePage)).textContent ?? "";
+
+    expect(text).toContain("How the product is built");
+    expect(text).toContain("1 flow");
+    expect(text).toContain("1 component");
+    expect(text).toContain("No architecture decision.");
+    expect(text).not.toContain("Comment le produit est construit");
+  });
+
+  it("presents a document in English", async () => {
+    await load(TREE_WITH_ARCHITECTURE);
+    const router = await routerAt("/test/test/architecture/document/CMP-api");
+    const view = mount(ArchitectureDocumentPage, {
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(view.get(".type").text()).toBe("Component");
+    expect(view.text()).toContain("Flows that touch it");
+    expect(view.text()).toContain("No scoping declares it");
+    expect(view.text()).not.toContain("Cadrages");
+  });
+
+  it("says in English that a decision does not exist", async () => {
+    await load(TREE_WITH_ARCHITECTURE);
+    const router = await routerAt("/test/test/architecture/decision/ADR-x");
+    const view = mount(ArchitectureDecisionPage, {
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(view.text()).toContain("Decision not found: ADR-x");
   });
 });

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { GithubClient, GithubError } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   ComparisonService,
@@ -15,6 +16,7 @@ import { DialogService } from "../../ui/dialog.service";
 import UiButton from "../../ui/UiButton.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
+import { evolutionPageMessages } from "./evolution-page.messages";
 import { LastVisit, periodStart, type Period } from "./periods";
 
 /**
@@ -22,13 +24,6 @@ import { LastVisit, periodStart, type Period } from "./periods";
  *
  * The question asked is not "what exists?" — the specification answers that — but "what has been decided since last time?". It is the question of a client coming back after a quarter, and one that neither Git nor a wiki answers without manual archaeology.
  */
-
-const LABEL: Record<Evolution, string> = {
-  ajoutee: "ajoutée",
-  modifiee: "modifiée",
-  abrogee: "abrogée",
-  retiree: "retirée",
-};
 
 /**
  * Bounds to the hour, not to the day.
@@ -41,16 +36,17 @@ function localInstant(d: Date): string {
 }
 
 /**
- * The `d MMMM y, HH:mm` and `d MMM, HH:mm` formats of Angular's `date` pipe, in the fr locale. `Intl` alone would write « 6 octobre 2026 à 12:00 »: the parts are therefore reassembled into SSK Canon's format.
+ * The `d MMMM y, HH:mm` and `d MMM, HH:mm` formats of Angular's `date` pipe, in the given locale. `Intl` alone would write « 6 octobre 2026 à 12:00 »: the parts are therefore reassembled into SSK Canon's format, the same in every language.
  */
 function formatDate(
+  locale: string,
   value: string | Date | null,
   month: "long" | "short",
   year: boolean,
 ): string {
   // Like the `date` pipe, a missing date is not written.
   if (value === null) return "";
-  const parts = new Intl.DateTimeFormat("fr-FR", {
+  const parts = new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: month,
     year: year ? "numeric" : undefined,
@@ -63,20 +59,20 @@ function formatDate(
   const day = `${part("day")} ${part("month")}${year ? ` ${part("year")}` : ""}`;
   return `${day}, ${part("hour")}:${part("minute")}`;
 }
-const longDate = (v: string | Date | null) => formatDate(v, "long", true);
-const shortDate = (v: string | Date | null) => formatDate(v, "short", false);
 
 /** The periods offered in one gesture, in the order they are displayed. */
-const PERIODS: ReadonlyArray<{
-  readonly period: Period;
-  readonly label: string;
-}> = [
-  { period: "7-jours", label: "7 jours" },
-  { period: "visite", label: "Depuis ma dernière visite" },
-  { period: "30-jours", label: "30 jours" },
-  { period: "3-mois", label: "3 mois" },
-  { period: "libre", label: "Choisir les dates…" },
+const PERIODS: readonly Period[] = [
+  "7-jours",
+  "visite",
+  "30-jours",
+  "3-mois",
+  "libre",
 ];
+
+/**
+ * Why a comparison could not be shown. The two reasons the view states itself are kept as such, not as phrases: their message then follows a language switch.
+ */
+type Problem = "bounds" | "failed" | { readonly message: string };
 
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
@@ -84,6 +80,13 @@ const comparison = inject(ComparisonService);
 const github = inject(GithubClient);
 const tokens = inject(TokenService);
 const dialog = inject(DialogService);
+const locale = inject(LocaleService);
+const t = locale.messages(evolutionPageMessages);
+
+const longDate = (v: string | Date | null) =>
+  formatDate(locale.formatLocale(), v, "long", true);
+const shortDate = (v: string | Date | null) =>
+  formatDate(locale.formatLocale(), v, "short", false);
 
 const today = localInstant(new Date());
 
@@ -95,7 +98,10 @@ const period = ref<Period>(visit ? "visite" : "30-jours");
 
 /** The last visit is offered only if it is known. */
 const periods = computed(() =>
-  PERIODS.filter((p) => p.period !== "visite" || visit),
+  PERIODS.filter((p) => p !== "visite" || visit).map((p) => ({
+    period: p,
+    label: t().periods[p],
+  })),
 );
 
 const departure = ref(
@@ -111,7 +117,14 @@ const arrival = ref(today);
 const lowerBound = ref<string | null>(null);
 
 const loading = ref(false);
-const error = ref<string | null>(null);
+const problem = ref<Problem | null>(null);
+const error = computed(() => {
+  const p = problem.value;
+  if (p === null) return null;
+  if (p === "bounds") return t().boundsOrder;
+  if (p === "failed") return t().failed;
+  return p.message;
+});
 const result = ref<Comparison | null>(null);
 
 void start();
@@ -163,7 +176,7 @@ async function loadLowerBound(): Promise<void> {
   if (departure.value < min) departure.value = min;
 }
 
-const label = (e: Evolution) => LABEL[e];
+const label = (e: Evolution) => t().evolutions[e];
 
 /**
  * Differences grouped by kind, in order of their reach.
@@ -192,12 +205,12 @@ const validBounds = computed(() => departure.value < arrival.value);
 async function launch(): Promise<void> {
   if (loading.value) return;
   if (!validBounds.value) {
-    error.value = "La date de départ doit précéder celle d’arrivée.";
+    problem.value = "bounds";
     return;
   }
 
   loading.value = true;
-  error.value = null;
+  problem.value = null;
   try {
     result.value = await comparison.compare(
       store.repoRef(),
@@ -206,10 +219,10 @@ async function launch(): Promise<void> {
     );
   } catch (e) {
     result.value = null;
-    error.value =
+    problem.value =
       e instanceof GithubError || e instanceof Error
-        ? e.message
-        : "La comparaison a échoué.";
+        ? { message: e.message }
+        : "failed";
   } finally {
     loading.value = false;
   }
@@ -219,15 +232,12 @@ async function launch(): Promise<void> {
 <template>
   <div class="evolution-page">
     <header class="entete">
-      <h1>Ce qui a changé</h1>
-      <p class="sous-titre">
-        Les règles de gestion ajoutées, modifiées ou abrogées entre deux dates,
-        et les cadrages livrés qui les expliquent.
-      </p>
+      <h1>{{ t().title }}</h1>
+      <p class="sous-titre">{{ t().subtitle }}</p>
     </header>
 
     <!-- RG-periode-par-defaut: the question asked here is almost always the same, and the view answers it on opening. Free dates remain, on request. -->
-    <div class="periodes" role="group" aria-label="Période">
+    <div class="periodes" role="group" :aria-label="t().period">
       <button
         v-for="p of periods"
         :key="p.period"
@@ -240,16 +250,15 @@ async function launch(): Promise<void> {
     </div>
 
     <p v-if="period === 'visite' && visit" class="periode-retenue">
-      Depuis votre dernière visite, le {{ longDate(visit) }}.
+      {{ t().sinceVisit(longDate(visit)) }}
     </p>
     <p v-else-if="period === '30-jours' && !visit" class="periode-retenue">
-      Les 30 derniers jours : aucune visite précédente n’est connue sur ce
-      poste.
+      {{ t().last30Days }}
     </p>
 
     <form v-if="period === 'libre'" class="bornes" @submit.prevent="launch()">
       <label>
-        <span>Du</span>
+        <span>{{ t().from }}</span>
         <input
           v-model="departure"
           type="datetime-local"
@@ -259,7 +268,7 @@ async function launch(): Promise<void> {
         />
       </label>
       <label>
-        <span>au</span>
+        <span>{{ t().to }}</span>
         <input
           v-model="arrival"
           type="datetime-local"
@@ -269,12 +278,12 @@ async function launch(): Promise<void> {
         />
       </label>
       <UiButton variant="filled" type="submit" :disabled="loading">
-        {{ loading ? "Chargement…" : "Comparer" }}
+        {{ loading ? t().loading : t().compare }}
       </UiButton>
     </form>
 
     <p v-if="loading && period !== 'libre'" class="periode-retenue">
-      Comparaison en cours…
+      {{ t().comparing }}
     </p>
 
     <p v-if="error" class="erreur">
@@ -288,7 +297,7 @@ async function launch(): Promise<void> {
           class="lien"
           @click="openTokenDialog()"
         >
-          Se connecter
+          {{ t().signIn }}
         </button>
       </span>
     </p>
@@ -296,22 +305,24 @@ async function launch(): Promise<void> {
     <template v-if="result">
       <section class="bornes-resolues">
         <p>
-          Comparaison entre l’état du
-          <strong>{{ longDate(result.departure.commit.date) }}</strong> et celui
-          du <strong>{{ longDate(result.arrival.commit.date) }}</strong
-          >.
+          {{ t().comparisonBefore
+          }}<strong>{{ longDate(result.departure.commit.date) }}</strong
+          >{{ t().comparisonMiddle
+          }}<strong>{{ longDate(result.arrival.commit.date) }}</strong
+          >{{ t().comparisonAfter }}
         </p>
         <p class="detail">
           <!-- The date displayed is that of the last commit before the requested bound, not the bound itself: it is the state that actually existed. -->
-          Derniers enregistrements avant les bornes demandées :
-          <code>{{ result.departure.commit.sha.slice(0, 7) }}</code> et
-          <code>{{ result.arrival.commit.sha.slice(0, 7) }}</code
-          >.
+          {{ t().lastRecordsBefore
+          }}<code>{{ result.departure.commit.sha.slice(0, 7) }}</code
+          >{{ t().lastRecordsMiddle
+          }}<code>{{ result.arrival.commit.sha.slice(0, 7) }}</code
+          >{{ t().lastRecordsAfter }}
         </p>
       </section>
 
       <section v-if="result.deliveredScopings.length" class="bloc">
-        <h2 class="section">Cadrages livrés dans l’intervalle</h2>
+        <h2 class="section">{{ t().deliveredScopings }}</h2>
         <div class="cadrages">
           <RouterLink
             v-for="id of result.deliveredScopings"
@@ -326,7 +337,7 @@ async function launch(): Promise<void> {
       </section>
 
       <section class="bloc">
-        <h2 class="section">Règles ({{ result.rules.length }})</h2>
+        <h2 class="section">{{ t().rules(result.rules.length) }}</h2>
 
         <template v-if="result.rules.length">
           <template v-for="groupe of groups" :key="groupe.evolution">
@@ -349,24 +360,24 @@ async function launch(): Promise<void> {
                 <details
                   v-if="e.evolution === 'modifiee' && e.before && e.after"
                 >
-                  <summary>Comparer les deux énoncés</summary>
+                  <summary>{{ t().compareStatements }}</summary>
                   <div class="cote-a-cote">
                     <div class="version">
                       <p class="quand">
-                        Au {{ shortDate(result.departure.commit.date) }}
+                        {{ t().asOf(shortDate(result.departure.commit.date)) }}
                       </p>
                       <RenderedMarkdown class="md" :text="e.before.statement" />
                     </div>
                     <div class="version">
                       <p class="quand">
-                        Au {{ shortDate(result.arrival.commit.date) }}
+                        {{ t().asOf(shortDate(result.arrival.commit.date)) }}
                       </p>
                       <RenderedMarkdown class="md" :text="e.after.statement" />
                     </div>
                   </div>
                 </details>
                 <details v-else-if="e.after">
-                  <summary>Voir l’énoncé</summary>
+                  <summary>{{ t().seeStatement }}</summary>
                   <RenderedMarkdown class="md" :text="e.after.statement" />
                 </details>
               </li>
@@ -374,8 +385,7 @@ async function launch(): Promise<void> {
           </template>
         </template>
         <p v-else class="vide">
-          Aucune règle n’a changé entre ces deux dates. Le référentiel décrivait
-          déjà le produit tel qu’il est aujourd’hui.
+          {{ t().noChange }}
         </p>
       </section>
     </template>

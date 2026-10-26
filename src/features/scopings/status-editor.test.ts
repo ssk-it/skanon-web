@@ -1,7 +1,8 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject, provide } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
@@ -143,5 +144,32 @@ describe("The status in the editor", () => {
     el = await stable(f);
 
     expect(displayedStatus(el)).toBe("En relecture");
+  });
+
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("names the status, its toggles and the form in English", async () => {
+      const el = await stable(await mountView([scoping("en_relecture")]));
+      const text = el.textContent ?? "";
+
+      expect(displayedStatus(el)).toBe("In review");
+      expect(toggles(el)).toEqual(["Draft"]);
+      expect(el.querySelector(".cycle-libelle")?.textContent).toBe("Status");
+      expect(el.querySelector(".type")?.textContent).toBe("Resume a scoping");
+      expect(
+        [...el.querySelectorAll("h2.section")].map((h) => h.textContent),
+      ).toEqual(["Impacts on rules", "Decisions"]);
+      // the journey is empty in the fixture: the editor names it
+      expect(
+        [...el.querySelectorAll(".problemes li")].map((l) => l.textContent),
+      ).toContain("A journey is missing.");
+      expect(text).toContain(
+        "The scoping must be consistent before changing status.",
+      );
+      expect(text).toContain("Save");
+      for (const french of ["Statut", "Décisions", "Enregistrer", "Il manque"])
+        expect(text).not.toContain(french);
+    });
   });
 });

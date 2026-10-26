@@ -1,0 +1,91 @@
+import { defineMessages } from "../../core/i18n/language";
+import type { Evolution } from "../../core/repo/comparison.service";
+import type { Period } from "./periods";
+
+export const evolutionPageMessages = defineMessages({
+  fr: {
+    title: "Ce qui a changé",
+    subtitle:
+      "Les règles de gestion ajoutées, modifiées ou abrogées entre deux dates, et les cadrages livrés qui les expliquent.",
+    period: "Période",
+    periods: {
+      "7-jours": "7 jours",
+      visite: "Depuis ma dernière visite",
+      "30-jours": "30 jours",
+      "3-mois": "3 mois",
+      libre: "Choisir les dates…",
+    } as Record<Period, string>,
+    sinceVisit: (date: string) => `Depuis votre dernière visite, le ${date}.`,
+    last30Days:
+      "Les 30 derniers jours : aucune visite précédente n’est connue sur ce poste.",
+    from: "Du",
+    to: "au",
+    loading: "Chargement…",
+    compare: "Comparer",
+    comparing: "Comparaison en cours…",
+    signIn: "Se connecter",
+    boundsOrder: "La date de départ doit précéder celle d’arrivée.",
+    failed: "La comparaison a échoué.",
+    comparisonBefore: "Comparaison entre l’état du ",
+    comparisonMiddle: " et celui du ",
+    comparisonAfter: ".",
+    lastRecordsBefore: "Derniers enregistrements avant les bornes demandées : ",
+    lastRecordsMiddle: " et ",
+    lastRecordsAfter: ".",
+    deliveredScopings: "Cadrages livrés dans l’intervalle",
+    rules: (n: number) => `Règles (${n})`,
+    evolutions: {
+      ajoutee: "ajoutée",
+      modifiee: "modifiée",
+      abrogee: "abrogée",
+      retiree: "retirée",
+    } as Record<Evolution, string>,
+    compareStatements: "Comparer les deux énoncés",
+    asOf: (date: string) => `Au ${date}`,
+    seeStatement: "Voir l’énoncé",
+    noChange:
+      "Aucune règle n’a changé entre ces deux dates. Le référentiel décrivait déjà le produit tel qu’il est aujourd’hui.",
+  },
+  en: {
+    title: "What has changed",
+    subtitle:
+      "The business rules added, modified or repealed between two dates, and the delivered scopings that explain them.",
+    period: "Period",
+    periods: {
+      "7-jours": "7 days",
+      visite: "Since my last visit",
+      "30-jours": "30 days",
+      "3-mois": "3 months",
+      libre: "Choose dates…",
+    },
+    sinceVisit: (date: string) => `Since your last visit, on ${date}.`,
+    last30Days: "The last 30 days: no previous visit is known on this device.",
+    from: "From",
+    to: "to",
+    loading: "Loading…",
+    compare: "Compare",
+    comparing: "Comparing…",
+    signIn: "Sign in",
+    boundsOrder: "The start date must precede the end date.",
+    failed: "The comparison failed.",
+    comparisonBefore: "Comparison between the state of ",
+    comparisonMiddle: " and that of ",
+    comparisonAfter: ".",
+    lastRecordsBefore: "Last commits before the requested bounds: ",
+    lastRecordsMiddle: " and ",
+    lastRecordsAfter: ".",
+    deliveredScopings: "Scopings delivered in the interval",
+    rules: (n: number) => `Rules (${n})`,
+    evolutions: {
+      ajoutee: "added",
+      modifiee: "modified",
+      abrogee: "repealed",
+      retiree: "removed",
+    },
+    compareStatements: "Compare the two statements",
+    asOf: (date: string) => `As of ${date}`,
+    seeStatement: "See the statement",
+    noChange:
+      "No rule changed between these two dates. The specification already described the product as it is today.",
+  },
+});

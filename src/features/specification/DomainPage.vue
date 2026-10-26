@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
@@ -10,10 +11,12 @@ import ViewState from "../shared/ViewState.vue";
 import RoadmapItemsSection from "./RoadmapItemsSection.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import StatusChip from "../shared/StatusChip.vue";
+import { domainPageMessages } from "./domain-page.messages";
 
 const route = useRoute();
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
+const t = useMessages(domainPageMessages);
 
 const id = computed(() => String(route.params["id"]));
 const domain = computed(() => store.findDomain(id.value));
@@ -34,16 +37,16 @@ function formatOtherDomains(ids: readonly string[]): string {
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="domain">
       <RouterLink class="retour" :to="links.path('referentiel')">
-        <UiIcon name="arrow_back" /> Référentiel
+        <UiIcon name="arrow_back" /> {{ t().back }}
       </RouterLink>
 
       <header class="entete" :style="domainStyle(domain.id, domainIds)">
-        <p class="type">Domaine</p>
+        <p class="type">{{ t().kind }}</p>
         <h1>{{ domain.name }}</h1>
         <RenderedMarkdown class="md" :text="domain.description" />
       </header>
 
-      <h2 class="section">Fonctionnalités</h2>
+      <h2 class="section">{{ t().features }}</h2>
       <div class="liste">
         <RouterLink
           v-for="f in features"
@@ -56,22 +59,22 @@ function formatOtherDomains(ids: readonly string[]): string {
             <span
               v-if="f.domains.length > 1"
               class="partage"
-              title="Rattachée à plusieurs domaines"
+              :title="t().featureShared"
             >
-              aussi dans
+              {{ t().alsoIn }}
               {{ formatOtherDomains(f.domains) }}
             </span>
           </div>
           <span class="compte">
-            {{ store.listRulesByFeature(f.id).length }} règles
+            {{ t().ruleCount(store.listRulesByFeature(f.id).length) }}
           </span>
         </RouterLink>
         <p v-if="!features.length" class="vide">
-          Aucune fonctionnalité rattachée à ce domaine.
+          {{ t().noFeature }}
         </p>
       </div>
 
-      <h2 class="section">Cadrages</h2>
+      <h2 class="section">{{ t().scopings }}</h2>
       <div class="liste">
         <RouterLink
           v-for="c in scopings"
@@ -85,22 +88,22 @@ function formatOtherDomains(ids: readonly string[]): string {
             <span
               v-if="c.domains.length > 1"
               class="partage"
-              title="Rattaché à plusieurs domaines"
+              :title="t().scopingShared"
             >
-              aussi dans
+              {{ t().alsoIn }}
               {{ formatOtherDomains(c.domains) }}
             </span>
           </div>
           <StatusChip :status="c.status" />
         </RouterLink>
         <p v-if="!scopings.length" class="vide">
-          Aucun cadrage rattaché à ce domaine.
+          {{ t().noScoping }}
         </p>
       </div>
 
       <RoadmapItemsSection :id="id" :key="id" collection="domains" />
     </template>
-    <p v-else class="vide">Domaine introuvable : {{ id }}</p>
+    <p v-else class="vide">{{ t().notFound(id) }}</p>
   </div>
 </template>
 

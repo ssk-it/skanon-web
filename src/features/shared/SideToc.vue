@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useMessages } from "../../core/i18n/locale.service";
+import { sideTocMessages } from "./side-toc.messages";
 
 export interface TocEntry {
   /** Anchor, without the hash. */
@@ -22,10 +24,9 @@ export interface TocEntry {
  *
  * The root element is `div.sommaire`, SSK Canon's `pc-sommaire` host. The component was called `Sommaire`: a single-word name, which the `vue/multi-word-component-names` rule rejects.
  */
-const props = withDefaults(
-  defineProps<{ entries: readonly TocEntry[]; title?: string }>(),
-  { title: "Sommaire" },
-);
+const props = defineProps<{ entries: readonly TocEntry[]; title?: string }>();
+
+const t = useMessages(sideTocMessages);
 
 const active = ref("");
 let observer: IntersectionObserver | null = null;
@@ -92,8 +93,8 @@ function scrollToEntry(event: Event, id: string): void {
 
 <template>
   <div class="sommaire">
-    <nav class="navigation" aria-label="Sommaire">
-      <p class="titre">{{ title }}</p>
+    <nav class="navigation" :aria-label="t().toc">
+      <p class="titre">{{ title ?? t().toc }}</p>
       <ol>
         <li v-for="e in entries" :key="e.id" :class="{ enfant: e.level === 1 }">
           <a

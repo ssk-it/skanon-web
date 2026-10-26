@@ -20,6 +20,7 @@ export function buildExcerpt(statement: string): string {
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
@@ -27,10 +28,12 @@ import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
 import RoadmapItemsSection from "./RoadmapItemsSection.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
+import { featurePageMessages } from "./feature-page.messages";
 
 const route = useRoute();
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
+const t = useMessages(featurePageMessages);
 
 const id = computed(() => String(route.params["id"]));
 const feature = computed(() => store.findFeature(id.value));
@@ -42,11 +45,11 @@ const rules = computed(() => store.listRulesByFeature(id.value));
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="feature">
       <RouterLink class="retour" :to="links.path('referentiel')">
-        <UiIcon name="arrow_back" /> Référentiel
+        <UiIcon name="arrow_back" /> {{ t().back }}
       </RouterLink>
 
       <header class="entete">
-        <p class="type">Fonctionnalité</p>
+        <p class="type">{{ t().kind }}</p>
         <h1>{{ feature.name }}</h1>
         <div class="domaines">
           <RouterLink
@@ -61,7 +64,7 @@ const rules = computed(() => store.listRulesByFeature(id.value));
         <RenderedMarkdown class="md" :text="feature.description" />
       </header>
 
-      <h2 class="section">Règles de gestion</h2>
+      <h2 class="section">{{ t().rules }}</h2>
       <div class="liste">
         <RouterLink
           v-for="r in rules"
@@ -74,18 +77,18 @@ const rules = computed(() => store.listRulesByFeature(id.value));
             <span class="rid">{{ r.id }}</span>
             <span class="extrait">{{ buildExcerpt(r.statement) }}</span>
           </div>
-          <span v-if="r.status === 'abroge'" class="marque-abrogee"
-            >abrogée</span
-          >
+          <span v-if="r.status === 'abroge'" class="marque-abrogee">{{
+            t().repealed
+          }}</span>
         </RouterLink>
         <p v-if="!rules.length" class="vide">
-          Aucune règle rattachée à cette fonctionnalité.
+          {{ t().noRule }}
         </p>
       </div>
 
       <RoadmapItemsSection :id="id" :key="id" collection="features" />
     </template>
-    <p v-else class="vide">Fonctionnalité introuvable : {{ id }}</p>
+    <p v-else class="vide">{{ t().notFound(id) }}</p>
   </div>
 </template>
 
