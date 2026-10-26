@@ -51,6 +51,9 @@ jobs:
   navigateur:
     name: Browser (headless WebKit)
     runs-on: ubuntu-latest
+    # Playwright's image already carries WebKit and its system libraries. `playwright install --with-deps` fetched 117 MB of packages from the runner's apt mirror: 9 s on a good day, 21 to 52 minutes on 26 October 2026. Keep the tag on the `playwright` version of `package.json`.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
     steps:
       - uses: actions/checkout@v7
 
@@ -64,8 +67,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install WebKit and its dependencies
-        run: pnpm exec playwright install --with-deps webkit
+      # A no-op while the image matches `package.json`; after a Playwright bump ahead of the image, it downloads the new WebKit (a few seconds, from Playwright's CDN, not apt).
+      - name: Install WebKit
+        run: pnpm exec playwright install webkit
 
       - name: Browser tests
         run: pnpm test:browser
