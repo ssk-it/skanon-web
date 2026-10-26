@@ -52,10 +52,13 @@ export default defineConfig({
       provider: "v8",
       reporter: ["lcov", "text-summary"],
       include: ["src/**", "tools/cla/**", "tools/pwa/pwa.ts"],
+      // The test tooling is not product code: counting it would lower the figure without saying anything of what ships.
       exclude: [
         "src/**/*.test.ts",
         "tools/**/*.test.mjs",
         "tools/**/*.test.ts",
+        "src/test-setup.ts",
+        "src/core/http/http-testing.ts",
       ],
     },
     projects: [
