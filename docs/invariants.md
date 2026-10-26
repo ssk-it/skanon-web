@@ -8,7 +8,7 @@ The constraints Skanon does not break. They follow from verified constraints —
 
 ## INV-1 — A file path is never renamed
 
-No GitHub API follows renames: a file moved in a project repo loses all its history as seen from the application. Rules live flat in `rules/`, features flat in `features/`, and scoping folders carry the identifier alone. Without this rule the defect is silent: the rule is displayed, but its timeline starts at the rename.
+No GitHub API follows renames: a file moved in a project repo loses all its history as seen from the application. Rules live flat in `rules/`, features flat in `features/`, and scoping folders carry the identifier alone. A repo may name these folders in `ssk-canon.yml` (RG-noms-declares): the name is chosen at creation and never changes either, and the application builds every path from the names `src/core/repo/repo-names.ts` resolves, never from a literal. Without this rule the defect is silent: the rule is displayed, but its timeline starts at the rename.
 
 ## INV-2 — History is not stored, it is derived
 

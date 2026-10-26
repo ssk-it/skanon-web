@@ -25,6 +25,7 @@ import {
 import { VerificationService } from "./verification.service";
 import { LocaleService } from "../i18n/locale.service";
 import { repoText } from "./repo.messages";
+import { decisionFile, decisionsFolder, scopingFile } from "./repo-names";
 
 /**
  * The kinds an impact can target, in the order they are looked for.
@@ -411,7 +412,7 @@ export class AuthoringService {
     await this.github.commitFile(
       repoRef,
       branch,
-      `cadrages/${id}/cadrage.md`,
+      scopingFile(this.store.names(), id),
       serializeNewScoping(id, next),
       `Cadrage ${id} : ${next.title}`,
     );
@@ -464,7 +465,9 @@ export class AuthoringService {
       await this.github.listScopingBranches(repoRef)
     ).filter((b) => !byPullRequest.includes(b));
     for (const branch of [...byPullRequest, ...withoutPullRequest]) {
-      if (await this.carries(repoRef, `cadrages/${id}/cadrage.md`, branch))
+      if (
+        await this.carries(repoRef, scopingFile(this.store.names(), id), branch)
+      )
         return branch;
     }
     return null;
@@ -504,7 +507,7 @@ export class AuthoringService {
     mainBranch: string;
   }> {
     const repoRef = this.store.repoRef();
-    const path = `cadrages/${id}/cadrage.md`;
+    const path = scopingFile(this.store.names(), id);
     const main = (await this.github.loadRepo(repoRef)).defaultBranch;
 
     if (await this.carries(repoRef, path, main)) {
@@ -627,7 +630,7 @@ export class AuthoringService {
     branch: string,
   ): Promise<Array<{ file: string; sha: string; decision: EditableDecision }>> {
     const repoRef = this.store.repoRef();
-    const prefix = `cadrages/${id}/decisions/`;
+    const prefix = decisionsFolder(this.store.names(), id);
     const tree = await this.github.loadTree({ ...repoRef, ref: branch });
 
     const files = tree.entries.filter(
@@ -680,6 +683,11 @@ export class AuthoringService {
       .sort((a, b) => a.file.localeCompare(b.file));
   }
 
+  /** The file of a scoping's decision, under the names the repo declares. */
+  decisionPath(scopingId: string, idDecision: string): string {
+    return decisionFile(this.store.names(), scopingId, idDecision);
+  }
+
   /** Writes a decision on the scoping's branch. */
   async saveDecision(
     scopingId: string,
@@ -688,7 +696,7 @@ export class AuthoringService {
     decision: EditableDecision,
     currentSha?: string,
   ): Promise<string> {
-    const path = `cadrages/${scopingId}/decisions/${idDecision}.md`;
+    const path = this.decisionPath(scopingId, idDecision);
     const { file } = await this.github.commitFile(
       this.store.repoRef(),
       branch,

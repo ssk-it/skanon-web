@@ -44,16 +44,27 @@ import {
   RuleStatus,
   DEFAULT_LINK_TAGS,
 } from "../model/model";
+import {
+  DEFAULT_NAMES,
+  RepoNames,
+  checkDeclaredFolders,
+  resolveNames,
+} from "./repo-names";
 
-/** Directories carrying entities. The rest (README…) is ignored. */
+/**
+ * The key of `dossiers` naming each directory that carries entities, under
+ * the collection the specification files it in. The rest (README…) is ignored.
+ */
 const DIRECTORIES = [
-  "domains",
-  "features",
-  "rules",
-  "cadrages",
-  "decisions",
-  "architecture",
+  ["domaines", "domains"],
+  ["fonctionnalites", "features"],
+  ["regles", "rules"],
+  ["cadrages", "cadrages"],
+  ["decisions", "decisions"],
+  ["architecture", "architecture"],
 ] as const;
+
+type Collection = (typeof DIRECTORIES)[number][1];
 
 /**
  * The kinds an impact can target, in the order they are looked for.
@@ -161,6 +172,7 @@ export class RepoLoader {
             specification: this.buildSpecification(
               files,
               this.treeAnomalies(known.truncated),
+              known.entries.map((x) => x.path),
             ),
             fingerprints: new Set(known.entries.map((x) => x.sha)),
             unconfirmed: { readAt: known.readAt, cause: e.message },
@@ -171,14 +183,7 @@ export class RepoLoader {
     }
 
     const anomalies = this.treeAnomalies(tree.truncated);
-    const relevant = tree.entries.filter(
-      (e) =>
-        e.type === "blob" &&
-        e.path.endsWith(".md") &&
-        this.isInKnownDirectory(e.path),
-    );
     const config = tree.entries.find((e) => e.path === CONFIG_NAME);
-    const toLoad: TreeEntry[] = config ? [config, ...relevant] : [...relevant];
 
     // Missing contents are read at the commit the tree has just resolved, not
     // by the branch name. `raw` serves with `max-age: 300`: a branch's URL
@@ -192,23 +197,39 @@ export class RepoLoader {
     let isPrivate = known?.private ?? false;
 
     let done = 0;
-    const files = await Promise.all(
-      toLoad.map(async (e) => {
-        let content = await this.cache.loadContent(repoRef, e.sha);
-        if (content === null) {
-          content = await this.github.loadContent(pinned, e.path, e.sha);
-          // Read through the API: the public channel does not serve this repo, it is
-          // private.
-          isPrivate ||= this.github.contentsViaApi();
-          await this.cache.saveContent(repoRef, e.sha, content, {
-            private: isPrivate,
-            persist: this.isPersistable(isPrivate),
-          });
-        }
-        options.progression?.(++done, toLoad.length);
-        return { path: e.path, content: content };
-      }),
+    let total = 1;
+    const loadEntry = async (e: TreeEntry): Promise<LoadedFile> => {
+      let content = await this.cache.loadContent(repoRef, e.sha);
+      if (content === null) {
+        content = await this.github.loadContent(pinned, e.path, e.sha);
+        // Read through the API: the public channel does not serve this repo, it is
+        // private.
+        isPrivate ||= this.github.contentsViaApi();
+        await this.cache.saveContent(repoRef, e.sha, content, {
+          private: isPrivate,
+          persist: this.isPersistable(isPrivate),
+        });
+      }
+      options.progression?.(++done, total);
+      return { path: e.path, content: content };
+    };
+
+    // The configuration first: it names the directories that carry entities
+    // (RG-noms-declares), and nothing else can be chosen before it is read.
+    const configFile = config ? await loadEntry(config) : null;
+    const names = this.namesOf(configFile?.content ?? null);
+    const relevant = tree.entries.filter(
+      (e) =>
+        e.type === "blob" &&
+        e.path.endsWith(".md") &&
+        this.collectionOf(e.path, names) !== null,
     );
+    const toLoad: TreeEntry[] = config ? [config, ...relevant] : [...relevant];
+    total = toLoad.length;
+    const files = [
+      ...(configFile ? [configFile] : []),
+      ...(await Promise.all(relevant.map(loadEntry))),
+    ];
 
     if (options.remember) {
       const state: KnownState = {
@@ -225,7 +246,11 @@ export class RepoLoader {
     }
 
     return {
-      specification: this.buildSpecification(files, anomalies),
+      specification: this.buildSpecification(
+        files,
+        anomalies,
+        tree.entries.filter((e) => e.type === "blob").map((e) => e.path),
+      ),
       fingerprints: new Set(toLoad.map((e) => e.sha)),
       unconfirmed: null,
     };
@@ -259,16 +284,34 @@ export class RepoLoader {
     return truncated ? [repoText().treeTruncated] : [];
   }
 
-  private isInKnownDirectory(path: string): boolean {
-    const first = path.split("/")[0];
+  /**
+   * The names the configuration declares. Its faults are reported by
+   * `parseConfig`, once: here, a faulty or unreadable declaration simply
+   * keeps the format's names.
+   */
+  private namesOf(content: string | null): RepoNames {
+    if (content === null) return DEFAULT_NAMES;
+    try {
+      return resolveNames(load(content)).names;
+    } catch {
+      return DEFAULT_NAMES;
+    }
+  }
+
+  /** The collection a path belongs to, under the declared names, or `null`. */
+  private collectionOf(path: string, names: RepoNames): Collection | null {
+    const segments = path.split("/");
+    if (segments.length < 2) return null;
     return (
-      (DIRECTORIES as readonly string[]).includes(first) && path.includes("/")
+      DIRECTORIES.find(([key]) => names.dossiers[key] === segments[0])?.[1] ??
+      null
     );
   }
 
   private buildSpecification(
     files: readonly LoadedFile[],
     anomalies: string[],
+    paths: readonly string[],
   ): Specification {
     const domains = new Map<string, Domain>();
     const features = new Map<string, Feature>();
@@ -295,14 +338,20 @@ export class RepoLoader {
       linkTags: DEFAULT_LINK_TAGS,
     };
 
+    const configFile = files.find((f) => f.path === CONFIG_NAME);
+    const names = this.namesOf(configFile?.content ?? null);
+    if (configFile) {
+      const config = this.parseConfig(configFile.content, project);
+      project = config.project;
+      settings = config.settings;
+      anomalies.push(...config.anomalies);
+    }
+    // A directory declared but absent while the format's one is still there:
+    // the repo's entities sit under a name nothing reads any more.
+    anomalies.push(...checkDeclaredFolders(names, paths));
+
     for (const f of files) {
-      if (f.path === CONFIG_NAME) {
-        const config = this.parseConfig(f.content, project);
-        project = config.project;
-        settings = config.settings;
-        anomalies.push(...config.anomalies);
-        continue;
-      }
+      if (f.path === CONFIG_NAME) continue;
 
       // A README in a content directory is not an entity: it explains what the
       // directory expects, to whoever opens the repo on the platform. Reporting
@@ -325,7 +374,7 @@ export class RepoLoader {
       const { data, body } = parse;
       const segments = f.path.split("/");
 
-      switch (segments[0]) {
+      switch (this.collectionOf(f.path, names)) {
         case "domains":
           domains.set(str(data["id"]), {
             id: str(data["id"]),
@@ -381,7 +430,7 @@ export class RepoLoader {
 
         case "cadrages": {
           const scopingId = segments[1];
-          if (segments[2] === "cadrage.md") {
+          if (segments.length === 3 && segments[2] === names.fichiers.cadrage) {
             // The Action's verifier refuses a declared status. Reporting it here
             // shows from the application what would otherwise only be discovered in
             // continuous integration, once the pull request is open.
@@ -389,11 +438,14 @@ export class RepoLoader {
               anomalies.push(repoText().statusDeclared(f.path));
             }
             rawScopings.set(scopingId, { data, body: body });
-          } else if (segments[2] === "decisions") {
+          } else if (segments[2] === names.dossiers.decisions_cadrage) {
             const decisions = decisionsByScoping.get(scopingId) ?? [];
             decisions.push(this.parseDecision(data, body));
             decisionsByScoping.set(scopingId, decisions);
-          } else if (segments[2] === "attachments.md") {
+          } else if (
+            segments.length === 3 &&
+            segments[2] === names.fichiers.pieces_jointes
+          ) {
             attachmentsByScoping.set(scopingId, this.parseAttachments(data));
           }
           break;
@@ -434,6 +486,7 @@ export class RepoLoader {
       decisions,
       architecture,
       scopings,
+      names,
       anomalies,
     };
   }
@@ -494,6 +547,10 @@ export class RepoLoader {
 
     const readProtection = parseTokenProtection(data?.["protection_du_jeton"]);
     if (readProtection.anomaly) anomalies.push(readProtection.anomaly);
+
+    // The names of folders and files: a faulty entry keeps the format's name,
+    // and is reported once, here (RG-noms-declares).
+    anomalies.push(...resolveNames(data).anomalies);
 
     const readIdentity = parseIdentity(data?.["identite"]);
     anomalies.push(...readIdentity.anomalies);

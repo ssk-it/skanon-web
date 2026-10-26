@@ -22,7 +22,8 @@ import { TokenService } from "../github/token.service";
 describe("reading a project's identity", () => {
   const REPO = { owner: "org", repo: "projet" };
   const API = "https://api.github.com/repos/org/projet";
-  const RAW = "https://raw.githubusercontent.com/org/projet/HEAD/identite";
+  const RAW_ROOT = "https://raw.githubusercontent.com/org/projet/HEAD";
+  const RAW = `${RAW_ROOT}/identite`;
   const TOKEN = "ghp_jetonDeTestSuffisammentLong";
   const ROOT_ETAG = '"racine-1"';
   const IDENTITY_SHA = "arbre-identite-1";
@@ -35,6 +36,9 @@ describe("reading a project's identity", () => {
 
   /** The played repo's `identite/` directory, name → content. */
   let files: Record<string, string>;
+  /** The played repo's configuration, and the name of its identity directory. */
+  let config: string;
+  let directory: string;
   let factory: IDBFactory | null;
   let http: HttpTestingController;
   let identities: ProjectIdentityService;
@@ -67,6 +71,8 @@ describe("reading a project's identity", () => {
       "symbole-clair.svg": SVG_LIGHT,
       "symbole-sombre.svg": SVG_DARK,
     };
+    config = "schema_version: 1\n";
+    directory = "identite";
     factory = new IDBFactory();
     newVisit();
   });
@@ -107,10 +113,13 @@ describe("reading a project's identity", () => {
           sha: "y",
         },
       ];
+      if (directory !== "identite") {
+        root.push({ name: "rules", path: "rules", type: "dir", sha: "r" });
+      }
       if (Object.keys(files).length) {
         root.push({
-          name: "identite",
-          path: "identite",
+          name: directory,
+          path: directory,
           type: "dir",
           sha: IDENTITY_SHA,
         });
@@ -130,12 +139,23 @@ describe("reading a project's identity", () => {
       });
       return;
     }
+    if (url === `${API}/git/blobs/y`) {
+      r.flush(bytes(config));
+      return;
+    }
+    if (url === `${RAW_ROOT}/ssk-canon.yml`) {
+      r.flush(bytes(config));
+      return;
+    }
     const blob = url.match(/\/git\/blobs\/blob-(.+)$/);
     if (blob && files[blob[1]] !== undefined) {
       r.flush(bytes(files[blob[1]]));
       return;
     }
-    const raw = url.startsWith(`${RAW}/`) ? url.slice(RAW.length + 1) : null;
+    const rawBase = `${RAW_ROOT}/${directory}`;
+    const raw = url.startsWith(`${rawBase}/`)
+      ? url.slice(rawBase.length + 1)
+      : null;
     if (raw !== null && files[raw] !== undefined) {
       r.flush(bytes(files[raw]));
       return;
@@ -214,6 +234,28 @@ describe("reading a project's identity", () => {
 
       expect(identities.findSymbol(REPO, "sombre")).toBeNull();
       expect(urls().some((u) => u.includes("/git/blobs/"))).toBe(false);
+    });
+
+    it("finds the identity under the name the repo declares, reading the configuration once", async () => {
+      // RG-noms-declares: the directory may carry another name.
+      config = "dossiers:\n  identite: marque\n";
+      directory = "marque";
+      await replay(identities.request(REPO, "sombre"));
+
+      expect(identities.findSymbol(REPO, "sombre")).toBe(asDataUrl(SVG_DARK));
+      expect(urls()).toEqual([
+        `${API}/contents/`,
+        `${API}/git/blobs/y`,
+        `${API}/git/trees/${IDENTITY_SHA}`,
+        `${API}/git/blobs/blob-symbole-sombre.svg`,
+      ]);
+
+      // the configuration is designated by its fingerprint: read once
+      newVisit();
+      tokens.set(TOKEN);
+      await replay(identities.request(REPO, "clair"));
+      expect(urls()).not.toContain(`${API}/git/blobs/y`);
+      expect(identities.findSymbol(REPO, "clair")).toBe(asDataUrl(SVG_LIGHT));
     });
 
     it("erases the identity with the access that read it", async () => {
@@ -295,6 +337,18 @@ describe("reading a project's identity", () => {
 
       expect(identities.findSymbol(REPO, "sombre")).toBeNull();
       expect(urls().some((u) => u.includes("clair"))).toBe(false);
+    });
+
+    it("finds the identity under the name the repo declares, after the format's one", async () => {
+      config = "dossiers:\n  identite: marque\n";
+      directory = "marque";
+      await replay(identities.request(REPO, "sombre"));
+
+      expect(identities.findSymbol(REPO, "sombre")).toBe(asDataUrl(SVG_DARK));
+      expect(urls().slice(-2)).toEqual([
+        `${RAW_ROOT}/ssk-canon.yml`,
+        `${RAW_ROOT}/marque/symbole-sombre.svg`,
+      ]);
     });
 
     it("does not query the API, whose anonymous quota counts every response", async () => {
