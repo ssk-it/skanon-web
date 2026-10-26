@@ -70,7 +70,8 @@ export function pwa(): Plugin {
       const publics = config.publicDir ? listerFichiers(config.publicDir) : [];
       const fichiers = [...Object.keys(bundle), ...emis.keys(), ...publics]
         .filter((f) => !HORS_PRECHARGEMENT.has(f))
-        .sort();
+        // Code-unit order, not `localeCompare`: the fingerprint below must not depend on the locale of the machine that builds.
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
       // The version's fingerprint: script and stylesheet names carry their content's fingerprint; for the others — `index.html`, the manifest, the public files —, the content goes in here.
       const empreinte = createHash("sha256");
