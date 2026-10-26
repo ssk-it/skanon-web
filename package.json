@@ -17,7 +17,8 @@
     "./signaux": "./src/core/signaux.ts",
     "./services/version": "./src/core/ui/version.service.ts",
     "./causes-version": "./src/features/shared/causes-version.ts",
-    "./ui/*": "./src/ui/*",
+    "./ui/*.vue": "./src/ui/*.vue",
+    "./ui/*": "./src/ui/*.ts",
     "./test/http": "./src/core/http/http-testing.ts",
     "./test/pages": "./src/test-pages.ts"
   },
@@ -54,7 +55,13 @@
     "@ssk-it/canon-check": "github:ssk-it/ssk-canon-action#main",
     "vue": "^3.5.44",
     "vue-router": "^5.4.0",
-    "@vue/reactivity": "3.5.44"
+    "@vue/reactivity": "3.5.44",
+    "@vue/test-utils": "^2.5.1"
+  },
+  "peerDependenciesMeta": {
+    "@vue/test-utils": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@ssk-it/canon-check": "github:ssk-it/ssk-canon-action#main",
