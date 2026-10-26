@@ -7,7 +7,11 @@
  * ```
  *
  * A real `<input type="checkbox">`, made invisible under the Material 3 drawing: the keyboard, the clickable label and screen readers remain the browser's.
+ * The wrapping `<label>` already names the input; `aria-labelledby` says so explicitly, since a slot is not text to a static checker.
  */
+import { useId } from "vue";
+
+const id = useId();
 const checked = defineModel<boolean>({ default: false });
 
 defineProps<{ disabled?: boolean }>();
@@ -21,6 +25,7 @@ defineProps<{ disabled?: boolean }>();
         class="ui-case__natif"
         type="checkbox"
         :disabled="disabled"
+        :aria-labelledby="`${id}-libelle`"
       />
       <span class="ui-case__boite" aria-hidden="true">
         <svg class="ui-case__coche" viewBox="0 0 24 24" focusable="false">
@@ -28,7 +33,7 @@ defineProps<{ disabled?: boolean }>();
         </svg>
       </span>
     </span>
-    <span class="ui-case__libelle"><slot /></span>
+    <span :id="`${id}-libelle`" class="ui-case__libelle"><slot /></span>
   </label>
 </template>
 
