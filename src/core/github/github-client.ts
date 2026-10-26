@@ -823,6 +823,70 @@ export class GithubClient {
   }
 
   /**
+   * Whether the repo has no commit yet — the only kind a specification is
+   * bootstrapped in without review (RG-amorcage-depot). Under this repo's
+   * token, for a repo that is not open yet.
+   */
+  async isEmptyRepo(repoRef: RepoRef): Promise<boolean> {
+    try {
+      await this.call(
+        `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/commits?per_page=1`,
+        undefined,
+        repoRef,
+      );
+      return false;
+    } catch (e) {
+      if (e instanceof GithubError && e.status === 409) return true;
+      throw e;
+    }
+  }
+
+  /**
+   * Writes the first commit of an empty repo, carrying every file at once,
+   * and returns its SHA (RG-amorcage-depot).
+   *
+   * The platform refuses trees and commits on a repo without any commit
+   * ("Git Repository is empty"): a first file opens the branch, then a root
+   * commit with the whole structure replaces it. The forced update only
+   * discards that opening commit — the repo was empty, nothing else can be on
+   * the branch yet.
+   */
+  async commitInitialTree(
+    repoRef: RepoRef,
+    branch: string,
+    files: readonly { path: string; content: string }[],
+    message: string,
+  ): Promise<string> {
+    const repoUrl = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}`;
+    const [first] = files;
+    await this.commitFile(repoRef, branch, first.path, first.content, message);
+
+    const tree = await this.send<{ sha: string }>(
+      `${repoUrl}/git/trees`,
+      "POST",
+      {
+        tree: files.map((f) => ({
+          path: f.path,
+          mode: "100644",
+          type: "blob",
+          content: f.content,
+        })),
+      },
+    );
+    const commit = await this.send<{ sha: string }>(
+      `${repoUrl}/git/commits`,
+      "POST",
+      { message, tree: tree.sha, parents: [], ...this.commitAuthor() },
+    );
+    await this.send(
+      `${repoUrl}/git/refs/heads/${encodeURIComponent(branch)}`,
+      "PATCH",
+      { sha: commit.sha, force: true },
+    );
+    return commit.sha;
+  }
+
+  /**
    * Deletes a file on a branch.
    *
    * `currentSha` is mandatory, as for writing: without it the platform
@@ -1117,18 +1181,29 @@ export class GithubClient {
     return { content: new TextDecoder().decode(bytes), sha: raw.sha };
   }
 
-  /** The repo's metadata — used to check that it exists and to read its branch. */
-  async loadRepo(
-    repoRef: RepoRef,
-  ): Promise<{ defaultBranch: string; description: string | null }> {
+  /**
+   * The repo's metadata — used to check that it exists, to read its branch,
+   * and whether the access may write to it.
+   *
+   * Under this repo's token, not the open project's: the repo checked before
+   * creating a specification is not open yet. `canWrite` is `null` when the
+   * platform does not say — it only does for an authenticated call.
+   */
+  async loadRepo(repoRef: RepoRef): Promise<{
+    defaultBranch: string;
+    description: string | null;
+    canWrite: boolean | null;
+  }> {
     const url = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}`;
     const raw = await this.call<{
       default_branch: string;
       description: string | null;
-    }>(url);
+      permissions?: { push?: boolean };
+    }>(url, undefined, repoRef);
     return {
       defaultBranch: raw.default_branch,
       description: raw.description,
+      canWrite: raw.permissions?.push ?? null,
     };
   }
 
