@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# `pnpm test:coverage`'s report.
+coverage
+
 # The screenshots Vitest leaves when a browser test fails.
 .vitest
 dist-web

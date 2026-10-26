@@ -47,6 +47,13 @@ export default defineConfig({
   },
 
   test: {
+    // `pnpm test:coverage`: the jsdom tests' coverage, which CI hands to SonarCloud. The four browser tests stay out of it — they check layout, not lines.
+    coverage: {
+      provider: "v8",
+      reporter: ["lcov", "text-summary"],
+      include: ["src/**"],
+      exclude: ["src/**/*.test.ts"],
+    },
     projects: [
       {
         extends: true,
