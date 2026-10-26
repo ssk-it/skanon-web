@@ -562,7 +562,10 @@ export class SpecificationStore {
       // Only a delivered scoping has stale branches: that of a scoping in
       // progress is simply its branch.
       if (!c || c.provenance) continue;
-      scopings.set(id, { ...c, staleBranches: stale.sort() });
+      scopings.set(id, {
+        ...c,
+        staleBranches: stale.sort((a, b) => a.localeCompare(b)),
+      });
     }
     this.specification.set({ ...current, scopings });
   }

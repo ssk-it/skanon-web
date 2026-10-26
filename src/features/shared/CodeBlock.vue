@@ -75,13 +75,13 @@ function splitJson(line: string): readonly Fragment[] {
 
 function splitBash(line: string): readonly Fragment[] {
   // The command is the first word; options are spotted by their dash.
-  const m = /^(\s*)([\w./-]+)(.*)$/.exec(line);
+  const m = /^(\s*)([\w./-]+)/.exec(line);
   if (!m) return [{ text: line, className: "" }];
 
   const rest: Fragment[] = [];
   const re = /(\s)(--?[\w-]+)/g;
   let last = 0;
-  const remainder = m[3];
+  const remainder = line.slice(m[0].length);
   for (const o of remainder.matchAll(re)) {
     const i = o.index ?? 0;
     if (i > last) rest.push({ text: remainder.slice(last, i), className: "" });
@@ -102,6 +102,7 @@ function splitBash(line: string): readonly Fragment[] {
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { trimTrailing } from "../../core/text";
 
 /**
  * A displayed code block, coloured according to its language.
@@ -111,8 +112,7 @@ import { computed } from "vue";
 const props = defineProps<{ text: string; language: CodeLanguage }>();
 
 const lines = computed(() =>
-  props.text
-    .replace(/\n+$/, "")
+  trimTrailing(props.text, "\n")
     .split("\n")
     .map((l) => split(l, props.language)),
 );
