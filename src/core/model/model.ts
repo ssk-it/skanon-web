@@ -1,3 +1,4 @@
+import { defineMessages } from "../i18n/language";
 /**
  * The model of the specification and of scopings.
  *
@@ -277,11 +278,18 @@ export const ACCESS_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>([
   "relais",
 ]);
 
-export const ACCESS_MODE_LABEL: Record<AccessMode, string> = {
-  jeton_personnel: "Jeton personnel",
-  identite_tierce: "Identité tierce",
-  relais: "Relais",
-};
+export const ACCESS_MODE_LABEL = defineMessages<Record<AccessMode, string>>({
+  fr: {
+    jeton_personnel: "Jeton personnel",
+    identite_tierce: "Identité tierce",
+    relais: "Relais",
+  },
+  en: {
+    jeton_personnel: "Personal token",
+    identite_tierce: "Third-party identity",
+    relais: "Relay",
+  },
+});
 
 /**
  * Where the project has its authors' identity verified.
@@ -398,14 +406,24 @@ export const STATUS_TOGGLES: ReadonlyMap<
   ["livree", []],
 ]);
 
-// --- display labels ---
+// --- display labels, in each language (RG-textes-traduits); the keys are the format's and are never translated ---
 
-export const SCOPING_STATUS_LABEL: Record<ScopingStatus, string> = {
-  brouillon: "Brouillon",
-  en_relecture: "En relecture",
-  validee: "Validée",
-  livree: "Livrée",
-};
+export const SCOPING_STATUS_LABEL = defineMessages<
+  Record<ScopingStatus, string>
+>({
+  fr: {
+    brouillon: "Brouillon",
+    en_relecture: "En relecture",
+    validee: "Validée",
+    livree: "Livrée",
+  },
+  en: {
+    brouillon: "Draft",
+    en_relecture: "In review",
+    validee: "Approved",
+    livree: "Delivered",
+  },
+});
 
 /**
  * The statuses of a decision.
@@ -419,18 +437,29 @@ export const DECISION_STATUSES: readonly DecisionStatus[] = [
   "annulee",
 ];
 
-export const DECISION_STATUS_LABEL: Record<DecisionStatus, string> = {
-  ouverte: "Ouverte",
-  retenue: "Retenue",
-  annulee: "Annulée",
-};
+export const DECISION_STATUS_LABEL = defineMessages<
+  Record<DecisionStatus, string>
+>({
+  fr: { ouverte: "Ouverte", retenue: "Retenue", annulee: "Annulée" },
+  en: { ouverte: "Open", retenue: "Adopted", annulee: "Cancelled" },
+});
 
-export const OPERATION_LABEL: Record<ImpactOperation, string> = {
-  cree: "crée",
-  modifie: "modifie",
-  abroge: "abroge",
-  touche: "touche",
-};
+export const OPERATION_LABEL = defineMessages<Record<ImpactOperation, string>>(
+  {
+    fr: {
+      cree: "crée",
+      modifie: "modifie",
+      abroge: "abroge",
+      touche: "touche",
+    },
+    en: {
+      cree: "creates",
+      modifie: "modifies",
+      abroge: "repeals",
+      touche: "touches",
+    },
+  },
+);
 
 /**
  * The link kinds of a project that declares none.
@@ -446,13 +475,24 @@ export const DEFAULT_LINK_TAGS: readonly string[] = [
   "document",
 ];
 
-export const LINK_TAG_LABEL: Record<string, string> = {
-  carte_trello: "Carte Trello",
-  issue_github: "Issue GitHub",
-  piste: "Piste",
-  maquette: "Maquette",
-  document: "Document",
-};
+export const LINK_TAG_LABEL = defineMessages<Readonly<Record<string, string>>>(
+  {
+    fr: {
+      carte_trello: "Carte Trello",
+      issue_github: "Issue GitHub",
+      piste: "Piste",
+      maquette: "Maquette",
+      document: "Document",
+    },
+    en: {
+      carte_trello: "Trello card",
+      issue_github: "GitHub issue",
+      piste: "Roadmap item",
+      maquette: "Mock-up",
+      document: "Document",
+    },
+  },
+);
 
 /**
  * Lifecycle order: draft, in review, approved, delivered.

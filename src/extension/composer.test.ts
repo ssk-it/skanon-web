@@ -3,13 +3,18 @@ import { inject } from "../core/injection";
 import { COMPOSITION, compose } from "./composer";
 import type { ToolbarAction, Extension } from "./extension";
 
+/** A phrase in both languages, the English one marked so that a mix-up shows. */
+function both(text: string) {
+  return { fr: text, en: `${text} (en)` };
+}
+
 function action(id: string, rank?: number): ToolbarAction {
   return {
     id,
     rank,
     icon: () => "key",
-    label: id,
-    title: () => id,
+    label: both(id),
+    title: () => both(id),
     activate: () => {},
   };
 }
@@ -33,32 +38,32 @@ describe("compose", () => {
       id: "a",
       shell: {
         toolbarActions: [action("a1")],
-        banners: [{ id: "a-bandeau", icon: "info", text: () => "Un bandeau." }],
+        banners: [{ id: "a-bandeau", icon: "info", text: () => both("Un bandeau.") }],
       },
       pages: {
-        help: { jetons: ["Une phrase de a."] },
-        legalNotice: { host: "Aucun.", data: ["Donnée de a."] },
+        help: { jetons: [both("Une phrase de a.")] },
+        legalNotice: { host: both("Aucun."), data: [both("Donnée de a.")] },
       },
     };
     const b: Extension = {
       id: "b",
       pages: {
-        help: { jetons: ["Une phrase de b."], communications: ["Un hôte."] },
-        legalNotice: { ownership: ["Licence de b."] },
+        help: { jetons: [both("Une phrase de b.")], communications: [both("Un hôte.")] },
+        legalNotice: { ownership: [both("Licence de b.")] },
       },
     };
     const composition = compose([a, b]);
     expect(composition.toolbarActions.map((x) => x.id)).toEqual(["a1"]);
     expect(composition.banners.map((x) => x.id)).toEqual(["a-bandeau"]);
     expect(composition.help).toEqual({
-      jetons: ["Une phrase de a.", "Une phrase de b."],
+      jetons: [both("Une phrase de a."), both("Une phrase de b.")],
       cache: [],
-      communications: ["Un hôte."],
+      communications: [both("Un hôte.")],
     });
     expect(composition.legalNotice).toEqual({
-      host: "Aucun.",
-      data: ["Donnée de a."],
-      ownership: ["Licence de b."],
+      host: both("Aucun."),
+      data: [both("Donnée de a.")],
+      ownership: [both("Licence de b.")],
     });
   });
 
@@ -93,8 +98,8 @@ describe("compose", () => {
   it("refuses two hosts: a deliverable is served by only one", () => {
     expect(() =>
       compose([
-        { id: "a", pages: { legalNotice: { host: "Un." } } },
-        { id: "b", pages: { legalNotice: { host: "Deux." } } },
+        { id: "a", pages: { legalNotice: { host: both("Un.") } } },
+        { id: "b", pages: { legalNotice: { host: both("Deux.") } } },
       ]),
     ).toThrow(/hébergeur/);
   });
