@@ -9,7 +9,7 @@ import { passkeyUnlockMessages } from "./passkey-unlock.messages";
 /**
  * How locked tokens are opened, without any window forced on load (2026-065, decision 02).
  *
- * Where the browser returns the passkey's key through its autofill, a field marked `webauthn` waits for the author: focusing it lists the passkey, picking it opens the tokens. Elsewhere, and always next to it, the « Unlock » button of 2026-055. A browser accepts one passkey request at a time: the button withdraws the offer before asking, and offers again if asking did not succeed.
+ * Where the browser returns the passkey's key through its autofill, a field marked `webauthn` waits for the author: focusing it lists the passkey, picking it opens the tokens; nothing can be typed in it. Elsewhere, and always next to it, the « Unlock » button of 2026-055. A browser accepts one passkey request at a time: the button withdraws the offer before asking, and offers again if asking did not succeed.
  */
 const tokens = inject(TokenService);
 const t = useMessages(passkeyUnlockMessages);
@@ -36,18 +36,27 @@ async function unlock(): Promise<void> {
   const issue = await tokens.unlock();
   if (issue !== "ouvert" && offered.value) offer();
 }
+
+/** The field only lists the passkey: what the browser inserts without a cancellable `beforeinput` — a composition, an autofill — is emptied at once. */
+function empty(event: Event): void {
+  (event.target as HTMLInputElement).value = "";
+}
 </script>
 
 <template>
-  <!-- RG-accessibilite-aa: the field is reached with the keyboard and named for screen readers; the button stays for whoever does not use the autofill. -->
+  <!-- RG-accessibilite-aa: the field is reached with the keyboard and named for screen readers; the button stays for whoever does not use the autofill.
+       `webauthn` alone, without `username`: the browser lists the passkey there and no saved password — the GitHub tokens it may keep as such. Nothing is typed in it: it is not read-only, which would exclude it from the autofill. -->
   <input
     v-if="offered"
     class="cle-d-acces"
     type="text"
     name="cle-d-acces"
-    autocomplete="username webauthn"
+    autocomplete="webauthn"
+    spellcheck="false"
     :aria-label="t().field"
     :placeholder="t().placeholder"
+    @beforeinput.prevent
+    @input="empty"
   />
   <UiButton @click="unlock()">{{ t().unlock }}</UiButton>
   {{ t().whileOpen }}

@@ -590,9 +590,29 @@ describe("Passkey banner", () => {
     const view = await mountView();
     await flushPromises();
     const field = view.find(".bandeau-passkey input");
-    expect(field.attributes("autocomplete")).toBe("username webauthn");
+    expect(field.attributes("autocomplete")).toBe("webauthn");
     expect(field.attributes("aria-label")).toBe("Votre clé d’accès Skanon");
     expect(offer).toHaveBeenCalledOnce();
+  });
+
+  // Without `username`, the browser offers no saved password there — the GitHub tokens it may keep as such.
+  it("lets nothing be typed in the passkey field", async () => {
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    vi.spyOn(tokens, "canOffer").mockResolvedValue(true);
+    vi.spyOn(tokens, "offerUnlock").mockReturnValue(new Promise(() => {}));
+    const view = await mountView();
+    await flushPromises();
+    const field = view.find<HTMLInputElement>(".bandeau-passkey input");
+    const typing = new InputEvent("beforeinput", {
+      inputType: "insertText",
+      data: "ghp_",
+      cancelable: true,
+    });
+    field.element.dispatchEvent(typing);
+    expect(typing.defaultPrevented).toBe(true);
+    // What the browser inserts without a cancellable `beforeinput` — a composition, an autofill — is emptied at once.
+    await field.setValue("ghp_");
+    expect(field.element.value).toBe("");
   });
 
   it("keeps only the button where the autofill cannot offer the passkey", async () => {

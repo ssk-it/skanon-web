@@ -304,14 +304,13 @@ function signOut(): void {
       </div>
     </div>
     <template v-else>
+      <!-- Not a password field: the browser would offer to keep the token in its password manager, which 2026-055 decision 01 rejected. -->
       <UiTextField
         :model-value="input"
         class="champ"
         :label="t().tokenLabel"
-        type="password"
+        secret
         placeholder="ghp_…"
-        autocomplete="off"
-        spellcheck="false"
         data-focus-initial
         :error="error"
         :hint="t().tokenHint(whereKept)"
