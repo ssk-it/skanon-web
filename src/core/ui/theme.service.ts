@@ -1,89 +1,88 @@
-import { computed, effect, signal } from "../signaux";
+import { computed, effect, signal } from "../signals";
 
 /**
- * Le thème voulu par l'utilisateur.
+ * The theme the user wants.
  *
- * `systeme` n'est pas une absence de choix mais un choix à part entière : celui
- * de suivre le réglage de l'appareil, y compris quand il bascule en cours de
- * journée. C'est le défaut, et le seul des trois qui puisse changer sans que
- * personne ne touche à l'application.
+ * `systeme` is not an absence of choice but a choice in its own right: that
+ * of following the device's setting, including when it switches during the
+ * day. It is the default, and the only one of the three that can change without
+ * anyone touching the application.
  */
 export type Theme = "clair" | "sombre" | "systeme";
 
 const THEMES: readonly Theme[] = ["clair", "sombre", "systeme"];
-const CLE = "ssk-canon.theme";
+const KEY = "ssk-canon.theme";
 
 /**
- * Le thème d'affichage, et sa mémoire.
+ * The display theme, and its memory.
  *
- * Le suivi du système se fait entièrement en CSS — `color-scheme: light dark`
- * et une requête `prefers-color-scheme`. Ce service n'existe que pour le cas
- * où l'on veut *ne pas* suivre le système : forcer le sombre sur un poste resté
- * en clair, par exemple. Il pose alors un attribut que la feuille de style
- * interprète, et ne fait rien d'autre le reste du temps.
+ * Following the system is done entirely in CSS — `color-scheme: light dark`
+ * and a `prefers-color-scheme` query. This service only exists for the case
+ * where one wants *not* to follow the system: forcing dark on a machine left
+ * in light mode, for instance. It then sets an attribute the stylesheet
+ * interprets, and does nothing else the rest of the time.
  */
 export class ThemeService {
-  /** Le choix, tel qu'il a été fait. */
-  readonly theme = signal<Theme>(this.lireMemoire());
+  /** The choice, as it was made. */
+  readonly theme = signal<Theme>(this.readStored());
 
   /**
-   * Ce que le système demande, observé en continu.
+   * What the system asks for, observed continuously.
    *
-   * Lu à chaque changement plutôt qu'une fois au démarrage : basculer le
-   * réglage de l'appareil pendant que l'application est ouverte est le cas
-   * ordinaire, pas l'exception.
+   * Read on each change rather than once at startup: switching the
+   * device's setting while the application is open is the ordinary
+   * case, not the exception.
    */
-  private readonly systemeSombre = signal(this.mediaSombre?.matches ?? false);
+  private readonly systemDark = signal(this.darkMedia?.matches ?? false);
 
-  /** Le thème réellement appliqué, une fois `systeme` résolu. */
-  readonly effectif = computed<"clair" | "sombre">(() => {
+  /** The theme actually applied, once `systeme` is resolved. */
+  readonly effective = computed<"clair" | "sombre">(() => {
     const t = this.theme();
     if (t !== "systeme") return t;
-    return this.systemeSombre() ? "sombre" : "clair";
+    return this.systemDark() ? "sombre" : "clair";
   });
 
-  private get mediaSombre(): MediaQueryList | null {
+  private get darkMedia(): MediaQueryList | null {
     return typeof matchMedia === "function"
       ? matchMedia("(prefers-color-scheme: dark)")
       : null;
   }
 
   constructor() {
-    this.mediaSombre?.addEventListener("change", (e) =>
-      this.systemeSombre.set(e.matches),
+    this.darkMedia?.addEventListener("change", (e) =>
+      this.systemDark.set(e.matches),
     );
 
     effect(() => {
       const t = this.theme();
-      const racine = document.documentElement;
+      const root = document.documentElement;
 
-      // Aucun attribut quand on suit le système : la feuille de style bascule
-      // alors d'elle-même. En poser un obligerait à réécrire ici ce que le CSS
-      // sait déjà faire, et à le tenir d'accord avec lui.
-      if (t === "systeme") racine.removeAttribute("data-theme");
-      else
-        racine.setAttribute("data-theme", t === "sombre" ? "sombre" : "clair");
+      // No attribute when following the system: the stylesheet then switches
+      // by itself. Setting one would require rewriting here what the CSS
+      // already knows how to do, and keeping it in step with it.
+      if (t === "systeme") root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", t === "sombre" ? "sombre" : "clair");
 
       try {
-        if (t === "systeme") localStorage.removeItem(CLE);
-        else localStorage.setItem(CLE, t);
+        if (t === "systeme") localStorage.removeItem(KEY);
+        else localStorage.setItem(KEY, t);
       } catch {
-        // Navigation privée, stockage refusé : le thème vaut pour la session.
-        // Perdre la mémoire d'un choix d'affichage ne justifie pas d'échouer.
+        // Private browsing, refused storage: the theme holds for the session.
+        // Losing the memory of a display choice does not justify failing.
       }
     });
   }
 
-  /** Passe au thème suivant : clair → sombre → système. */
-  basculer(): void {
+  /** Moves to the next theme: light → dark → system. */
+  toggle(): void {
     const i = THEMES.indexOf(this.theme());
     this.theme.set(THEMES[(i + 1) % THEMES.length]);
   }
 
-  private lireMemoire(): Theme {
+  private readStored(): Theme {
     try {
-      const brut = localStorage.getItem(CLE);
-      return THEMES.includes(brut as Theme) ? (brut as Theme) : "systeme";
+      const raw = localStorage.getItem(KEY);
+      return THEMES.includes(raw as Theme) ? (raw as Theme) : "systeme";
     } catch {
       return "systeme";
     }

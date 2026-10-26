@@ -1,40 +1,40 @@
-# Pour l'agent
+# For the agent
 
-Skanon : l'interface Vue 3 de SSK Canon et sa version web statique, en source disponible (FSL-1.1-ALv2). Ce dépôt est aussi le paquet `@ssk-it/skanon`, que l'application de bureau consomme depuis un dépôt privé : rien de ce qui la concerne en propre n'y entre ([docs/pratiques.md](docs/pratiques.md#ce-qui-tient-au-livrable--les-extensions)).
+Skanon: the Vue 3 interface of SSK Canon and its static web version, source-available (FSL-1.1-ALv2). This repo is also the `@ssk-it/skanon` package, which the desktop application consumes from a private repo: nothing that concerns the desktop application alone goes in here ([docs/practices.md](docs/practices.md#what-belongs-to-the-deliverable-extensions)).
 
-## Que lire, et quand
+## What to read, and when
 
-| Avant de…                                                     | Lire                                                                                                         |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Cadrer ou développer une évolution fonctionnelle              | Le référentiel [ssk-it/ssk-canon](https://github.com/ssk-it/ssk-canon), par le skill `consulter-referentiel` |
-| Toucher au code                                               | [docs/developpement.md](docs/developpement.md)                                                               |
-| Toucher à la lecture du format, aux jetons, aux appels GitHub | [docs/invariants.md](docs/invariants.md) — **obligatoire**                                                   |
-| Parler au système, créer un module ou un test                 | [docs/pratiques.md](docs/pratiques.md)                                                                       |
-| Écrire une fonction                                           | [docs/clean-code.md](docs/clean-code.md)                                                                     |
-| Nommer quoi que ce soit                                       | [docs/conventions.md](docs/conventions.md)                                                                   |
+| Before…                                            | Read                                                                                                                 |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Scoping or developing a functional change          | The specification [ssk-it/ssk-canon](https://github.com/ssk-it/ssk-canon), through the `consulter-referentiel` skill |
+| Touching the code                                  | [docs/development.md](docs/development.md)                                                                           |
+| Touching format reading, tokens, GitHub calls      | [docs/invariants.md](docs/invariants.md) — **mandatory**                                                             |
+| Talking to the system, creating a module or a test | [docs/practices.md](docs/practices.md)                                                                               |
+| Writing a function                                 | [docs/clean-code.md](docs/clean-code.md)                                                                             |
+| Naming anything                                    | [docs/conventions.md](docs/conventions.md), [docs/glossary.md](docs/glossary.md)                                     |
 
-L'index complet : [docs/README.md](docs/README.md).
+The full index: [docs/README.md](docs/README.md).
 
-## Comportement attendu
+## Expected behaviour
 
-**Vérifier plutôt que supposer.** Ne jamais annoncer qu'une chose fonctionne sans l'avoir exécutée.
+**Verify rather than assume.** Never announce that something works without having run it.
 
-**Test rouge d'abord.** Un test qui n'a jamais échoué n'a rien prouvé.
+**Red test first.** A test that has never failed has proven nothing.
 
-**Porter sans changer.** Un service ou une vue portés depuis `ssk-it/ssk-canon-pwa` gardent leur comportement et leurs tests ; un défaut découvert se corrige à part, et se signale.
+**Port without changing.** A service or a view ported from `ssk-it/ssk-canon-pwa` keeps its behaviour and its tests; a defect found on the way is fixed separately, and reported.
 
-**Ne pas contourner un invariant.** Les citer par leur numéro (`INV-1`…`INV-10`) ; s'il gêne, le dire.
+**Do not work around an invariant.** Cite invariants by number (`INV-1`…`INV-10`); if one gets in the way, say so.
 
-**Ne rien lancer qui ouvre une fenêtre pendant le travail** : les tests du navigateur tournent sans tête. Un navigateur visible, en fin de chantier, avec l'accord de l'utilisateur, ou à sa demande.
+**Run nothing that opens a window during the work**: browser tests run headless. A visible browser only at the end of the work, with the user's consent, or at their request.
 
-**Le dépôt est public.** Aucun nom de client, aucun chemin de machine, aucun secret, ni dans le code, ni dans les tests, ni dans un message de commit : des noms fictifs dans les tests.
+**The repo is public.** No client name, no machine path, no secret — not in the code, not in the tests, not in a commit message: fictitious names in tests.
 
-**pnpm, jamais npm.**
+**pnpm, never npm.**
 
-**Ne pas committer sur `main`.** Une copie liée par sujet, une demande de fusion.
+**Do not commit to `main`.** One linked worktree per topic, one pull request.
 
-**Cadrer la boucle qui se termine.** Quand une phase aboutit ou qu'un choix technique est tranché, invoquer le skill `cadrer-la-boucle` : il demande si les décisions prises doivent être reportées dans `ssk-it/ssk-canon`. Un outil de cadrage qui ne cadre pas ses propres décisions ne tient pas sa promesse.
+**Scope the loop that is ending.** When a phase completes or a technical choice is settled, invoke the `cadrer-la-boucle` skill: it asks whether the decisions taken should be recorded in `ssk-it/ssk-canon`. A scoping tool that does not scope its own decisions does not keep its promise.
 
-**Tenir la documentation à jour** dans le même changement que le code : une commande citée dans `docs/` existe dans `package.json`, un renvoi pointe vers un fichier réel.
+**Keep the documentation up to date** in the same change as the code: a command cited in `docs/` exists in `package.json`, a reference points to a real file.
 
-**Échanges en français**, vocabulaire du domaine en français, mécanique en anglais ([docs/conventions.md](docs/conventions.md)).
+**Exchanges with the maintainer are in French; code, comments, documentation and commits are in English** ([docs/conventions.md](docs/conventions.md)).

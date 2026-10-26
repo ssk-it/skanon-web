@@ -1,79 +1,79 @@
 import { markRaw, type Component } from "vue";
-import { signal } from "../core/signaux";
+import { signal } from "../core/signals";
 
 /**
- * Comment s'ouvre un dialogue. Tout est facultatif.
+ * How a dialog opens. Everything is optional.
  */
-export interface OptionsDialogue<D> {
-  /** Ce que le composant reçoit en prop `data`. */
+export interface DialogOptions<D> {
+  /** What the component receives as its `data` prop. */
   readonly data?: D;
-  /** La largeur du panneau — `'640px'`. Sans elle, le panneau prend celle de son contenu, entre 280 et 560 px. */
-  readonly largeur?: string;
-  /** La largeur maximale, qui remplace les 560 px de Material — `'calc(100vw - 32px)'`. */
-  readonly largeurMax?: string;
-  /** La distance au haut de la fenêtre ; sans elle, le panneau est centré verticalement. */
-  readonly haut?: string;
-  /** Une classe de plus sur le panneau, pour un dialogue qui s'habille à part (la palette de recherche). */
-  readonly classe?: string;
-  /** Le nom du dialogue pour les lecteurs d'écran, quand il n'a pas de titre visible. */
-  readonly libelle?: string;
+  /** The panel width — `'640px'`. Without it, the panel takes its content's width, between 280 and 560 px. */
+  readonly width?: string;
+  /** The maximum width, which replaces Material's 560 px — `'calc(100vw - 32px)'`. */
+  readonly maxWidth?: string;
+  /** The distance from the top of the window; without it, the panel is centred vertically. */
+  readonly top?: string;
+  /** One more class on the panel, for a dialog styled on its own (the search palette). */
+  readonly className?: string;
+  /** The dialog's name for screen readers, when it has no visible title. */
+  readonly label?: string;
   /**
-   * Ce qui reçoit le focus à l'ouverture : le premier élément focalisable — ou celui qui porte `data-focus-initial` — par défaut ; le panneau lui-même avec `'dialogue'`, l'équivalent de `autoFocus: 'dialog'`.
+   * What receives focus on opening: the first focusable element — or the one carrying `data-focus-initial` — by default; the panel itself with `'dialogue'`, the equivalent of `autoFocus: 'dialog'`.
    */
   readonly focus?: "premier" | "dialogue";
 }
 
-/** Un dialogue ouvert, tel que `UiDialogHote` le monte. */
-export interface DialogueOuvert {
+/** An open dialog, as `UiDialogHost` mounts it. */
+export interface OpenDialog {
   readonly id: number;
-  readonly composant: Component;
-  readonly options: OptionsDialogue<unknown>;
-  /** Ferme le dialogue ; la promesse d'`open` se résout avec ce résultat. */
-  fermer(resultat?: unknown): void;
+  readonly component: Component;
+  readonly options: DialogOptions<unknown>;
+  /** Closes the dialog; the promise from `open` resolves with this result. */
+  close(result?: unknown): void;
 }
 
 /**
- * Le service des dialogues : `MatDialog`, sans Material.
+ * The dialog service: `MatDialog`, without Material.
  *
  * ```ts
  * const dialog = inject(DialogService);
- * const confirme = await dialog.open<boolean>(ConfirmationDialog, {
- *   data: { titre: "Supprimer ce lien ?", message: "…", action: "Supprimer" },
+ * const confirmed = await dialog.open<boolean>(ConfirmationDialog, {
+ *   data: { title: "Supprimer ce lien ?", message: "…", action: "Supprimer" },
  * });
- * if (!confirme) return;
+ * if (!confirmed) return;
  * ```
  *
- * Le composant ouvert reçoit `data` en prop et émet `fermer(résultat)` ; sa structure — titre, contenu qui défile, actions — vient de `UiDialogue`. La promesse se résout avec le résultat émis, ou avec `undefined` quand le dialogue est fermé sans réponse : Échap, clic sur le fond, changement de page.
+ * The opened component receives `data` as a prop and emits `close(result)`; its structure — title, scrolling content, actions — comes from `UiDialog`. The promise resolves with the emitted result, or with `undefined` when the dialog is closed without an answer: Escape, click on the backdrop, page change.
  *
- * Le service ne fait que tenir la liste des dialogues ouverts ; `UiDialogHote`, monté une fois dans `App.vue`, les affiche, piège le focus dans le dernier ouvert et le rend ensuite à l'élément qui l'avait.
+ * The service only keeps the list of open dialogs; `UiDialogHost`, mounted once in `App.vue`, shows them, traps focus in the last one opened and then gives it back to the element that had it.
  */
 export class DialogService {
-  readonly ouverts = signal<readonly DialogueOuvert[]>([]);
-  private prochain = 1;
+  readonly openDialogs = signal<readonly OpenDialog[]>([]);
+  private nextId = 1;
 
   open<R = unknown, D = unknown>(
-    composant: Component,
-    options: OptionsDialogue<D> = {},
+    component: Component,
+    options: DialogOptions<D> = {},
   ): Promise<R | undefined> {
-    return new Promise<R | undefined>((resoudre) => {
-      const id = this.prochain++;
-      const dialogue: DialogueOuvert = {
+    return new Promise<R | undefined>((resolve) => {
+      const id = this.nextId++;
+      const dialog: OpenDialog = {
         id,
-        // Le composant est une définition, non un état : le rendre réactif ne servirait à rien et coûterait à chaque rendu.
-        composant: markRaw(composant),
+        // The component is a definition, not state: making it reactive would serve no purpose and cost on every render.
+        component: markRaw(component),
         options,
-        fermer: (resultat?: unknown) => {
-          if (!this.ouverts().some((d) => d.id === id)) return;
-          this.ouverts.update((liste) => liste.filter((d) => d.id !== id));
-          resoudre(resultat as R | undefined);
+        close: (result?: unknown) => {
+          if (!this.openDialogs().some((d) => d.id === id)) return;
+          this.openDialogs.update((list) => list.filter((d) => d.id !== id));
+          resolve(result as R | undefined);
         },
       };
-      this.ouverts.update((liste) => [...liste, dialogue]);
+      this.openDialogs.update((list) => [...list, dialog]);
     });
   }
 
-  /** Ferme tous les dialogues sans réponse — à la navigation, comme `closeOnNavigation`. */
+  /** Closes all dialogs without an answer — on navigation, like `closeOnNavigation`. */
   closeAll(): void {
-    for (const d of [...this.ouverts()].reverse()) d.fermer(undefined);
+    for (const d of [...this.openDialogs()].reverse()) d.close(undefined);
   }
 }

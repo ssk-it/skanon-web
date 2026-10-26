@@ -1,406 +1,406 @@
 /**
- * Le modèle du référentiel et des cadrages.
+ * The model of the specification and of scopings.
  *
- * Les identifiants sont des slugs stables et lisibles, jamais des UUID : ils
- * apparaissent dans les chemins de fichiers et les liens croisés, et ne changent
- * jamais. Voir RG-identifiants-stables.
+ * Identifiers are stable, readable slugs, never UUIDs: they
+ * appear in file paths and cross-links, and never
+ * change. See RG-identifiants-stables.
  */
 
 /**
- * Le statut d'un cadrage ne se déclare pas : il se déduit de l'état du dépôt.
+ * A scoping's status is not declared: it is deduced from the repo's state.
  *
- * Un champ `statut:` dans le frontmatter serait une seconde source pour un fait
- * que la plateforme établit déjà, et c'est cette duplication qui avait divergé.
- * Le vérificateur de l'Action refuse désormais un statut déclaré.
+ * A `statut:` field in the frontmatter would be a second source for a fact
+ * the platform already establishes, and that duplication is what had diverged.
+ * The Action's checker now refuses a declared status.
  *
- * La branche principale établit la livraison ; la demande de fusion porte le
- * reste du cycle. Voir `deriverStatut` dans `statut-derive.ts`.
+ * The main branch establishes delivery; the pull request carries the
+ * rest of the cycle. See `deriveStatus` in `derived-status.ts`.
  */
-export type StatutCadrage = "brouillon" | "en_relecture" | "validee" | "livree";
-export type StatutRegle = "actif" | "abroge";
-export type OperationImpact = "cree" | "modifie" | "abroge" | "touche";
-export type StatutDecision = "ouverte" | "retenue" | "annulee";
+export type ScopingStatus = "brouillon" | "en_relecture" | "validee" | "livree";
+export type RuleStatus = "actif" | "abroge";
+export type ImpactOperation = "cree" | "modifie" | "abroge" | "touche";
+export type DecisionStatus = "ouverte" | "retenue" | "annulee";
 
-export interface Domaine {
+export interface Domain {
   readonly id: string;
-  readonly nom: string;
-  /** Corps Markdown : la description. */
+  readonly name: string;
+  /** Markdown body: the description. */
   readonly description: string;
 }
 
-export interface Fonctionnalite {
+export interface Feature {
   readonly id: string;
-  readonly nom: string;
-  readonly domaines: readonly string[];
+  readonly name: string;
+  readonly domains: readonly string[];
   readonly description: string;
 }
 
-export interface Regle {
+export interface Rule {
   readonly id: string;
-  readonly statut: StatutRegle;
-  readonly fonctionnalites: readonly string[];
-  /** L'énoncé, en Markdown. C'est le contenu qui compte. */
-  readonly enonce: string;
+  readonly status: RuleStatus;
+  readonly features: readonly string[];
+  /** The statement, in Markdown. It is the content that matters. */
+  readonly statement: string;
   /**
-   * Index dérivés de l'historique, écrits par la propagation.
-   * Jamais une source de vérité — voir RG-histoire-derivee.
+   * Indexes derived from history, written by propagation.
+   * Never a source of truth — see RG-histoire-derivee.
    */
-  readonly creePar: string | null;
-  readonly modifiePar: readonly string[];
+  readonly createdBy: string | null;
+  readonly modifiedBy: readonly string[];
 }
 
-export interface LienExterne {
+export interface ExternalLink {
   readonly tag: string;
   readonly url: string;
   /**
-   * Le libellé affiché, tel que saisi.
+   * The displayed label, as entered.
    *
-   * Le tag ne dit que la nature du lien : deux issues d'un même cadrage
-   * s'annonceraient toutes deux « Issue GitHub », et rien ne les distinguerait
-   * sans ouvrir les deux. Vide sur les cadrages écrits avant ce champ, d'où le
-   * repli sur le libellé du tag à l'affichage.
+   * The tag only says the link's kind: two issues of the same scoping
+   * would both announce themselves as « Issue GitHub », and nothing would tell them apart
+   * without opening both. Empty on scopings written before this field, hence the
+   * fallback on the tag's label at display.
    */
-  readonly nom: string;
+  readonly name: string;
 }
 
 /**
- * Ce qu'un impact peut viser.
+ * What an impact can target.
  *
- * `regle` dit ce que le produit fait ; `adr` et `architecture` disent comment il
- * est construit. Les trois suivent le même régime de projection — voir
+ * `regle` says what the product does; `adr` and `architecture` say how it
+ * is built. All three follow the same projection regime — see
  * RG-cible-impact.
  */
-export type NatureCible = "regle" | "adr" | "architecture";
+export type TargetKind = "regle" | "adr" | "architecture";
 
-/** Les natures qu'un document d'architecture peut prendre — RG-architecture-flux-composants. */
-export type NatureDocument = "composant" | "flux" | "contexte";
+/** The kinds an architecture document can take — RG-architecture-flux-composants. */
+export type DocumentKind = "composant" | "flux" | "contexte";
 
 export interface Impact {
   /**
-   * L'identifiant visé, quelle que soit sa nature.
+   * The targeted identifier, whatever its kind.
    *
-   * `regle` est conservé pour les cadrages écrits avant que l'impact puisse
-   * viser autre chose : un champ retiré rendrait illisible tout l'historique
-   * déjà commité, que rien ne réécrira.
+   * `rule` is kept for scopings written before the impact could
+   * target anything else: a removed field would make the whole history
+   * already committed unreadable, which nothing will rewrite.
    */
-  readonly cible: string;
-  readonly nature: NatureCible;
-  readonly operation: OperationImpact;
-  /** @deprecated Lire `cible`. Présent tant que des cadrages l'emploient. */
-  readonly regle: string;
+  readonly target: string;
+  readonly kind: TargetKind;
+  readonly operation: ImpactOperation;
+  /** @deprecated Read `target`. Present as long as scopings use it. */
+  readonly rule: string;
 }
 
 /**
- * Une décision d'architecture : pourquoi le système est construit ainsi.
+ * An architecture decision: why the system is built this way.
  *
- * Même forme qu'une règle, à un détail près — elle n'est rattachée à aucune
- * fonctionnalité. Le référentiel fonctionnel se parcourt par domaines et
- * fonctionnalités ; l'architecture se parcourt par son propre répertoire.
+ * Same shape as a rule, but for one detail — it is attached to no
+ * feature. The functional specification is browsed by domains and
+ * features; architecture is browsed through its own directory.
  */
-export interface DecisionArchitecture {
+export interface ArchitectureDecision {
   readonly id: string;
-  readonly statut: StatutRegle;
-  readonly enonce: string;
-  readonly creePar: string | null;
-  readonly modifiePar: readonly string[];
+  readonly status: RuleStatus;
+  readonly statement: string;
+  readonly createdBy: string | null;
+  readonly modifiedBy: readonly string[];
 }
 
 /**
- * Un document d'architecture : composant, flux, ou vue d'ensemble.
+ * An architecture document: component, flow, or overview.
  *
- * Un flux référence les composants qu'il relie plutôt que de les décrire. La
- * relation inverse — quels flux touchent ce composant — se calcule de ces
- * références, et n'est donc tenue nulle part.
+ * A flow references the components it connects rather than describing them. The
+ * inverse relation — which flows touch this component — is computed from these
+ * references, and is therefore kept nowhere.
  */
-export interface DocumentArchitecture {
+export interface ArchitectureDocument {
   readonly id: string;
-  readonly nature: NatureDocument;
-  readonly statut: StatutRegle;
-  /** Les composants reliés, pour un flux. Vide pour un composant ou le contexte. */
-  readonly composants: readonly string[];
-  readonly enonce: string;
-  readonly creePar: string | null;
-  readonly modifiePar: readonly string[];
+  readonly kind: DocumentKind;
+  readonly status: RuleStatus;
+  /** The connected components, for a flow. Empty for a component or the context. */
+  readonly components: readonly string[];
+  readonly statement: string;
+  readonly createdBy: string | null;
+  readonly modifiedBy: readonly string[];
 }
 
 export interface Option {
   readonly id: string;
-  readonly titre: string;
-  readonly retenue: boolean;
-  readonly corps: string;
+  readonly title: string;
+  readonly chosen: boolean;
+  readonly body: string;
 }
 
 export interface Decision {
   readonly id: string;
-  readonly titre: string;
-  readonly statut: StatutDecision;
-  readonly optionRetenue: string | null;
+  readonly title: string;
+  readonly status: DecisionStatus;
+  readonly chosenOption: string | null;
   readonly description: string;
   readonly options: readonly Option[];
-  /** Le corps complet, pour l'affichage brut si le découpage échoue. */
-  readonly corps: string;
+  /** The complete body, for raw display if splitting fails. */
+  readonly body: string;
 }
 
-export interface PieceJointe {
-  readonly nom: string;
+export interface Attachment {
+  readonly name: string;
   readonly sha256: string;
-  readonly taille: number;
+  readonly size: number;
   readonly type: string;
-  readonly ajouteLe: string | null;
+  readonly addedAt: string | null;
 }
 
 /**
- * D'où vient un cadrage qu'on n'a pas encore livré.
+ * Where a not yet delivered scoping comes from.
  *
- * Un cadrage en brouillon ou en relecture n'est jamais sur la branche par
- * défaut : il y arrive à sa livraison. Le montrer sans dire d'où il vient
- * laisserait croire qu'il fait déjà partie du référentiel.
+ * A draft or in-review scoping is never on the default
+ * branch: it arrives there on delivery. Showing it without saying where it comes from
+ * would suggest it is already part of the specification.
  */
-export interface ProvenanceCadrage {
-  readonly branche: string;
+export interface ScopingProvenance {
+  readonly branch: string;
   /**
-   * Absent pour une branche qui n'a pas encore de demande de fusion : un
-   * cadrage commencé, en brouillon (RG-statuts-cadrage).
+   * Absent for a branch that has no pull request yet: a
+   * started scoping, in draft (RG-statuts-cadrage).
    */
   readonly pullRequest?: number;
-  readonly brouillon: boolean;
+  readonly draft: boolean;
   /**
-   * La décision des relecteurs, telle que la plateforme la résume.
+   * The reviewers' decision, as the platform summarises it.
    *
-   * `null` quand personne ne s'est encore prononcé, ou quand l'appel qui la lit
-   * n'a pas abouti : le cadrage est alors montré en relecture, jamais validé.
-   * Affirmer une validation qui n'a pas eu lieu serait le seul mensonge coûteux
-   * de cette dérivation.
+   * `null` when nobody has given a verdict yet, or when the call that reads it
+   * did not succeed: the scoping is then shown in review, never approved.
+   * Asserting an approval that did not happen would be the only costly lie
+   * of this derivation.
    */
-  readonly approbation?: DecisionRelecture | null;
+  readonly approval?: ReviewDecision | null;
 }
 
-/** Ce que GitHub résume de l'avis des relecteurs sur une demande de fusion. */
-export type DecisionRelecture =
+/** What GitHub summarises of the reviewers' opinion on a pull request. */
+export type ReviewDecision =
   "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED";
 
 /**
- * Une section de niveau 2 que le gabarit d'un cadrage ne présente pas en propre.
+ * A level-2 section the scoping template does not present on its own.
  *
- * Un cadrage porte ce que son auteur juge utile : un relevé de mesures, des
- * questions ouvertes, une note. L'éditeur les conservait déjà à la réécriture,
- * mais la fiche ne les montrait nulle part — écrit et invisible, ce qui est
- * pire que refusé.
+ * A scoping carries what its author deems useful: a record of measurements, open
+ * questions, a note. The editor already kept them on rewrite,
+ * but the page showed them nowhere — written and invisible, which is
+ * worse than refused.
  */
-export interface SectionDivers {
-  readonly titre: string;
-  readonly corps: string;
+export interface MiscSection {
+  readonly title: string;
+  readonly body: string;
 }
 
-export interface Cadrage {
+export interface Scoping {
   readonly id: string;
-  readonly titre: string;
-  readonly statut: StatutCadrage;
-  readonly domaines: readonly string[];
-  readonly liens: readonly LienExterne[];
+  readonly title: string;
+  readonly status: ScopingStatus;
+  readonly domains: readonly string[];
+  readonly links: readonly ExternalLink[];
   readonly impacts: readonly Impact[];
-  readonly objectif: string;
-  readonly parcours: string;
-  /** Énoncés portés par ce cadrage, indexés par identifiant de règle. */
-  readonly enonces: ReadonlyMap<string, string>;
+  readonly goal: string;
+  readonly journey: string;
+  /** Statements carried by this scoping, indexed by rule identifier. */
+  readonly statements: ReadonlyMap<string, string>;
   readonly decisions: readonly Decision[];
-  readonly piecesJointes: readonly PieceJointe[];
+  readonly attachments: readonly Attachment[];
   /**
-   * Les sections que la fiche rassemble sous « Divers », dans leur ordre
-   * d'origine.
+   * The sections the page gathers under « Divers », in their original
+   * order.
    */
-  readonly divers: readonly SectionDivers[];
-  /** Renseigné pour un cadrage lu depuis une branche, absent sur la principale. */
-  readonly provenance?: ProvenanceCadrage;
+  readonly misc: readonly MiscSection[];
+  /** Filled in for a scoping read from a branch, absent on the main one. */
+  readonly provenance?: ScopingProvenance;
   /**
-   * Les branches qui portent encore ce cadrage, déjà livré
-   * (RG-branches-survivantes-signalees). Sans effet, elles sont signalées pour
-   * qu'on ne les reprenne pas en croyant travailler sur un cadrage en cours.
+   * The branches that still carry this scoping, already delivered
+   * (RG-branches-survivantes-signalees). Without effect, they are flagged so
+   * that nobody picks them up believing they are working on an in-progress scoping.
    */
-  readonly branchesSurvivantes?: readonly string[];
+  readonly staleBranches?: readonly string[];
 }
 
 /**
- * Comment les rédacteurs d'un projet obtiennent l'accès au dépôt.
+ * How a project's authors obtain access to the repo.
  *
- * Les trois modes s'empilent : chacun lève un obstacle que le précédent laissait,
- * sans annuler ce qu'il apportait. Passer de l'un à l'autre ne demande de
- * reprendre ni le référentiel ni les cadrages — seule la façon d'obtenir l'accès
- * change. Voir RG-modes-acces.
+ * The three modes stack: each removes an obstacle the previous one left,
+ * without cancelling what it brought. Moving from one to the other requires
+ * reworking neither the specification nor the scopings — only the way of obtaining access
+ * changes. See RG-modes-acces.
  */
-export type ModeAcces = "jeton_personnel" | "identite_tierce" | "relais";
+export type AccessMode = "jeton_personnel" | "identite_tierce" | "relais";
 
 /**
- * Ce que chaque mode garantit, et ce qu'il ne garantit pas.
+ * What each mode guarantees, and what it does not.
  *
- * Ces limites sont imposées par la plateforme, non choisies : un jeton
- * d'installation se restreint aux dépôts et aux permissions, jamais aux chemins.
- * Les annoncer est ce qu'exige RG-garanties-annoncees — une garantie absente
- * qu'on tairait ferait cesser de se méfier là où il faudrait.
+ * These limits are imposed by the platform, not chosen: an installation
+ * token is restricted to repos and permissions, never to paths.
+ * Announcing them is what RG-garanties-annoncees requires — an absent guarantee
+ * kept quiet would make people stop being wary where they should be.
  */
-export interface GarantiesAcces {
-  /** Jusqu'où descend l'autorisation. */
-  readonly portee: "depot" | "chemin";
-  /** Si l'auteur d'un commit est vérifié, ou seulement déclaré par le client. */
-  readonly auteurVerifie: boolean;
-  /** Si le rédacteur doit disposer d'un compte sur la plateforme de dépôt. */
-  readonly compteRequis: boolean;
+export interface AccessGuarantees {
+  /** How far down authorisation goes. */
+  readonly scope: "depot" | "chemin";
+  /** Whether a commit's author is verified, or only declared by the client. */
+  readonly authorVerified: boolean;
+  /** Whether the author must have an account on the repo platform. */
+  readonly accountRequired: boolean;
 }
 
-export const GARANTIES: Record<ModeAcces, GarantiesAcces> = {
+export const GUARANTEES: Record<AccessMode, AccessGuarantees> = {
   jeton_personnel: {
-    portee: "depot",
-    auteurVerifie: false,
-    compteRequis: true,
+    scope: "depot",
+    authorVerified: false,
+    accountRequired: true,
   },
   identite_tierce: {
-    portee: "depot",
-    auteurVerifie: false,
-    compteRequis: false,
+    scope: "depot",
+    authorVerified: false,
+    accountRequired: false,
   },
-  relais: { portee: "chemin", auteurVerifie: true, compteRequis: false },
+  relais: { scope: "chemin", authorVerified: true, accountRequired: false },
 };
 
 /**
- * Ce qu'un projet demande du jeton qui l'ouvre, dans la version web : la passkey proposée au rédacteur, ou exigée de lui (RG-protection-du-jeton-par-projet). Proposée est le défaut : un projet qui ne règle rien fonctionne comme avant.
+ * What a project asks of the token that opens it, in the web version: the passkey offered to the author, or required of them (RG-protection-du-jeton-par-projet). Offered is the default: a project that sets nothing works as before.
  */
-export type ProtectionDuJeton = "proposee" | "exigee";
+export type TokenProtection = "proposee" | "exigee";
 
-/** Les valeurs qu'un projet peut déclarer, pour valider ce qui est lu. */
-export const PROTECTIONS_DU_JETON: ReadonlySet<ProtectionDuJeton> =
-  new Set<ProtectionDuJeton>(["proposee", "exigee"]);
+/** The values a project can declare, to validate what is read. */
+export const TOKEN_PROTECTIONS: ReadonlySet<TokenProtection> =
+  new Set<TokenProtection>(["proposee", "exigee"]);
 
-/** Les modes qu'un projet peut déclarer, pour valider ce qui est lu. */
-export const MODES_ACCES: ReadonlySet<ModeAcces> = new Set<ModeAcces>([
+/** The modes a project can declare, to validate what is read. */
+export const ACCESS_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>([
   "jeton_personnel",
   "identite_tierce",
   "relais",
 ]);
 
-export const LIBELLE_MODE_ACCES: Record<ModeAcces, string> = {
+export const ACCESS_MODE_LABEL: Record<AccessMode, string> = {
   jeton_personnel: "Jeton personnel",
   identite_tierce: "Identité tierce",
   relais: "Relais",
 };
 
 /**
- * Où le projet fait vérifier l'identité de ses rédacteurs.
+ * Where the project has its authors' identity verified.
  *
- * Rien de secret ici : l'émetteur et l'identifiant du client sont publics par
- * nature, comme dans toute application qui s'exécute dans un navigateur. Le
- * client n'a pas de secret — c'est l'échange à secret jetable qui le protège.
+ * Nothing secret here: the issuer and the client identifier are public by
+ * nature, as in any application that runs in a browser. The
+ * client has no secret — the one-time-secret exchange is what protects it.
  */
-export interface ReglagesIdentite {
-  /** Racine du serveur d'identité, jusqu'au domaine du projet inclus. */
-  readonly emetteur: string;
-  /** Identifiant du client public déclaré chez cet émetteur. */
+export interface IdentitySettings {
+  /** Root of the identity server, up to and including the project's domain. */
+  readonly issuer: string;
+  /** Identifier of the public client declared with this issuer. */
   readonly client: string;
-  /** Composant qui échange une identité vérifiée contre un accès au dépôt. */
-  readonly echange: string;
+  /** Component that exchanges a verified identity for access to the repo. */
+  readonly exchange: string;
 }
 
 /**
- * Ce qu'un projet règle pour lui-même, dans son fichier de configuration.
+ * What a project sets for itself, in its configuration file.
  *
- * Ces réglages vivent dans le dépôt, non dans le navigateur : ils valent pour
- * tous ceux qui travaillent sur le projet, se relisent sur la plateforme, et
- * suivent le dépôt s'il change de mains. Un réglage d'équipe qui varierait d'un
- * poste à l'autre ne réglerait rien.
+ * These settings live in the repo, not in the browser: they apply to
+ * everyone working on the project, can be reviewed on the platform, and
+ * follow the repo if it changes hands. A team setting that varied from one
+ * machine to another would settle nothing.
  */
-export interface ReglagesProjet {
+export interface ProjectSettings {
   /**
-   * Comment les rédacteurs obtiennent l'accès au dépôt.
+   * How authors obtain access to the repo.
    *
-   * Le jeton personnel est le défaut : un projet qui ne déclare rien fonctionne,
-   * et n'a rien à héberger.
+   * The personal token is the default: a project that declares nothing works,
+   * and has nothing to host.
    */
-  readonly acces: ModeAcces;
+  readonly access: AccessMode;
   /**
-   * Paramètres du mode « identité tierce ». Absents dans les autres modes, et
-   * absents aussi d'un projet qui déclare ce mode sans les fournir — auquel cas
-   * l'application le signale plutôt que d'échouer à la connexion.
+   * Parameters of the « identité tierce » mode. Absent in the other modes, and
+   * also absent from a project that declares this mode without providing them — in which case
+   * the application reports it rather than failing at sign-in.
    */
-  readonly identite: ReglagesIdentite | null;
-  /** Si le jeton qui ouvre ce projet doit être gardé sous passkey dans la version web. */
-  readonly protectionDuJeton: ProtectionDuJeton;
+  readonly identity: IdentitySettings | null;
+  /** Whether the token that opens this project must be kept under a passkey in the web version. */
+  readonly tokenProtection: TokenProtection;
   /**
-   * Les natures de lien externe que ce projet reconnaît.
+   * The external link kinds this project recognises.
    *
-   * Déclarées dans le dépôt : un projet suivi sur Trello et un autre sur Jira
-   * n'ont pas les mêmes ressources à référencer, et une liste en dur dans
-   * l'application obligerait à la modifier pour chaque projet.
+   * Declared in the repo: a project tracked on Trello and another on Jira
+   * do not have the same resources to reference, and a hard-coded list in
+   * the application would require changing it for each project.
    */
-  readonly tagsLiens: readonly string[];
+  readonly linkTags: readonly string[];
 }
 
-/** Le contenu complet d'un dépôt de projet, tel que chargé en mémoire. */
+/** The complete content of a project repo, as loaded in memory. */
 /**
- * Un dépôt de code que ce projet réalise.
+ * A code repo this project builds.
  *
- * Le lien est déclaré ici, du côté qui a autorité : le dépôt de cadrage porte la
- * vue « projet », que plusieurs dépôts de code composent. Le déclarer dans
- * chaque dépôt de code le dupliquerait autant de fois qu'il y en a, et rien ne
- * garantirait qu'ils restent d'accord.
+ * The link is declared here, on the side that has authority: the scoping repo carries the
+ * « projet » view, which several code repos make up. Declaring it in
+ * each code repo would duplicate it as many times as there are, and nothing would
+ * guarantee that they stay in agreement.
  */
-export interface DepotCode {
-  /** `organisation/depot`, tel que la plateforme le nomme. */
+export interface CodeRepo {
+  /** `organisation/repo`, as the platform names it. */
   readonly repo: string;
-  /** Ce qu'il porte, en quelques mots. Facultatif. */
+  /** What it carries, in a few words. Optional. */
   readonly role: string;
 }
 
-export interface Referentiel {
-  readonly projet: {
-    readonly nom: string;
+export interface Specification {
+  readonly project: {
+    readonly name: string;
     readonly description: string;
-    readonly depotsCode: readonly DepotCode[];
+    readonly codeRepos: readonly CodeRepo[];
     /**
-     * Le préfixe ajouté aux identifiants à l'affichage — RG-prefixe-projet.
+     * The prefix added to identifiers on display — RG-prefixe-projet.
      *
-     * `null` quand le projet n'en déclare pas, ce qui est le cas par défaut :
-     * ses identifiants s'affichent alors nus, comme ils sont stockés.
+     * `null` when the project does not declare one, which is the default case:
+     * its identifiers are then shown bare, as they are stored.
      */
-    readonly prefixe: string | null;
+    readonly prefix: string | null;
   };
-  readonly reglages: ReglagesProjet;
-  readonly domaines: ReadonlyMap<string, Domaine>;
-  readonly fonctionnalites: ReadonlyMap<string, Fonctionnalite>;
-  readonly regles: ReadonlyMap<string, Regle>;
-  /** Ce qui décrit comment le produit est construit — cadrage 2026-038. */
-  readonly decisions: ReadonlyMap<string, DecisionArchitecture>;
-  readonly architecture: ReadonlyMap<string, DocumentArchitecture>;
-  readonly cadrages: ReadonlyMap<string, Cadrage>;
-  /** Anomalies rencontrées au chargement, non bloquantes pour l'affichage. */
+  readonly settings: ProjectSettings;
+  readonly domains: ReadonlyMap<string, Domain>;
+  readonly features: ReadonlyMap<string, Feature>;
+  readonly rules: ReadonlyMap<string, Rule>;
+  /** What describes how the product is built — scoping 2026-038. */
+  readonly decisions: ReadonlyMap<string, ArchitectureDecision>;
+  readonly architecture: ReadonlyMap<string, ArchitectureDocument>;
+  readonly scopings: ReadonlyMap<string, Scoping>;
+  /** Anomalies met while loading, not blocking display. */
   readonly anomalies: readonly string[];
 }
 
-/** Les statuts qu'un cadrage peut porter, pour valider ce qui est déclaré. */
-export const STATUTS_CADRAGE: ReadonlySet<StatutCadrage> =
-  new Set<StatutCadrage>(["brouillon", "en_relecture", "validee", "livree"]);
+/** The statuses a scoping can carry, to validate what is declared. */
+export const SCOPING_STATUSES: ReadonlySet<ScopingStatus> =
+  new Set<ScopingStatus>(["brouillon", "en_relecture", "validee", "livree"]);
 
 /**
- * Les bascules de statut que l'application propose — RG-bascule-de-statut.
+ * The status toggles the application offers — RG-bascule-de-statut.
  *
- * Fixes, et non réglables : le statut se lit sur la demande de fusion, et
- * l'application ne sait la déplacer qu'entre brouillon et prête à relire.
- * « Validée » ne s'obtient que par une relecture ; se l'accorder à soi-même la
- * viderait de son sens. « Livrée » résulte de la fusion, et rien ne la propose.
- * Un cadrage validé peut repasser en brouillon : on le reprend.
+ * Fixed, and not configurable: the status is read on the pull request, and
+ * the application can only move it between draft and ready for review.
+ * « Validée » is only obtained through a review; granting it to oneself would
+ * empty it of its meaning. « Livrée » results from the merge, and nothing offers it.
+ * An approved scoping can go back to draft: it is taken up again.
  */
-export const BASCULES_STATUT: ReadonlyMap<
-  StatutCadrage,
-  readonly StatutCadrage[]
-> = new Map<StatutCadrage, readonly StatutCadrage[]>([
+export const STATUS_TOGGLES: ReadonlyMap<
+  ScopingStatus,
+  readonly ScopingStatus[]
+> = new Map<ScopingStatus, readonly ScopingStatus[]>([
   ["brouillon", ["en_relecture"]],
   ["en_relecture", ["brouillon"]],
   ["validee", ["brouillon"]],
-  // un cadrage livré ne se reprend plus : ses impacts sont propagés
+  // a delivered scoping is no longer taken up again: its impacts are propagated
   ["livree", []],
 ]);
 
-// --- libellés d'affichage ---
+// --- display labels ---
 
-export const LIBELLE_STATUT_CADRAGE: Record<StatutCadrage, string> = {
+export const SCOPING_STATUS_LABEL: Record<ScopingStatus, string> = {
   brouillon: "Brouillon",
   en_relecture: "En relecture",
   validee: "Validée",
@@ -408,24 +408,24 @@ export const LIBELLE_STATUT_CADRAGE: Record<StatutCadrage, string> = {
 };
 
 /**
- * Les statuts d'une décision.
+ * The statuses of a decision.
  *
- * `annulee` conserve la décision et son motif : l'effacer ferait reposer la
- * question, sans le raisonnement qui l'avait close.
+ * `annulee` keeps the decision and its reason: erasing it would raise the
+ * question again, without the reasoning that had closed it.
  */
-export const STATUTS_DECISION: readonly StatutDecision[] = [
+export const DECISION_STATUSES: readonly DecisionStatus[] = [
   "ouverte",
   "retenue",
   "annulee",
 ];
 
-export const LIBELLE_STATUT_DECISION: Record<StatutDecision, string> = {
+export const DECISION_STATUS_LABEL: Record<DecisionStatus, string> = {
   ouverte: "Ouverte",
   retenue: "Retenue",
   annulee: "Annulée",
 };
 
-export const LIBELLE_OPERATION: Record<OperationImpact, string> = {
+export const OPERATION_LABEL: Record<ImpactOperation, string> = {
   cree: "crée",
   modifie: "modifie",
   abroge: "abroge",
@@ -433,12 +433,12 @@ export const LIBELLE_OPERATION: Record<OperationImpact, string> = {
 };
 
 /**
- * Les natures de lien d'un projet qui n'en déclare aucune.
+ * The link kinds of a project that declares none.
  *
- * Les mêmes que celles du fichier de configuration d'exemple : un projet
- * amorcé sans y toucher retrouve ce qu'il aurait eu en le lisant.
+ * The same as those of the example configuration file: a project
+ * bootstrapped without touching it gets what it would have had by reading it.
  */
-export const TAGS_LIENS_PAR_DEFAUT: readonly string[] = [
+export const DEFAULT_LINK_TAGS: readonly string[] = [
   "carte_trello",
   "issue_github",
   "piste",
@@ -446,7 +446,7 @@ export const TAGS_LIENS_PAR_DEFAUT: readonly string[] = [
   "document",
 ];
 
-export const LIBELLE_TAG_LIEN: Record<string, string> = {
+export const LINK_TAG_LABEL: Record<string, string> = {
   carte_trello: "Carte Trello",
   issue_github: "Issue GitHub",
   piste: "Piste",
@@ -455,12 +455,12 @@ export const LIBELLE_TAG_LIEN: Record<string, string> = {
 };
 
 /**
- * Ordre du cycle de vie : brouillon, en relecture, validée, livrée.
+ * Lifecycle order: draft, in review, approved, delivered.
  *
- * C'est l'ordre de la liste des cadrages, où ce qui demande de l'attention
- * passe devant ce qui fait déjà référence.
+ * It is the order of the scoping list, where what needs attention
+ * comes before what is already a reference.
  */
-export const ORDRE_CYCLE_VIE: Record<StatutCadrage, number> = {
+export const LIFECYCLE_ORDER: Record<ScopingStatus, number> = {
   brouillon: 0,
   en_relecture: 1,
   validee: 2,
@@ -468,12 +468,12 @@ export const ORDRE_CYCLE_VIE: Record<StatutCadrage, number> = {
 };
 
 /**
- * Ordre inverse, pour lire une histoire à rebours.
+ * Reverse order, to read a history backwards.
  *
- * Sur la chronologie d'une règle, on part de l'état actuel — donc du cadrage
- * livré le plus récent — pour remonter vers son origine.
+ * On a rule's timeline, one starts from the current state — hence from the most
+ * recent delivered scoping — to go back to its origin.
  */
-export const ORDRE_HISTORIQUE: Record<StatutCadrage, number> = {
+export const HISTORY_ORDER: Record<ScopingStatus, number> = {
   livree: 0,
   validee: 1,
   en_relecture: 2,

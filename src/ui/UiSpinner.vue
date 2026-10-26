@@ -2,24 +2,29 @@
 import { computed } from "vue";
 
 /**
- * L'indicateur d'attente circulaire : `mat-spinner`, indéterminé.
+ * The circular wait indicator: `mat-spinner`, indeterminate.
  *
  * ```vue
- * <UiSpinner :diametre="16" />
+ * <UiSpinner :diameter="16" />
  * ```
  *
- * Les proportions sont celles de Material : un trait du dixième du diamètre, sur un cercle de rayon `(diamètre − 10) / 2` dans une boîte de `diamètre − 10 + trait`.
+ * The proportions are Material's: a stroke a tenth of the diameter, on a circle of radius `(diameter − 10) / 2` in a box of `diameter − 10 + stroke`.
  */
-const props = withDefaults(defineProps<{ diametre?: number }>(), {
-  diametre: 48,
+const props = withDefaults(defineProps<{ diameter?: number }>(), {
+  diameter: 48,
 });
 
-const geometrie = computed(() => {
-  const trait = props.diametre / 10;
-  const rayon = (props.diametre - 10) / 2;
-  const boite = rayon * 2 + trait;
-  const circonference = 2 * Math.PI * rayon;
-  return { trait, rayon, boite, circonference };
+const geometry = computed(() => {
+  const stroke = props.diameter / 10;
+  const radius = (props.diameter - 10) / 2;
+  const box = radius * 2 + stroke;
+  const circumference = 2 * Math.PI * radius;
+  return {
+    stroke: stroke,
+    radius: radius,
+    box: box,
+    circumference: circumference,
+  };
 });
 </script>
 
@@ -29,21 +34,21 @@ const geometrie = computed(() => {
     role="progressbar"
     aria-valuemin="0"
     aria-valuemax="100"
-    :style="{ width: `${diametre}px`, height: `${diametre}px` }"
+    :style="{ width: `${diameter}px`, height: `${diameter}px` }"
   >
     <svg
-      :viewBox="`0 0 ${geometrie.boite} ${geometrie.boite}`"
+      :viewBox="`0 0 ${geometry.box} ${geometry.box}`"
       focusable="false"
       aria-hidden="true"
     >
       <circle
-        :cx="geometrie.boite / 2"
-        :cy="geometrie.boite / 2"
-        :r="geometrie.rayon"
-        :stroke-width="geometrie.trait * (geometrie.boite / diametre)"
+        :cx="geometry.box / 2"
+        :cy="geometry.box / 2"
+        :r="geometry.radius"
+        :stroke-width="geometry.stroke * (geometry.box / diameter)"
         :style="{
-          strokeDasharray: `${geometrie.circonference}`,
-          '--ui-spinner-circonference': `${geometrie.circonference}`,
+          strokeDasharray: `${geometry.circumference}`,
+          '--ui-spinner-circonference': `${geometry.circumference}`,
         }"
       />
     </svg>

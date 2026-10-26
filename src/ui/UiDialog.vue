@@ -1,0 +1,110 @@
+<script setup lang="ts">
+/**
+ * The structure of a dialog: `mat-dialog-title`, `mat-dialog-content` and `mat-dialog-actions`, in one component.
+ *
+ * ```vue
+ * <UiDialog title="Supprimer ce lien ?">
+ *   <p>Le message.</p>
+ *   <template #actions>
+ *     <UiButton @click="emit('close', false)">Annuler</UiButton>
+ *     <UiButton variant="filled" @click="emit('close', true)">Supprimer</UiButton>
+ *   </template>
+ * </UiDialog>
+ * ```
+ *
+ * The content scrolls on its own beyond 65 % of the window height; title and actions stay in place. Actions align to the right, 8 px apart. A view that must adjust the content — its height, its width, its layout — targets it with `:deep(.ui-dialogue__contenu)` from a class placed on `UiDialog`.
+ */
+defineProps<{ title?: string }>();
+</script>
+
+<template>
+  <div
+    class="ui-dialogue"
+    :class="{ 'ui-dialogue--avec-actions': !!$slots.actions }"
+  >
+    <h2 v-if="title || $slots.titre" class="ui-dialogue__titre">
+      <slot name="titre">{{ title }}</slot>
+    </h2>
+    <div class="ui-dialogue__contenu"><slot /></div>
+    <div v-if="$slots.actions" class="ui-dialogue__actions">
+      <slot name="actions" />
+    </div>
+  </div>
+</template>
+
+<style>
+.ui-dialogue {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: inherit;
+}
+
+.ui-dialogue__titre {
+  display: block;
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin: 0 0 1px;
+  padding: 6px 24px 13px;
+  color: var(--mat-sys-on-surface);
+  font-family: Roboto, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 2rem;
+  letter-spacing: 0;
+}
+.ui-dialogue__titre::before {
+  display: inline-block;
+  width: 0;
+  height: 40px;
+  content: "";
+  vertical-align: 0;
+}
+
+.ui-dialogue__contenu {
+  display: block;
+  flex-grow: 1;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 20px 24px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  max-height: 65vh;
+  color: var(--mat-sys-on-surface-variant);
+  font-family: Roboto, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25rem;
+  letter-spacing: 0.016rem;
+}
+.ui-dialogue--avec-actions .ui-dialogue__contenu {
+  padding: 20px 24px 0;
+}
+.ui-dialogue__titre + .ui-dialogue__contenu {
+  padding-top: 0;
+}
+.ui-dialogue__contenu > :first-child {
+  margin-top: 0;
+}
+.ui-dialogue__contenu > :last-child {
+  margin-bottom: 0;
+}
+
+.ui-dialogue__actions {
+  display: flex;
+  position: relative;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  min-height: 52px;
+  margin: 0;
+  padding: 16px 24px;
+  border-top: 1px solid transparent;
+}
+.ui-dialogue__actions .ui-bouton + .ui-bouton {
+  margin-left: 8px;
+}
+</style>
