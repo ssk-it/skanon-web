@@ -68,6 +68,17 @@ export default defineConfig({
         },
       },
       /**
+       * The repo's own tooling, which runs under Node in its workflows — the CLA check (`tools/cla/`).
+       */
+      {
+        extends: true,
+        test: {
+          name: "tools",
+          environment: "node",
+          include: ["tools/**/*.test.mjs"],
+        },
+      },
+      /**
        * What jsdom does not lay out — layout, scrolling, fonts —, in the engine closest to WKWebView, without a window: Playwright's WebKit, headless.
        */
       {

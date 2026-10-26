@@ -20,6 +20,8 @@
 | Consume this repo as a package          | [development.md](development.md#the-package)                            |
 | Add an extension point                  | [practices.md](practices.md#what-belongs-to-the-deliverable-extensions) |
 | Name a domain concept                   | [glossary.md](glossary.md)                                              |
+| Contribute from outside, sign the CLA   | [CONTRIBUTING.md](../CONTRIBUTING.md)                                   |
+| Change the CLA check                    | [development.md](development.md#the-cla-check)                          |
 
 ## What is not here
 

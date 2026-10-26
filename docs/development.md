@@ -21,6 +21,7 @@ src/                    The interface, shared by the web version and the desktop
   features/             The views, one folder per domain
     shared/             What several views share: loading state, dialogs, Markdown
 tools/pwa/              What only the web version publishes: manifest, icons, service worker, SSK Canon handover
+tools/cla/              The CLA check, which .github/workflows/cla.yml runs (ADR-contributions-relicenciables)
 public/                 The logo, copied as is into the deliverable
 ```
 
@@ -143,6 +144,14 @@ The service worker is registered only by the built web version (`src/platform/we
 ## Checks
 
 `.github/workflows/controles.yml`, on every pull request, on GitHub's runners: the repo is public, and the code of a pull request coming from a fork must not run on any ssk-it machine. The interface job runs the tests with coverage and hands it to SonarCloud (`sonar-project.properties`), when the `SONAR_TOKEN` secret is there — never for a pull request from a fork; SonarCloud's automatic analysis is off, since it cannot coexist with this one. The browser job runs in Playwright's image, `mcr.microsoft.com/playwright:v<version>-noble`: its tag follows the `playwright` version of `package.json`, and is bumped with it.
+
+### The CLA check
+
+`.github/workflows/cla.yml` asks every commit author of a pull request to sign [CLA.md](../CLA.md), by a comment whose sentence `tools/cla/cla.mjs` holds, and sets the `CLA` commit status that `main` requires ([CONTRIBUTING.md](../CONTRIBUTING.md#the-contributor-licence-agreement)). Signatures are committed to `signatures.json` on the `cla-signatures` branch, a root branch that shares nothing with `main`; the first signature creates it. The rights holder and Dependabot are exempt.
+
+It runs on `pull_request_target` and `issue_comment`, with a token that can write, from the default branch: it checks out `main`, never the pull request, so that a pull request cannot change what checks it — and a change to `tools/cla/` or to the workflow only takes effect once merged. Its logic is tested under Node, against a fake GitHub (`pnpm test`).
+
+A new version of the CLA changes its `Version x.y` line: every author is asked to sign again, and earlier signatures stay recorded.
 
 ## What must be green before a pull request
 

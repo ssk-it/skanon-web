@@ -30,8 +30,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run --project jsdom",
-    "test:watch": "vitest --project jsdom",
+    "test": "vitest run --project jsdom --project tools",
+    "test:watch": "vitest --project jsdom --project tools",
     "test:coverage": "vitest run --project jsdom --coverage",
     "build:web": "vue-tsc --noEmit && vite build --mode web",
     "test:browser": "vitest run --project browser"
