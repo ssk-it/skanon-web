@@ -1,6 +1,9 @@
+import { formaterAnomalie } from "@ssk-it/canon-check";
+import { splitFrontmatter as splitCanonFrontmatter } from "@ssk-it/canon-check/format";
 import { load } from "js-yaml";
+import { LocaleService } from "../i18n/locale.service";
+import { inject } from "../injection";
 import { MiscSection } from "../model/model";
-import { repoText } from "./repo.messages";
 
 /**
  * Frontmatter / body splitting.
@@ -44,41 +47,18 @@ export function splitFrontmatter<T = Record<string, unknown>>(
   if (!m) return null;
   try {
     return { data: (load(m[1]) ?? {}) as T, body: m[2] };
-  } catch (e) {
-    return { error: formatYamlError(e), body: m[2] };
+  } catch {
+    // RG-parseur-partage, RG-anomalies-codees: the fault is the library's to name — the faulty line, the unquoted « : » —, said in the displayed language. Reading the block once more on this path costs nothing next to a second wording that would drift from the pull request's.
+    const unreadable = splitCanonFrontmatter(text);
+    const anomaly =
+      unreadable && "anomalie" in unreadable ? unreadable.anomalie : null;
+    return {
+      error: anomaly
+        ? formaterAnomalie(anomaly, inject(LocaleService).language())
+        : "",
+      body: m[2],
+    };
   }
-}
-
-/**
- * Formats a `js-yaml` error.
- *
- * Its `message` embeds a multi-line excerpt of the document, unreadable in a
- * list of anomalies: the first line and the coordinates are kept.
- */
-function formatYamlError(e: unknown): string {
-  const err = e as {
-    reason?: string;
-    message?: string;
-    mark?: { line?: number };
-  };
-  let reason = String(err?.reason ?? err?.message ?? e)
-    .split("\n")[0]
-    .trim();
-
-  // By far the most frequent cause, and one the original message says nothing about:
-  // a « : » followed by a space in an unquoted value, which YAML reads as
-  // a separator. A decision title almost always contains one.
-  if (/bad indentation of a mapping entry/.test(reason)) {
-    reason += repoText().quoteColonHint;
-  }
-
-  // `line` is zero-indexed and relative to the block: the opening `---` shifts
-  // by one more line to find the number in the file.
-  const line = err?.mark?.line;
-  return repoText().unreadableFrontmatter(
-    reason,
-    typeof line === "number" ? line + 2 : undefined,
-  );
 }
 
 /** Extracts a level-2 section by its heading, without the heading itself. */

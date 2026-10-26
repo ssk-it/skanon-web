@@ -1,5 +1,11 @@
 import { inject } from "../injection";
-import { checkRepo } from "@ssk-it/canon-check";
+import {
+  checkRepo,
+  enTexte,
+  formaterAnomalie,
+  type Anomalie,
+} from "@ssk-it/canon-check";
+import { LocaleService } from "../i18n/locale.service";
 import { SpecificationStore } from "./specification.store";
 import {
   Scoping,
@@ -19,6 +25,8 @@ export interface Verdict {
   readonly errors: readonly string[];
   /** What deserves attention without blocking. */
   readonly warnings: readonly string[];
+  /** The same, coded: what is said again when the language changes (RG-anomalies-codees). */
+  readonly anomalies: readonly Anomalie[];
 }
 
 /** A scoping as entered, not written yet. */
@@ -54,6 +62,7 @@ export interface ScopingInput {
  */
 export class VerificationService {
   private readonly store = inject(SpecificationStore);
+  private readonly locale = inject(LocaleService);
 
   /**
    * Verifies the specification as it would be with this scoping.
@@ -81,7 +90,7 @@ export class VerificationService {
     // `ignorerIndexDerives`: `cree_par` and `modifie_par` are written by
     // propagation, after delivery. Requiring them correct during authoring
     // would report as a fault what the scoping has not produced yet.
-    const { errors, warnings } = checkRepo(
+    const { anomalies } = checkRepo(
       {
         domains: ref.domains,
         features: mapValues(ref.features, (f) => ({
@@ -110,10 +119,14 @@ export class VerificationService {
       },
     );
 
-    const concernsIt = (m: string) => m.includes(input.id);
+    // What concerns this scoping is read in the library's French form, the one that names it the same way whatever the displayed language.
+    const concerned = anomalies.filter((a) =>
+      formaterAnomalie(a, "fr").includes(input.id),
+    );
+    // RG-verification-a-la-saisie: the message is the library's, for the code it returned, in the interface's language — never a rewording of ours. Read here, the language makes a caller's computed say them again when it changes.
     return {
-      errors: errors.filter(concernsIt),
-      warnings: warnings.filter(concernsIt),
+      ...enTexte(concerned, this.locale.language()),
+      anomalies: concerned,
     };
   }
 }
