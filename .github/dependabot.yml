@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # `typescript-eslint` borne `typescript` (peerDependencies `>=4.8.4 <6.1.0`, vérifié en 8.71.2) ; pnpm n'en fait qu'un avertissement. Défaire le groupe quand la borne disparaît.
+      typescript:
+        patterns: ["typescript", "typescript-eslint", "vue-tsc"]
+      # `@vitest/browser-playwright` épingle `vitest` à la version exacte (peerDependencies `vitest: 5.0.3`, vérifié en 5.0.3) : l'un monté sans l'autre ne se résout pas.
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
+      # `vue` et `@vue/reactivity` se publient ensemble, à la même version : `src/core/signaux.ts` emploie la seconde, et deux versions installées feraient deux systèmes réactifs qui ne se voient pas.
+      vue:
+        patterns: ["vue", "@vue/reactivity"]
+      mineures:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # TypeScript 7, la réécriture native du compilateur, n'a plus l'API JavaScript dont dépendent `vue-tsc` 3.3 et `typescript-eslint` 8.71 (constaté dans ssk-it/skift#6, le 10 octobre 2026). Rouvrir quand l'un et l'autre le prennent en charge.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      # Toutes les actions dans une seule demande de fusion : chacune modifie `controles.yml`, et des demandes séparées entrent en conflit dès que la première est fusionnée.
+      actions:
+        patterns: ["*"]

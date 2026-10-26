@@ -1,0 +1,4 @@
+# Les scripts d'installation que pnpm laisse s'exécuter. Il les bloque par défaut, et c'est voulu : un script d'installation exécute du code à chaque installation.
+allowBuilds:
+  # Vérifie à l'installation que son binaire correspond à la machine.
+  esbuild: true
