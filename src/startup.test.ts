@@ -14,11 +14,19 @@ describe("provideRoot", () => {
     provideRoot({
       platform,
       extensions: [
-        { id: "essai", pages: { legalNotice: { host: "Un hébergeur." } } },
+        {
+          id: "essai",
+          pages: {
+            legalNotice: { host: { fr: "Un hébergeur.", en: "A host." } },
+          },
+        },
       ],
     });
     expect(inject(PLATFORM)).toBe(platform);
-    expect(inject(COMPOSITION).legalNotice.host).toBe("Un hébergeur.");
+    expect(inject(COMPOSITION).legalNotice.host).toEqual({
+      fr: "Un hébergeur.",
+      en: "A host.",
+    });
   });
 
   it("refuses a wrong composition before any startup", () => {

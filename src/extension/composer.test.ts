@@ -38,7 +38,9 @@ describe("compose", () => {
       id: "a",
       shell: {
         toolbarActions: [action("a1")],
-        banners: [{ id: "a-bandeau", icon: "info", text: () => both("Un bandeau.") }],
+        banners: [
+          { id: "a-bandeau", icon: "info", text: () => both("Un bandeau.") },
+        ],
       },
       pages: {
         help: { jetons: [both("Une phrase de a.")] },
@@ -48,7 +50,10 @@ describe("compose", () => {
     const b: Extension = {
       id: "b",
       pages: {
-        help: { jetons: [both("Une phrase de b.")], communications: [both("Un hôte.")] },
+        help: {
+          jetons: [both("Une phrase de b.")],
+          communications: [both("Un hôte.")],
+        },
         legalNotice: { ownership: [both("Licence de b.")] },
       },
     };
