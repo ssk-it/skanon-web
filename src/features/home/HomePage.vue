@@ -19,6 +19,7 @@ import TokenHelp from "../shared/TokenHelp.vue";
 import OrganizationAvatar from "../shared/OrganizationAvatar.vue";
 import { openSignIn } from "../shared/open-sign-in";
 import ProjectSymbol from "../shared/ProjectSymbol.vue";
+import CreateSpecification from "./CreateSpecification.vue";
 import { homeMessages } from "./home.messages";
 
 /**
@@ -173,6 +174,8 @@ function validateRepo(): void {
       />
       <UiButton variant="filled" type="submit">{{ t().open }}</UiButton>
     </form>
+
+    <CreateSpecification class="nouveau" />
 
     <!-- RG-connexion-optionnelle, RG-modes-acces: the help offers itself, below the list, without posing as a prerequisite — a public repo is read without a token, and a project under third-party identity asks for none. -->
     <section v-if="tokens.noAccess()" class="connexion">
@@ -346,6 +349,11 @@ function validateRepo(): void {
   font-size: 18px;
   width: 18px;
   height: 18px;
+}
+/* RG-amorcage-depot: below the field, where whoever finds no project to open ends up. */
+.nouveau {
+  max-width: 46rem;
+  margin-top: 24px;
 }
 .saisie {
   display: flex;
