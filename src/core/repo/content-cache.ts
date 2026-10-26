@@ -65,6 +65,12 @@ export interface KnownSymbol {
   readonly source: string;
 }
 
+/** The identity directory's declared name, and the configuration that says it. */
+export interface DeclaredIdentityDirectory {
+  readonly sha: string;
+  readonly directory: string;
+}
+
 /**
  * What is known of a project's identity, and what to request it again with.
  *
@@ -81,6 +87,11 @@ export interface KnownProjectIdentity {
   readonly directory: string | null;
   /** What the directory contains, when the API said so. */
   readonly files: readonly IdentityFile[] | null;
+  /**
+   * The configuration read to find the directory's declared name, by its
+   * fingerprint — RG-noms-declares. Absent when it was not needed.
+   */
+  readonly config?: DeclaredIdentityDirectory | null;
   /** The symbol of each background already requested; `null` when there is none. */
   readonly symbols: Partial<Record<IdentityVariant, KnownSymbol | null>>;
   readonly private: boolean;

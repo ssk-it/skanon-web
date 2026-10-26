@@ -1,4 +1,6 @@
+import type { Noms } from "@ssk-it/canon-check/noms";
 import { defineMessages } from "../i18n/language";
+
 /**
  * The model of the specification and of scopings.
  *
@@ -378,6 +380,11 @@ export interface Specification {
   readonly decisions: ReadonlyMap<string, ArchitectureDecision>;
   readonly architecture: ReadonlyMap<string, ArchitectureDocument>;
   readonly scopings: ReadonlyMap<string, Scoping>;
+  /**
+   * The names of the repo's folders and conventional files, as it declares
+   * them in `ssk-canon.yml` — RG-noms-declares. Absent, the format's names.
+   */
+  readonly names?: Noms;
   /** Anomalies met while loading, not blocking display. */
   readonly anomalies: readonly string[];
 }
