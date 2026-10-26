@@ -36,7 +36,7 @@ Frontmatter splitting, the format rules and their verification live in the libra
 
 ## INV-8 — A token leaves the machine only towards GitHub
 
-An access token travels through no link, no address, no log, and is displayed only by its last characters. In the desktop application it is written only to the vault the system protects, never in clear on disk; in the web version it lives in the browser's local storage — in clear, or sealed by a passkey whose key never leaves the user's keychain —, and the interface says which. A project that requires the passkey never sees its token kept in clear: without the passkey, the token is valid for the tab only (RG-protection-du-jeton-par-projet, scoping 2026-055).
+An access token travels through no link, no address, no log, and is displayed only by its last characters. In the desktop application it is written only to the vault the system protects, never in clear on disk; in the web version it lives in the browser's local storage — in clear, or sealed by a passkey whose key never leaves the user's keychain —, and the interface says which. A project that requires the passkey never sees its token kept in clear: without the passkey, the token is valid for the tab only (RG-protection-du-jeton-par-projet, scoping 2026-055). The key that opens sealed tokens lives in memory only: it passes from an open tab to the tabs opened afterwards, never through any storage, and is only ever obtained from the passkey after a user gesture — never by a request forced on load (scoping 2026-065).
 
 ## INV-9 — One interface codebase for both deliverables
 

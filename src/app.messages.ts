@@ -53,8 +53,6 @@ export const appMessages = defineMessages({
     },
     passkey: {
       locked: "Vos jetons sont protégés par une passkey.",
-      unlock: "Déverrouiller",
-      toUseInTab: "pour vous en servir dans cet onglet.",
       unreadable: "La passkey ne les ouvre plus :",
       forget: "Oublier ces jetons",
       typeAgain: "puis saisissez de nouveau votre jeton.",
@@ -130,8 +128,6 @@ export const appMessages = defineMessages({
     },
     passkey: {
       locked: "Your tokens are protected by a passkey.",
-      unlock: "Unlock",
-      toUseInTab: "to use them in this tab.",
       unreadable: "The passkey no longer opens them:",
       forget: "Forget these tokens",
       typeAgain: "then enter your token again.",

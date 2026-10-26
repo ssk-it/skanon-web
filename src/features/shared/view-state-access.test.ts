@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TokenService } from "../../core/github/token.service";
 import {
   provideHttpTesting,
@@ -68,6 +68,17 @@ describe("repo not found under a token", () => {
       view.querySelector('a[href="https://github.com/settings/tokens"]'),
     ).not.toBeNull();
     expect(view.textContent).not.toContain("Repository access");
+  });
+
+  // 2026-065: a private repo read before the tokens are opened is not « not found » — it waits for them.
+  it("says the repo waits for the tokens to be unlocked, rather than not found", async () => {
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    await loadNotFound();
+
+    const view = render();
+    expect(view.textContent).toContain("Vos jetons sont verrouillés");
+    expect(view.textContent).not.toContain("introuvable");
+    expect(view.querySelector('a[href*="personal-access-tokens"]')).toBeNull();
   });
 
   it("does not mention it without a token: there is none to correct", async () => {

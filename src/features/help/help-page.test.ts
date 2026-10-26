@@ -72,6 +72,28 @@ describe("« Fonctionnement de Skanon » page", () => {
     expect(text).toContain("sous la même clé que les jetons");
   });
 
+  // 2026-065: one unlock while a Skanon tab stays open, offered by the browser's autofill, and the author's preference.
+  it("says sealed tokens open once while a tab stays open, and what a script can then read", async () => {
+    vi.spyOn(inject(TokenService), "form").mockReturnValue("scelle");
+    const text = await mountView("web");
+    expect(text).toContain(
+      "une fois, tant qu’un onglet de Skanon reste ouvert",
+    );
+    expect(text).toContain("clé d’accès enregistrée");
+    expect(text).not.toContain("chaque onglet");
+    expect(text).toContain(
+      "Dans ce navigateur, vous pouvez vous passer de la passkey",
+    );
+  });
+
+  it("says the author may do without the passkey where their project leaves the choice", async () => {
+    const text = await mountView("web");
+    expect(text).toContain(
+      "Dans ce navigateur, vous pouvez vous passer de la passkey",
+    );
+    expect(text).not.toContain("chaque onglet");
+  });
+
   it("says, on the desktop, that the token is in the system keychain", async () => {
     const text = await mountView("bureau");
     expect(text).toContain("rangé dans le coffre du système");

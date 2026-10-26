@@ -10,6 +10,9 @@ export const viewStateMessages = defineMessages({
     loadFailed: "Le dépôt n’a pas pu être chargé",
     retry: "Réessayer",
     noRepo: "Aucun dépôt ouvert",
+    waitingForUnlock: "Vos jetons sont verrouillés",
+    waitingForUnlockDetail:
+      "Ce dépôt est peut-être privé : déverrouillez vos jetons, dans le bandeau ci-dessus, et il s’ouvrira.",
   },
   en: {
     loading: "Loading the specification…",
@@ -20,5 +23,8 @@ export const viewStateMessages = defineMessages({
     loadFailed: "The repo could not be loaded",
     retry: "Try again",
     noRepo: "No repo open",
+    waitingForUnlock: "Your tokens are locked",
+    waitingForUnlockDetail:
+      "This repo may be private: unlock your tokens, in the banner above, and it will open.",
   },
 });

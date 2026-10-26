@@ -58,8 +58,22 @@ export interface TokenSealing {
   isPossible(): Promise<boolean>;
   /** Seals these tokens, and erases what the vault kept in plain text. */
   sealTokens(tokens: StoredTokens): Promise<SealingOutcome>;
-  /** Opens the sealed tokens for this page. */
+  /** Opens the sealed tokens for this page, through the passkey. To be called from a user gesture. */
   unlockTokens(): Promise<UnlockOutcome>;
+  /** Opens them with the key an open tab of the application already holds, without the passkey; `null` when no open tab answers with a key that opens them (2026-065, decision 01). */
+  joinOpenTabs(): Promise<UnlockOutcome | null>;
+  /** What another tab did to the sealed store: opened it — these tokens —, or removed it — `null`. */
+  listenChanges(onChange: (tokens: StoredTokens | null) => void): void;
+  /** False when the browser surely cannot offer the passkey through its autofill, with the key (2026-065, decision 02). */
+  canOffer(): Promise<boolean>;
+  /** Offers the passkey through the browser's autofill, until the user picks it or `signal` withdraws the offer. */
+  offerUnlock(signal: AbortSignal): Promise<UnlockOutcome>;
+  /** True when the author chose, in this browser, to do without the passkey wherever their project leaves them the choice (2026-065, decision 03). */
+  readonly optedOut: boolean;
+  /** Records that choice; false when the browser refuses to keep it. */
+  optOut(value: boolean): boolean;
+  /** Keeps these open tokens in plain text again, and removes the sealed store. Refused while they are locked. */
+  unsealTokens(tokens: StoredTokens): Promise<VaultWrite>;
   /** The cipher for private contents, as long as the tokens are open; `null` otherwise. */
   findCipher(): Cipher | null;
 }

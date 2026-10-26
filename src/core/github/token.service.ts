@@ -114,6 +114,17 @@ export class TokenService {
   /** True when a project in the tab requires the passkey, to say so. */
   readonly protectionRequired = computed(() => this.required());
 
+  /** True when the author chose, in this browser, to do without the passkey wherever their project leaves them the choice (2026-065, decision 03). */
+  readonly optedOut = signal(this.sealing?.optedOut ?? false);
+
+  /** Whether entering a token proposes protecting it: always on a project that requires it, otherwise unless the author opted out. */
+  readonly protectByDefault = computed(
+    () => this.required() || !this.optedOut(),
+  );
+
+  /** Counts the times the sealed tokens were opened in this tab — by the passkey, or by another tab: the open repo is reread each time. */
+  readonly unlocks = signal(0);
+
   /** What the last passkey request gave, to say so; `null` after a success. */
   readonly passkeyFailure = signal<PasskeyFailure | null>(null);
 
@@ -303,6 +314,24 @@ export class TokenService {
     this.token.set(stored.general);
     this.byScope.set(new Map(stored.byScope));
     this.readSealingState();
+    this.sealing?.listenChanges((tokens) => this.followOtherTab(tokens));
+    // An open tab hands over its key: no passkey for this one (2026-065, decision 01).
+    const joined = await this.sealing?.joinOpenTabs();
+    if (joined?.issue === "ouvert") this.adopt(joined.tokens);
+  }
+
+  /** What another tab did: opened the sealed tokens — this tab opens them too —, or removed them. */
+  private followOtherTab(tokens: StoredTokens | null): void {
+    if (tokens) return this.adopt(tokens);
+    this.readSealingState();
+  }
+
+  private adopt(tokens: StoredTokens): void {
+    this.unlocks.update((n) => n + 1);
+    this.token.set(tokens.general);
+    this.byScope.set(new Map(tokens.byScope));
+    this.passkeyFailure.set(null);
+    this.readSealingState();
   }
 
   /**
@@ -356,19 +385,42 @@ export class TokenService {
     const opened = await this.sealing.unlockTokens();
     this.passkeyFailure.set(opened.issue === "ouvert" ? null : opened.issue);
     if (opened.issue !== "ouvert") return opened.issue;
-    this.token.set(opened.tokens.general);
-    this.byScope.set(new Map(opened.tokens.byScope));
-    this.readSealingState();
+    this.adopt(opened.tokens);
+    return "ouvert";
+  }
+
+  /** True when the browser can offer the passkey through its autofill; otherwise only the button unlocks. */
+  async canOffer(): Promise<boolean> {
+    return (await this.sealing?.canOffer()) ?? false;
+  }
+
+  /**
+   * Offers the passkey in the browser's autofill, until the author picks it or `signal` withdraws the offer (2026-065, decision 02). Nothing shows until the author focuses the field: no window is forced on load. A withdrawn offer is not a failure, and is not reported.
+   */
+  async offerUnlock(signal: AbortSignal): Promise<"ouvert" | PasskeyFailure> {
+    if (!this.sealing) return "impossible";
+    const opened = await this.sealing.offerUnlock(signal);
+    if (opened.issue === "annule") return "annule";
+    this.passkeyFailure.set(opened.issue === "ouvert" ? null : opened.issue);
+    if (opened.issue !== "ouvert") return opened.issue;
+    this.adopt(opened.tokens);
     return "ouvert";
   }
 
   /**
-   * Opens the sealed tokens as soon as the tab opens, without waiting for a click: Touch ID or the device code remain the gesture (RG-secret-conserve-localement). A browser that requires a click in the page refuses the way one cancels — WebAuthn does not distinguish them —, and this refusal is not reported: the banner simply offers to unlock.
+   * Records the author's choice to do without the passkey in this browser. Opting out returns tokens already protected to plain text — unless a project open in the tab requires the passkey: the preference yields to it (RG-protection-du-jeton-par-projet).
    */
-  async unlockWithoutGesture(): Promise<"ouvert" | PasskeyFailure> {
-    const issue = await this.unlock();
-    if (issue === "annule") this.passkeyFailure.set(null);
-    return issue;
+  async optOut(value: boolean): Promise<void> {
+    if (!this.sealing) return;
+    this.sealing.optOut(value);
+    this.optedOut.set(this.sealing.optedOut);
+    if (!value || this.required() || this.sealingState() !== "ouvert") return;
+    const writing = await this.sealing.unsealTokens(this.content());
+    this.recordWrite(writing, "ecriture");
+    if (writing === "refusee") return;
+    // What the cache kept under the key would no longer open: it will be reread.
+    await this.cache.clearPrivate();
+    this.readSealingState();
   }
 
   private readSealingState(): void {
@@ -376,6 +428,7 @@ export class TokenService {
     const cipher = this.sealing?.findCipher() ?? null;
     if (cipher) this.cache.encryptWith(cipher);
     else if (this.locked()) this.cache.lock();
+    else this.cache.encryptWith(null);
   }
 
   /** What the cache kept in plain text does not survive sealing: it will be reread, under the key. */

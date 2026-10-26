@@ -80,10 +80,15 @@ export const tokenDialogMessages = defineMessages({
     scopeHint:
       "Un jeton par organisation : celui d’une autre ne s’en trouve pas écrasé.",
     protect: "Protéger ce jeton par une passkey",
+    optOut: "Dans ce navigateur, me passer de la passkey",
+    optOutHelp:
+      "Vos jetons y seront gardés en clair, sur les projets qui vous laissent le choix. Un projet qui exige la passkey l’obtient toujours.",
+    optOutRequired:
+      "Ce projet exige la passkey : votre préférence n’y change rien, et le jeton qui l’ouvre reste protégé.",
     protectHelp:
-      "Touch ID, ou le code de l’appareil, l’ouvrira dans chaque onglet. Seul son chiffré reste dans ce navigateur : un programme qui lit le profil ne le trouve pas. Un script sur la page, onglet déverrouillé, le lirait toujours.",
+      "Touch ID, ou le code de l’appareil, l’ouvrira une fois, pour tous les onglets de Skanon ouverts ensuite. Seul son chiffré reste dans ce navigateur : un programme qui lit le profil ne le trouve pas. Un script sur la page, tant qu’un onglet déverrouillé reste ouvert, le lirait toujours.",
     protectionRequired:
-      "Ce projet exige que le jeton soit protégé par une passkey : Touch ID, ou le code de l’appareil, vous sera demandé à l’enregistrement, puis dans chaque onglet.",
+      "Ce projet exige que le jeton soit protégé par une passkey : Touch ID, ou le code de l’appareil, vous sera demandé à l’enregistrement, puis une fois tant qu’un onglet de Skanon reste ouvert.",
     protectionSealed:
       "Vos jetons sont protégés par une passkey : celui-ci le sera aussi.",
     protectionImpossibleRequired:
@@ -177,10 +182,15 @@ export const tokenDialogMessages = defineMessages({
     scopeOthers: "all other repos",
     scopeHint: "One token per organisation: another one's is not overwritten.",
     protect: "Protect this token with a passkey",
+    optOut: "In this browser, do without the passkey",
+    optOutHelp:
+      "Your tokens will be kept in clear there, on projects that leave you the choice. A project that requires the passkey always gets it.",
+    optOutRequired:
+      "This project requires the passkey: your preference changes nothing here, and the token that opens it stays protected.",
     protectHelp:
-      "Touch ID, or the device code, will open it in each tab. Only its ciphertext stays in this browser: a program reading the profile does not find it. A script on the page, with the tab unlocked, could still read it.",
+      "Touch ID, or the device code, will open it once, for every Skanon tab opened afterwards. Only its ciphertext stays in this browser: a program reading the profile does not find it. A script on the page, while an unlocked tab stays open, could still read it.",
     protectionRequired:
-      "This project requires the token to be protected by a passkey: Touch ID, or the device code, will be asked for when saving, then in each tab.",
+      "This project requires the token to be protected by a passkey: Touch ID, or the device code, will be asked for when saving, then once while a Skanon tab stays open.",
     protectionSealed:
       "Your tokens are protected by a passkey: this one will be too.",
     protectionImpossibleRequired:

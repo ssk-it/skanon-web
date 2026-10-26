@@ -49,7 +49,12 @@ function openTokenDialog(): void {
       </p>
     </div>
     <template v-else-if="store.state() === 'erreur'">
-      <div v-if="store.emptyRepo()" class="etat amorcage">
+      <div v-if="store.waitingForUnlock()" class="etat">
+        <UiIcon name="lock" />
+        <p class="titre">{{ t().waitingForUnlock }}</p>
+        <p class="detail">{{ t().waitingForUnlockDetail }}</p>
+      </div>
+      <div v-else-if="store.emptyRepo()" class="etat amorcage">
         <UiIcon name="rocket_launch" />
         <p class="titre">{{ t().emptyRepo }}</p>
         <p class="detail">{{ t().emptyRepoDetail }}</p>

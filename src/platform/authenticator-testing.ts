@@ -39,6 +39,53 @@ export class FakeAuthenticator implements Authenticator {
     return this.output(id, salt);
   }
 
+  /** Whether the browser offers passkeys through autofill, and returns PRF that way. */
+  conditionalPossible = true;
+  /** The autofill request waiting for the user to pick a passkey, if there is one. */
+  private offered: {
+    readonly salt: Uint8Array;
+    readonly answer: (output: ArrayBuffer | null) => void;
+  } | null = null;
+
+  async isConditionalPossible(): Promise<boolean> {
+    return this.conditionalPossible;
+  }
+
+  evaluateConditional(
+    salt: Uint8Array,
+    signal: AbortSignal,
+  ): Promise<ArrayBuffer | null> {
+    return new Promise((answer) => {
+      if (signal.aborted) return answer(null);
+      this.offered = { salt, answer };
+      signal.addEventListener("abort", () => {
+        this.offered = null;
+        answer(null);
+      });
+    });
+  }
+
+  /** True while the autofill offers a passkey. */
+  get offering(): boolean {
+    return this.offered !== null;
+  }
+
+  /** The user picks the passkey the autofill offers, and confirms with Touch ID. */
+  async pick(): Promise<void> {
+    const offered = this.offered;
+    if (!offered) throw new Error("no passkey offered");
+    this.offered = null;
+    const [id] = [...this.secrets.keys()];
+    offered.answer(
+      this.cancel || id === undefined
+        ? null
+        : await this.output(
+            Uint8Array.from(id.split(","), Number),
+            offered.salt,
+          ),
+    );
+  }
+
   private async output(id: Uint8Array, salt: Uint8Array): Promise<ArrayBuffer> {
     const secret = this.substitute
       ? new Uint8Array(32).fill(7)
