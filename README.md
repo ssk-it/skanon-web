@@ -54,7 +54,7 @@ The other choices follow from the promise of a _lasting_ specification.
 - **The specification has a repo of its own.** The client reads it without seeing the code, and one scoping can span several code repos.
 - **Rules are written for people, not machines.** A statement is prose the client can read and settle, not a test. Checking that the code complies stays the job of the code's own tests.
 - **Links, not synchronisation.** A scoping links to its Trello card, its issues and its mock-ups; it neither reads nor writes them, and so never falls out of sync with them.
-- **One interface, two deliveries.** A desktop application for macOS, Windows and Linux, and an installable web application, from the same interface code.
+- **Nothing to install.** Skanon runs in the browser, as a static web application that any file host can serve, and installs as an app from Chrome.
 
 ## How it works
 
@@ -67,23 +67,23 @@ The other choices follow from the promise of a _lasting_ specification.
 
 The [ssk-canon](https://github.com/ssk-it/ssk-canon) repo is the specification of SSK Canon written with SSK Canon: every behaviour described here has its rule there, with the scoping that decided it. Its README also explains how to set up a scoping repo for a project of your own.
 
-## This repo
-
-Skanon is delivered as a desktop application and, from the same interface code, an installable web application. This repo holds the shared interface, in Vue 3, and the web version; the desktop application lives in a private repo, which consumes this one as a package. It replaces [ssk-canon-pwa](https://github.com/ssk-it/ssk-canon-pwa), the first web application, written in Angular, whose behaviour it took over and whose place it takes at the same address ([ssk-canon#2026-051](https://ssk-canon.s3-website.fr-par.scw.cloud/ssk-it/ssk-canon/cadrages/2026-051), `ADR-application-de-bureau`).
-
 ## Getting started
+
+Skanon is online at [ssk-canon.s3-website.fr-par.scw.cloud](https://ssk-canon.s3-website.fr-par.scw.cloud/): open it and choose a repo. Every view has its own address, of the form `/<owner>/<repo>/<view>`.
+
+This repo holds its code, in Vue 3. To run it locally:
 
 ```bash
 pnpm install
 pnpm dev:web
 ```
 
-The web version, served on `http://localhost:1430`. `pnpm build:web` builds it into `dist-web/`, which any file host can serve.
+Served on `http://localhost:1430`. `pnpm build:web` builds it into `dist-web/`, which any file host can serve.
 
 ## Access to repos
 
-A public repo can be read without signing in. A personal GitHub token — read-only as long as writing is not needed — raises the rate limits and opens private repos. The desktop application keeps it in the system keychain; the web version, in the browser's local storage, in clear or sealed by a passkey — which a project can require.
+A public repo can be read without signing in. A personal GitHub token — read-only as long as writing is not needed — raises the rate limits and opens private repos. Skanon keeps it in the browser's local storage, in clear or sealed by a passkey — which a project can require.
 
 ## Licence
 
-The interface and the web version are published as source-available, under the [Functional Source License 1.1, ALv2 Future License](LICENSE.md) (FSL-1.1-ALv2): anyone may read, modify and use them, except to build a competing product or service. Each version becomes Apache-2.0 two years after its release. The desktop application is proprietary.
+This repo is published as source-available, under the [Functional Source License 1.1, ALv2 Future License](LICENSE.md) (FSL-1.1-ALv2): anyone may read, modify and use it, except to build a competing product or service. Each version becomes Apache-2.0 two years after its release.
