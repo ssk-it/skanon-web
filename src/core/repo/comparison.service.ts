@@ -164,5 +164,5 @@ export function listScopingsDeliveredBetween(
     if (scoping.status !== "livree") continue;
     if (before.scopings.get(id)?.status !== "livree") out.push(id);
   }
-  return out.sort();
+  return out.sort((a, b) => a.localeCompare(b));
 }
