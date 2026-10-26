@@ -1,0 +1,61 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import {
+  LIBELLE_STATUT_CADRAGE,
+  type StatutCadrage,
+} from "../../core/model/model";
+
+/**
+ * Le statut d'un cadrage, encodé par la forme autant que par le texte : la couleur seule ne suffit pas à distinguer quatre états d'un coup d'œil.
+ */
+const props = defineProps<{ statut: StatutCadrage }>();
+
+const libelle = computed(() => LIBELLE_STATUT_CADRAGE[props.statut]);
+</script>
+
+<template>
+  <span class="statut-chip chip" :class="'s-' + statut">{{ libelle }}</span>
+</template>
+
+<style scoped>
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 2px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.s-brouillon {
+  color: var(--pc-statut-brouillon);
+  background: var(--pc-statut-brouillon-bg);
+  border-color: var(--pc-statut-brouillon-bd);
+}
+.s-en_relecture {
+  color: var(--pc-statut-relecture);
+  background: var(--pc-statut-relecture-bg);
+  border-color: var(--pc-statut-relecture-bd);
+}
+.s-validee {
+  color: var(--pc-statut-validee);
+  background: var(--pc-statut-validee-bg);
+  border-color: var(--pc-statut-validee-bd);
+}
+.s-livree {
+  color: var(--pc-statut-livree);
+  background: var(--pc-statut-livree-bg);
+  border-color: var(--pc-statut-livree-bd);
+}
+</style>

@@ -1,0 +1,71 @@
+name: Contrôles
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Runners de GitHub, et non les Mac de ssk-it comme ailleurs dans l'organisation : le dépôt est public, et une demande de fusion venue d'un fork exécute son code sur le runner. Un runner neuf à chaque job ne garde rien de ce qu'un tiers y a fait.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  interface:
+    name: Interface (types, lint, format, tests, build web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Lit la version dans `packageManager`.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Types
+        run: pnpm typecheck
+
+      # Pas de --fix : la CI constate, elle ne corrige pas.
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Build de la version web
+        run: pnpm exec vite build --mode web
+
+  navigateur:
+    name: Navigateur (WebKit sans tête)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Installer WebKit et ses dépendances
+        run: pnpm exec playwright install --with-deps webkit
+
+      - name: Tests du navigateur
+        run: pnpm test:navigateur
