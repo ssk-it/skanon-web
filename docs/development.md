@@ -21,7 +21,6 @@ src/                    The interface, shared by the web version and the desktop
   features/             The views, one folder per domain
     shared/             What several views share: loading state, dialogs, Markdown
 tools/pwa/              What only the web version publishes: manifest, icons, service worker, SSK Canon handover
-tools/cutover/          The test of Skanon's handover from SSK Canon
 public/                 The logo, copied as is into the deliverable
 ```
 
@@ -129,22 +128,10 @@ The web version (`pnpm build:web`) is an installable application, which takes SS
 
 The service worker is registered only by the built web version (`src/platform/web.ts`): not by the development server, nor the tests, nor the desktop application. Versions are announced through the `VersionAnnouncer` port of `src/platform/ports.ts`, which `VersionService` (`src/core/ui/version.service.ts`) listens to and the banner of `App.vue` displays; the desktop application provides its own announcer.
 
-### Testing the handover
-
-```bash
-pnpm build:web
-node tools/cutover/test-handover.mjs
-```
-
-In headless Chromium, without a window: the test serves the SSK Canon build, waits for its service worker to control the page and fill its caches, then serves, at the same origin, `dist-web/` laid over the old build, without `ngsw.json` — which is what deployment does. It reloads up to three times, and checks that Skanon is displayed, that Skanon's service worker controls the page, that Angular's caches are gone, and that the page is still served offline, including a view never opened before. The SSK Canon build is expected in `../ssk-canon-pwa-mesures/app/dist/app/browser/`, or under `--ancienne <folder>`.
-
-`--sans-releve` (without Skanon's `/ngsw-worker.js`) and `--garder-ngsw-json` (the old `ngsw.json` still served) each remove one of the two mechanisms that dislodge Angular's service worker: either alone is enough, both together make the test fail — which is how we check that it sees the defect.
-
 ## Tooling pitfalls
 
 - **Under pnpm's global store**, `node_modules` leads outside the repo, and Vite's server refuses to serve a file from there: a font goes missing with no visible error. `server.fs.allow` in `vite.config.ts` opens it.
 - **`data:` images** are refused by a `default-src 'self'` content security policy, the desktop application's: `assetsInlineLimit: 0` always emits them as files.
-- **Angular's service worker fills its caches only on its first request**, not on installation: a test that switches hosting as soon as it controls the page sees it fetch `index.html` from the new hosting, and believes in a handover that did not happen. `test-handover.mjs` waits until `index.html` is in its cache.
 - **The handover takes two loads.** The first is still served by Angular's service worker, from its cache; it is after that load that the browser rechecks the registered script and installs the handover. An author who had the application open therefore sees Skanon on the second load.
 
 ## Checks
