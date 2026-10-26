@@ -1,57 +1,68 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { RouterLink } from "vue-router";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { COMPOSITION } from "../../extension/composer";
 import ExternalLink from "../../ui/ExternalLink.vue";
 import UiIcon from "../../ui/UiIcon.vue";
+import { legalNoticeMessages } from "./legal-notice.messages";
 
 /**
- * The publisher's legal notice, taken from https://www.ssk-it.fr/mentions-legales/: a change to one is carried over to the other.
+ * The publisher's legal notice, taken from https://www.ssk-it.fr/mentions-legales/: a change to one is carried over to the other. The English one is a translation, and says so (RG-textes-traduits).
  *
  * Like the help, it says only what holds for the deliverable one is on (2026-054, decision 03): its host, what it presents of the publisher and its licence come from its extension (ADR-extensions-commerciales). What concerns data stays consistent with the « Fonctionnement » page, which details it (RG-aide-fidele).
  */
-const legalNotice = inject(COMPOSITION).legalNotice;
+const locale = inject(LocaleService);
+const t = locale.messages(legalNoticeMessages);
+const brought = inject(COMPOSITION).legalNotice;
+const legalNotice = computed(() => {
+  const language = locale.language();
+  return {
+    host: brought.host?.[language] ?? null,
+    data: brought.data.map((phrase) => phrase[language]),
+    ownership: brought.ownership.map((phrase) => phrase[language]),
+  };
+});
 </script>
 
 <template>
   <article class="mentions-page">
     <header class="entete">
-      <h1>Mentions légales</h1>
+      <h1>{{ t().title }}</h1>
+      <p v-if="t().translation" class="traduction">{{ t().translation }}</p>
     </header>
 
     <section>
-      <h2><UiIcon name="badge" />Éditeur</h2>
+      <h2><UiIcon name="badge" />{{ t().publisher }}</h2>
       <dl>
-        <dt>Nom</dt>
+        <dt>{{ t().name }}</dt>
         <dd>Sébastien Skorupski</dd>
-        <dt>Forme juridique</dt>
-        <dd>Auto-entrepreneur</dd>
-        <dt>Adresse</dt>
+        <dt>{{ t().legalForm }}</dt>
+        <dd>{{ t().legalFormValue }}</dd>
+        <dt>{{ t().address }}</dt>
         <dd>
           554 rue Mathieu Pichon<br />
           43330 Saint-Ferréol-d’Auroure, France
         </dd>
-        <dt>Contact</dt>
+        <dt>{{ t().contact }}</dt>
         <!-- The domain is added by the stylesheet, as on ssk-it.fr: the full address is written neither in the page nor in the bundle. -->
         <dd class="courriel">skanon</dd>
         <dt>SIRET</dt>
         <dd>511 992 406 00047</dd>
-        <dt>N° TVA intracommunautaire</dt>
+        <dt>{{ t().vat }}</dt>
         <dd>FR 78511992406</dd>
       </dl>
     </section>
 
     <section v-if="legalNotice.host">
-      <h2><UiIcon name="cloud" />Hébergeur</h2>
+      <h2><UiIcon name="cloud" />{{ t().host }}</h2>
       <p>{{ legalNotice.host }}</p>
     </section>
 
     <section>
-      <h2><UiIcon name="copyright" />Propriété intellectuelle</h2>
-      <p>
-        Les droits d’auteur sur Skanon appartiennent à Sébastien Skorupski.
-        Chaque partie est publiée sous sa propre licence.
-      </p>
+      <h2><UiIcon name="copyright" />{{ t().ownership }}</h2>
+      <p>{{ t().copyright }}</p>
       <template v-for="(phrase, rang) in legalNotice.ownership" :key="rang">
         <p v-if="typeof phrase === 'string'">{{ phrase }}</p>
         <p v-else>
@@ -62,26 +73,20 @@ const legalNotice = inject(COMPOSITION).legalNotice;
           >{{ phrase.after }}
         </p>
       </template>
-      <p>
-        Les composants libres sur lesquels Skanon s’appuie restent sous leurs
-        propres licences. Les référentiels qu’il affiche appartiennent à leurs
-        auteurs.
-      </p>
+      <p>{{ t().components }}</p>
     </section>
 
     <section>
-      <h2><UiIcon name="shield" />Données personnelles</h2>
+      <h2><UiIcon name="shield" />{{ t().personalData }}</h2>
       <p>
-        Skanon ne dépose aucun cookie et n’emploie aucun outil de mesure
-        d’audience. Il n’a pas de serveur qui garde vos données : ce qu’il lit,
-        il le tient de GitHub, et le garde sur ce poste.
+        {{ t().noTracking }}
         <template v-for="phrase in legalNotice.data" :key="phrase">
           {{ phrase }}
         </template>
       </p>
       <p>
-        Ce que Skanon fait de vos jetons, ce qu’il garde, et à qui il parle :
-        <RouterLink to="/aide">Fonctionnement de Skanon</RouterLink>.
+        {{ t().seeHelp }}
+        <RouterLink to="/aide">{{ t().help }}</RouterLink>.
       </p>
     </section>
   </article>
@@ -96,6 +101,10 @@ h1 {
   margin: 0 0 6px;
   font-size: 26px;
   font-weight: 600;
+}
+
+.traduction {
+  color: var(--mat-sys-on-surface-variant);
 }
 
 section {

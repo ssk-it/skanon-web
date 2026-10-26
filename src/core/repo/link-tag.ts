@@ -13,3 +13,17 @@ export function normalizeTag(raw: string): string {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 }
+
+/**
+ * The kind an entry designates: a known kind's label, in the displayed language, gives its key; anything else is reduced (RG-nature-lien-normalisee). The key never derives from a translated label, which would write `trello_card` next to `carte_trello`.
+ */
+export function tagFromInput(
+  raw: string,
+  labels: Readonly<Record<string, string>>,
+): string {
+  const entered = normalizeTag(raw);
+  const known = Object.entries(labels).find(
+    ([, label]) => normalizeTag(label) === entered,
+  );
+  return known ? known[0] : entered;
+}
