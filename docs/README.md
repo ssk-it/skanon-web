@@ -8,7 +8,8 @@
 4. [clean-code.md](clean-code.md) — how the inside of a unit is written, and what the tooling enforces.
 5. [conventions.md](conventions.md) — naming, language, comments, commits.
 6. [glossary.md](glossary.md) — each domain term, as the format writes it and as the code names it.
-7. [deployment.md](deployment.md) — deploying the web version, and its protected environment.
+7. [accessibility.md](accessibility.md) — WCAG 2.2 AA: what each criterion asks of Skanon's code, and how to check it.
+8. [deployment.md](deployment.md) — deploying the web version, and its protected environment.
 
 ## By task
 
@@ -16,6 +17,7 @@
 | --------------------------------------- | ----------------------------------------------------------------------- |
 | Add a view or a route                   | [development.md](development.md#adding-a-view)                          |
 | Talk to the system (secret, link, file) | [practices.md](practices.md#the-boundary-with-the-system)               |
+| Make a view accessible (WCAG 2.2 AA)    | [accessibility.md](accessibility.md)                                    |
 | Write a test                            | [practices.md](practices.md#tests)                                      |
 | Run a single test, or in watch mode     | [development.md](development.md#everyday-tasks)                         |
 | Consume this repo as a package          | [development.md](development.md#the-package)                            |
