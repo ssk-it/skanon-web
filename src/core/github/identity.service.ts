@@ -4,6 +4,7 @@ import { SpecificationStore } from "../repo/specification.store";
 import { TokenService, TemporaryAccess } from "./token.service";
 import { IdentitySettings } from "../model/model";
 import { githubText } from "./github.messages";
+import { trimTrailing } from "../text";
 
 /** What is kept between leaving for the issuer and coming back. */
 const PENDING_KEY = "ssk-canon.identite.attente";
@@ -24,10 +25,10 @@ function randomBytes(bytes = 32): string {
 function base64url(bytes: Uint8Array): string {
   let binary = "";
   for (const o of bytes) binary += String.fromCharCode(o);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return trimTrailing(
+    btoa(binary).replace(/\+/g, "-").replace(/\//g, "_"),
+    "=",
+  );
 }
 
 /**

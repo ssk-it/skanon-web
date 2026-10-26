@@ -50,6 +50,7 @@ import {
   checkDeclaredFolders,
   resolveNames,
 } from "./repo-names";
+import { trimTrailing } from "../text";
 
 /**
  * The key of `dossiers` naming each directory that carries entities, under
@@ -814,9 +815,9 @@ export function parseIdentity(raw: unknown): {
   return {
     identity: {
       // a trailing slash would double the separators of built addresses
-      issuer: values["emetteur"].replace(/\/+$/, ""),
+      issuer: trimTrailing(values["emetteur"], "/"),
       client: values["client"],
-      exchange: values["echange"].replace(/\/+$/, ""),
+      exchange: trimTrailing(values["echange"], "/"),
     },
     anomalies: [],
   };

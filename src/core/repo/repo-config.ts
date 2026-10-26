@@ -1,5 +1,6 @@
 import { signal } from "../signals";
 import { RepoRef } from "../github/github-client";
+import { trimTrailing } from "../text";
 
 const KEY = "ssk-canon.depot";
 const RECENTS_KEY = "ssk-canon.depots-recents";
@@ -115,10 +116,7 @@ export class RepoConfig {
 
   /** Accepts « owner/repo » or a full GitHub URL. */
   static parseRepo(input: string): RepoRef | null {
-    const cleaned = input
-      .trim()
-      .replace(/\.git$/, "")
-      .replace(/\/+$/, "");
+    const cleaned = trimTrailing(input.trim().replace(/\.git$/, ""), "/");
     if (!cleaned) return null;
 
     const url = /github\.com\/([^/]+)\/([^/]+)/.exec(cleaned);
