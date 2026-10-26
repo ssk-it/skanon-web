@@ -56,7 +56,7 @@ pnpm vitest run --project jsdom src/core/signals.test.ts
 pnpm test:watch src/core/http
 ```
 
-The jsdom tests' coverage, written to `coverage/` (`lcov.info` and an HTML report):
+The coverage of the jsdom and tooling tests, written to `coverage/` (`lcov.info` and an HTML report):
 
 ```bash
 pnpm test:coverage
