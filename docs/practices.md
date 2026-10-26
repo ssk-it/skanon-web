@@ -48,11 +48,11 @@ What these adapters store on the machine is a persisted format, which outlives a
 
 **During the work, windowless tests:**
 
-| Level     | Tool                                          | What it exercises                                         | What it does not see |
-| --------- | --------------------------------------------- | --------------------------------------------------------- | -------------------- |
-| Interface | Vitest, jsdom (`*.test.ts`)                   | Services, stores, components mounted by `@vue/test-utils` | Page layout          |
-| Browser   | Vitest, headless WebKit (`*.browser.test.ts`) | Layout, scrolling, fonts                                  | Classic scrollbars   |
-| Tooling   | Vitest, Node (`tools/**/*.test.mjs`)          | The logic of the repo's workflows, against a fake GitHub  | GitHub itself        |
+| Level     | Tool                                          | What it exercises                                                                             | What it does not see                           |
+| --------- | --------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Interface | Vitest, jsdom (`*.test.ts`)                   | Services, stores, components mounted by `@vue/test-utils`                                     | Page layout                                    |
+| Browser   | Vitest, headless WebKit (`*.browser.test.ts`) | Layout, scrolling, fonts                                                                      | Classic scrollbars                             |
+| Tooling   | Vitest, Node (`tools/**/*.test.{mjs,ts}`)     | The logic of the repo's workflows, against a fake GitHub; the PWA plugin, on a made-up bundle | GitHub itself; the service worker in a browser |
 
 **Every external boundary** has at least three cases: the expected response, absence, refusal — leading to three distinct states. The HTTP fake (`src/core/http/http-testing.ts`) produces them: `flush(body)`, `flush(null, { status: 404 })`, `error(…)` for no response. The passkey is faked by `FakeAuthenticator` (`src/platform/authenticator-testing.ts`), which, like a real one, returns the same 32 bytes for a given passkey and salt; the encryption itself is the real one, WebCrypto's. The WebAuthn call is exercised only at the end of the work, in a real browser.
 
