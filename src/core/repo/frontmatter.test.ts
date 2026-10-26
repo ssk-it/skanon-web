@@ -1,3 +1,5 @@
+import { formaterAnomalie } from "@ssk-it/canon-check";
+import { splitFrontmatter as canonSplit } from "@ssk-it/canon-check/format";
 import { describe, expect, it } from "vitest";
 import { inject } from "../injection";
 import { LocaleService } from "../i18n/locale.service";
@@ -84,10 +86,24 @@ plusieurs lignes.
       "---\nid: x\ntitre: Choisir : ceci ou cela\n---\ncorps",
     );
     expect(isUnreadable(r) && r.error).toContain(
-      "unreadable frontmatter, line 3",
+      "unreadable frontmatter at line 3",
     );
-    expect(isUnreadable(r) && r.error).toContain("must be in quotes");
+    expect(isUnreadable(r) && r.error).toContain("must be in single quotes");
     expect(isUnreadable(r) && r.error).not.toContain("illisible");
+  });
+
+  // RG-parseur-partage, RG-anomalies-codees: the message is the library's, in the displayed language — not a second wording of the same fault.
+  it("says the library's message, in each language", () => {
+    const text = "---\nid: x\ntitre: Choisir : ceci ou cela\n---\ncorps";
+    const library = canonSplit(text);
+    if (!library || !("anomalie" in library)) throw new Error("readable");
+    for (const language of ["fr", "en"] as const) {
+      inject(LocaleService).choice.set(language);
+      const r = splitFrontmatter(text);
+      expect(isUnreadable(r) && r.error).toBe(
+        formaterAnomalie(library.anomalie, language),
+      );
+    }
   });
 
   it("accepts Windows line endings", () => {
