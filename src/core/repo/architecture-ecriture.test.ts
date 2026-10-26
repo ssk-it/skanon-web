@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { serializeCadrage } from "./redaction.service";
-import type { CadrageEditable } from "./redaction.service";
+import { serializeScoping } from "./redaction.service";
+import type { EditableScoping } from "./redaction.service";
 
 /**
  * Ce qu'un cadrage écrit quand il vise une cible d'architecture.
@@ -10,62 +10,62 @@ import type { CadrageEditable } from "./redaction.service";
  * toujours comme `regle` produirait un fichier accepté à la saisie, refusé à la
  * livraison, et le rédacteur ne l'apprendrait qu'une fois sa demande ouverte.
  */
-function cadrage(partiel: Partial<CadrageEditable>): CadrageEditable {
+function scoping(partial: Partial<EditableScoping>): EditableScoping {
   return {
-    titre: "Un cadrage",
-    domaines: [],
-    liens: [],
+    title: "Un cadrage",
+    domains: [],
+    links: [],
     impacts: [],
-    objectif: "Un objectif.",
-    parcours: "",
-    sectionsLibres: [],
-    ...partiel,
-  } as unknown as CadrageEditable;
+    goal: "Un objectif.",
+    journey: "",
+    freeSections: [],
+    ...partial,
+  } as unknown as EditableScoping;
 }
 
 describe("écriture d’un impact vers une cible d’architecture", () => {
   it("écrit le champ correspondant à la nature visée", () => {
-    const texte = serializeCadrage(
+    const text = serializeScoping(
       "2026-001",
-      cadrage({
+      scoping({
         impacts: [
           {
-            cible: "RG-a",
-            nature: "regle",
+            target: "RG-a",
+            kind: "regle",
             operation: "cree",
-            enonce: "Une règle.",
+            statement: "Une règle.",
           },
           {
-            cible: "ADR-b",
-            nature: "adr",
+            target: "ADR-b",
+            kind: "adr",
             operation: "cree",
-            enonce: "Une décision.",
+            statement: "Une décision.",
           },
           {
-            cible: "FLX-c",
-            nature: "architecture",
+            target: "FLX-c",
+            kind: "architecture",
             operation: "modifie",
-            enonce: "Un flux.",
+            statement: "Un flux.",
           },
         ],
       }),
     );
 
-    expect(texte).toContain("- { regle: RG-a, operation: cree }");
-    expect(texte).toContain("- { adr: ADR-b, operation: cree }");
-    expect(texte).toContain("- { architecture: FLX-c, operation: modifie }");
+    expect(text).toContain("- { regle: RG-a, operation: cree }");
+    expect(text).toContain("- { adr: ADR-b, operation: cree }");
+    expect(text).toContain("- { architecture: FLX-c, operation: modifie }");
   });
 
   it("titre les énoncés par l’identifiant visé, quelle que soit la nature", () => {
-    const texte = serializeCadrage(
+    const text = serializeScoping(
       "2026-001",
-      cadrage({
+      scoping({
         impacts: [
           {
-            cible: "ADR-b",
-            nature: "adr",
+            target: "ADR-b",
+            kind: "adr",
             operation: "cree",
-            enonce: "Une décision.",
+            statement: "Une décision.",
           },
         ],
       }),
@@ -73,20 +73,20 @@ describe("écriture d’un impact vers une cible d’architecture", () => {
 
     // La propagation retrouve l'énoncé par l'identifiant de la cible : un titre
     // portant autre chose la laisserait sans rien à écrire.
-    expect(texte).toContain("### ADR-b");
-    expect(texte).toContain("Une décision.");
+    expect(text).toContain("### ADR-b");
+    expect(text).toContain("Une décision.");
   });
 
   it("écrit « regle » pour un impact dont la nature n’est pas renseignée", () => {
     // Les cadrages rédigés avant ce changement n'ont pas de nature. Les écrire
     // sans champ de cible produirait un impact que rien ne peut résoudre.
-    const texte = serializeCadrage(
+    const text = serializeScoping(
       "2026-001",
-      cadrage({
-        impacts: [{ cible: "RG-ancien", operation: "touche", enonce: "" }],
-      } as Partial<CadrageEditable>),
+      scoping({
+        impacts: [{ target: "RG-ancien", operation: "touche", statement: "" }],
+      } as Partial<EditableScoping>),
     );
 
-    expect(texte).toContain("- { regle: RG-ancien, operation: touche }");
+    expect(text).toContain("- { regle: RG-ancien, operation: touche }");
   });
 });

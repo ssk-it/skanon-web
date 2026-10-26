@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ORDRE_CYCLE_VIE,
-  ORDRE_HISTORIQUE,
-  StatutCadrage,
-} from "../model/model";
+import { LIFECYCLE_ORDER, HISTORY_ORDER, ScopingStatus } from "../model/model";
 
 /**
  * Deux ordres coexistent, et ce n'est pas une incohérence.
@@ -12,90 +8,90 @@ import {
  * y cherche ce qui demande de l'attention. La chronologie d'une règle suit
  * l'ordre inverse, parce qu'on y remonte depuis l'état actuel.
  */
-function trier(
-  entrees: Array<{ id: string; statut: StatutCadrage }>,
-  ordre: Record<StatutCadrage, number>,
-  idCroissant = true,
+function sort(
+  entries: Array<{ id: string; status: ScopingStatus }>,
+  order: Record<ScopingStatus, number>,
+  ascendingId = true,
 ) {
-  return [...entrees]
+  return [...entries]
     .sort((a, b) => {
-      const parStatut = ordre[a.statut] - ordre[b.statut];
-      if (parStatut !== 0) return parStatut;
-      return idCroissant ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id);
+      const byStatus = order[a.status] - order[b.status];
+      if (byStatus !== 0) return byStatus;
+      return ascendingId ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id);
     })
     .map((e) => e.id);
 }
 
 describe("ordre de la liste des cadrages", () => {
   it("place les brouillons devant et les livrés en dernier", () => {
-    const ordre = trier(
+    const order = sort(
       [
-        { id: "2026-001", statut: "livree" },
-        { id: "2026-005", statut: "brouillon" },
-        { id: "2026-003", statut: "validee" },
-        { id: "2026-004", statut: "en_relecture" },
+        { id: "2026-001", status: "livree" },
+        { id: "2026-005", status: "brouillon" },
+        { id: "2026-003", status: "validee" },
+        { id: "2026-004", status: "en_relecture" },
       ],
-      ORDRE_CYCLE_VIE,
+      LIFECYCLE_ORDER,
       false,
     );
-    expect(ordre).toEqual(["2026-005", "2026-004", "2026-003", "2026-001"]);
+    expect(order).toEqual(["2026-005", "2026-004", "2026-003", "2026-001"]);
   });
 
   it("place le plus récent en tête à statut égal", () => {
-    const ordre = trier(
+    const order = sort(
       [
-        { id: "2026-008", statut: "livree" },
-        { id: "2026-002", statut: "livree" },
-        { id: "2026-010", statut: "livree" },
+        { id: "2026-008", status: "livree" },
+        { id: "2026-002", status: "livree" },
+        { id: "2026-010", status: "livree" },
       ],
-      ORDRE_CYCLE_VIE,
+      LIFECYCLE_ORDER,
       false,
     );
     // la séquence sur trois chiffres rend la comparaison textuelle correcte
-    expect(ordre).toEqual(["2026-010", "2026-008", "2026-002"]);
+    expect(order).toEqual(["2026-010", "2026-008", "2026-002"]);
   });
 
   it("respecte le passage d’une année à l’autre", () => {
-    const ordre = trier(
+    const order = sort(
       [
-        { id: "2026-012", statut: "livree" },
-        { id: "2027-001", statut: "livree" },
+        { id: "2026-012", status: "livree" },
+        { id: "2027-001", status: "livree" },
       ],
-      ORDRE_CYCLE_VIE,
+      LIFECYCLE_ORDER,
       false,
     );
-    expect(ordre).toEqual(["2027-001", "2026-012"]);
+    expect(order).toEqual(["2027-001", "2026-012"]);
   });
 });
 
 describe("ordre de la chronologie d’une règle", () => {
   it("place les livrés en tête, du plus récent au plus ancien", () => {
-    const ordre = trier(
+    const order = sort(
       [
-        { id: "2026-002", statut: "livree" },
-        { id: "2026-009", statut: "brouillon" },
-        { id: "2026-006", statut: "livree" },
+        { id: "2026-002", status: "livree" },
+        { id: "2026-009", status: "brouillon" },
+        { id: "2026-006", status: "livree" },
       ],
-      ORDRE_HISTORIQUE,
+      HISTORY_ORDER,
       false,
     );
     // on part de l'état actuel pour remonter vers l'origine de la règle
-    expect(ordre).toEqual(["2026-006", "2026-002", "2026-009"]);
+    expect(order).toEqual(["2026-006", "2026-002", "2026-009"]);
   });
 
   it("est bien l’inverse du cycle de vie sur les statuts", () => {
-    const statuts: StatutCadrage[] = [
+    const statuses: ScopingStatus[] = [
       "brouillon",
       "en_relecture",
       "validee",
       "livree",
     ];
-    const cycle = [...statuts].sort(
-      (a, b) => ORDRE_CYCLE_VIE[a] - ORDRE_CYCLE_VIE[b],
+    const cycle = [...statuses].sort(
+      (a, b) => LIFECYCLE_ORDER[a] - LIFECYCLE_ORDER[b],
     );
-    const histoire = [...statuts].sort(
-      (a, b) => ORDRE_HISTORIQUE[a] - ORDRE_HISTORIQUE[b],
+    const history = [...statuses].sort(
+      (a, b) => HISTORY_ORDER[a] - HISTORY_ORDER[b],
     );
-    expect(histoire).toEqual([...cycle].reverse());
+    expect(history).toEqual([...cycle].reverse());
   });
 });

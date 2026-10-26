@@ -1,7 +1,7 @@
-import type { Cadrage } from "../model/model";
+import type { Scoping } from "../model/model";
 
 /** Le dépôt qui porte le cadrage cité. */
-export interface RefDepotCourt {
+export interface ShortRepoRef {
   readonly owner: string;
   readonly repo: string;
 }
@@ -13,20 +13,20 @@ export interface RefDepotCourt {
  * la fiche existe, la discussion est ouverte, ou ce dépôt ne connaît pas cet
  * identifiant.
  */
-export type CibleReference =
+export type ReferenceTarget =
   | {
-      readonly genre: "fiche";
-      readonly lien: unknown[];
-      readonly libelle: string;
+      readonly kind: "fiche";
+      readonly link: unknown[];
+      readonly label: string;
     }
   | {
-      readonly genre: "demande";
+      readonly kind: "demande";
       readonly url: string;
-      readonly libelle: string;
+      readonly label: string;
       /** Vrai tant que la demande est en brouillon : la discussion n'est pas ouverte. */
-      readonly enCours: boolean;
+      readonly inProgress: boolean;
     }
-  | { readonly genre: "inconnu"; readonly libelle: string };
+  | { readonly kind: "inconnu"; readonly label: string };
 
 /**
  * Résout une référence écrite par identifiant — RG-reference-par-identifiant.
@@ -39,36 +39,36 @@ export type CibleReference =
  * le cadrage peut être en cours ailleurs, sur une branche que ce chargement n'a
  * pas vue. Le dire vaut mieux que de fabriquer un lien mort.
  */
-export function resoudreReferenceCadrage(
+export function resolveScopingReference(
   id: string,
-  cadrages: Iterable<Cadrage>,
-  depot: RefDepotCourt,
-): CibleReference {
-  const cadrage = [...cadrages].find((c) => c.id === id);
-  if (!cadrage) return { genre: "inconnu", libelle: id };
+  scopings: Iterable<Scoping>,
+  repoRef: ShortRepoRef,
+): ReferenceTarget {
+  const scoping = [...scopings].find((c) => c.id === id);
+  if (!scoping) return { kind: "inconnu", label: id };
 
-  const p = cadrage.provenance;
+  const p = scoping.provenance;
   if (p) {
     return {
-      genre: "demande",
+      kind: "demande",
       // Sans demande de fusion, la branche est ce qui se consulte.
       url: p.pullRequest
-        ? `https://github.com/${depot.owner}/${depot.repo}/pull/${p.pullRequest}`
-        : `https://github.com/${depot.owner}/${depot.repo}/tree/${p.branche}`,
-      libelle: id,
-      enCours: p.brouillon,
+        ? `https://github.com/${repoRef.owner}/${repoRef.repo}/pull/${p.pullRequest}`
+        : `https://github.com/${repoRef.owner}/${repoRef.repo}/tree/${p.branch}`,
+      label: id,
+      inProgress: p.draft,
     };
   }
 
   return {
-    genre: "fiche",
-    lien: ["/", depot.owner, depot.repo, "cadrages", id],
-    libelle: id,
+    kind: "fiche",
+    link: ["/", repoRef.owner, repoRef.repo, "cadrages", id],
+    label: id,
   };
 }
 
 /** Un identifiant de cadrage, tel qu'il est stocké : `AAAA-NNN`. */
-const FORME_IDENTIFIANT = /^\d{4}-\d{3,}$/;
+const IDENTIFIER_SHAPE = /^\d{4}-\d{3,}$/;
 
 /**
  * L'identifiant stocké derrière une référence, préfixée ou non — RG-prefixe-projet.
@@ -80,19 +80,19 @@ const FORME_IDENTIFIANT = /^\d{4}-\d{3,}$/;
  *
  * Rend `null` quand la référence ne désigne rien dans ce projet.
  */
-export function extraireIdentifiantCadrage(
+export function extractScopingIdentifier(
   reference: string,
-  prefixe: string | null,
+  prefix: string | null,
 ): string | null {
-  const propre = reference.trim();
-  if (FORME_IDENTIFIANT.test(propre)) return propre;
+  const own = reference.trim();
+  if (IDENTIFIER_SHAPE.test(own)) return own;
 
-  if (!prefixe) return null;
-  const attendu = `${prefixe}-`;
-  if (!propre.startsWith(attendu)) return null;
+  if (!prefix) return null;
+  const expected = `${prefix}-`;
+  if (!own.startsWith(expected)) return null;
 
-  const reste = propre.slice(attendu.length);
-  return FORME_IDENTIFIANT.test(reste) ? reste : null;
+  const rest = own.slice(expected.length);
+  return IDENTIFIER_SHAPE.test(rest) ? rest : null;
 }
 
 /**
@@ -103,9 +103,6 @@ export function extraireIdentifiantCadrage(
  * adresse, le routage acceptant les deux formes — c'est ce qui rend l'écart
  * entre l'affiché et le stocké invisible au lecteur.
  */
-export function afficherIdentifiant(
-  id: string,
-  prefixe: string | null,
-): string {
-  return prefixe ? `${prefixe}-${id}` : id;
+export function displayIdentifier(id: string, prefix: string | null): string {
+  return prefix ? `${prefix}-${id}` : id;
 }

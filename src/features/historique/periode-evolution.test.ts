@@ -4,11 +4,11 @@ import { createMemoryHistory } from "vue-router";
 import { GithubClient } from "../../core/github/github-client";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { inject, provide } from "../../core/injection";
-import { ComparaisonService } from "../../core/repo/comparaison.service";
+import { ComparisonService } from "../../core/repo/comparaison.service";
 import { RepoConfig } from "../../core/repo/repo-config";
-import { createRouteur } from "../../routeur";
+import { createAppRouter } from "../../routeur";
 import EvolutionPage from "./EvolutionPage.vue";
-import { DerniereVisite, debutPeriode } from "./periodes";
+import { LastVisit, periodStart } from "./periodes";
 
 /**
  * L'Évolution à l'ouverture — RG-periode-par-defaut.
@@ -16,59 +16,59 @@ import { DerniereVisite, debutPeriode } from "./periodes";
  * Ce qui est éprouvé ici, c'est qu'elle répond d'emblée à la question qu'on lui pose — qu'est-ce qui a changé depuis la dernière fois ? — et qu'elle dit laquelle des périodes elle a retenue.
  */
 
-const MAINTENANT = new Date("2026-10-06T12:00:00Z");
-const JOUR = 86_400_000;
+const NOW = new Date("2026-10-06T12:00:00Z");
+const DAY = 86_400_000;
 
 describe("Les périodes toutes faites", () => {
   it("remontent du nombre de jours annoncé", () => {
-    expect(debutPeriode("7-jours", MAINTENANT, null)?.toISOString()).toBe(
-      new Date(MAINTENANT.getTime() - 7 * JOUR).toISOString(),
+    expect(periodStart("7-jours", NOW, null)?.toISOString()).toBe(
+      new Date(NOW.getTime() - 7 * DAY).toISOString(),
     );
-    expect(debutPeriode("30-jours", MAINTENANT, null)?.getTime()).toBe(
-      MAINTENANT.getTime() - 30 * JOUR,
+    expect(periodStart("30-jours", NOW, null)?.getTime()).toBe(
+      NOW.getTime() - 30 * DAY,
     );
-    expect(debutPeriode("3-mois", MAINTENANT, null)?.getTime()).toBe(
-      MAINTENANT.getTime() - 90 * JOUR,
+    expect(periodStart("3-mois", NOW, null)?.getTime()).toBe(
+      NOW.getTime() - 90 * DAY,
     );
   });
 
   it("partent de la dernière visite quand elle est connue", () => {
-    const visite = new Date("2026-09-10T08:00:00Z");
-    expect(debutPeriode("visite", MAINTENANT, visite)).toEqual(visite);
-    expect(debutPeriode("visite", MAINTENANT, null)).toBeNull();
+    const visit = new Date("2026-09-10T08:00:00Z");
+    expect(periodStart("visite", NOW, visit)).toEqual(visit);
+    expect(periodStart("visite", NOW, null)).toBeNull();
   });
 });
 
 /**
  * Un stockage complet, substitué à celui du banc d'essai. Ce qui est éprouvé ici est la mémoire des visites, non la capacité du navigateur à stocker.
  */
-function substituerStockage(nom: "localStorage" | "sessionStorage"): void {
-  let valeurs: Record<string, string> = {};
-  Object.defineProperty(globalThis, nom, {
+function substituteStorage(name: "localStorage" | "sessionStorage"): void {
+  let values: Record<string, string> = {};
+  Object.defineProperty(globalThis, name, {
     configurable: true,
     value: {
-      getItem: (c: string) => valeurs[c] ?? null,
-      setItem: (c: string, v: string) => void (valeurs[c] = v),
-      removeItem: (c: string) => void delete valeurs[c],
-      clear: () => void (valeurs = {}),
+      getItem: (c: string) => values[c] ?? null,
+      setItem: (c: string, v: string) => void (values[c] = v),
+      removeItem: (c: string) => void delete values[c],
+      clear: () => void (values = {}),
     },
   });
 }
 
 describe("La dernière visite", () => {
-  const depot = { owner: "org", repo: "depot" };
+  const repoRef = { owner: "org", repo: "depot" };
 
   beforeEach(() => {
-    substituerStockage("localStorage");
-    substituerStockage("sessionStorage");
+    substituteStorage("localStorage");
+    substituteStorage("sessionStorage");
   });
 
   it("n’existe pas à la première visite, et s’enregistre", () => {
-    const v = new DerniereVisite();
+    const v = new LastVisit();
 
-    expect(v.consulter(depot, MAINTENANT)).toBeNull();
+    expect(v.visit(repoRef, NOW)).toBeNull();
     expect(localStorage.getItem("pc-evolution-visite:org/depot")).toBe(
-      MAINTENANT.toISOString(),
+      NOW.toISOString(),
     );
   });
 
@@ -77,14 +77,14 @@ describe("La dernière visite", () => {
       "pc-evolution-visite:org/depot",
       "2026-09-10T08:00:00.000Z",
     );
-    const v = new DerniereVisite();
+    const v = new LastVisit();
 
-    expect(v.consulter(depot, MAINTENANT)?.toISOString()).toBe(
+    expect(v.visit(repoRef, NOW)?.toISOString()).toBe(
       "2026-09-10T08:00:00.000Z",
     );
     // un rechargement dans la même session ne ramène pas la période à une minute
-    const plusTard = new Date(MAINTENANT.getTime() + 60_000);
-    expect(v.consulter(depot, plusTard)?.toISOString()).toBe(
+    const later = new Date(NOW.getTime() + 60_000);
+    expect(v.visit(repoRef, later)?.toISOString()).toBe(
       "2026-09-10T08:00:00.000Z",
     );
   });
@@ -95,26 +95,26 @@ describe("La dernière visite", () => {
       "2026-09-10T08:00:00.000Z",
     );
 
-    expect(new DerniereVisite().consulter(depot, MAINTENANT)).toBeNull();
+    expect(new LastVisit().visit(repoRef, NOW)).toBeNull();
   });
 });
 
 describe("L’Évolution à l’ouverture", () => {
-  let appels: Array<{ depart: Date; arrivee: Date }>;
-  let visite: Date | null;
+  let calls: Array<{ departure: Date; arrival: Date }>;
+  let visit: Date | null;
 
-  async function monter(): Promise<VueWrapper> {
+  async function mountView(): Promise<VueWrapper> {
     provideHttpTesting();
-    provide(ComparaisonService, {
-      comparer: async (_d: unknown, depart: Date, arrivee: Date) => {
-        appels.push({ depart, arrivee });
+    provide(ComparisonService, {
+      compare: async (_d: unknown, departure: Date, arrival: Date) => {
+        calls.push({ departure, arrival });
         throw new Error("pas de comparaison dans ce test");
       },
     });
-    provide(GithubClient, { dateDuPremierCommit: async () => null });
-    provide(DerniereVisite, { consulter: () => visite });
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
-    const router = createRouteur(createMemoryHistory());
+    provide(GithubClient, { firstCommitDate: async () => null });
+    provide(LastVisit, { visit: () => visit });
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
+    const router = createAppRouter(createMemoryHistory());
     // La racine, non la route de la vue : son garde chargerait le référentiel, que le banc de SSK Canon ne montait pas (`provideRouter([])`).
     await router.push("/");
     await router.isReady();
@@ -126,20 +126,20 @@ describe("L’Évolution à l’ouverture", () => {
     return f.element as HTMLElement;
   }
 
-  function joursAvant(d: Date): number {
-    return Math.round((Date.now() - d.getTime()) / JOUR);
+  function daysBefore(d: Date): number {
+    return Math.round((Date.now() - d.getTime()) / DAY);
   }
 
   beforeEach(() => {
-    appels = [];
-    visite = null;
+    calls = [];
+    visit = null;
   });
 
   it("compare d’emblée les trente derniers jours à la première visite, et le dit", async () => {
-    const el = await stable(await monter());
+    const el = await stable(await mountView());
 
-    expect(appels.length).toBe(1);
-    expect(joursAvant(appels[0].depart)).toBe(30);
+    expect(calls.length).toBe(1);
+    expect(daysBefore(calls[0].departure)).toBe(30);
     expect(el.querySelector(".periode-retenue")?.textContent).toContain(
       "30 derniers jours",
     );
@@ -149,11 +149,11 @@ describe("L’Évolution à l’ouverture", () => {
   });
 
   it("compare depuis la dernière visite quand elle est connue", async () => {
-    visite = new Date(Date.now() - 12 * JOUR);
-    const el = await stable(await monter());
+    visit = new Date(Date.now() - 12 * DAY);
+    const el = await stable(await mountView());
 
-    expect(appels[0].depart.getTime()).toBeLessThanOrEqual(visite.getTime());
-    expect(visite.getTime() - appels[0].depart.getTime()).toBeLessThan(60_000);
+    expect(calls[0].departure.getTime()).toBeLessThanOrEqual(visit.getTime());
+    expect(visit.getTime() - calls[0].departure.getTime()).toBeLessThan(60_000);
     expect(el.querySelector(".periode-retenue")?.textContent).toContain(
       "dernière visite",
     );
@@ -163,12 +163,12 @@ describe("L’Évolution à l’ouverture", () => {
   });
 
   it("ne propose pas la dernière visite quand il n’y en a pas", async () => {
-    const el = await stable(await monter());
+    const el = await stable(await mountView());
 
-    const libelles = [...el.querySelectorAll(".periodes button")].map((b) =>
+    const labels = [...el.querySelectorAll(".periodes button")].map((b) =>
       b.textContent?.trim(),
     );
-    expect(libelles).toEqual([
+    expect(labels).toEqual([
       "7 jours",
       "30 jours",
       "3 mois",
@@ -177,7 +177,7 @@ describe("L’Évolution à l’ouverture", () => {
   });
 
   it("change de période d’un geste", async () => {
-    const f = await monter();
+    const f = await mountView();
     const el = await stable(f);
 
     [...el.querySelectorAll<HTMLButtonElement>(".periodes button")]
@@ -185,12 +185,12 @@ describe("L’Évolution à l’ouverture", () => {
       .click();
     await stable(f);
 
-    expect(appels.length).toBe(2);
-    expect(joursAvant(appels[1].depart)).toBe(7);
+    expect(calls.length).toBe(2);
+    expect(daysBefore(calls[1].departure)).toBe(7);
   });
 
   it("ne montre les dates libres que sur demande", async () => {
-    const f = await monter();
+    const f = await mountView();
     const el = await stable(f);
     expect(el.querySelector("form.bornes")).toBeNull();
 
@@ -201,6 +201,6 @@ describe("L’Évolution à l’ouverture", () => {
 
     expect(el.querySelector("form.bornes")).not.toBeNull();
     // choisir ses dates ne relance rien tant qu'on n'a pas comparé
-    expect(appels.length).toBe(1);
+    expect(calls.length).toBe(1);
   });
 });

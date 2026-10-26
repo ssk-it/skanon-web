@@ -21,8 +21,8 @@ export {
 } from "@ssk-it/canon-check/identite";
 export type { NomIdentite } from "@ssk-it/canon-check/identite";
 
-export type VarianteIdentite = (typeof VARIANTES_IDENTITE)[number];
-export type FormatIdentite = (typeof FORMATS_IDENTITE)[number];
+export type IdentityVariant = (typeof VARIANTES_IDENTITE)[number];
+export type IdentityFormat = (typeof FORMATS_IDENTITE)[number];
 
 /**
  * Les fichiers qui peuvent porter le symbole sur un fond, du meilleur au
@@ -32,8 +32,8 @@ export type FormatIdentite = (typeof FORMATS_IDENTITE)[number];
  * sombre peut disparaître, et l'avatar de l'organisation vaut mieux qu'une
  * identité illisible (RG-identite-affichee).
  */
-export function listCandidatsSymbole(variante: VarianteIdentite): string[] {
-  return [`symbole-${variante}`, "symbole"].flatMap((base) =>
+export function listSymbolCandidates(variant: IdentityVariant): string[] {
+  return [`symbole-${variant}`, "symbole"].flatMap((base) =>
     FORMATS_IDENTITE.map((format) => `${base}.${format}`),
   );
 }
@@ -44,7 +44,7 @@ export function listCandidatsSymbole(variante: VarianteIdentite): string[] {
  * vérification n'a pas à connaître. Distinct du `FichierIdentite` de la
  * bibliothèque (`chemin`, `taille`), qui décrit ce qu'elle contrôle.
  */
-export interface FichierIdentite {
+export interface IdentityFile {
   readonly path: string;
   readonly sha: string;
   readonly size?: number;
@@ -57,18 +57,18 @@ export interface FichierIdentite {
  * Un fichier au-delà de la borne est écarté : la vérification le refuse, et
  * le télécharger ferait payer à l'accueil le poids qu'elle existe pour éviter.
  */
-export function chooseSymbole<F extends FichierIdentite>(
-  fichiers: readonly F[],
-  variante: VarianteIdentite,
+export function chooseSymbol<F extends IdentityFile>(
+  files: readonly F[],
+  variant: IdentityVariant,
 ): F | null {
-  for (const nom of listCandidatsSymbole(variante)) {
-    const f = fichiers.find((x) => x.path === nom);
+  for (const name of listSymbolCandidates(variant)) {
+    const f = files.find((x) => x.path === name);
     if (f && (f.size ?? 0) <= POIDS_MAX_IDENTITE) return f;
   }
   return null;
 }
 
-const TYPES: Record<FormatIdentite, string> = {
+const TYPES: Record<IdentityFormat, string> = {
   svg: "image/svg+xml",
   webp: "image/webp",
   png: "image/png",
@@ -80,7 +80,7 @@ const TYPES: Record<FormatIdentite, string> = {
  * Le canal non décompté sert tout en `text/plain` : sans un type déclaré,
  * l'image ne s'afficherait pas.
  */
-export function formatTypeImage(chemin: string): string | null {
-  const nom = lireNomIdentite(chemin);
-  return nom ? TYPES[nom.format] : null;
+export function formatImageType(path: string): string | null {
+  const name = lireNomIdentite(path);
+  return name ? TYPES[name.format] : null;
 }

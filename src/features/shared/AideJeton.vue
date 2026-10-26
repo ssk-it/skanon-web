@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { inject } from "../../core/injection";
-import { PLATEFORME } from "../../plateforme/jeton";
-import LienExterne from "../../ui/LienExterne.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import { PLATFORM } from "../../plateforme/jeton";
+import ExternalLink from "../../ui/LienExterne.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 
-const auBureau = inject(PLATEFORME).cible === "bureau";
+const onDesktop = inject(PLATFORM).target === "bureau";
 
 /**
  * Comment créer un jeton d'accès GitHub.
@@ -13,7 +13,7 @@ const auBureau = inject(PLATEFORME).cible === "bureau";
  *
  * `collerOu` dit où coller le jeton créé : « ici » dans la connexion, ailleurs là où l'aide se lit sans champ de saisie.
  */
-withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
+withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
 </script>
 
 <template>
@@ -23,10 +23,10 @@ withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
     <ol class="etapes">
       <li>
         Ouvrir
-        <LienExterne
+        <ExternalLink
           href="https://github.com/settings/personal-access-tokens/new"
-          >la page de création d’un jeton <UiIcone nom="open_in_new"
-        /></LienExterne>
+          >la page de création d’un jeton <UiIcon name="open_in_new"
+        /></ExternalLink>
         sur GitHub.
       </li>
       <li>
@@ -42,7 +42,7 @@ withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
         que l’usage demande — voir le tableau ci-dessous.
       </li>
       <li>
-        Créer le jeton, le copier, et le coller {{ collerOu }}. GitHub ne
+        Créer le jeton, le copier, et le coller {{ pasteWhere }}. GitHub ne
         l’affichera plus.
       </li>
     </ol>
@@ -75,7 +75,7 @@ withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
     </table>
 
     <div class="note">
-      <UiIcone nom="help_outline" />
+      <UiIcon name="help_outline" />
       <div>
         <p>
           <strong>Pourquoi écrire demande les deux.</strong> Rédiger un cadrage
@@ -94,7 +94,7 @@ withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
     </div>
 
     <div class="note">
-      <UiIcone nom="help_outline" />
+      <UiIcon name="help_outline" />
       <div>
         <p>
           <strong>Pourquoi lire les issues.</strong> La roadmap d’un projet — ce
@@ -106,12 +106,12 @@ withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
     </div>
 
     <div class="note">
-      <UiIcone nom="shield" />
+      <UiIcon name="shield" />
       <div>
         <p>
           <strong>N’accorder que ce dont on a besoin.</strong> Un jeton est
           conservé
-          {{ auBureau ? "dans le coffre du système" : "par votre navigateur" }}
+          {{ onDesktop ? "dans le coffre du système" : "par votre navigateur" }}
           : toute personne ayant accès à cette session peut le récupérer. En
           lecture seule, le pire qu’il permette est de lire ce que vous pouviez
           déjà lire.
@@ -125,7 +125,7 @@ withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
     </div>
 
     <div class="note">
-      <UiIcone nom="help_outline" />
+      <UiIcon name="help_outline" />
       <div>
         <p>
           <strong>Un dépôt public a-t-il besoin d’un jeton ?</strong> Non pour
@@ -144,8 +144,8 @@ withDefaults(defineProps<{ collerOu?: string }>(), { collerOu: "ici" });
 
     <p class="revoquer">
       Un jeton se révoque à tout moment depuis
-      <LienExterne href="https://github.com/settings/tokens"
-        >les réglages GitHub <UiIcone nom="open_in_new" /></LienExterne
+      <ExternalLink href="https://github.com/settings/tokens"
+        >les réglages GitHub <UiIcon name="open_in_new" /></ExternalLink
       >. Le révoquer suffit : rien à faire ici.
     </p>
   </section>

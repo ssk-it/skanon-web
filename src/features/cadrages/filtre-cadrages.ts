@@ -2,13 +2,13 @@ import { computed, signal } from "../../core/signaux";
 import { inject } from "../../core/injection";
 import { RepoConfig } from "../../core/repo/repo-config";
 
-interface EtatFiltre {
-  readonly depot: string;
-  readonly texte: string;
-  readonly domaines: ReadonlySet<string>;
+interface FilterState {
+  readonly repoRef: string;
+  readonly text: string;
+  readonly domains: ReadonlySet<string>;
 }
 
-const AUCUN: ReadonlySet<string> = new Set();
+const NONE: ReadonlySet<string> = new Set();
 
 /**
  * Le filtre de la liste des cadrages, tenu hors de la page —
@@ -24,40 +24,40 @@ const AUCUN: ReadonlySet<string> = new Set();
  * visible. Il ne survit pas à un rechargement, ce qui n'est pas un manque : il
  * sert à parcourir, non à être retrouvé.
  */
-export class FiltreCadrages {
+export class ScopingFilter {
   private readonly config = inject(RepoConfig);
-  private readonly etat = signal<EtatFiltre>({
-    depot: "",
-    texte: "",
-    domaines: AUCUN,
+  private readonly state = signal<FilterState>({
+    repoRef: "",
+    text: "",
+    domains: NONE,
   });
 
-  private readonly depot = computed(() => {
-    const d = this.config.depot();
+  private readonly repoRef = computed(() => {
+    const d = this.config.repoRef();
     return `${d.owner}/${d.repo}`;
   });
 
-  private readonly courant = computed(() =>
-    this.etat().depot === this.depot() ? this.etat() : null,
+  private readonly current = computed(() =>
+    this.state().repoRef === this.repoRef() ? this.state() : null,
   );
 
-  readonly texte = computed(() => this.courant()?.texte ?? "");
-  readonly domaines = computed(() => this.courant()?.domaines ?? AUCUN);
-  readonly actif = computed(
-    () => this.texte().trim() !== "" || this.domaines().size > 0,
+  readonly text = computed(() => this.current()?.text ?? "");
+  readonly domains = computed(() => this.current()?.domains ?? NONE);
+  readonly active = computed(
+    () => this.text().trim() !== "" || this.domains().size > 0,
   );
 
-  setTexte(texte: string): void {
-    this.etat.set({ depot: this.depot(), texte, domaines: this.domaines() });
+  setText(text: string): void {
+    this.state.set({ repoRef: this.repoRef(), text, domains: this.domains() });
   }
 
-  toggleDomaine(id: string): void {
-    const domaines = new Set(this.domaines());
-    if (!domaines.delete(id)) domaines.add(id);
-    this.etat.set({ depot: this.depot(), texte: this.texte(), domaines });
+  toggleDomain(id: string): void {
+    const domains = new Set(this.domains());
+    if (!domains.delete(id)) domains.add(id);
+    this.state.set({ repoRef: this.repoRef(), text: this.text(), domains });
   }
 
   clear(): void {
-    this.etat.set({ depot: this.depot(), texte: "", domaines: AUCUN });
+    this.state.set({ repoRef: this.repoRef(), text: "", domains: NONE });
   }
 }

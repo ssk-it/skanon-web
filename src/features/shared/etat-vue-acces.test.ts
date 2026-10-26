@@ -6,103 +6,103 @@ import {
   type HttpTestingController,
 } from "../../core/http/http-testing";
 import { inject } from "../../core/injection";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import EtatVue from "./EtatVue.vue";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import ViewState from "./EtatVue.vue";
 
 /**
  * RG-message-nomme-la-cause : un dépôt introuvable sous un jeton personnel l'est presque toujours parce que le jeton ne le couvre pas. Le message seul dit quoi vérifier ; l'aide dit où, et comment.
  */
 describe("dépôt introuvable sous un jeton", () => {
-  const DEPOT = { owner: "ssk-it", repo: "prive" };
+  const REPO = { owner: "ssk-it", repo: "prive" };
   let httpMock: HttpTestingController;
-  let store: ReferentielStore;
+  let store: SpecificationStore;
   let tokens: TokenService;
 
   beforeEach(() => {
     httpMock = provideHttpTesting();
-    store = inject(ReferentielStore);
+    store = inject(SpecificationStore);
     tokens = inject(TokenService);
   });
 
-  afterEach(() => tokens.effacer());
+  afterEach(() => tokens.erase());
 
   // Sous un jeton, la requête part après la lecture du dernier état connu, qui est asynchrone.
-  async function attendre(): Promise<void> {
+  async function waitFor(): Promise<void> {
     for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
   }
 
-  async function chargerIntrouvable(): Promise<void> {
-    const attente = store.loadReferentiel(DEPOT);
-    await attendre();
+  async function loadNotFound(): Promise<void> {
+    const pending = store.loadSpecification(REPO);
+    await waitFor();
     httpMock
       .expectOne((r) => r.url.includes("/git/trees/"))
       .flush("Not Found", { status: 404, statusText: "Not Found" });
-    await attente;
+    await pending;
   }
 
-  function rendre(): HTMLElement {
-    return mount(EtatVue).element as HTMLElement;
+  function render(): HTMLElement {
+    return mount(ViewState).element as HTMLElement;
   }
 
   it("renvoie vers la gestion des jetons, en nommant le dépôt à y ajouter", async () => {
-    tokens.definir("github_pat_jetonDeTestSuffisammentLong");
-    await chargerIntrouvable();
+    tokens.set("github_pat_jetonDeTestSuffisammentLong");
+    await loadNotFound();
 
-    const vue = rendre();
-    const lien = vue.querySelector<HTMLAnchorElement>(
+    const view = render();
+    const link = view.querySelector<HTMLAnchorElement>(
       'a[href="https://github.com/settings/personal-access-tokens"]',
     );
-    expect(lien).not.toBeNull();
-    expect(lien?.target).toBe("_blank");
-    expect(vue.textContent).toContain("Repository access");
-    expect(vue.textContent).toContain("ssk-it/prive");
+    expect(link).not.toBeNull();
+    expect(link?.target).toBe("_blank");
+    expect(view.textContent).toContain("Repository access");
+    expect(view.textContent).toContain("ssk-it/prive");
   });
 
   it("dirige un jeton classique vers ses propres réglages : il n’a pas de sélection de dépôts", async () => {
-    tokens.definir("ghp_jetonDeTestSuffisammentLong");
-    await chargerIntrouvable();
+    tokens.set("ghp_jetonDeTestSuffisammentLong");
+    await loadNotFound();
 
-    const vue = rendre();
+    const view = render();
     expect(
-      vue.querySelector('a[href="https://github.com/settings/tokens"]'),
+      view.querySelector('a[href="https://github.com/settings/tokens"]'),
     ).not.toBeNull();
-    expect(vue.textContent).not.toContain("Repository access");
+    expect(view.textContent).not.toContain("Repository access");
   });
 
   it("n’en parle pas sans jeton : il n’y en a aucun à corriger", async () => {
-    await chargerIntrouvable();
+    await loadNotFound();
 
     expect(
-      rendre().querySelector('a[href*="personal-access-tokens"]'),
+      render().querySelector('a[href*="personal-access-tokens"]'),
     ).toBeNull();
   });
 
   it("n’en parle pas sous un accès temporaire : il ne se règle pas dans ses jetons", async () => {
-    tokens.definirAcces({
-      jeton: "ghs_accesTemporaire",
-      valideJusqua: new Date(Date.now() + 3_600_000).toISOString(),
-      depots: [],
-      identite: { identifiant: "u", nom: "U", courriel: null },
+    tokens.setAccess({
+      token: "ghs_accesTemporaire",
+      validUntil: new Date(Date.now() + 3_600_000).toISOString(),
+      repos: [],
+      identity: { identifier: "u", name: "U", email: null },
     });
-    await chargerIntrouvable();
+    await loadNotFound();
 
     expect(
-      rendre().querySelector('a[href*="personal-access-tokens"]'),
+      render().querySelector('a[href*="personal-access-tokens"]'),
     ).toBeNull();
-    tokens.effacerAcces();
+    tokens.eraseAccess();
   });
 
   it("n’en parle pas pour un autre échec", async () => {
-    tokens.definir("github_pat_jetonDeTestSuffisammentLong");
-    const attente = store.loadReferentiel(DEPOT);
-    await attendre();
+    tokens.set("github_pat_jetonDeTestSuffisammentLong");
+    const pending = store.loadSpecification(REPO);
+    await waitFor();
     httpMock
       .expectOne((r) => r.url.includes("/git/trees/"))
       .flush("Boom", { status: 500, statusText: "Server Error" });
-    await attente;
+    await pending;
 
     expect(
-      rendre().querySelector('a[href*="personal-access-tokens"]'),
+      render().querySelector('a[href*="personal-access-tokens"]'),
     ).toBeNull();
   });
 });

@@ -1,15 +1,15 @@
 <script lang="ts">
 import {
-  LIBELLE_OPERATION,
-  LIBELLE_TAG_LIEN,
+  OPERATION_LABEL,
+  LINK_TAG_LABEL,
   type Decision,
   type Impact,
-  type LienExterne as Lien,
-  type OperationImpact,
+  type ExternalLink as Lien,
+  type ImpactOperation,
   type Option,
 } from "../../core/model/model";
 
-const PARTICIPES: ReadonlyArray<[OperationImpact, string, string]> = [
+const PARTICIPLES: ReadonlyArray<[ImpactOperation, string, string]> = [
   ["cree", "créée", "créées"],
   ["modifie", "modifiée", "modifiées"],
   ["abroge", "abrogée", "abrogées"],
@@ -21,27 +21,27 @@ const PARTICIPES: ReadonlyArray<[OperationImpact, string, string]> = [
  *
  * Il dit d'un coup d'œil si le cadrage change le comportement du produit ou s'il le commente. Le nom ne figure qu'une fois, au premier compte : la suite se lit dans son élan. « Cibles » dès qu'une décision ou un document d'architecture s'y mêle, pour ne pas appeler règle ce qui n'en est pas une.
  */
-export function formatDecompteImpacts(impacts: readonly Impact[]): string {
-  const regles = impacts.every((i) => i.nature === "regle");
-  const morceaux: string[] = [];
-  for (const [operation, un, plusieurs] of PARTICIPES) {
+export function formatImpactCount(impacts: readonly Impact[]): string {
+  const rules = impacts.every((i) => i.kind === "regle");
+  const parts: string[] = [];
+  for (const [operation, one, several] of PARTICIPLES) {
     const n = impacts.filter((i) => i.operation === operation).length;
     if (!n) continue;
-    const participe = n > 1 ? plusieurs : un;
-    if (morceaux.length) {
-      morceaux.push(`${n} ${participe}`);
+    const participle = n > 1 ? several : one;
+    if (parts.length) {
+      parts.push(`${n} ${participle}`);
     } else {
-      const nom = regles
+      const name = rules
         ? n > 1
           ? "règles"
           : "règle"
         : n > 1
           ? "cibles"
           : "cible";
-      morceaux.push(`${n} ${nom} ${participe}`);
+      parts.push(`${n} ${name} ${participle}`);
     }
   }
-  return morceaux.join(" · ");
+  return parts.join(" · ");
 }
 </script>
 
@@ -50,53 +50,51 @@ import { computed, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { RedactionService } from "../../core/repo/redaction.service";
+import { LinksService } from "../../core/repo/liens.service";
+import { AuthoringService } from "../../core/repo/redaction.service";
 import {
-  afficherIdentifiant,
-  extraireIdentifiantCadrage,
+  displayIdentifier,
+  extractScopingIdentifier,
 } from "../../core/repo/reference-cadrage";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { styleDomaine } from "../../core/ui/couleur-domaine";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { domainStyle } from "../../core/ui/couleur-domaine";
 import { DialogService } from "../../ui/dialog.service";
-import LienExterne from "../../ui/LienExterne.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import ExternalLink from "../../ui/LienExterne.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 import UiMenu from "../../ui/UiMenu.vue";
 import ConfirmationDialog from "../shared/ConfirmationDialog.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import LienDialog from "../shared/LienDialog.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
+import ViewState from "../shared/EtatVue.vue";
+import LinkDialog from "../shared/LienDialog.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
 import OperationChip from "../shared/OperationChip.vue";
-import SommaireLateral, {
-  type EntreeSommaire,
-} from "../shared/SommaireLateral.vue";
-import StatutChip from "../shared/StatutChip.vue";
+import SideToc, { type TocEntry } from "../shared/SommaireLateral.vue";
+import StatusChip from "../shared/StatutChip.vue";
 import { extractJustification } from "./justification";
 
 const route = useRoute();
 const id = computed(() => String(route.params["id"]));
 
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 const dialog = inject(DialogService);
-const redaction = inject(RedactionService);
+const authoring = inject(AuthoringService);
 
 /**
  * L'écriture en cours, désignée par l'adresse du lien qu'elle touche.
  *
  * Une adresse plutôt qu'un booléen : c'est elle qui dit lequel des chips s'estompe. `AJOUT` tient la place quand aucun lien n'existe encore.
  */
-const AJOUT = "\u0000ajout";
-const ecriture = ref<string | null>(null);
-const erreurLien = ref<string | null>(null);
+const ADDITION = "\u0000ajout";
+const writing = ref<string | null>(null);
+const linkError = ref<string | null>(null);
 /** Ce qu'on vient d'écrire, tant que la relecture ne l'a pas ramené. */
-const attendu = ref<{
-  readonly arrive: (liens: readonly Lien[]) => boolean;
+const expected = ref<{
+  readonly arrived: (links: readonly Lien[]) => boolean;
 } | null>(null);
 
 /** L'identifiant tel qu'il se donne à lire, préfixé si le projet en déclare un. */
-function afficher(idCadrage: string): string {
-  return afficherIdentifiant(idCadrage, store.referentiel().projet.prefixe);
+function show(scopingId: string): string {
+  return displayIdentifier(scopingId, store.specification().project.prefix);
 }
 
 /**
@@ -104,14 +102,14 @@ function afficher(idCadrage: string): string {
  *
  * L'adresse accepte les deux formes : nue, telle qu'elle a été posée dans les issues et les demandes de fusion, ou préfixée du projet. Un préfixe qui n'est pas le sien ne désigne rien ici — le cadrage ne sera pas trouvé, ce qui est le comportement voulu.
  */
-const idResolu = computed(() =>
-  extraireIdentifiantCadrage(id.value, store.referentiel().projet.prefixe),
+const resolvedId = computed(() =>
+  extractScopingIdentifier(id.value, store.specification().project.prefix),
 );
 
-const cadrage = computed(() => {
-  const resolu = idResolu.value;
+const scoping = computed(() => {
+  const resolved = resolvedId.value;
   // `null` dit une adresse qui ne désigne rien ici — un préfixe étranger, par exemple. Retomber sur la valeur brute trouverait le cadrage malgré tout, et ferait passer pour valide une adresse qui ne l'est pas.
-  return resolu ? store.findCadrage(resolu) : null;
+  return resolved ? store.findScoping(resolved) : null;
 });
 
 /**
@@ -119,10 +117,10 @@ const cadrage = computed(() => {
  *
  * Dérivé plutôt que posé une fois : les cadrages en branche sont lus après coup, sans bloquer le premier rendu, si bien que le lien peut arriver une seconde après le rechargement. Un drapeau posé à ce moment-là resterait affiché sous un lien pourtant visible.
  */
-const ecritureRecente = computed(() => {
-  const attente = attendu.value;
-  const c = cadrage.value;
-  return !!attente && !!c && !attente.arrive(c.liens);
+const recentWrite = computed(() => {
+  const pending = expected.value;
+  const c = scoping.value;
+  return !!pending && !!c && !pending.arrived(c.links);
 });
 
 /**
@@ -130,28 +128,28 @@ const ecritureRecente = computed(() => {
  *
  * Le référentiel est rechargé après coup plutôt que corrigé en mémoire : le lien peut avoir rejoint la branche du cadrage, que la vue courante ne lit pas. Modifier la mémoire l'y ferait apparaître alors qu'il vit ailleurs, puis disparaître au rechargement suivant.
  */
-async function ajouterLien(): Promise<void> {
-  const lien = await saisirLien();
-  if (!lien) return;
-  await ecrire(
-    AJOUT,
-    () => redaction.ajouterLien(id.value, lien),
-    (liste) => liste.some((l) => l.url === lien.url),
+async function addLink(): Promise<void> {
+  const link = await enterLink();
+  if (!link) return;
+  await write(
+    ADDITION,
+    () => authoring.addLink(id.value, link),
+    (list) => list.some((l) => l.url === link.url),
     "Le lien n’a pas pu être ajouté.",
   );
 }
 
 /** Corrige un lien existant, son adresse comprise. */
-async function modifierLien(actuel: Lien): Promise<void> {
-  const lien = await saisirLien(actuel);
-  if (!lien) return;
-  await ecrire(
-    actuel.url,
-    () => redaction.modifierLien(id.value, actuel.url, lien),
+async function editLink(current: Lien): Promise<void> {
+  const link = await enterLink(current);
+  if (!link) return;
+  await write(
+    current.url,
+    () => authoring.editLink(id.value, current.url, link),
     // La relecture est arrivée quand le lien s'y trouve tel qu'il a été saisi — comparer la seule adresse manquerait la correction d'un nom.
-    (liste) =>
-      liste.some(
-        (l) => l.url === lien.url && l.nom === lien.nom && l.tag === lien.tag,
+    (list) =>
+      list.some(
+        (l) => l.url === link.url && l.name === link.name && l.tag === link.tag,
       ),
     "Le lien n’a pas pu être modifié.",
   );
@@ -162,30 +160,30 @@ async function modifierLien(actuel: Lien): Promise<void> {
  *
  * L'écriture commite dans le dépôt et l'application ne sait pas la défaire : retrouver l'adresse demanderait de passer par l'historique GitHub.
  */
-async function supprimerLien(lien: Lien): Promise<void> {
-  if (ecriture.value) return;
-  const confirme = await dialog.open<boolean>(ConfirmationDialog, {
+async function deleteLink(link: Lien): Promise<void> {
+  if (writing.value) return;
+  const confirmed = await dialog.open<boolean>(ConfirmationDialog, {
     focus: "dialogue",
     data: {
-      titre: "Supprimer ce lien ?",
-      message: `« ${formatLibelle(lien)} » ne sera plus rattaché à ce cadrage. La ressource, elle, n’est pas touchée.`,
+      title: "Supprimer ce lien ?",
+      message: `« ${formatLabel(link)} » ne sera plus rattaché à ce cadrage. La ressource, elle, n’est pas touchée.`,
       action: "Supprimer",
     },
   });
-  if (!confirme) return;
+  if (!confirmed) return;
 
-  await ecrire(
-    lien.url,
-    () => redaction.supprimerLien(id.value, lien.url),
-    (liste) => !liste.some((l) => l.url === lien.url),
+  await write(
+    link.url,
+    () => authoring.deleteLink(id.value, link.url),
+    (list) => !list.some((l) => l.url === link.url),
     "Le lien n’a pas pu être supprimé.",
   );
 }
 
 /** Ouvre l'écran de saisie, garni du lien à corriger le cas échéant. */
-async function saisirLien(initial?: Lien): Promise<Lien | undefined> {
-  if (ecriture.value) return undefined;
-  return dialog.open<Lien>(LienDialog, {
+async function enterLink(initial?: Lien): Promise<Lien | undefined> {
+  if (writing.value) return undefined;
+  return dialog.open<Lien>(LinkDialog, {
     focus: "dialogue",
     data: initial ?? null,
   });
@@ -196,124 +194,124 @@ async function saisirLien(initial?: Lien): Promise<Lien | undefined> {
  *
  * `arrive` dit à quoi se reconnaît la relecture réussie ; il est posé avant le rechargement parce qu'un cadrage en branche n'est relu qu'en second, et le dire vaut mieux que de laisser conclure à un échec — l'écriture, elle, a bien eu lieu.
  */
-async function ecrire(
-  cible: string,
+async function write(
+  target: string,
   operation: () => Promise<void>,
-  arrive: (liste: readonly Lien[]) => boolean,
-  echec: string,
+  arrived: (list: readonly Lien[]) => boolean,
+  failure: string,
 ): Promise<void> {
-  ecriture.value = cible;
-  erreurLien.value = null;
-  attendu.value = null;
+  writing.value = target;
+  linkError.value = null;
+  expected.value = null;
   try {
     await operation();
-    attendu.value = { arrive };
-    await store.loadReferentiel();
+    expected.value = { arrived };
+    await store.loadSpecification();
   } catch (e) {
-    erreurLien.value =
-      e instanceof GithubError || e instanceof Error ? e.message : echec;
+    linkError.value =
+      e instanceof GithubError || e instanceof Error ? e.message : failure;
   } finally {
-    ecriture.value = null;
+    writing.value = null;
   }
 }
 
 /** Le nom saisi, ou la nature du lien pour ceux écrits avant qu'il existe. */
-function formatLibelle(l: Lien): string {
-  return l.nom.trim() || formatLibelleTag(l.tag);
+function formatLabel(l: Lien): string {
+  return l.name.trim() || formatTagLabel(l.tag);
 }
 
-function formatLibelleTag(tag: string): string {
-  return LIBELLE_TAG_LIEN[tag] ?? tag;
+function formatTagLabel(tag: string): string {
+  return LINK_TAG_LABEL[tag] ?? tag;
 }
 
 /** L'ensemble du dépôt : une teinte se calcule par rapport aux autres. */
-const idsDomaines = computed(() => store.domaines().map((d) => d.id));
+const domainIds = computed(() => store.domains().map((d) => d.id));
 
 /**
  * Où mène une cible, selon sa nature.
  *
  * Un impact d'architecture pointait vers la page des règles : le lien menait à une règle inexistante, silencieusement.
  */
-function lienCible(impact: Impact): string {
-  switch (impact.nature) {
+function targetLink(impact: Impact): string {
+  switch (impact.kind) {
     case "adr":
-      return liens.chemin("architecture", "decision", impact.cible);
+      return links.path("architecture", "decision", impact.target);
     case "architecture":
-      return liens.chemin("architecture", "document", impact.cible);
+      return links.path("architecture", "document", impact.target);
     default:
-      return liens.chemin("referentiel", "regle", impact.cible);
+      return links.path("referentiel", "regle", impact.target);
   }
 }
 
 /**
  * Une décision annulée a beau porter une option retenue dans son frontmatter, elle n'a plus rien tranché : la garder au récapitulatif ferait passer pour acquis un choix révoqué.
  */
-const tranchees = computed(() => {
-  const c = cadrage.value;
+const decided = computed(() => {
+  const c = scoping.value;
   if (!c) return [];
   return c.decisions
-    .filter((d) => d.statut !== "annulee" && d.optionRetenue)
+    .filter((d) => d.status !== "annulee" && d.chosenOption)
     .map((decision) => {
       const option =
-        decision.options.find((o) => o.id === decision.optionRetenue) ?? null;
+        decision.options.find((o) => o.id === decision.chosenOption) ?? null;
       return {
         decision,
         option,
-        justification: option ? extractJustification(option.corps) : "",
+        justification: option ? extractJustification(option.body) : "",
       };
     });
 });
 
 const impacts = computed(() => {
-  const c = cadrage.value;
-  return c ? store.listCiblesByCadrage(c) : [];
+  const c = scoping.value;
+  return c ? store.listTargetsByScoping(c) : [];
 });
 
 /** Les impacts qui changent leur cible, dans l'ordre déclaré. */
-const impactsChangeants = computed(() =>
+const changingImpacts = computed(() =>
   impacts.value.filter((i) => i.impact.operation !== "touche"),
 );
 
 /** Ceux qui ne font que la mentionner, présentés à part. */
-const impactsTouches = computed(() =>
+const touchImpacts = computed(() =>
   impacts.value.filter((i) => i.impact.operation === "touche"),
 );
 
 /**
  * Les deux blocs d'impacts, sous un seul gabarit de fiche : le `ng-template` que SSK Canon instanciait deux fois. Le bloc de ce qui change n'a ni ancre ni intitulé ; il se rend dans un `div` sans classe, sans effet sur la mise en page.
  */
-const blocsImpacts = computed(() => {
-  const blocs: {
-    cle: string;
+const impactBlocks = computed(() => {
+  const blocks: {
+    key: string;
     id?: string;
-    classe?: string;
-    titre?: string;
+    className?: string;
+    title?: string;
     impacts: typeof impacts.value;
-  }[] = [{ cle: "changeants", impacts: impactsChangeants.value }];
-  const n = impactsTouches.value.length;
+  }[] = [{ key: "changeants", impacts: changingImpacts.value }];
+  const n = touchImpacts.value.length;
   if (n) {
-    blocs.push({
-      cle: "touches",
+    blocks.push({
+      key: "touches",
       id: "impacts-touches",
-      classe: "impacts-touches",
-      titre: formatTouches(n),
-      impacts: impactsTouches.value,
+      className: "impacts-touches",
+      title: formatTouched(n),
+      impacts: touchImpacts.value,
     });
   }
-  return blocs;
+  return blocks;
 });
 
 /** « 7 règles touchées », ou « cibles » si une décision s'y mêle. */
-function formatTouches(n: number): string {
-  const regles = impactsTouches.value.every((i) => i.impact.nature === "regle");
-  const nom = regles
+function formatTouched(n: number): string {
+  const rules = touchImpacts.value.every((i) => i.impact.kind === "regle");
+  const name = rules
     ? n > 1
       ? "règles"
       : "règle"
     : n > 1
       ? "cibles"
       : "cible";
-  return `${n} ${nom} ${n > 1 ? "touchées" : "touchée"}`;
+  return `${n} ${name} ${n > 1 ? "touchées" : "touchée"}`;
 }
 
 /**
@@ -321,247 +319,249 @@ function formatTouches(n: number): string {
  *
  * L'ensemble retient les repliés et non les dépliés : la fiche s'ouvre entière, si bien que l'ensemble vide est déjà le bon état. Retenir les dépliés obligerait à le remplir au chargement, puis à le refaire à chaque cadrage ouvert.
  */
-const replies = ref<ReadonlySet<string>>(new Set());
+const collapsed = ref<ReadonlySet<string>>(new Set());
 
-function isReplie(ancre: string): boolean {
-  return replies.value.has(ancre);
+function isCollapsed(anchor: string): boolean {
+  return collapsed.value.has(anchor);
 }
 
-function toggleRepli(ancre: string): void {
-  const suivant = new Set(replies.value);
-  if (!suivant.delete(ancre)) suivant.add(ancre);
-  replies.value = suivant;
+function toggleCollapsed(anchor: string): void {
+  const next = new Set(collapsed.value);
+  if (!next.delete(anchor)) next.add(anchor);
+  collapsed.value = next;
 }
 
 /** L'option retenue, pour la résumer quand la décision est repliée. */
-function findOptionRetenue(decision: Decision): Option | null {
-  return decision.options.find((o) => o.id === decision.optionRetenue) ?? null;
+function findChosenOption(decision: Decision): Option | null {
+  return decision.options.find((o) => o.id === decision.chosenOption) ?? null;
 }
 
 /**
  * Le sommaire reprend la structure réelle du cadrage : les sections, mais aussi chaque décision et chaque impact nommément. C'est ce qu'on cherche en revenant sur une fiche — « où était la décision sur le stockage ? » — et une liste de cinq sections n'y répondrait pas.
  */
-const sommaire = computed<EntreeSommaire[]>(() => {
-  const c = cadrage.value;
+const toc = computed<TocEntry[]>(() => {
+  const c = scoping.value;
   if (!c) return [];
-  const entrees: EntreeSommaire[] = [];
+  const entries: TocEntry[] = [];
 
-  if (c.objectif)
-    entrees.push({ id: "objectif", libelle: "Objectif", niveau: 0 });
-  if (c.parcours) {
-    entrees.push({
+  if (c.goal) entries.push({ id: "objectif", label: "Objectif", level: 0 });
+  if (c.journey) {
+    entries.push({
       id: "parcours",
-      libelle: "Parcours utilisateur",
-      niveau: 0,
+      label: "Parcours utilisateur",
+      level: 0,
     });
   }
 
   if (c.decisions.length) {
-    entrees.push({ id: "decisions", libelle: "Décisions", niveau: 0 });
+    entries.push({ id: "decisions", label: "Décisions", level: 0 });
     for (const d of c.decisions) {
-      entrees.push({
+      entries.push({
         id: `decision-${d.id}`,
-        libelle: d.titre,
-        niveau: 1,
-        marque: d.statut === "annulee" ? "annulée" : undefined,
+        label: d.title,
+        level: 1,
+        badge: d.status === "annulee" ? "annulée" : undefined,
       });
     }
   }
 
   if (c.impacts.length) {
-    entrees.push({ id: "impacts", libelle: "Impacts", niveau: 0 });
+    entries.push({ id: "impacts", label: "Impacts", level: 0 });
     for (const i of c.impacts.filter((i) => i.operation !== "touche")) {
-      entrees.push({
-        id: `impact-${i.cible}`,
-        libelle: i.cible,
-        niveau: 1,
-        marque: LIBELLE_OPERATION[i.operation],
+      entries.push({
+        id: `impact-${i.target}`,
+        label: i.target,
+        level: 1,
+        badge: OPERATION_LABEL[i.operation],
       });
     }
     // Une entrée pour tous : listés au même rang que les créations, ils noyaient ce que le cadrage change — RG-sommaire-fiche-longue.
-    const touches = c.impacts.filter((i) => i.operation === "touche").length;
-    if (touches) {
-      entrees.push({
+    const touched = c.impacts.filter((i) => i.operation === "touche").length;
+    if (touched) {
+      entries.push({
         id: "impacts-touches",
-        libelle: formatTouches(touches),
-        niveau: 1,
+        label: formatTouched(touched),
+        level: 1,
       });
     }
   }
 
-  if (c.divers.length) {
-    entrees.push({ id: "divers", libelle: "Divers", niveau: 0 });
-    for (const [i, section] of c.divers.entries()) {
-      entrees.push({ id: `divers-${i}`, libelle: section.titre, niveau: 1 });
+  if (c.misc.length) {
+    entries.push({ id: "divers", label: "Divers", level: 0 });
+    for (const [i, section] of c.misc.entries()) {
+      entries.push({ id: `divers-${i}`, label: section.title, level: 1 });
     }
   }
 
-  if (c.piecesJointes.length) {
-    entrees.push({
+  if (c.attachments.length) {
+    entries.push({
       id: "pieces-jointes",
-      libelle: "Pièces jointes",
-      niveau: 0,
+      label: "Pièces jointes",
+      level: 0,
     });
   }
 
-  return entrees;
+  return entries;
 });
 
 /** Même comportement que le sommaire : rejoindre sans polluer l'historique. */
-function scrollToDecision(evenement: Event, idDecision: string): void {
-  const cible = document.getElementById(`decision-${idDecision}`);
-  if (!cible) return;
-  evenement.preventDefault();
+function scrollToDecision(event: Event, idDecision: string): void {
+  const target = document.getElementById(`decision-${idDecision}`);
+  if (!target) return;
+  event.preventDefault();
 
   // Atterrir sur une décision repliée ne montrerait pas ce qu'on vient lire. Le dépli ne rend qu'au tour suivant : défiler avant viserait la hauteur repliée, et la fiche s'arrêterait trop bas.
-  if (isReplie(`decision-${idDecision}`)) {
-    toggleRepli(`decision-${idDecision}`);
-    queueMicrotask(() => scrollTo(cible));
+  if (isCollapsed(`decision-${idDecision}`)) {
+    toggleCollapsed(`decision-${idDecision}`);
+    queueMicrotask(() => scrollTo(target));
     return;
   }
-  scrollTo(cible);
+  scrollTo(target);
 }
 
-function scrollTo(cible: HTMLElement): void {
-  const doux = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  cible.scrollIntoView({ behavior: doux ? "smooth" : "auto", block: "start" });
-  cible.setAttribute("tabindex", "-1");
-  cible.focus({ preventScroll: true });
+function scrollTo(target: HTMLElement): void {
+  const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({
+    behavior: smooth ? "smooth" : "auto",
+    block: "start",
+  });
+  target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
 }
 
-function buildMessageRegleAbsente(): string {
+function buildMissingRuleMessage(): string {
   return "Cette règle n’existe pas dans le référentiel courant.";
 }
 
 /**
  * Un cadrage porte l'énoncé au moment de sa livraison. Signaler l'écart évite qu'un lecteur prenne une différence légitime pour une incohérence.
  */
-function isDivergent(porte: string, courant: string | undefined): boolean {
-  if (!courant) return false;
-  return porte.trim() !== courant.trim();
+function isDivergent(carries: string, current: string | undefined): boolean {
+  if (!current) return false;
+  return carries.trim() !== current.trim();
 }
 
-function formatTaille(octets: number): string {
-  if (octets < 1024) return `${octets} o`;
-  if (octets < 1024 * 1024) return `${Math.round(octets / 1024)} ko`;
-  return `${(octets / (1024 * 1024)).toFixed(1)} Mo`;
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
 // Le pipe `date` d'Angular en locale fr, au format `'longDate'`.
-const DATE_LONGUE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
+const LONG_DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
 
 function formatDate(iso: string): string {
-  return DATE_LONGUE.format(new Date(iso));
+  return LONG_DATE.format(new Date(iso));
 }
 </script>
 
 <template>
-  <EtatVue v-if="store.etat() !== 'pret'" />
-  <div v-else-if="cadrage" class="mise-en-page">
+  <ViewState v-if="store.state() !== 'pret'" />
+  <div v-else-if="scoping" class="mise-en-page">
     <aside class="rail">
-      <SommaireLateral :entrees="sommaire" :titre="cadrage.id" />
+      <SideToc :entries="toc" :title="scoping.id" />
     </aside>
 
     <div class="fiche">
-      <RouterLink class="retour" :to="liens.chemin('cadrages')">
-        <UiIcone nom="arrow_back" /> Cadrages
+      <RouterLink class="retour" :to="links.path('cadrages')">
+        <UiIcon name="arrow_back" /> Cadrages
       </RouterLink>
 
       <header class="fiche-entete">
-        <h1>{{ cadrage.titre }}</h1>
+        <h1>{{ scoping.title }}</h1>
 
         <!-- Le titre dit de quoi il s'agit ; ce qui suit dit à quoi on a affaire. Les intitulés portent la distinction, qu'une rangée de pastilles côte à côte laissait deviner. -->
         <dl class="identite">
           <dt>Cadrage</dt>
           <dd class="ligne-type">
-            <span class="cid">{{ afficher(cadrage.id) }}</span>
-            <StatutChip :statut="cadrage.statut" />
+            <span class="cid">{{ show(scoping.id) }}</span>
+            <StatusChip :status="scoping.status" />
             <!-- Un cadrage livré ne se reprend plus : ses impacts sont propagés, et le rouvrir ferait diverger le référentiel de ses cadrages. -->
             <RouterLink
-              v-if="cadrage.statut !== 'livree'"
+              v-if="scoping.status !== 'livree'"
               class="editer"
-              :to="liens.chemin('cadrages', cadrage.id, 'editer')"
+              :to="links.path('cadrages', scoping.id, 'editer')"
             >
-              <UiIcone nom="edit" /> Reprendre
+              <UiIcon name="edit" /> Reprendre
             </RouterLink>
           </dd>
 
-          <template v-if="cadrage.domaines.length">
+          <template v-if="scoping.domains.length">
             <dt>Domaines</dt>
             <dd class="meta">
               <RouterLink
-                v-for="d in cadrage.domaines"
+                v-for="d in scoping.domains"
                 :key="d"
                 class="pastille"
-                :style="styleDomaine(d, idsDomaines)"
-                :to="liens.chemin('referentiel', 'domaine', d)"
+                :style="domainStyle(d, domainIds)"
+                :to="links.path('referentiel', 'domaine', d)"
               >
-                {{ store.findDomaine(d)?.nom ?? d }}
+                {{ store.findDomain(d)?.name ?? d }}
               </RouterLink>
             </dd>
           </template>
 
-          <template v-if="formatDecompteImpacts(cadrage.impacts)">
+          <template v-if="formatImpactCount(scoping.impacts)">
             <dt>Impacts</dt>
             <dd class="decompte">
-              {{ formatDecompteImpacts(cadrage.impacts) }}
+              {{ formatImpactCount(scoping.impacts) }}
             </dd>
           </template>
 
           <!-- Livré et sans lien, il n'y a rien à montrer : l'intitulé resterait seul en face d'une case vide. Non livré, le bouton d'ajout occupe toujours la rangée. -->
-          <template v-if="cadrage.liens.length || cadrage.statut !== 'livree'">
+          <template v-if="scoping.links.length || scoping.status !== 'livree'">
             <dt>Ressources</dt>
             <dd class="liens">
               <!-- Un cadrage en cours se discute sur sa demande de fusion : c'est le premier lien qu'on y cherche. -->
-              <LienExterne
-                v-if="cadrage.provenance?.pullRequest"
+              <ExternalLink
+                v-if="scoping.provenance?.pullRequest"
                 class="lien demande"
-                :href="liens.versGithub('pull', cadrage.provenance.pullRequest)"
+                :href="links.toGithub('pull', scoping.provenance.pullRequest)"
               >
-                <UiIcone nom="call_split" />
-                Demande de fusion #{{ cadrage.provenance.pullRequest }}
-              </LienExterne>
+                <UiIcon name="call_split" />
+                Demande de fusion #{{ scoping.provenance.pullRequest }}
+              </ExternalLink>
               <!-- Sans demande de fusion, un cadrage commencé se trouve sur sa branche : c'est elle qu'on ouvre. -->
-              <LienExterne
-                v-else-if="cadrage.provenance"
+              <ExternalLink
+                v-else-if="scoping.provenance"
                 class="lien demande"
                 :href="
-                  liens.versGithub(
+                  links.toGithub(
                     'tree',
-                    ...cadrage.provenance.branche.split('/'),
+                    ...scoping.provenance.branch.split('/'),
                   )
                 "
               >
-                <UiIcone nom="call_split" />
-                Branche {{ cadrage.provenance.branche }}
-              </LienExterne>
+                <UiIcon name="call_split" />
+                Branche {{ scoping.provenance.branch }}
+              </ExternalLink>
               <!-- Ouvrir reste le geste direct : le menu ne s'ouvre que sur demande, et l'ancre garde la surface du chip. -->
               <span
-                v-for="l in cadrage.liens"
+                v-for="l in scoping.links"
                 :key="l.url"
                 class="bloc-lien"
-                :class="{ occupe: ecriture === l.url }"
+                :class="{ occupe: writing === l.url }"
               >
-                <LienExterne
+                <ExternalLink
                   class="lien"
                   :href="l.url"
-                  :title="formatLibelleTag(l.tag)"
+                  :title="formatTagLabel(l.tag)"
                 >
-                  <UiIcone nom="open_in_new" />
-                  {{ formatLibelle(l) }}
-                </LienExterne>
+                  <UiIcon name="open_in_new" />
+                  {{ formatLabel(l) }}
+                </ExternalLink>
                 <UiMenu
-                  v-if="cadrage.statut !== 'livree'"
+                  v-if="scoping.status !== 'livree'"
                   :actions="[
                     {
-                      libelle: 'Modifier',
-                      icone: 'edit',
-                      action: () => void modifierLien(l),
+                      label: 'Modifier',
+                      icon: 'edit',
+                      action: () => void editLink(l),
                     },
                     {
-                      libelle: 'Supprimer',
-                      icone: 'link_off',
-                      action: () => void supprimerLien(l),
+                      label: 'Supprimer',
+                      icon: 'link_off',
+                      action: () => void deleteLink(l),
                     },
                   ]"
                 >
@@ -570,26 +570,26 @@ function formatDate(iso: string): string {
                       type="button"
                       class="menu-lien"
                       v-bind="attributs"
-                      :disabled="!!ecriture"
-                      :aria-label="'Actions sur le lien ' + formatLibelle(l)"
+                      :disabled="!!writing"
+                      :aria-label="'Actions sur le lien ' + formatLabel(l)"
                     >
-                      <UiIcone nom="more_vert" />
+                      <UiIcon name="more_vert" />
                     </button>
                   </template>
                 </UiMenu>
               </span>
               <!-- Un cadrage livré ne se reprend plus : lui ajouter un lien écrirait dans le référentiel hors de tout cadrage. -->
               <button
-                v-if="cadrage.statut !== 'livree'"
+                v-if="scoping.status !== 'livree'"
                 type="button"
                 class="lien ajout"
-                :disabled="!!ecriture"
-                @click="ajouterLien()"
+                :disabled="!!writing"
+                @click="addLink()"
               >
-                <UiIcone
-                  :nom="ecriture === AJOUT ? 'hourglass_empty' : 'add_link'"
+                <UiIcon
+                  :name="writing === ADDITION ? 'hourglass_empty' : 'add_link'"
                 />
-                {{ ecriture === AJOUT ? "Ajout…" : "Ajouter un lien" }}
+                {{ writing === ADDITION ? "Ajout…" : "Ajouter un lien" }}
               </button>
             </dd>
           </template>
@@ -597,21 +597,18 @@ function formatDate(iso: string): string {
 
         <!-- RG-branches-survivantes-signalees : une branche qui porte encore ce cadrage livré est sans effet, mais on la reprendrait en croyant travailler sur un cadrage en cours. Le dire, sans rien interdire. -->
         <p
-          v-if="cadrage.branchesSurvivantes?.length"
+          v-if="scoping.staleBranches?.length"
           class="branches-survivantes"
           role="note"
         >
-          <UiIcone nom="info" />
-          <span v-if="cadrage.branchesSurvivantes.length === 1">
+          <UiIcon name="info" />
+          <span v-if="scoping.staleBranches.length === 1">
             La branche
-            <LienExterne
+            <ExternalLink
               :href="
-                liens.versGithub(
-                  'tree',
-                  ...cadrage.branchesSurvivantes[0].split('/'),
-                )
+                links.toGithub('tree', ...scoping.staleBranches[0].split('/'))
               "
-              ><code>{{ cadrage.branchesSurvivantes[0] }}</code></LienExterne
+              ><code>{{ scoping.staleBranches[0] }}</code></ExternalLink
             >
             porte encore ce cadrage, déjà livré. Elle est sans effet — la
             branche principale l’emporte — et n’a sans doute pas été supprimée
@@ -619,10 +616,10 @@ function formatDate(iso: string): string {
           </span>
           <span v-else>
             Les branches
-            <template v-for="(b, i) in cadrage.branchesSurvivantes" :key="b">
+            <template v-for="(b, i) in scoping.staleBranches" :key="b">
               {{ i ? ", " : "" }}
-              <LienExterne :href="liens.versGithub('tree', ...b.split('/'))"
-                ><code>{{ b }}</code></LienExterne
+              <ExternalLink :href="links.toGithub('tree', ...b.split('/'))"
+                ><code>{{ b }}</code></ExternalLink
               >
             </template>
             portent encore ce cadrage, déjà livré. Elles sont sans effet — la
@@ -631,11 +628,11 @@ function formatDate(iso: string): string {
           </span>
         </p>
 
-        <p v-if="erreurLien" class="echec-lien">
-          <UiIcone nom="error_outline" /> <span>{{ erreurLien }}</span>
+        <p v-if="linkError" class="echec-lien">
+          <UiIcon name="error_outline" /> <span>{{ linkError }}</span>
         </p>
-        <p v-else-if="ecritureRecente" class="attente-lien">
-          <UiIcone nom="schedule" />
+        <p v-else-if="recentWrite" class="attente-lien">
+          <UiIcon name="schedule" />
           <span>
             La modification est enregistrée. Elle apparaîtra ici dès que la
             branche du cadrage aura été relue.
@@ -643,97 +640,99 @@ function formatDate(iso: string): string {
         </p>
       </header>
 
-      <section v-if="cadrage.objectif" id="objectif" class="bloc">
+      <section v-if="scoping.goal" id="objectif" class="bloc">
         <h2 class="section">Objectif</h2>
-        <MarkdownRendu class="md" :texte="cadrage.objectif" />
+        <RenderedMarkdown class="md" :text="scoping.goal" />
       </section>
 
-      <section v-if="cadrage.parcours" id="parcours" class="bloc">
+      <section v-if="scoping.journey" id="parcours" class="bloc">
         <h2 class="section">Parcours utilisateur</h2>
-        <MarkdownRendu class="md" :texte="cadrage.parcours" />
+        <RenderedMarkdown class="md" :text="scoping.journey" />
       </section>
 
-      <section v-if="cadrage.decisions.length" id="decisions" class="bloc">
+      <section v-if="scoping.decisions.length" id="decisions" class="bloc">
         <h2 class="section">Décisions</h2>
         <div class="decisions">
           <article
-            v-for="d in cadrage.decisions"
+            v-for="d in scoping.decisions"
             :id="'decision-' + d.id"
             :key="d.id"
             class="decision"
-            :class="{ annulee: d.statut === 'annulee' }"
+            :class="{ annulee: d.status === 'annulee' }"
           >
             <button
               type="button"
               class="entete bascule"
-              :aria-expanded="!isReplie('decision-' + d.id)"
+              :aria-expanded="!isCollapsed('decision-' + d.id)"
               :aria-controls="'corps-decision-' + d.id"
-              @click="toggleRepli('decision-' + d.id)"
+              @click="toggleCollapsed('decision-' + d.id)"
             >
-              <UiIcone
+              <UiIcon
                 class="chevron"
-                :nom="
-                  isReplie('decision-' + d.id) ? 'chevron_right' : 'expand_more'
+                :name="
+                  isCollapsed('decision-' + d.id)
+                    ? 'chevron_right'
+                    : 'expand_more'
                 "
               />
-              <h3>{{ d.titre }}</h3>
-              <span v-if="d.statut === 'annulee'" class="d-statut annulee"
+              <h3>{{ d.title }}</h3>
+              <span v-if="d.status === 'annulee'" class="d-statut annulee"
                 >annulée</span
               >
-              <span v-else-if="d.optionRetenue" class="d-statut retenue"
+              <span v-else-if="d.chosenOption" class="d-statut retenue"
                 >tranchée</span
               >
               <span v-else class="d-statut ouverte">ouverte</span>
             </button>
 
-            <template v-if="isReplie('decision-' + d.id)">
+            <template v-if="isCollapsed('decision-' + d.id)">
               <!-- Repliée, la décision garde ce qu'elle a tranché : le reste est du raisonnement, celle-ci est la réponse. -->
-              <p v-if="findOptionRetenue(d)" class="d-resume">
-                <UiIcone nom="check" />
-                {{ findOptionRetenue(d)?.titre }}
+              <p v-if="findChosenOption(d)" class="d-resume">
+                <UiIcon name="check" />
+                {{ findChosenOption(d)?.title }}
               </p>
             </template>
             <div v-else :id="'corps-decision-' + d.id" class="d-corps">
-              <MarkdownRendu
+              <RenderedMarkdown
                 v-if="d.description"
                 class="md d-description"
-                :texte="d.description"
+                :text="d.description"
               />
 
               <ul v-if="d.options.length" class="options">
                 <li
                   v-for="o in d.options"
                   :key="o.id"
-                  :class="{ retenue: o.retenue }"
+                  :class="{ retenue: o.chosen }"
                 >
                   <div class="o-entete">
-                    <span class="o-titre">{{ o.titre }}</span>
-                    <span v-if="o.retenue" class="o-marque">retenue</span>
+                    <span class="o-titre">{{ o.title }}</span>
+                    <span v-if="o.chosen" class="o-marque">retenue</span>
                   </div>
-                  <MarkdownRendu class="md o-corps" :texte="o.corps" />
+                  <RenderedMarkdown class="md o-corps" :text="o.body" />
                 </li>
               </ul>
-              <MarkdownRendu v-else class="md" :texte="d.corps" />
+              <RenderedMarkdown v-else class="md" :text="d.body" />
             </div>
           </article>
         </div>
       </section>
 
-      <section v-if="cadrage.impacts.length" id="impacts" class="bloc">
+      <section v-if="scoping.impacts.length" id="impacts" class="bloc">
         <h2 class="section">Impacts sur les règles de gestion</h2>
         <!-- RG-sommaire-fiche-longue : ce qui ne change rien à sa cible vient après ce qui change, réuni sous un intitulé qui le compte. Le sommaire y mène d'une seule entrée. -->
         <div
-          v-for="b in blocsImpacts"
+          v-for="b in impactBlocks"
           :id="b.id"
-          :key="b.cle"
-          :class="b.classe"
+          :key="b.key"
+          :class="b.className"
         >
-          <h3 v-if="b.titre" class="sous-section">{{ b.titre }}</h3>
+          <h3 v-if="b.title" class="sous-section">{{ b.title }}</h3>
           <div class="impacts">
             <article
               v-for="i in b.impacts"
-              :id="'impact-' + i.impact.cible"
-              :key="i.impact.cible"
+              :id="'impact-' + i.impact.target"
+              :key="i.impact.target"
               class="impact"
             >
               <div class="i-entete">
@@ -741,15 +740,15 @@ function formatDate(iso: string): string {
                 <button
                   type="button"
                   class="i-bascule"
-                  :aria-expanded="!isReplie('impact-' + i.impact.cible)"
-                  :aria-controls="'corps-impact-' + i.impact.cible"
-                  :aria-label="'Détail de ' + i.impact.cible"
-                  @click="toggleRepli('impact-' + i.impact.cible)"
+                  :aria-expanded="!isCollapsed('impact-' + i.impact.target)"
+                  :aria-controls="'corps-impact-' + i.impact.target"
+                  :aria-label="'Détail de ' + i.impact.target"
+                  @click="toggleCollapsed('impact-' + i.impact.target)"
                 >
-                  <UiIcone
+                  <UiIcon
                     class="chevron"
-                    :nom="
-                      isReplie('impact-' + i.impact.cible)
+                    :name="
+                      isCollapsed('impact-' + i.impact.target)
                         ? 'chevron_right'
                         : 'expand_more'
                     "
@@ -757,42 +756,44 @@ function formatDate(iso: string): string {
                 </button>
                 <OperationChip :operation="i.impact.operation" />
                 <RouterLink
-                  v-if="i.cible"
+                  v-if="i.target"
                   class="i-regle"
-                  :to="lienCible(i.impact)"
+                  :to="targetLink(i.impact)"
                 >
-                  {{ i.impact.cible }}
+                  {{ i.impact.target }}
                 </RouterLink>
                 <span
                   v-else
                   class="i-regle absente"
-                  :title="buildMessageRegleAbsente()"
+                  :title="buildMissingRuleMessage()"
                 >
-                  {{ i.impact.cible }}
+                  {{ i.impact.target }}
                 </span>
-                <span v-if="i.cible?.statut === 'abroge'" class="marque-abrogee"
+                <span
+                  v-if="i.target?.status === 'abroge'"
+                  class="marque-abrogee"
                   >abrogée</span
                 >
               </div>
 
               <div
-                v-if="!isReplie('impact-' + i.impact.cible)"
-                :id="'corps-impact-' + i.impact.cible"
+                v-if="!isCollapsed('impact-' + i.impact.target)"
+                :id="'corps-impact-' + i.impact.target"
               >
-                <template v-if="i.enonce">
-                  <MarkdownRendu class="md i-enonce" :texte="i.enonce" />
+                <template v-if="i.statement">
+                  <RenderedMarkdown class="md i-enonce" :text="i.statement" />
                   <p
                     v-if="
                       isDivergent(
-                        i.enonce,
-                        i.cible && 'enonce' in i.cible
-                          ? i.cible.enonce
+                        i.statement,
+                        i.target && 'statement' in i.target
+                          ? i.target.statement
                           : undefined,
                       )
                     "
                     class="i-divergence"
                   >
-                    <UiIcone nom="history" />
+                    <UiIcon name="history" />
                     L’énoncé courant diffère : il a été modifié par un cadrage
                     ultérieur. Ce texte est celui porté par le présent cadrage.
                   </p>
@@ -801,7 +802,7 @@ function formatDate(iso: string): string {
                   Ce cadrage la concerne sans la modifier. La mention sert de
                   signal de relecture.
                 </p>
-                <p v-else-if="!i.cible" class="i-attente">
+                <p v-else-if="!i.target" class="i-attente">
                   Cette cible n’existe pas encore dans le référentiel : elle
                   sera créée à la livraison du cadrage.
                 </p>
@@ -812,38 +813,38 @@ function formatDate(iso: string): string {
       </section>
 
       <!-- Ce que le gabarit ne présente pas ailleurs se lit ici plutôt que nulle part. Le titre d'origine est conservé : c'est lui qui dit de quoi la section parle, « Divers » ne fait que les rassembler. -->
-      <section v-if="cadrage.divers.length" id="divers" class="bloc">
+      <section v-if="scoping.misc.length" id="divers" class="bloc">
         <h2 class="section">Divers</h2>
         <div class="divers">
           <article
-            v-for="(s, index) in cadrage.divers"
+            v-for="(s, index) in scoping.misc"
             :id="'divers-' + index"
             :key="index"
             class="libre"
           >
             <header class="entete">
-              <h3>{{ s.titre }}</h3>
+              <h3>{{ s.title }}</h3>
             </header>
-            <MarkdownRendu class="md" :texte="s.corps" />
+            <RenderedMarkdown class="md" :text="s.body" />
           </article>
         </div>
       </section>
 
       <section
-        v-if="cadrage.piecesJointes.length"
+        v-if="scoping.attachments.length"
         id="pieces-jointes"
         class="bloc"
       >
         <h2 class="section">Pièces jointes</h2>
         <ul class="pj">
-          <li v-for="p in cadrage.piecesJointes" :key="p.sha256">
-            <UiIcone nom="attach_file" />
+          <li v-for="p in scoping.attachments" :key="p.sha256">
+            <UiIcon name="attach_file" />
             <div class="pj-corps">
-              <span class="pj-nom">{{ p.nom }}</span>
+              <span class="pj-nom">{{ p.name }}</span>
               <span class="pj-meta">
-                {{ formatTaille(p.taille) }} · {{ p.type }}
-                <template v-if="p.ajouteLe">
-                  · {{ formatDate(p.ajouteLe) }}
+                {{ formatSize(p.size) }} · {{ p.type }}
+                <template v-if="p.addedAt">
+                  · {{ formatDate(p.addedAt) }}
                 </template>
               </span>
               <code class="pj-hash">{{ p.sha256.slice(0, 16) }}…</code>
@@ -858,20 +859,20 @@ function formatDate(iso: string): string {
     </div>
 
     <!-- Ce qui a été tranché est ce qu'on vient revérifier le plus souvent sur un cadrage relu. Le récapitulatif le tient sous les yeux pendant qu'on parcourt le reste de la fiche ; le raisonnement, lui, reste à sa place dans la section Décisions. -->
-    <aside v-if="tranchees.length" class="rail-tranchees">
+    <aside v-if="decided.length" class="rail-tranchees">
       <div class="panneau">
         <p class="p-titre">Décisions tranchées</p>
         <ul class="p-liste">
-          <li v-for="t in tranchees" :key="t.decision.id">
+          <li v-for="t in decided" :key="t.decision.id">
             <a
               class="p-lien"
               :href="'#decision-' + t.decision.id"
               @click="scrollToDecision($event, t.decision.id)"
             >
-              <span class="p-decision">{{ t.decision.titre }}</span>
+              <span class="p-decision">{{ t.decision.title }}</span>
               <span class="p-option">
-                <UiIcone nom="check" />
-                {{ t.option?.titre ?? t.decision.optionRetenue }}
+                <UiIcon name="check" />
+                {{ t.option?.title ?? t.decision.chosenOption }}
               </span>
               <span v-if="t.justification" class="p-justification">{{
                 t.justification
@@ -883,7 +884,7 @@ function formatDate(iso: string): string {
     </aside>
   </div>
   <!-- Un cadrage en cours vit sur sa branche, lue après la principale : le dire introuvable d'ici là annoncerait absent ce qui arrive. -->
-  <p v-else-if="store.branchesEnChargement()" class="vide">
+  <p v-else-if="store.loadingBranches()" class="vide">
     Lecture des cadrages en cours…
   </p>
   <p v-else class="vide">Cadrage introuvable : {{ id }}</p>

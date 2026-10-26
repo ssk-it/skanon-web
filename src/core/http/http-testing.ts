@@ -14,12 +14,12 @@ import {
  * La requête est enregistrée au moment même où le client l'émet. Un appelant qui attend une promesse avant d'émettre — une file d'attente, un cache consulté d'abord — n'a pas encore émis quand le test reprend la main : `await settle()` laisse passer les microtâches en attente.
  */
 export class TestRequest {
-  private repondu = false;
+  private answered = false;
 
   constructor(
     readonly request: HttpRequest,
-    private readonly resoudre: (reponse: HttpResponse<unknown>) => void,
-    private readonly rejeter: (erreur: unknown) => void,
+    private readonly resolve: (response: HttpResponse<unknown>) => void,
+    private readonly reject: (error: unknown) => void,
   ) {}
 
   get cancelled(): boolean {
@@ -34,13 +34,13 @@ export class TestRequest {
       headers?: Record<string, string> | HttpHeaders;
     } = {},
   ): void {
-    this.assertOuverte();
+    this.assertOpen();
     const status = options.status ?? 200;
     const headers =
       options.headers instanceof HttpHeaders
         ? options.headers
         : new HttpHeaders(options.headers);
-    this.resoudre(
+    this.resolve(
       new HttpResponse(
         status,
         options.statusText ?? (status === 200 ? "OK" : ""),
@@ -60,11 +60,11 @@ export class TestRequest {
       headers?: Record<string, string>;
     } = {},
   ): void {
-    this.assertOuverte();
+    this.assertOpen();
     const status = options.status ?? 0;
     if (status === 0) {
       // Comme `fetch` : aucune réponse, une erreur de statut 0 qui porte la cause.
-      this.rejeter(
+      this.reject(
         new HttpErrorResponse(
           0,
           options.statusText ?? "Unknown Error",
@@ -75,7 +75,7 @@ export class TestRequest {
       );
       return;
     }
-    this.resoudre(
+    this.resolve(
       new HttpResponse(
         status,
         options.statusText ?? "",
@@ -86,114 +86,114 @@ export class TestRequest {
     );
   }
 
-  private assertOuverte(): void {
-    if (this.repondu)
+  private assertOpen(): void {
+    if (this.answered)
       throw new Error(
         `Requête déjà répondue : ${this.request.method} ${this.request.url}`,
       );
-    this.repondu = true;
+    this.answered = true;
   }
 }
 
-function toBody(body: unknown, requete: HttpRequest): unknown {
+function toBody(body: unknown, query: HttpRequest): unknown {
   if (
-    requete.responseType === "text" &&
+    query.responseType === "text" &&
     typeof body !== "string" &&
     body !== null
   )
     return JSON.stringify(body);
-  if (requete.responseType === "arraybuffer" && typeof body === "string")
+  if (query.responseType === "arraybuffer" && typeof body === "string")
     return new TextEncoder().encode(body).buffer;
   return body;
 }
 
-type Critere =
+type Criterion =
   | string
-  | ((requete: HttpRequest) => boolean)
+  | ((query: HttpRequest) => boolean)
   | { method?: string; url?: string };
 
 export class HttpTestingController implements HttpBackend {
-  private readonly ouvertes: TestRequest[] = [];
+  private readonly open: TestRequest[] = [];
 
-  handle(requete: HttpRequest): Promise<HttpResponse<unknown>> {
-    return new Promise((resoudre, rejeter) => {
-      const enregistree: TestRequest = new TestRequest(
-        requete,
+  handle(query: HttpRequest): Promise<HttpResponse<unknown>> {
+    return new Promise((resolve, reject) => {
+      const registered: TestRequest = new TestRequest(
+        query,
         (r) => {
-          this.retirer(enregistree);
-          resoudre(r);
+          this.remove(registered);
+          resolve(r);
         },
         (e) => {
-          this.retirer(enregistree);
-          rejeter(e);
+          this.remove(registered);
+          reject(e);
         },
       );
-      this.ouvertes.push(enregistree);
+      this.open.push(registered);
     });
   }
 
-  match(critere: Critere): TestRequest[] {
-    const predicat = toPredicat(critere);
-    return this.ouvertes.filter((r) => predicat(r.request));
+  match(criterion: Criterion): TestRequest[] {
+    const predicate = toPredicate(criterion);
+    return this.open.filter((r) => predicate(r.request));
   }
 
-  expectOne(critere: Critere, description?: string): TestRequest {
-    const trouvees = this.match(critere);
-    if (trouvees.length !== 1) {
-      const ouvertes = this.ouvertes
+  expectOne(criterion: Criterion, description?: string): TestRequest {
+    const found = this.match(criterion);
+    if (found.length !== 1) {
+      const open = this.open
         .map((r) => `${r.request.method} ${r.request.url}`)
         .join("\n  ");
       throw new Error(
-        `Une requête attendue pour ${description ?? describe(critere)}, ${trouvees.length} trouvée(s). Requêtes ouvertes :\n  ${ouvertes || "(aucune)"}`,
+        `Une requête attendue pour ${description ?? describe(criterion)}, ${found.length} trouvée(s). Requêtes ouvertes :\n  ${open || "(aucune)"}`,
       );
     }
-    return trouvees[0];
+    return found[0];
   }
 
-  expectNone(critere: Critere, description?: string): void {
-    const trouvees = this.match(critere);
-    if (trouvees.length)
+  expectNone(criterion: Criterion, description?: string): void {
+    const found = this.match(criterion);
+    if (found.length)
       throw new Error(
-        `Aucune requête attendue pour ${description ?? describe(critere)}, ${trouvees.length} trouvée(s).`,
+        `Aucune requête attendue pour ${description ?? describe(criterion)}, ${found.length} trouvée(s).`,
       );
   }
 
   verify(): void {
-    if (this.ouvertes.length) {
+    if (this.open.length) {
       throw new Error(
-        `Requêtes restées sans réponse :\n  ${this.ouvertes.map((r) => `${r.request.method} ${r.request.url}`).join("\n  ")}`,
+        `Requêtes restées sans réponse :\n  ${this.open.map((r) => `${r.request.method} ${r.request.url}`).join("\n  ")}`,
       );
     }
   }
 
-  private retirer(requete: TestRequest): void {
-    const i = this.ouvertes.indexOf(requete);
-    if (i >= 0) this.ouvertes.splice(i, 1);
+  private remove(query: TestRequest): void {
+    const i = this.open.indexOf(query);
+    if (i >= 0) this.open.splice(i, 1);
   }
 }
 
-function toPredicat(critere: Critere): (r: HttpRequest) => boolean {
-  if (typeof critere === "string") return (r) => r.url === critere;
-  if (typeof critere === "function") return critere;
+function toPredicate(criterion: Criterion): (r: HttpRequest) => boolean {
+  if (typeof criterion === "string") return (r) => r.url === criterion;
+  if (typeof criterion === "function") return criterion;
   return (r) =>
-    (!critere.method || r.method === critere.method.toUpperCase()) &&
-    (!critere.url || r.url === critere.url);
+    (!criterion.method || r.method === criterion.method.toUpperCase()) &&
+    (!criterion.url || r.url === criterion.url);
 }
 
-function describe(critere: Critere): string {
-  if (typeof critere === "string") return critere;
-  if (typeof critere === "function") return "le prédicat";
-  return `${critere.method ?? "*"} ${critere.url ?? "*"}`;
+function describe(criterion: Criterion): string {
+  if (typeof criterion === "string") return criterion;
+  if (typeof criterion === "function") return "le prédicat";
+  return `${criterion.method ?? "*"} ${criterion.url ?? "*"}`;
 }
 
 /** Installe la doublure dans le conteneur, et la rend. */
 export function provideHttpTesting(): HttpTestingController {
-  const controleur = new HttpTestingController();
-  provide(HTTP_BACKEND, controleur);
-  return controleur;
+  const controller = new HttpTestingController();
+  provide(HTTP_BACKEND, controller);
+  return controller;
 }
 
 /** Laisse passer les microtâches en attente : ce qu'un appelant fait avant d'émettre sa requête. */
-export async function settle(tours = 10): Promise<void> {
-  for (let i = 0; i < tours; i++) await Promise.resolve();
+export async function settle(rounds = 10): Promise<void> {
+  for (let i = 0; i < rounds; i++) await Promise.resolve();
 }

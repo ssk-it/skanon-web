@@ -2,73 +2,71 @@
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { styleDomaine } from "../../core/ui/couleur-domaine";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import PistesSection from "./PistesSection.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
-import StatutChip from "../shared/StatutChip.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { domainStyle } from "../../core/ui/couleur-domaine";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
+import RoadmapItemsSection from "./PistesSection.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
+import StatusChip from "../shared/StatutChip.vue";
 
 const route = useRoute();
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 
 const id = computed(() => String(route.params["id"]));
-const domaine = computed(() => store.findDomaine(id.value));
-const idsDomaines = computed(() => store.domaines().map((d) => d.id));
-const fonctionnalites = computed(() =>
-  store.listFonctionnalitesByDomaine(id.value),
-);
-const cadrages = computed(() => store.listCadragesByDomaine(id.value));
+const domain = computed(() => store.findDomain(id.value));
+const domainIds = computed(() => store.domains().map((d) => d.id));
+const features = computed(() => store.listFeaturesByDomain(id.value));
+const scopings = computed(() => store.listScopingsByDomain(id.value));
 
-function formatAutresDomaines(ids: readonly string[]): string {
+function formatOtherDomains(ids: readonly string[]): string {
   return ids
     .filter((d) => d !== id.value)
-    .map((d) => store.findDomaine(d)?.nom ?? d)
+    .map((d) => store.findDomain(d)?.name ?? d)
     .join(", ");
 }
 </script>
 
 <template>
   <div class="page-domaine">
-    <EtatVue v-if="store.etat() !== 'pret'" />
-    <template v-else-if="domaine">
-      <RouterLink class="retour" :to="liens.chemin('referentiel')">
-        <UiIcone nom="arrow_back" /> Référentiel
+    <ViewState v-if="store.state() !== 'pret'" />
+    <template v-else-if="domain">
+      <RouterLink class="retour" :to="links.path('referentiel')">
+        <UiIcon name="arrow_back" /> Référentiel
       </RouterLink>
 
-      <header class="entete" :style="styleDomaine(domaine.id, idsDomaines)">
+      <header class="entete" :style="domainStyle(domain.id, domainIds)">
         <p class="type">Domaine</p>
-        <h1>{{ domaine.nom }}</h1>
-        <MarkdownRendu class="md" :texte="domaine.description" />
+        <h1>{{ domain.name }}</h1>
+        <RenderedMarkdown class="md" :text="domain.description" />
       </header>
 
       <h2 class="section">Fonctionnalités</h2>
       <div class="liste">
         <RouterLink
-          v-for="f in fonctionnalites"
+          v-for="f in features"
           :key="f.id"
           class="ligne"
-          :to="liens.chemin('referentiel', 'fonctionnalite', f.id)"
+          :to="links.path('referentiel', 'fonctionnalite', f.id)"
         >
           <div class="principal">
-            <span class="nom">{{ f.nom }}</span>
+            <span class="nom">{{ f.name }}</span>
             <span
-              v-if="f.domaines.length > 1"
+              v-if="f.domains.length > 1"
               class="partage"
               title="Rattachée à plusieurs domaines"
             >
               aussi dans
-              {{ formatAutresDomaines(f.domaines) }}
+              {{ formatOtherDomains(f.domains) }}
             </span>
           </div>
           <span class="compte">
-            {{ store.listReglesByFonctionnalite(f.id).length }} règles
+            {{ store.listRulesByFeature(f.id).length }} règles
           </span>
         </RouterLink>
-        <p v-if="!fonctionnalites.length" class="vide">
+        <p v-if="!features.length" class="vide">
           Aucune fonctionnalité rattachée à ce domaine.
         </p>
       </div>
@@ -76,31 +74,31 @@ function formatAutresDomaines(ids: readonly string[]): string {
       <h2 class="section">Cadrages</h2>
       <div class="liste">
         <RouterLink
-          v-for="c in cadrages"
+          v-for="c in scopings"
           :key="c.id"
           class="ligne"
-          :to="liens.chemin('cadrages', c.id)"
+          :to="links.path('cadrages', c.id)"
         >
           <span class="cid">{{ c.id }}</span>
           <div class="principal">
-            <span class="nom">{{ c.titre }}</span>
+            <span class="nom">{{ c.title }}</span>
             <span
-              v-if="c.domaines.length > 1"
+              v-if="c.domains.length > 1"
               class="partage"
               title="Rattaché à plusieurs domaines"
             >
               aussi dans
-              {{ formatAutresDomaines(c.domaines) }}
+              {{ formatOtherDomains(c.domains) }}
             </span>
           </div>
-          <StatutChip :statut="c.statut" />
+          <StatusChip :status="c.status" />
         </RouterLink>
-        <p v-if="!cadrages.length" class="vide">
+        <p v-if="!scopings.length" class="vide">
           Aucun cadrage rattaché à ce domaine.
         </p>
       </div>
 
-      <PistesSection :id="id" :key="id" collection="domains" />
+      <RoadmapItemsSection :id="id" :key="id" collection="domains" />
     </template>
     <p v-else class="vide">Domaine introuvable : {{ id }}</p>
   </div>

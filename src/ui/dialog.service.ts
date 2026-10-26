@@ -4,19 +4,19 @@ import { signal } from "../core/signaux";
 /**
  * Comment s'ouvre un dialogue. Tout est facultatif.
  */
-export interface OptionsDialogue<D> {
+export interface DialogOptions<D> {
   /** Ce que le composant reçoit en prop `data`. */
   readonly data?: D;
   /** La largeur du panneau — `'640px'`. Sans elle, le panneau prend celle de son contenu, entre 280 et 560 px. */
-  readonly largeur?: string;
+  readonly width?: string;
   /** La largeur maximale, qui remplace les 560 px de Material — `'calc(100vw - 32px)'`. */
-  readonly largeurMax?: string;
+  readonly maxWidth?: string;
   /** La distance au haut de la fenêtre ; sans elle, le panneau est centré verticalement. */
-  readonly haut?: string;
+  readonly top?: string;
   /** Une classe de plus sur le panneau, pour un dialogue qui s'habille à part (la palette de recherche). */
-  readonly classe?: string;
+  readonly className?: string;
   /** Le nom du dialogue pour les lecteurs d'écran, quand il n'a pas de titre visible. */
-  readonly libelle?: string;
+  readonly label?: string;
   /**
    * Ce qui reçoit le focus à l'ouverture : le premier élément focalisable — ou celui qui porte `data-focus-initial` — par défaut ; le panneau lui-même avec `'dialogue'`, l'équivalent de `autoFocus: 'dialog'`.
    */
@@ -24,12 +24,12 @@ export interface OptionsDialogue<D> {
 }
 
 /** Un dialogue ouvert, tel que `UiDialogHote` le monte. */
-export interface DialogueOuvert {
+export interface OpenDialog {
   readonly id: number;
-  readonly composant: Component;
-  readonly options: OptionsDialogue<unknown>;
+  readonly component: Component;
+  readonly options: DialogOptions<unknown>;
   /** Ferme le dialogue ; la promesse d'`open` se résout avec ce résultat. */
-  fermer(resultat?: unknown): void;
+  close(result?: unknown): void;
 }
 
 /**
@@ -48,32 +48,32 @@ export interface DialogueOuvert {
  * Le service ne fait que tenir la liste des dialogues ouverts ; `UiDialogHote`, monté une fois dans `App.vue`, les affiche, piège le focus dans le dernier ouvert et le rend ensuite à l'élément qui l'avait.
  */
 export class DialogService {
-  readonly ouverts = signal<readonly DialogueOuvert[]>([]);
-  private prochain = 1;
+  readonly openDialogs = signal<readonly OpenDialog[]>([]);
+  private nextId = 1;
 
   open<R = unknown, D = unknown>(
-    composant: Component,
-    options: OptionsDialogue<D> = {},
+    component: Component,
+    options: DialogOptions<D> = {},
   ): Promise<R | undefined> {
-    return new Promise<R | undefined>((resoudre) => {
-      const id = this.prochain++;
-      const dialogue: DialogueOuvert = {
+    return new Promise<R | undefined>((resolve) => {
+      const id = this.nextId++;
+      const dialog: OpenDialog = {
         id,
         // Le composant est une définition, non un état : le rendre réactif ne servirait à rien et coûterait à chaque rendu.
-        composant: markRaw(composant),
+        component: markRaw(component),
         options,
-        fermer: (resultat?: unknown) => {
-          if (!this.ouverts().some((d) => d.id === id)) return;
-          this.ouverts.update((liste) => liste.filter((d) => d.id !== id));
-          resoudre(resultat as R | undefined);
+        close: (result?: unknown) => {
+          if (!this.openDialogs().some((d) => d.id === id)) return;
+          this.openDialogs.update((list) => list.filter((d) => d.id !== id));
+          resolve(result as R | undefined);
         },
       };
-      this.ouverts.update((liste) => [...liste, dialogue]);
+      this.openDialogs.update((list) => [...list, dialog]);
     });
   }
 
   /** Ferme tous les dialogues sans réponse — à la navigation, comme `closeOnNavigation`. */
   closeAll(): void {
-    for (const d of [...this.ouverts()].reverse()) d.fermer(undefined);
+    for (const d of [...this.openDialogs()].reverse()) d.close(undefined);
   }
 }

@@ -1,10 +1,10 @@
 import { inject } from "../injection";
-import { GithubClient, RefDepot } from "../github/github-client";
-import { ReferentielStore } from "./referentiel.store";
+import { GithubClient, RepoRef } from "../github/github-client";
+import { SpecificationStore } from "./referentiel.store";
 
 /** Ce qu'il faut savoir du projet pour amorcer son dépôt. */
-export interface NouveauProjet {
-  readonly nom: string;
+export interface NewProject {
+  readonly name: string;
   readonly description: string;
 }
 
@@ -19,18 +19,18 @@ export interface NouveauProjet {
  * et les opérations d'impact sont fixes. Les écrire ferait passer pour réglable
  * ce que plus rien ne lit.
  */
-function configuration(projet: NouveauProjet): string {
+function configuration(project: NewProject): string {
   // Une description absente le reste : la remplacer par une phrase composée
   // ferait passer pour une intention ce qui n'est qu'un gabarit.
-  const description = projet.description.trim()
-    ? `  description: >\n    ${projet.description.trim().split("\n").join("\n    ")}\n`
+  const description = project.description.trim()
+    ? `  description: >\n    ${project.description.trim().split("\n").join("\n    ")}\n`
     : "  # description : ce que fait ce produit, en une phrase.\n";
 
   return `# Configuration du projet — lue par l'application et par l'automatisation
 schema_version: 1
 
 projet:
-  nom: ${projet.nom}
+  nom: ${project.name}
 ${description}
 tags_liens:
   - carte_trello
@@ -48,10 +48,10 @@ tags_liens:
  * serve — celui qui ouvre le dépôt sur la plateforme y lit ce qu'on y dépose,
  * plutôt qu'un fichier vide dont il se demande à quoi il sert.
  */
-const REPERTOIRES: ReadonlyArray<{ chemin: string; contenu: string }> = [
+const DIRECTORIES: ReadonlyArray<{ path: string; content: string }> = [
   {
-    chemin: "domains/README.md",
-    contenu: `# Domaines
+    path: "domains/README.md",
+    content: `# Domaines
 
 Les grands découpages fonctionnels du produit. Un domaine par fichier, nommé par
 son identifiant — \`acces.md\`, \`facturation.md\`.
@@ -61,8 +61,8 @@ gestion.
 `,
   },
   {
-    chemin: "features/README.md",
-    contenu: `# Fonctionnalités
+    path: "features/README.md",
+    content: `# Fonctionnalités
 
 Ce que le produit sait faire, rattaché à un ou plusieurs domaines. Une
 fonctionnalité par fichier, à plat.
@@ -72,8 +72,8 @@ visible depuis l'application.
 `,
   },
   {
-    chemin: "rules/README.md",
-    contenu: `# Règles de gestion
+    path: "rules/README.md",
+    content: `# Règles de gestion
 
 Le comportement du produit, énoncé règle par règle. Identifiants \`RG-<slug>\`,
 stables à vie.
@@ -83,8 +83,8 @@ livrés, et l'automatisation les met à jour à chaque livraison.
 `,
   },
   {
-    chemin: "cadrages/README.md",
-    contenu: `# Cadrages
+    path: "cadrages/README.md",
+    content: `# Cadrages
 
 Les unités de changement, datées. Un répertoire par cadrage, nommé par son
 identifiant seul — \`2026-001/\` — sans slug de titre, pour qu'un titre réécrit
@@ -95,12 +95,12 @@ Chacun porte son \`cadrage.md\`, et ses décisions dans \`decisions/\`.
   },
 ];
 
-function lisezMoi(projet: NouveauProjet): string {
-  const description = projet.description.trim();
+function readme(project: NewProject): string {
+  const description = project.description.trim();
 
-  return `# ${projet.nom}
+  return `# ${project.name}
 ${description ? `\n${description}\n` : ""}
-Ce dépôt est le référentiel de ${projet.nom} : il décrit ce que le produit fait
+Ce dépôt est le référentiel de ${project.name} : il décrit ce que le produit fait
 aujourd'hui, et les cadrages qui l'ont amené là.
 
 ## Comment il est organisé
@@ -125,9 +125,9 @@ livrés.
  * remédier évite au projet de composer à la main une arborescence dont il ne
  * connaît pas encore les conventions.
  */
-export class AmorcageService {
+export class BootstrapService {
   private readonly github = inject(GithubClient);
-  private readonly store = inject(ReferentielStore);
+  private readonly store = inject(SpecificationStore);
 
   /**
    * Dépose la structure d'un dépôt cadré, directement sur la branche par défaut.
@@ -136,29 +136,29 @@ export class AmorcageService {
    * à relire dans un dépôt vide, et une branche ne peut de toute façon pas
    * diverger de ce qui n'existe pas.
    */
-  async amorcer(projet: NouveauProjet): Promise<void> {
-    const depot: RefDepot = this.store.depot();
-    const branche = (await this.github.loadDepot(depot)).defaultBranch;
+  async bootstrapProject(project: NewProject): Promise<void> {
+    const repoRef: RepoRef = this.store.repoRef();
+    const branch = (await this.github.loadRepo(repoRef)).defaultBranch;
 
-    const fichiers = [
-      { chemin: "ssk-canon.yml", contenu: configuration(projet) },
-      { chemin: "README.md", contenu: lisezMoi(projet) },
-      ...REPERTOIRES,
+    const files = [
+      { path: "ssk-canon.yml", content: configuration(project) },
+      { path: "README.md", content: readme(project) },
+      ...DIRECTORIES,
     ];
 
     // Un fichier après l'autre : la première écriture crée la branche, et les
     // suivantes s'y ajoutent. Les grouper en un seul enregistrement demanderait
     // de composer un arbre Git, pour un gain nul à cette échelle.
-    for (const f of fichiers) {
-      await this.github.commitFichier(
-        depot,
-        branche,
-        f.chemin,
-        f.contenu,
-        `Amorce le référentiel : ${f.chemin}`,
+    for (const f of files) {
+      await this.github.commitFile(
+        repoRef,
+        branch,
+        f.path,
+        f.content,
+        `Amorce le référentiel : ${f.path}`,
       );
     }
 
-    await this.store.loadReferentiel();
+    await this.store.loadSpecification();
   }
 }

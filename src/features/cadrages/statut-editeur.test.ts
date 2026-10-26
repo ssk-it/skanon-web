@@ -4,18 +4,18 @@ import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { inject, provide } from "../../core/injection";
 import {
-  TAGS_LIENS_PAR_DEFAUT,
-  type Cadrage,
-  type Referentiel,
+  DEFAULT_LINK_TAGS,
+  type Scoping,
+  type Specification,
 } from "../../core/model/model";
 import {
-  RedactionService,
-  listBascules,
+  AuthoringService,
+  listToggles,
 } from "../../core/repo/redaction.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { RepoConfig } from "../../core/repo/repo-config";
-import { createRouteur } from "../../routeur";
-import EditerCadragePage from "./EditerCadragePage.vue";
+import { createAppRouter } from "../../routeur";
+import EditScopingPage from "./EditerCadragePage.vue";
 
 /**
  * Le statut dans l'éditeur — RG-statuts-cadrage et RG-bascule-de-statut.
@@ -23,7 +23,7 @@ import EditerCadragePage from "./EditerCadragePage.vue";
  * Le statut ne s'écrit plus dans le fichier : il se lit sur la demande de fusion. L'éditeur le lisait encore dans un champ `statut:` que plus aucun cadrage ne porte, et montrait donc « Brouillon » quoi qu'il en soit — avec, en face, une bascule vers la relecture même pour un cadrage déjà relu.
  */
 
-const CONTENU = `---
+const CONTENT = `---
 id: 2026-050
 titre: Un cadrage en relecture
 domaines: [d]
@@ -34,73 +34,73 @@ domaines: [d]
 Un objectif.
 `;
 
-function cadrage(statut: Cadrage["statut"]): Cadrage {
+function scoping(status: Scoping["status"]): Scoping {
   return {
     id: "2026-050",
-    titre: "Un cadrage en relecture",
-    statut,
-    domaines: ["d"],
-    liens: [],
+    title: "Un cadrage en relecture",
+    status: status,
+    domains: ["d"],
+    links: [],
     impacts: [],
-    objectif: "Un objectif.",
-    parcours: "",
-    enonces: new Map(),
+    goal: "Un objectif.",
+    journey: "",
+    statements: new Map(),
     decisions: [],
-    piecesJointes: [],
-    divers: [],
+    attachments: [],
+    misc: [],
     provenance: {
-      branche: "cadrage/2026-050",
+      branch: "cadrage/2026-050",
       pullRequest: 9,
-      brouillon: statut === "brouillon",
+      draft: status === "brouillon",
     },
   };
 }
 
-function referentiel(cadrages: Cadrage[]): Referentiel {
+function specification(scopings: Scoping[]): Specification {
   return {
-    projet: { nom: "Essai", description: "", depotsCode: [], prefixe: null },
-    reglages: {
-      acces: "jeton_personnel",
-      identite: null,
-      protectionDuJeton: "proposee",
-      tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+    project: { name: "Essai", description: "", codeRepos: [], prefix: null },
+    settings: {
+      access: "jeton_personnel",
+      identity: null,
+      tokenProtection: "proposee",
+      linkTags: DEFAULT_LINK_TAGS,
     },
-    domaines: new Map([["d", { id: "d", nom: "D", description: "" }]]),
-    fonctionnalites: new Map(),
-    regles: new Map(),
+    domains: new Map([["d", { id: "d", name: "D", description: "" }]]),
+    features: new Map(),
+    rules: new Map(),
     decisions: new Map(),
     architecture: new Map(),
-    cadrages: new Map(cadrages.map((c) => [c.id, c])),
+    scopings: new Map(scopings.map((c) => [c.id, c])),
     anomalies: [],
   };
 }
 
 describe("Le statut dans l’éditeur", () => {
-  async function monter(cadrages: Cadrage[]): Promise<VueWrapper> {
+  async function mountView(scopings: Scoping[]): Promise<VueWrapper> {
     provideHttpTesting();
-    provide(RedactionService, {
-      loadPourEdition: async () => ({
+    provide(AuthoringService, {
+      loadForEditing: async () => ({
         source: {
-          branche: "cadrage/2026-050",
-          chemin: "cadrages/2026-050/cadrage.md",
+          branch: "cadrage/2026-050",
+          path: "cadrages/2026-050/cadrage.md",
           sha: "x",
         },
-        contenu: CONTENU,
-        contexte: null,
-        branchePrincipale: "main",
+        content: CONTENT,
+        context: null,
+        mainBranch: "main",
       }),
       loadDecisions: async () => [],
-      transitionsPossibles: listBascules,
+      possibleTransitions: listToggles,
     });
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
-    const store = inject(ReferentielStore);
-    store.referentiel.set(referentiel(cadrages));
-    store.etat.set("pret");
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
+    const store = inject(SpecificationStore);
+    store.specification.set(specification(scopings));
+    store.state.set("pret");
 
-    const router = createRouteur(createMemoryHistory());
+    const router = createAppRouter(createMemoryHistory());
     await router.push("/org/depot/cadrages/2026-050/editer");
     await router.isReady();
-    return mount(EditerCadragePage, { global: { plugins: [router] } });
+    return mount(EditScopingPage, { global: { plugins: [router] } });
   }
 
   async function stable(f: VueWrapper): Promise<HTMLElement> {
@@ -109,39 +109,39 @@ describe("Le statut dans l’éditeur", () => {
     return f.element as HTMLElement;
   }
 
-  function statutAffiche(el: HTMLElement): string {
+  function displayedStatus(el: HTMLElement): string {
     return el.querySelector(".cycle-etat strong")?.textContent?.trim() ?? "";
   }
 
-  function bascules(el: HTMLElement): string[] {
+  function toggles(el: HTMLElement): string[] {
     return [...el.querySelectorAll(".cycle-actions button")].map(
       (b) => b.textContent?.trim() ?? "",
     );
   }
 
   it("montre le statut que porte la demande de fusion", async () => {
-    const el = await stable(await monter([cadrage("en_relecture")]));
+    const el = await stable(await mountView([scoping("en_relecture")]));
 
-    expect(statutAffiche(el)).toBe("En relecture");
-    expect(bascules(el)).toEqual(["Brouillon"]);
+    expect(displayedStatus(el)).toBe("En relecture");
+    expect(toggles(el)).toEqual(["Brouillon"]);
   });
 
   it("ne propose jamais « Validée », et laisse reprendre un cadrage validé", async () => {
-    const el = await stable(await monter([cadrage("validee")]));
+    const el = await stable(await mountView([scoping("validee")]));
 
-    expect(statutAffiche(el)).toBe("Validée");
-    expect(bascules(el)).toEqual(["Brouillon"]);
+    expect(displayedStatus(el)).toBe("Validée");
+    expect(toggles(el)).toEqual(["Brouillon"]);
   });
 
   it("suit le statut quand les branches finissent d’arriver", async () => {
-    const f = await monter([]);
+    const f = await mountView([]);
     let el = await stable(f);
-    expect(statutAffiche(el)).toBe("Brouillon");
+    expect(displayedStatus(el)).toBe("Brouillon");
 
-    const store = inject(ReferentielStore);
-    store.referentiel.set(referentiel([cadrage("en_relecture")]));
+    const store = inject(SpecificationStore);
+    store.specification.set(specification([scoping("en_relecture")]));
     el = await stable(f);
 
-    expect(statutAffiche(el)).toBe("En relecture");
+    expect(displayedStatus(el)).toBe("En relecture");
   });
 });

@@ -1,7 +1,7 @@
 import { inject, provide, resetInjection } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TokenService } from "./token.service";
-import { ContenusCache, FABRIQUE_INDEXEDDB } from "../repo/contenus-cache";
+import { ContentCache, INDEXEDDB_FACTORY } from "../repo/contenus-cache";
 
 /**
  * RG-contenus-prives-au-repos : les contenus d'un dépôt privé ne survivent pas
@@ -9,48 +9,48 @@ import { ContenusCache, FABRIQUE_INDEXEDDB } from "../repo/contenus-cache";
  * stockage du navigateur suit les mêmes effacements, vérifiés à part.
  */
 describe("oubli d’un accès et contenus privés", () => {
-  const PRIVE = { owner: "org", repo: "prive" };
-  const AUTRE = { owner: "autre", repo: "prive" };
+  const PRIVATE = { owner: "org", repo: "prive" };
+  const OTHER = { owner: "autre", repo: "prive" };
   const PUBLIC = { owner: "org", repo: "public" };
 
   let tokens: TokenService;
-  let cache: ContenusCache;
+  let cache: ContentCache;
 
   beforeEach(async () => {
     resetInjection();
-    provide(FABRIQUE_INDEXEDDB, null);
+    provide(INDEXEDDB_FACTORY, null);
     tokens = inject(TokenService);
-    cache = inject(ContenusCache);
-    await cache.saveContenu(PRIVE, "a1", "privé", {
-      prive: true,
-      persister: true,
+    cache = inject(ContentCache);
+    await cache.saveContent(PRIVATE, "a1", "privé", {
+      private: true,
+      persist: true,
     });
-    await cache.saveContenu(AUTRE, "a1", "autre", {
-      prive: true,
-      persister: true,
+    await cache.saveContent(OTHER, "a1", "autre", {
+      private: true,
+      persist: true,
     });
-    await cache.saveContenu(PUBLIC, "a1", "public", {
-      prive: false,
-      persister: true,
+    await cache.saveContent(PUBLIC, "a1", "public", {
+      private: false,
+      persist: true,
     });
   });
 
   it("efface tous les contenus privés à la déconnexion", async () => {
-    tokens.effacer();
+    tokens.erase();
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(await cache.loadContenu(PRIVE, "a1")).toBeNull();
-    expect(await cache.loadContenu(AUTRE, "a1")).toBeNull();
-    expect(await cache.loadContenu(PUBLIC, "a1")).toBe("public");
+    expect(await cache.loadContent(PRIVATE, "a1")).toBeNull();
+    expect(await cache.loadContent(OTHER, "a1")).toBeNull();
+    expect(await cache.loadContent(PUBLIC, "a1")).toBe("public");
   });
 
   it("n’efface, à l’oubli d’une portée, que les dépôts qu’elle couvrait", async () => {
-    tokens.definirPourPortee("org", "ghp_jetonDeTestSuffisammentLong");
-    tokens.oublierPortee("org");
+    tokens.setForScope("org", "ghp_jetonDeTestSuffisammentLong");
+    tokens.forgetScope("org");
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(await cache.loadContenu(PRIVE, "a1")).toBeNull();
-    expect(await cache.loadContenu(AUTRE, "a1")).toBe("autre");
-    expect(await cache.loadContenu(PUBLIC, "a1")).toBe("public");
+    expect(await cache.loadContent(PRIVATE, "a1")).toBeNull();
+    expect(await cache.loadContent(OTHER, "a1")).toBe("autre");
+    expect(await cache.loadContent(PUBLIC, "a1")).toBe("public");
   });
 });

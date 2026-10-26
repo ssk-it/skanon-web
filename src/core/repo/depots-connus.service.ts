@@ -1,13 +1,13 @@
 import { inject } from "../injection";
 import { signal } from "../signaux";
-import { GithubClient, RefDepot } from "../github/github-client";
-import { RepoConfig, memeDepot } from "./repo-config";
+import { GithubClient, RepoRef } from "../github/github-client";
+import { RepoConfig, sameRepo } from "./repo-config";
 
 /** Un dépôt proposé au choix, avec ce qu'on sait de lui. */
-export interface DepotConnu {
-  readonly depot: RefDepot;
+export interface KnownRepo {
+  readonly repoRef: RepoRef;
   /** Porte un référentiel — vérifié, non supposé. */
-  readonly cadre: boolean;
+  readonly framed: boolean;
   /** Déjà ouvert par le passé. */
   readonly recent: boolean;
 }
@@ -19,13 +19,13 @@ export interface DepotConnu {
  * lesquels on travaille, y compris sans connexion ; la découverte dit ce que
  * l'accès courant autorise réellement, ce qu'aucune mémoire ne peut savoir.
  */
-export class DepotsConnusService {
+export class KnownReposService {
   private readonly github = inject(GithubClient);
   private readonly config = inject(RepoConfig);
 
-  readonly depots = signal<readonly DepotConnu[]>([]);
-  readonly enCours = signal(false);
-  readonly erreur = signal<string | null>(null);
+  readonly repos = signal<readonly KnownRepo[]>([]);
+  readonly inProgress = signal(false);
+  readonly error = signal<string | null>(null);
 
   /**
    * Rassemble les dépôts connus, et regarde lesquels portent un référentiel.
@@ -34,61 +34,65 @@ export class DepotsConnusService {
    * n'aboutisse : ils sont déjà connus, et les faire attendre un appel réseau
    * les rendrait moins accessibles qu'avant.
    */
-  async rafraichir(): Promise<void> {
-    if (this.enCours()) return;
-    this.enCours.set(true);
-    this.erreur.set(null);
+  async refresh(): Promise<void> {
+    if (this.inProgress()) return;
+    this.inProgress.set(true);
+    this.error.set(null);
 
     const recents = this.config.recents();
-    this.depots.set(
-      recents.map((depot) => ({ depot, cadre: false, recent: true })),
+    this.repos.set(
+      recents.map((repoRef) => ({
+        repoRef: repoRef,
+        framed: false,
+        recent: true,
+      })),
     );
 
     try {
-      const autorises = await this.github.listDepotsTousJetons();
-      const tous = [
+      const allowed = await this.github.listReposAllTokens();
+      const all = [
         // La graphie de la plateforme l'emporte sur celle d'une saisie : deux
         // casses pour une organisation la couperaient en deux à l'écran.
-        ...recents.map((r) => autorises.find((a) => memeDepot(r, a)) ?? r),
-        ...autorises.filter((a) => !recents.some((r) => memeDepot(r, a))),
+        ...recents.map((r) => allowed.find((a) => sameRepo(r, a)) ?? r),
+        ...allowed.filter((a) => !recents.some((r) => sameRepo(r, a))),
       ];
 
       // Le contrôle passe par la file d'attente du client, qui borne la
       // concurrence : c'est elle qui protège des limites secondaires.
-      const cadres = await Promise.all(
-        tous.map((d) => this.github.estDepotCadre(d)),
+      const framedRepos = await Promise.all(
+        all.map((d) => this.github.isScopingRepo(d)),
       );
 
-      this.depots.set(
-        tous
-          .map((depot, i) => ({
-            depot,
-            cadre: cadres[i],
-            recent: recents.some((r) => memeDepot(r, depot)),
+      this.repos.set(
+        all
+          .map((repoRef, i) => ({
+            repoRef: repoRef,
+            framed: framedRepos[i],
+            recent: recents.some((r) => sameRepo(r, repoRef)),
           }))
           // Les cadrés d'abord : ce sont les seuls que l'application sait
           // ouvrir. Les autres restent proposés, un dépôt vide qu'on veut
           // amorcer n'ayant pas encore de référentiel.
-          .sort((a, b) => Number(b.cadre) - Number(a.cadre)),
+          .sort((a, b) => Number(b.framed) - Number(a.framed)),
       );
     } catch (e) {
       // La découverte qui échoue ne doit pas emporter les récents : ils sont
       // ce qui reste utile quand l'accès manque.
-      this.erreur.set(
+      this.error.set(
         e instanceof Error
           ? e.message
           : "Les dépôts autorisés n’ont pas pu être listés.",
       );
     } finally {
-      this.enCours.set(false);
+      this.inProgress.set(false);
     }
   }
 }
 
 /** Les dépôts d'une même organisation, présentés ensemble. */
-export interface GroupeOrganisation {
-  readonly organisation: string;
-  readonly depots: readonly DepotConnu[];
+export interface OrganizationGroup {
+  readonly organization: string;
+  readonly repos: readonly KnownRepo[];
 }
 
 /**
@@ -98,27 +102,27 @@ export interface GroupeOrganisation {
  * les seuls que l'application sait ouvrir, voir RG-projets-connus —, puis par
  * nom. La casse ne sépare rien, la plateforme ne la distinguant pas.
  */
-export function groupDepotsByOrganisation(
-  depots: readonly DepotConnu[],
-): GroupeOrganisation[] {
-  const parCle = new Map<string, DepotConnu[]>();
-  for (const d of depots) {
-    const cle = d.depot.owner.toLowerCase();
-    const groupe = parCle.get(cle);
-    if (groupe) groupe.push(d);
-    else parCle.set(cle, [d]);
+export function groupReposByOrganization(
+  repos: readonly KnownRepo[],
+): OrganizationGroup[] {
+  const byKey = new Map<string, KnownRepo[]>();
+  for (const d of repos) {
+    const key = d.repoRef.owner.toLowerCase();
+    const group = byKey.get(key);
+    if (group) group.push(d);
+    else byKey.set(key, [d]);
   }
 
-  const parNom = (a: string, b: string) =>
+  const byName = (a: string, b: string) =>
     a.localeCompare(b, "fr", { sensitivity: "base" });
-  return [...parCle.values()]
-    .map((groupe) => ({
-      organisation: groupe[0].depot.owner,
-      depots: [...groupe].sort(
+  return [...byKey.values()]
+    .map((group) => ({
+      organization: group[0].repoRef.owner,
+      repos: [...group].sort(
         (a, b) =>
-          Number(b.cadre) - Number(a.cadre) ||
-          parNom(a.depot.repo, b.depot.repo),
+          Number(b.framed) - Number(a.framed) ||
+          byName(a.repoRef.repo, b.repoRef.repo),
       ),
     }))
-    .sort((a, b) => parNom(a.organisation, b.organisation));
+    .sort((a, b) => byName(a.organization, b.organization));
 }

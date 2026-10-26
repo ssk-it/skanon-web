@@ -1,10 +1,10 @@
 import { inject } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory, type Router } from "vue-router";
-import { createRouteur } from "../../routeur";
-import { TitreStrategy } from "./titre.strategy";
-import { Referentiel } from "../model/model";
-import { ReferentielStore } from "./referentiel.store";
+import { createAppRouter } from "../../routeur";
+import { TitleStrategy } from "./titre.strategy";
+import { Specification } from "../model/model";
+import { SpecificationStore } from "./referentiel.store";
 
 /**
  * Le titre de la page — ce que l'historique du navigateur retient.
@@ -15,31 +15,31 @@ import { ReferentielStore } from "./referentiel.store";
  */
 describe("Titre de la page", () => {
   let router: Router;
-  let store: ReferentielStore;
-  const titre = { getTitle: () => document.title };
+  let store: SpecificationStore;
+  const title = { getTitle: () => document.title };
 
   beforeEach(() => {
-    router = createRouteur(createMemoryHistory());
-    inject(TitreStrategy).attach(router);
-    store = inject(ReferentielStore);
+    router = createAppRouter(createMemoryHistory());
+    inject(TitleStrategy).attach(router);
+    store = inject(SpecificationStore);
   });
 
   /** Pose un référentiel chargé, sans passer par le réseau. */
-  function chargerReferentiel(
-    partiel: Partial<Referentiel["projet"]> = {},
-    contenu = {},
+  function loadTestSpecification(
+    partial: Partial<Specification["project"]> = {},
+    content = {},
   ) {
-    const actuel = store.referentiel();
-    store.referentiel.set({
-      ...actuel,
-      projet: {
-        ...actuel.projet,
-        nom: "Explorateur S3",
-        prefixe: null,
-        ...partiel,
+    const current = store.specification();
+    store.specification.set({
+      ...current,
+      project: {
+        ...current.project,
+        name: "Explorateur S3",
+        prefix: null,
+        ...partial,
       },
-      ...contenu,
-    } as Referentiel);
+      ...content,
+    } as Specification);
   }
 
   it("nomme le dépôt tant que le référentiel n’est pas chargé", async () => {
@@ -47,7 +47,7 @@ describe("Titre de la page", () => {
     // qu'après. Un titre muet en attendant ne dirait rien à l'historique.
     await router.push("/ssk-it/exemple-cadrage/referentiel");
 
-    expect(titre.getTitle()).toBe(
+    expect(title.getTitle()).toBe(
       "Référentiel — ssk-it/exemple-cadrage — Skanon",
     );
   });
@@ -55,18 +55,18 @@ describe("Titre de la page", () => {
   it("nomme le projet dès que le référentiel est chargé", async () => {
     await router.push("/ssk-it/exemple-cadrage/referentiel");
 
-    chargerReferentiel();
+    loadTestSpecification();
 
-    expect(titre.getTitle()).toBe("Référentiel — Explorateur S3 — Skanon");
+    expect(title.getTitle()).toBe("Référentiel — Explorateur S3 — Skanon");
   });
 
   it("retombe sur le dépôt quand le projet ne déclare pas de nom", async () => {
     await router.push("/ssk-it/exemple-cadrage/referentiel");
 
     // « Projet » est le nom par défaut : il ne distingue rien.
-    chargerReferentiel({ nom: "Projet" });
+    loadTestSpecification({ name: "Projet" });
 
-    expect(titre.getTitle()).toContain("ssk-it/exemple-cadrage");
+    expect(title.getTitle()).toContain("ssk-it/exemple-cadrage");
   });
 
   it("porte l’identifiant de l’élément consulté", async () => {
@@ -74,7 +74,7 @@ describe("Titre de la page", () => {
       "/ssk-it/projet/referentiel/regle/RG-lien-partage-presigne",
     );
 
-    expect(titre.getTitle()).toContain("RG-lien-partage-presigne");
+    expect(title.getTitle()).toContain("RG-lien-partage-presigne");
   });
 
   it("remplace l’intitulé générique par l’élément", async () => {
@@ -83,8 +83,8 @@ describe("Titre de la page", () => {
       "/ssk-it/projet/referentiel/regle/RG-secret-au-trousseau",
     );
 
-    expect(titre.getTitle()).not.toContain("Règle de gestion");
-    expect(titre.getTitle()).toBe(
+    expect(title.getTitle()).not.toContain("Règle de gestion");
+    expect(title.getTitle()).toBe(
       "RG-secret-au-trousseau — ssk-it/projet — Skanon",
     );
   });
@@ -92,16 +92,16 @@ describe("Titre de la page", () => {
   it("ajoute le titre du cadrage à son identifiant", async () => {
     await router.push("/ssk-it/projet/cadrages/2026-016");
 
-    chargerReferentiel(
+    loadTestSpecification(
       {},
       {
-        cadrages: new Map([
-          ["2026-016", { id: "2026-016", titre: "Donner accès à un fichier" }],
+        scopings: new Map([
+          ["2026-016", { id: "2026-016", title: "Donner accès à un fichier" }],
         ]),
       },
     );
 
-    expect(titre.getTitle()).toBe(
+    expect(title.getTitle()).toBe(
       "2026-016 Donner accès à un fichier — Explorateur S3 — Skanon",
     );
   });
@@ -109,16 +109,16 @@ describe("Titre de la page", () => {
   it("ajoute le nom du domaine à son identifiant", async () => {
     await router.push("/ssk-it/projet/referentiel/domaine/exploration");
 
-    chargerReferentiel(
+    loadTestSpecification(
       {},
       {
-        domaines: new Map([
-          ["exploration", { id: "exploration", nom: "Exploration" }],
+        domains: new Map([
+          ["exploration", { id: "exploration", name: "Exploration" }],
         ]),
       },
     );
 
-    expect(titre.getTitle()).toContain("exploration Exploration");
+    expect(title.getTitle()).toContain("exploration Exploration");
   });
 
   it("affiche l’identifiant préfixé comme le reste de l’application", async () => {
@@ -126,9 +126,9 @@ describe("Titre de la page", () => {
     // affichage comme un autre.
     await router.push("/ssk-it/projet/cadrages/2026-016");
 
-    chargerReferentiel({ prefixe: "TSE" });
+    loadTestSpecification({ prefix: "TSE" });
 
-    expect(titre.getTitle()).toContain("TSE-2026-016");
+    expect(title.getTitle()).toContain("TSE-2026-016");
   });
 
   it("se contente de l’identifiant quand l’élément n’est pas encore connu", async () => {
@@ -136,13 +136,13 @@ describe("Titre de la page", () => {
     // générique dans l'historique.
     await router.push("/ssk-it/projet/cadrages/2026-016");
 
-    expect(titre.getTitle()).toBe("2026-016 — ssk-it/projet — Skanon");
+    expect(title.getTitle()).toBe("2026-016 — ssk-it/projet — Skanon");
   });
 
   it("garde un titre lisible hors de tout projet", async () => {
     await router.push("/");
 
-    expect(titre.getTitle()).toContain("Ouvrir un projet");
-    expect(titre.getTitle()).toContain("Skanon");
+    expect(title.getTitle()).toContain("Ouvrir un projet");
+    expect(title.getTitle()).toContain("Skanon");
   });
 });

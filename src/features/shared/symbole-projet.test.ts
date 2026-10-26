@@ -2,11 +2,11 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { inject, provide } from "../../core/injection";
-import type { VarianteIdentite } from "../../core/repo/identite-noms";
-import { IdentitesService } from "../../core/repo/identites.service";
+import type { IdentityVariant } from "../../core/repo/identite-noms";
+import { ProjectIdentityService } from "../../core/repo/identites.service";
 import { signal, type WritableSignal } from "../../core/signaux";
 import { ThemeService } from "../../core/ui/theme.service";
-import SymboleProjet from "./SymboleProjet.vue";
+import ProjectSymbol from "./SymboleProjet.vue";
 
 /**
  * RG-identite-affichee : le symbole du thème réellement appliqué, en image seulement, puis l'avatar ou l'icône de dossier, à la même place.
@@ -14,15 +14,15 @@ import SymboleProjet from "./SymboleProjet.vue";
  * `pc-symbole-projet` et `pc-avatar-organisation`, les hôtes Angular, sont ici les racines `.symbole-projet` et `.avatar-organisation` ; `mat-icon`, la `.material-symbols-outlined` de `UiIcone`.
  */
 describe("symbole d’un projet", () => {
-  const CLAIR = "data:image/svg+xml;base64,Y2xhaXI=";
-  const SOMBRE = "data:image/svg+xml;base64,c29tYnJl";
+  const PLAIN = "data:image/svg+xml;base64,Y2xhaXI=";
+  const DARK = "data:image/svg+xml;base64,c29tYnJl";
 
-  let sources: WritableSignal<Partial<Record<VarianteIdentite, string>>>;
-  let demandes: VarianteIdentite[];
+  let sources: WritableSignal<Partial<Record<IdentityVariant, string>>>;
+  let requests: IdentityVariant[];
 
-  function monter(
-    repli: "avatar" | "folder" | "aucun" = "avatar",
-    fond: VarianteIdentite | null = null,
+  function mountView(
+    fallback: "avatar" | "folder" | "aucun" = "avatar",
+    background: IdentityVariant | null = null,
   ) {
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
@@ -34,102 +34,99 @@ describe("symbole d’un projet", () => {
       },
     });
     sources = signal({});
-    demandes = [];
-    provide(IdentitesService, {
+    requests = [];
+    provide(ProjectIdentityService, {
       generation: signal(0),
-      findSymbole: (_: unknown, v: VarianteIdentite) => sources()[v] ?? null,
-      demander: async (_: unknown, v: VarianteIdentite) =>
-        void demandes.push(v),
+      findSymbol: (_: unknown, v: IdentityVariant) => sources()[v] ?? null,
+      request: async (_: unknown, v: IdentityVariant) => void requests.push(v),
     });
     // L'hôte de SSK Canon : un conteneur où le symbole est posé.
-    const racine = document.createElement("div");
-    mount(SymboleProjet, {
-      props: { depot: { owner: "org", repo: "projet" }, repli, fond },
-      attachTo: racine,
+    const root = document.createElement("div");
+    mount(ProjectSymbol, {
+      props: {
+        repoRef: { owner: "org", repo: "projet" },
+        fallback: fallback,
+        background: background,
+      },
+      attachTo: root,
     });
-    return { racine };
+    return { root: root };
   }
 
   it("montre la variante du thème forcé, et la suit quand il change", async () => {
-    const { racine } = monter();
+    const { root: root } = mountView();
     const theme = inject(ThemeService);
-    sources.set({ clair: CLAIR, sombre: SOMBRE });
+    sources.set({ clair: PLAIN, sombre: DARK });
 
     theme.theme.set("sombre");
     await nextTick();
     expect(
-      racine
-        .querySelector<HTMLImageElement>("img.symbole")
-        ?.getAttribute("src"),
-    ).toBe(SOMBRE);
-    expect(demandes).toContain("sombre");
+      root.querySelector<HTMLImageElement>("img.symbole")?.getAttribute("src"),
+    ).toBe(DARK);
+    expect(requests).toContain("sombre");
 
     theme.theme.set("clair");
     await nextTick();
     expect(
-      racine
-        .querySelector<HTMLImageElement>("img.symbole")
-        ?.getAttribute("src"),
-    ).toBe(CLAIR);
+      root.querySelector<HTMLImageElement>("img.symbole")?.getAttribute("src"),
+    ).toBe(PLAIN);
   });
 
   it("ne l’insère jamais dans le document : une image, sans texte à lire", async () => {
-    const { racine } = monter();
-    sources.set({ clair: CLAIR, sombre: CLAIR });
+    const { root: root } = mountView();
+    sources.set({ clair: PLAIN, sombre: PLAIN });
     await nextTick();
 
-    expect(racine.querySelector(".symbole-projet svg")).toBeNull();
-    const image = racine.querySelector("img.symbole")!;
+    expect(root.querySelector(".symbole-projet svg")).toBeNull();
+    const image = root.querySelector("img.symbole")!;
     // Le nom du projet est écrit à côté : le symbole ne le répète pas.
     expect(image.getAttribute("alt")).toBe("");
   });
 
   it("retombe sur l’avatar de l’organisation sans symbole", () => {
-    const { racine } = monter("avatar");
-    expect(racine.querySelector("img.symbole")).toBeNull();
-    expect(racine.querySelector(".avatar-organisation")).not.toBeNull();
+    const { root: root } = mountView("avatar");
+    expect(root.querySelector("img.symbole")).toBeNull();
+    expect(root.querySelector(".avatar-organisation")).not.toBeNull();
   });
 
   it("retombe sur l’icône de dossier, sur l’accueil", () => {
-    const { racine } = monter("folder");
-    expect(racine.querySelector(".avatar-organisation")).toBeNull();
+    const { root: root } = mountView("folder");
+    expect(root.querySelector(".avatar-organisation")).toBeNull();
     expect(
-      racine.querySelector(".material-symbols-outlined")?.textContent?.trim(),
+      root.querySelector(".material-symbols-outlined")?.textContent?.trim(),
     ).toBe("folder");
   });
 
   it("retombe sur son repli quand l’image ne se lit pas", async () => {
-    const { racine } = monter("folder");
-    sources.set({ clair: CLAIR, sombre: CLAIR });
+    const { root: root } = mountView("folder");
+    sources.set({ clair: PLAIN, sombre: PLAIN });
     await nextTick();
 
-    racine.querySelector("img.symbole")!.dispatchEvent(new Event("error"));
+    root.querySelector("img.symbole")!.dispatchEvent(new Event("error"));
     await nextTick();
-    expect(racine.querySelector("img.symbole")).toBeNull();
+    expect(root.querySelector("img.symbole")).toBeNull();
     expect(
-      racine.querySelector(".material-symbols-outlined")?.textContent?.trim(),
+      root.querySelector(".material-symbols-outlined")?.textContent?.trim(),
     ).toBe("folder");
   });
 
   it("ne montre rien sans symbole quand aucun repli n’est voulu", () => {
-    const { racine } = monter("aucun");
-    const hote = racine.querySelector(".symbole-projet")!;
-    expect(hote.children).toHaveLength(0);
+    const { root: root } = mountView("aucun");
+    const host = root.querySelector(".symbole-projet")!;
+    expect(host.children).toHaveLength(0);
     // La place ne se réserve pas : elle n'existait pas avant le symbole.
-    expect(hote.classList).toContain("vide");
+    expect(host.classList).toContain("vide");
   });
 
   it("prend la variante d’un fond imposé, quel que soit le thème", async () => {
-    const { racine } = monter("aucun", "sombre");
+    const { root: root } = mountView("aucun", "sombre");
     inject(ThemeService).theme.set("clair");
-    sources.set({ clair: CLAIR, sombre: SOMBRE });
+    sources.set({ clair: PLAIN, sombre: DARK });
     await nextTick();
 
-    expect(racine.querySelector("img.symbole")?.getAttribute("src")).toBe(
-      SOMBRE,
-    );
-    expect(demandes).toEqual(["sombre"]);
-    expect(racine.querySelector(".symbole-projet")!.classList).not.toContain(
+    expect(root.querySelector("img.symbole")?.getAttribute("src")).toBe(DARK);
+    expect(requests).toEqual(["sombre"]);
+    expect(root.querySelector(".symbole-projet")!.classList).not.toContain(
       "vide",
     );
   });

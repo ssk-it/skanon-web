@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exempleDepotsCode, commandeInstallation } from "./skill-cadrage";
+import { sampleCodeRepos, installCommand } from "./skill-cadrage";
 
 /**
  * L'exemple affiché dans les réglages doit refléter le projet ouvert : un
@@ -8,13 +8,13 @@ import { exempleDepotsCode, commandeInstallation } from "./skill-cadrage";
  */
 describe("exemple de dépôts de code", () => {
   it("propose un modèle générique quand le projet n’en déclare aucun", () => {
-    const out = exempleDepotsCode([]);
+    const out = sampleCodeRepos([]);
     expect(out).toContain("organisation/depot-front");
     expect(out.startsWith("depots_code:")).toBe(true);
   });
 
   it("reprend les dépôts déclarés par le projet", () => {
-    const out = exempleDepotsCode([
+    const out = sampleCodeRepos([
       { repo: "Wayne-Corp/wayne-front", role: "Application web" },
       { repo: "Wayne-Corp/wayne-back", role: "API" },
     ]);
@@ -27,14 +27,14 @@ describe("exemple de dépôts de code", () => {
 
   it("omet le rôle quand il n’est pas renseigné", () => {
     expect(
-      exempleDepotsCode([{ repo: "ssk-it/ssk-canon-pwa", role: "" }]),
+      sampleCodeRepos([{ repo: "ssk-it/ssk-canon-pwa", role: "" }]),
     ).toContain("{ repo: ssk-it/ssk-canon-pwa }");
   });
 
   it("installe le skill depuis le dépôt de l’automatisation", () => {
     // Il n'est pas embarqué dans l'application : une deuxième copie du format
     // divergerait de la première dès la première correction.
-    expect(commandeInstallation()).toContain("ssk-it/ssk-canon-action");
-    expect(commandeInstallation()).toContain("~/.claude/skills/");
+    expect(installCommand()).toContain("ssk-it/ssk-canon-action");
+    expect(installCommand()).toContain("~/.claude/skills/");
   });
 });

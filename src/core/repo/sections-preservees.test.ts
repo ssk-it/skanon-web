@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  extractSectionsAutres,
-  extractSectionsLibres,
+  extractOtherSections,
+  extractFreeSections,
   extractSection,
-  SECTIONS_CONNUES,
+  KNOWN_SECTIONS,
 } from "./frontmatter";
-import { serializeCadrage } from "./redaction.service";
+import { serializeScoping } from "./redaction.service";
 
 /**
  * Un cadrage porte ce que son auteur juge utile. Reconstruire le fichier à
@@ -13,9 +13,9 @@ import { serializeCadrage } from "./redaction.service";
  * dire — c'est arrivé sur un cadrage réel, qui a perdu vingt-trois lignes de
  * questions ouvertes.
  */
-const CONNUES = SECTIONS_CONNUES;
+const KNOWN = KNOWN_SECTIONS;
 
-const CORPS = `## Objectif
+const BODY = `## Objectif
 
 Ce qu'on cherche.
 
@@ -35,31 +35,31 @@ Une note libre.
 
 describe("sections qu’un cadrage porte en propre", () => {
   it("rend celles que l’éditeur ne présente pas, titres compris", () => {
-    const autres = extractSectionsAutres(CORPS, CONNUES);
-    expect(autres).toContain("## Questions ouvertes");
-    expect(autres).toContain("## Notes");
-    expect(autres).toContain("Qui peut déclarer");
+    const others = extractOtherSections(BODY, KNOWN);
+    expect(others).toContain("## Questions ouvertes");
+    expect(others).toContain("## Notes");
+    expect(others).toContain("Qui peut déclarer");
   });
 
   it("écarte celles que l’éditeur sait déjà écrire", () => {
-    const autres = extractSectionsAutres(CORPS, CONNUES);
-    expect(autres).not.toContain("## Objectif");
-    expect(autres).not.toContain("## Parcours utilisateur");
+    const others = extractOtherSections(BODY, KNOWN);
+    expect(others).not.toContain("## Objectif");
+    expect(others).not.toContain("## Parcours utilisateur");
   });
 
   it("rend une chaîne vide quand tout est connu", () => {
-    expect(extractSectionsAutres("## Objectif\n\nX.\n", CONNUES)).toBe("");
+    expect(extractOtherSections("## Objectif\n\nX.\n", KNOWN)).toBe("");
   });
 
   it("les conserve à la réécriture", () => {
     // Le cas qui a échoué en vrai : réenregistrer sans y toucher.
-    const out = serializeCadrage("2026-001", {
-      titre: "Un cadrage",
-      domaines: ["contrats"],
-      objectif: "Ce qu’on cherche.",
-      parcours: "1. Il ouvre l’écran.",
+    const out = serializeScoping("2026-001", {
+      title: "Un cadrage",
+      domains: ["contrats"],
+      goal: "Ce qu’on cherche.",
+      journey: "1. Il ouvre l’écran.",
       impacts: [],
-      sectionsInconnues: extractSectionsAutres(CORPS, CONNUES),
+      unknownSections: extractOtherSections(BODY, KNOWN),
     });
 
     expect(out).toContain("## Questions ouvertes");
@@ -69,13 +69,13 @@ describe("sections qu’un cadrage porte en propre", () => {
   });
 
   it("n’écrit rien de superflu quand il n’y a pas de section en propre", () => {
-    const out = serializeCadrage("2026-001", {
-      titre: "Un cadrage",
-      domaines: [],
-      objectif: "X.",
-      parcours: "Y.",
+    const out = serializeScoping("2026-001", {
+      title: "Un cadrage",
+      domains: [],
+      goal: "X.",
+      journey: "Y.",
       impacts: [],
-      sectionsInconnues: "",
+      unknownSections: "",
     });
     expect(out.trimEnd().endsWith("Y.")).toBe(true);
   });
@@ -84,24 +84,24 @@ describe("sections qu’un cadrage porte en propre", () => {
     // Le défaut trouvé en vrai : le fichier gagnait une ligne vide à chaque
     // enregistrement, l'espace du séparateur s'ajoutant à celui que le bloc
     // portait déjà. Réextraire ce qu'on vient d'écrire doit rendre l'identique.
-    const ecrire = (autres: string) =>
-      serializeCadrage("2026-001", {
-        titre: "Un cadrage",
-        domaines: [],
-        objectif: "X.",
-        parcours: "Y.",
+    const write = (others: string) =>
+      serializeScoping("2026-001", {
+        title: "Un cadrage",
+        domains: [],
+        goal: "X.",
+        journey: "Y.",
         impacts: [],
-        sectionsInconnues: autres,
+        unknownSections: others,
       });
 
-    const premier = ecrire(extractSectionsAutres(CORPS, CONNUES));
-    const second = ecrire(extractSectionsAutres(premier, CONNUES));
-    expect(second).toBe(premier);
+    const first = write(extractOtherSections(BODY, KNOWN));
+    const second = write(extractOtherSections(first, KNOWN));
+    expect(second).toBe(first);
   });
 
   it("survit à un cadrage sans aucune section", () => {
-    expect(extractSectionsAutres("", CONNUES)).toBe("");
-    expect(extractSectionsAutres("Du texte sans titre.", CONNUES)).toBe("");
+    expect(extractOtherSections("", KNOWN)).toBe("");
+    expect(extractOtherSections("Du texte sans titre.", KNOWN)).toBe("");
   });
 });
 
@@ -112,18 +112,18 @@ describe("sections qu’un cadrage porte en propre", () => {
  */
 describe("sections rassemblées sous « Divers »", () => {
   it("rend chaque section libre avec son titre et son corps", () => {
-    const libres = extractSectionsLibres(CORPS, CONNUES);
+    const free = extractFreeSections(BODY, KNOWN);
 
-    expect(libres.map((s) => s.titre)).toEqual(["Questions ouvertes", "Notes"]);
-    expect(libres[0].corps).toContain("Qui peut déclarer");
-    expect(libres[0].corps).not.toContain("##");
-    expect(libres[1].corps).toBe("Une note libre.");
+    expect(free.map((s) => s.title)).toEqual(["Questions ouvertes", "Notes"]);
+    expect(free[0].body).toContain("Qui peut déclarer");
+    expect(free[0].body).not.toContain("##");
+    expect(free[1].body).toBe("Une note libre.");
   });
 
   it("garde les sous-sections de niveau 3 dans le corps qui les porte", () => {
     // Le cas qui a motivé l'écran : une observation écrite en « ### » sous une
     // section libre. Découper au niveau 3 l'aurait sortie de son contexte.
-    const corps = `## Ce que la mesure a montré
+    const body = `## Ce que la mesure a montré
 
 Le relevé.
 
@@ -131,25 +131,25 @@ Le relevé.
 
 Ce qu'elle dit.
 `;
-    const [section] = extractSectionsLibres(corps, CONNUES);
+    const [section] = extractFreeSections(body, KNOWN);
 
-    expect(section.titre).toBe("Ce que la mesure a montré");
-    expect(section.corps).toContain("### Une observation, hors périmètre");
-    expect(section.corps).toContain("Ce qu'elle dit.");
+    expect(section.title).toBe("Ce que la mesure a montré");
+    expect(section.body).toContain("### Une observation, hors périmètre");
+    expect(section.body).toContain("Ce qu'elle dit.");
   });
 
   it("ne rend rien quand tout est connu", () => {
-    expect(extractSectionsLibres("## Objectif\n\nX.\n", CONNUES)).toEqual([]);
-    expect(extractSectionsLibres("", CONNUES)).toEqual([]);
+    expect(extractFreeSections("## Objectif\n\nX.\n", KNOWN)).toEqual([]);
+    expect(extractFreeSections("", KNOWN)).toEqual([]);
   });
 
   it("dit la même chose que le texte préservé à la réécriture", () => {
     // Les deux sorties viennent du même découpage : si elles divergeaient, la
     // fiche montrerait autre chose que ce que l'enregistrement conserve.
-    const attendu = extractSectionsLibres(CORPS, CONNUES)
-      .map((s) => `## ${s.titre}\n\n${s.corps}`)
+    const expected = extractFreeSections(BODY, KNOWN)
+      .map((s) => `## ${s.title}\n\n${s.body}`)
       .join("\n\n");
 
-    expect(extractSectionsAutres(CORPS, CONNUES)).toBe(attendu);
+    expect(extractOtherSections(BODY, KNOWN)).toBe(expected);
   });
 });

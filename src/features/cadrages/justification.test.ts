@@ -3,19 +3,19 @@ import { extractJustification } from "./justification";
 
 describe("extractJustification", () => {
   it("rend le texte qui suit le marqueur", () => {
-    const corps = `**Retenue.** Distinguer les trois situations, chacune déductible
+    const body = `**Retenue.** Distinguer les trois situations, chacune déductible
 de ce qui est connu.
 
 **Pour** — chaque mention est vérifiable.`;
-    expect(extractJustification(corps)).toBe(
+    expect(extractJustification(body)).toBe(
       "Distinguer les trois situations, chacune déductible de ce qui est connu.",
     );
   });
 
   it("s'arrête à l'argumentaire même sans ligne vide", () => {
-    const corps = `**Retenue.** Le choix tient en une phrase.
+    const body = `**Retenue.** Le choix tient en une phrase.
 **Pour** — un argument qui ne doit pas remonter.`;
-    expect(extractJustification(corps)).toBe("Le choix tient en une phrase.");
+    expect(extractJustification(body)).toBe("Le choix tient en une phrase.");
   });
 
   // Le marqueur est une convention de rédaction, pas une garantie du format :
@@ -25,8 +25,8 @@ de ce qui est connu.
   });
 
   it("retire le balisage inline", () => {
-    const corps = "**Retenue.** Un **gras**, un `code` et un [lien](http://x).";
-    expect(extractJustification(corps)).toBe("Un gras, un code et un lien.");
+    const body = "**Retenue.** Un **gras**, un `code` et un [lien](http://x).";
+    expect(extractJustification(body)).toBe("Un gras, un code et un lien.");
   });
 
   it("accepte le marqueur sans point", () => {

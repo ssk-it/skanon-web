@@ -9,43 +9,42 @@ import { InjectionToken, inject } from "../injection";
  */
 
 export class HttpHeaders {
-  private readonly valeurs: ReadonlyMap<string, string>;
+  private readonly values: ReadonlyMap<string, string>;
 
   constructor(
     init?: Record<string, string> | Headers | ReadonlyMap<string, string>,
   ) {
-    const valeurs = new Map<string, string>();
+    const values = new Map<string, string>();
     if (init instanceof Headers)
-      init.forEach((v, k) => valeurs.set(k.toLowerCase(), v));
+      init.forEach((v, k) => values.set(k.toLowerCase(), v));
     else if (init instanceof Map)
-      init.forEach((v, k) => valeurs.set(k.toLowerCase(), v));
+      init.forEach((v, k) => values.set(k.toLowerCase(), v));
     else if (init)
-      for (const [k, v] of Object.entries(init))
-        valeurs.set(k.toLowerCase(), v);
-    this.valeurs = valeurs;
+      for (const [k, v] of Object.entries(init)) values.set(k.toLowerCase(), v);
+    this.values = values;
   }
 
   /** Rend un nouvel objet : celui-ci ne change pas. */
-  set(nom: string, valeur: string): HttpHeaders {
-    const copie = new Map(this.valeurs);
-    copie.set(nom.toLowerCase(), valeur);
-    return new HttpHeaders(copie);
+  set(name: string, value: string): HttpHeaders {
+    const copied = new Map(this.values);
+    copied.set(name.toLowerCase(), value);
+    return new HttpHeaders(copied);
   }
 
-  get(nom: string): string | null {
-    return this.valeurs.get(nom.toLowerCase()) ?? null;
+  get(name: string): string | null {
+    return this.values.get(name.toLowerCase()) ?? null;
   }
 
-  has(nom: string): boolean {
-    return this.valeurs.has(nom.toLowerCase());
+  has(name: string): boolean {
+    return this.values.has(name.toLowerCase());
   }
 
   keys(): string[] {
-    return [...this.valeurs.keys()];
+    return [...this.values.keys()];
   }
 
   toRecord(): Record<string, string> {
-    return Object.fromEntries(this.valeurs);
+    return Object.fromEntries(this.values);
   }
 }
 
@@ -100,18 +99,18 @@ export class HttpErrorResponse extends Error {
 
 /** Le transport : rend la réponse quel que soit son statut, et ne lève qu'en l'absence de réponse. */
 export interface HttpBackend {
-  handle(requete: HttpRequest): Promise<HttpResponse<unknown>>;
+  handle(query: HttpRequest): Promise<HttpResponse<unknown>>;
 }
 
 export class FetchBackend implements HttpBackend {
-  async handle(requete: HttpRequest): Promise<HttpResponse<unknown>> {
-    let reponse: Response;
+  async handle(query: HttpRequest): Promise<HttpResponse<unknown>> {
+    let response: Response;
     try {
-      reponse = await fetch(requete.url, {
-        method: requete.method,
-        headers: requete.headers.toRecord(),
-        body: encodeBody(requete.body),
-        cache: requete.cache,
+      response = await fetch(query.url, {
+        method: query.method,
+        headers: query.headers.toRecord(),
+        body: encodeBody(query.body),
+        cache: query.cache,
       });
     } catch (cause) {
       throw new HttpErrorResponse(
@@ -119,16 +118,16 @@ export class FetchBackend implements HttpBackend {
         "Unknown Error",
         new HttpHeaders(),
         cause,
-        requete.url,
+        query.url,
       );
     }
-    const body = await readBody(reponse, requete.responseType);
+    const body = await readBody(response, query.responseType);
     return new HttpResponse(
-      reponse.status,
-      reponse.statusText,
-      new HttpHeaders(reponse.headers),
+      response.status,
+      response.statusText,
+      new HttpHeaders(response.headers),
       body,
-      requete.url,
+      query.url,
     );
   }
 }
@@ -148,18 +147,18 @@ function encodeBody(body: unknown): BodyInit | undefined {
 }
 
 async function readBody(
-  reponse: Response,
+  response: Response,
   type: ResponseType,
 ): Promise<unknown> {
-  if (type === "arraybuffer") return reponse.arrayBuffer();
-  const texte = await reponse.text();
-  if (type === "text") return texte;
-  if (!texte) return null;
+  if (type === "arraybuffer") return response.arrayBuffer();
+  const text = await response.text();
+  if (type === "text") return text;
+  if (!text) return null;
   try {
-    return JSON.parse(texte);
+    return JSON.parse(text);
   } catch {
     // Un corps d'erreur n'est pas toujours du JSON : le garder tel quel plutôt que de perdre la cause.
-    return texte;
+    return text;
   }
 }
 
@@ -179,7 +178,7 @@ export class HttpClient {
       options.headers instanceof HttpHeaders
         ? options.headers
         : new HttpHeaders(options.headers);
-    const requete: HttpRequest = {
+    const query: HttpRequest = {
       method: method.toUpperCase(),
       url,
       headers:
@@ -192,17 +191,17 @@ export class HttpClient {
       responseType: options.responseType ?? "json",
       cache: options.cache,
     };
-    const reponse = await this.backend.handle(requete);
-    if (!reponse.ok) {
+    const response = await this.backend.handle(query);
+    if (!response.ok) {
       throw new HttpErrorResponse(
-        reponse.status,
-        reponse.statusText,
-        reponse.headers,
-        reponse.body,
+        response.status,
+        response.statusText,
+        response.headers,
+        response.body,
         url,
       );
     }
-    return reponse as HttpResponse<T>;
+    return response as HttpResponse<T>;
   }
 
   get(

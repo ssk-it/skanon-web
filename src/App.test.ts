@@ -4,43 +4,43 @@ import { nextTick } from "vue";
 import { createMemoryHistory } from "vue-router";
 import App from "./App.vue";
 import { signal } from "./core/signaux";
-import { COMPOSITION, composer } from "./extension/composer";
+import { COMPOSITION, compose } from "./extension/composer";
 import { TokenService } from "./core/github/token.service";
 import {
   provideHttpTesting,
   type HttpTestingController,
 } from "./core/http/http-testing";
 import { inject, provide } from "./core/injection";
-import { ReferentielStore } from "./core/repo/referentiel.store";
-import { RECHARGER_PAGE } from "./core/ui/version.service";
-import { PLATEFORME } from "./plateforme/jeton";
-import type { AnnonceVersion } from "./plateforme/ports";
-import { createPlateformeWeb } from "./plateforme/web";
-import { createRouteur } from "./routeur";
+import { SpecificationStore } from "./core/repo/referentiel.store";
+import { RELOAD_PAGE } from "./core/ui/version.service";
+import { PLATFORM } from "./plateforme/jeton";
+import type { VersionAnnouncement } from "./plateforme/ports";
+import { createWebPlatform } from "./plateforme/web";
+import { createAppRouter } from "./routeur";
 
 /**
  * Le chargement est déclenché par le garde de route, non par la barre : c'est l'adresse qui dit quel dépôt ouvrir. Ces cas visent donc le store, appelé comme le garde l'appelle.
  */
 describe("Chargement du dépôt", () => {
   let httpMock: HttpTestingController;
-  let store: ReferentielStore;
+  let store: SpecificationStore;
 
   beforeEach(() => {
     httpMock = provideHttpTesting();
-    store = inject(ReferentielStore);
+    store = inject(SpecificationStore);
   });
 
   it("demande l’arborescence du dépôt", async () => {
-    void store.loadReferentiel({ owner: "ssk-it", repo: "ssk-canon" });
+    void store.loadSpecification({ owner: "ssk-it", repo: "ssk-canon" });
 
     // un seul appel d'API pour l'arborescence : les contenus passent par raw, qui n'est pas décompté du quota
-    const requete = httpMock.expectOne((r) => r.url.includes("/git/trees/"));
-    expect(requete.request.url).toContain("recursive=1");
-    expect(store.etat()).toBe("chargement");
+    const query = httpMock.expectOne((r) => r.url.includes("/git/trees/"));
+    expect(query.request.url).toContain("recursive=1");
+    expect(store.state()).toBe("chargement");
   });
 
   it("passe à l’état prêt une fois l’arborescence vide reçue", async () => {
-    const attente = store.loadReferentiel({
+    const pending = store.loadSpecification({
       owner: "ssk-it",
       repo: "ssk-canon",
     });
@@ -49,21 +49,24 @@ describe("Chargement du dépôt", () => {
       .expectOne((r) => r.url.includes("/git/trees/"))
       .flush({ sha: "abc", truncated: false, tree: [] });
 
-    await attente;
-    expect(store.etat()).toBe("pret");
+    await pending;
+    expect(store.state()).toBe("pret");
   });
 
   it("signale une erreur lisible quand le dépôt est introuvable", async () => {
-    const attente = store.loadReferentiel({ owner: "ssk-it", repo: "absent" });
+    const pending = store.loadSpecification({
+      owner: "ssk-it",
+      repo: "absent",
+    });
 
     httpMock
       .expectOne((r) => r.url.includes("/git/trees/"))
       .flush("Not Found", { status: 404, statusText: "Not Found" });
 
-    await attente;
-    expect(store.etat()).toBe("erreur");
+    await pending;
+    expect(store.state()).toBe("erreur");
     // le message doit dire quoi faire, pas seulement que ça a échoué
-    expect(store.erreur()).toContain("public");
+    expect(store.error()).toContain("public");
   });
 });
 
@@ -73,30 +76,30 @@ describe("App", () => {
   });
 
   it("affiche le nom du produit dans la barre", async () => {
-    const routeur = createRouteur(createMemoryHistory());
-    await routeur.push("/");
-    await routeur.isReady();
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/");
+    await router.isReady();
 
-    const vue = mount(App, { global: { plugins: [routeur] } });
+    const view = mount(App, { global: { plugins: [router] } });
     await flushPromises();
 
-    expect(vue.find(".barre").text()).toContain("Skanon");
+    expect(view.find(".barre").text()).toContain("Skanon");
   });
 
   // RG-aide-a-portee : l'aide n'est pas une vue d'un projet, sa porte est partout.
   it.each([["/"], ["/ssk-it/ssk-canon/referentiel"]])(
     "mène à l’aide depuis la barre, sur %s",
     async (url) => {
-      const routeur = createRouteur(createMemoryHistory());
-      await routeur.push(url);
-      await routeur.isReady();
+      const router = createAppRouter(createMemoryHistory());
+      await router.push(url);
+      await router.isReady();
 
-      const vue = mount(App, { global: { plugins: [routeur] } });
+      const view = mount(App, { global: { plugins: [router] } });
       await flushPromises();
 
-      const aide = vue.find('.barre a[aria-label="Fonctionnement de Skanon"]');
-      expect(aide.exists()).toBe(true);
-      expect(aide.attributes("href")).toBe("/aide");
+      const help = view.find('.barre a[aria-label="Fonctionnement de Skanon"]');
+      expect(help.exists()).toBe(true);
+      expect(help.attributes("href")).toBe("/aide");
     },
   );
 
@@ -104,38 +107,38 @@ describe("App", () => {
   it.each([["/"], ["/ssk-it/ssk-canon/referentiel"]])(
     "porte, en bas, la version et les mentions légales, sur %s",
     async (url) => {
-      provide(PLATEFORME, {
-        ...createPlateformeWeb(),
+      provide(PLATFORM, {
+        ...createWebPlatform(),
         loadVersion: async () => "2026.10.1",
       });
-      const routeur = createRouteur(createMemoryHistory());
-      await routeur.push(url);
-      await routeur.isReady();
+      const router = createAppRouter(createMemoryHistory());
+      await router.push(url);
+      await router.isReady();
 
-      const vue = mount(App, { global: { plugins: [routeur] } });
+      const view = mount(App, { global: { plugins: [router] } });
       await flushPromises();
 
-      const pied = vue.find("footer.pied");
-      expect(pied.text()).toContain("Skanon 2026.10.1");
-      const mentions = pied.find('a[href="/mentions-legales"]');
-      expect(mentions.text()).toBe("Mentions légales");
+      const footer = view.find("footer.pied");
+      expect(footer.text()).toContain("Skanon 2026.10.1");
+      const legalNotice = footer.find('a[href="/mentions-legales"]');
+      expect(legalNotice.text()).toBe("Mentions légales");
     },
   );
 
   it("tait la version que la plateforme ne sait pas dire", async () => {
-    provide(PLATEFORME, {
-      ...createPlateformeWeb(),
+    provide(PLATFORM, {
+      ...createWebPlatform(),
       loadVersion: () => Promise.reject(new Error("indisponible")),
     });
-    const routeur = createRouteur(createMemoryHistory());
-    await routeur.push("/");
-    await routeur.isReady();
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/");
+    await router.isReady();
 
-    const vue = mount(App, { global: { plugins: [routeur] } });
+    const view = mount(App, { global: { plugins: [router] } });
     await flushPromises();
 
-    expect(vue.find("footer.pied").text()).not.toContain("Skanon");
-    expect(vue.find('footer.pied a[href="/mentions-legales"]').exists()).toBe(
+    expect(view.find("footer.pied").text()).not.toContain("Skanon");
+    expect(view.find('footer.pied a[href="/mentions-legales"]').exists()).toBe(
       true,
     );
   });
@@ -145,123 +148,123 @@ describe("App", () => {
  * Le bandeau de version — RG-nouvelle-version-proposee, RG-version-perdue-signalee. L'annonceur de la plateforme est simulé : seules ses annonces comptent ici, la vérification est l'affaire du service.
  */
 describe("Bandeau de version", () => {
-  let ecouteurs: Set<(a: AnnonceVersion) => void>;
-  let activer: ReturnType<typeof vi.fn>;
-  let recharger: ReturnType<typeof vi.fn>;
+  let listeners: Set<(a: VersionAnnouncement) => void>;
+  let activate: ReturnType<typeof vi.fn>;
+  let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     provideHttpTesting();
-    ecouteurs = new Set();
-    activer = vi.fn(() => Promise.resolve());
-    recharger = vi.fn();
-    provide(PLATEFORME, {
-      ...createPlateformeWeb(),
+    listeners = new Set();
+    activate = vi.fn(() => Promise.resolve());
+    reload = vi.fn();
+    provide(PLATFORM, {
+      ...createWebPlatform(),
       version: {
-        actif: true,
-        relance: false,
-        listen: (e: (a: AnnonceVersion) => void) => {
-          ecouteurs.add(e);
-          return () => ecouteurs.delete(e);
+        active: true,
+        relaunches: false,
+        listen: (e: (a: VersionAnnouncement) => void) => {
+          listeners.add(e);
+          return () => listeners.delete(e);
         },
         listenCause: () => () => {},
         check: () => Promise.resolve(),
-        activate: activer,
+        activate: activate,
       },
     });
-    provide(RECHARGER_PAGE, recharger);
+    provide(RELOAD_PAGE, reload);
   });
 
-  async function monter(url = "/ssk-it/ssk-canon/referentiel") {
-    const routeur = createRouteur(createMemoryHistory());
-    await routeur.push(url);
-    await routeur.isReady();
-    const vue = mount(App, { global: { plugins: [routeur] } });
+  async function mountView(url = "/ssk-it/ssk-canon/referentiel") {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push(url);
+    await router.isReady();
+    const view = mount(App, { global: { plugins: [router] } });
     await nextTick();
-    return vue;
+    return view;
   }
 
-  async function annoncer(a: AnnonceVersion = "prete"): Promise<void> {
-    for (const e of ecouteurs) e(a);
+  async function announce(a: VersionAnnouncement = "prete"): Promise<void> {
+    for (const e of listeners) e(a);
     await nextTick();
   }
 
-  function bandeau(vue: VueWrapper): HTMLElement | null {
-    const trouve = vue.find(".bandeau-version");
-    return trouve.exists() ? (trouve.element as HTMLElement) : null;
+  function banner(view: VueWrapper): HTMLElement | null {
+    const found = view.find(".bandeau-version");
+    return found.exists() ? (found.element as HTMLElement) : null;
   }
 
   it("ne montre rien tant qu’aucune version n’attend", async () => {
-    const vue = await monter();
-    expect(bandeau(vue)).toBeNull();
+    const view = await mountView();
+    expect(banner(view)).toBeNull();
   });
 
   it("annonce la version prête et propose de recharger", async () => {
-    const vue = await monter();
-    await annoncer();
+    const view = await mountView();
+    await announce();
 
-    const b = bandeau(vue)!;
+    const b = banner(view)!;
     expect(b.textContent).toContain("nouvelle version de Skanon est prête");
     expect(b.querySelector("button")?.textContent).toContain("Recharger");
     // rien ne s'efface sans que le rédacteur l'ait décidé
-    expect(recharger).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it("recharge au clic, après avoir activé la version", async () => {
-    const vue = await monter();
-    await annoncer();
+    const view = await mountView();
+    await announce();
 
-    bandeau(vue)!.querySelector("button")!.click();
+    banner(view)!.querySelector("button")!.click();
     await flushPromises();
 
-    expect(activer).toHaveBeenCalledOnce();
-    expect(recharger).toHaveBeenCalledOnce();
+    expect(activate).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
   });
 
   it("se montre aussi hors d’un projet", async () => {
-    const vue = await monter("/");
-    await annoncer();
-    expect(bandeau(vue)).not.toBeNull();
+    const view = await mountView("/");
+    await announce();
+    expect(banner(view)).not.toBeNull();
   });
 
   it("prévient qu’une saisie non enregistrée serait perdue", async () => {
-    const vue = await monter("/ssk-it/ssk-canon/cadrages/2026-049/editer");
-    await annoncer();
-    expect(bandeau(vue)!.textContent).toContain("saisie non enregistrée");
+    const view = await mountView("/ssk-it/ssk-canon/cadrages/2026-049/editer");
+    await announce();
+    expect(banner(view)!.textContent).toContain("saisie non enregistrée");
   });
 
   it("ne parle pas de saisie sur une page de lecture", async () => {
-    const vue = await monter("/ssk-it/ssk-canon/cadrages/2026-049");
-    await annoncer();
-    expect(bandeau(vue)!.textContent).not.toContain("saisie");
+    const view = await mountView("/ssk-it/ssk-canon/cadrages/2026-049");
+    await announce();
+    expect(banner(view)!.textContent).not.toContain("saisie");
   });
 
   it("prévient que l’accès temporaire prendra fin — RG-acces-temporaire", async () => {
-    inject(TokenService).definirAcces({
-      jeton: "ghs_temporaire",
-      valideJusqua: new Date(Date.now() + 3_600_000).toISOString(),
-      depots: ["ssk-it/ssk-canon"],
-      identite: { identifiant: "ssk", nom: "SSK", courriel: null },
+    inject(TokenService).setAccess({
+      token: "ghs_temporaire",
+      validUntil: new Date(Date.now() + 3_600_000).toISOString(),
+      repos: ["ssk-it/ssk-canon"],
+      identity: { identifier: "ssk", name: "SSK", email: null },
     });
-    const vue = await monter();
-    await annoncer();
-    expect(bandeau(vue)!.textContent).toContain("identité vérifiée");
+    const view = await mountView();
+    await announce();
+    expect(banner(view)!.textContent).toContain("identité vérifiée");
   });
 
   it("nomme une version perdue, avec sa cause propre", async () => {
-    const vue = await monter();
-    await annoncer("perdue");
+    const view = await mountView();
+    await announce("perdue");
 
-    const b = bandeau(vue)!;
+    const b = banner(view)!;
     expect(b.classList).toContain("perdue");
     expect(b.textContent).toContain("n’est plus entièrement disponible");
     // une cause distincte de l'absence de réseau ne partage pas son texte
     expect(b.textContent).not.toContain("prête");
-    expect(recharger).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
 
     b.querySelector("button")!.click();
     await flushPromises();
-    expect(activer).not.toHaveBeenCalled();
-    expect(recharger).toHaveBeenCalledOnce();
+    expect(activate).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledOnce();
   });
 });
 
@@ -269,76 +272,76 @@ describe("Bandeau de version", () => {
  * L'application de bureau : la relance, le coffre qui refuse — RG-nouvelle-version-proposee, RG-secret-conserve-localement. L'annonceur est simulé : ce sont les textes et les gestes de la coquille qui comptent ici. Ce que l'application de bureau y ajoute s'éprouve dans son dépôt, avec ses extensions.
  */
 describe("Coquille du bureau", () => {
-  let ecouteurs: Set<(a: AnnonceVersion) => void>;
-  let activer: ReturnType<typeof vi.fn>;
-  let recharger: ReturnType<typeof vi.fn>;
+  let listeners: Set<(a: VersionAnnouncement) => void>;
+  let activate: ReturnType<typeof vi.fn>;
+  let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     provideHttpTesting();
-    ecouteurs = new Set();
-    activer = vi.fn(() => Promise.resolve());
-    recharger = vi.fn();
-    provide(PLATEFORME, {
-      ...createPlateformeWeb(),
-      cible: "bureau",
+    listeners = new Set();
+    activate = vi.fn(() => Promise.resolve());
+    reload = vi.fn();
+    provide(PLATFORM, {
+      ...createWebPlatform(),
+      target: "bureau",
       version: {
-        actif: true,
-        relance: true,
-        listen: (e: (a: AnnonceVersion) => void) => {
-          ecouteurs.add(e);
-          return () => ecouteurs.delete(e);
+        active: true,
+        relaunches: true,
+        listen: (e: (a: VersionAnnouncement) => void) => {
+          listeners.add(e);
+          return () => listeners.delete(e);
         },
         listenCause: () => () => {},
         check: () => Promise.resolve(),
-        activate: activer,
+        activate: activate,
       },
     });
-    provide(RECHARGER_PAGE, recharger);
+    provide(RELOAD_PAGE, reload);
   });
 
-  async function monter(url = "/ssk-it/ssk-canon/referentiel") {
-    const routeur = createRouteur(createMemoryHistory());
-    await routeur.push(url);
-    await routeur.isReady();
-    const vue = mount(App, { global: { plugins: [routeur] } });
+  async function mountView(url = "/ssk-it/ssk-canon/referentiel") {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push(url);
+    await router.isReady();
+    const view = mount(App, { global: { plugins: [router] } });
     await nextTick();
-    return vue;
+    return view;
   }
 
-  async function annoncer(a: AnnonceVersion = "prete"): Promise<void> {
-    for (const e of ecouteurs) e(a);
+  async function announce(a: VersionAnnouncement = "prete"): Promise<void> {
+    for (const e of listeners) e(a);
     await nextTick();
   }
 
   it("propose de relancer, et relance au clic sans recharger la page", async () => {
-    const vue = await monter();
-    await annoncer();
+    const view = await mountView();
+    await announce();
 
-    const b = vue.find(".bandeau-version").element as HTMLElement;
+    const b = view.find(".bandeau-version").element as HTMLElement;
     expect(b.querySelector("button")?.textContent).toContain("Relancer");
     b.querySelector("button")!.click();
     await flushPromises();
 
-    expect(activer).toHaveBeenCalledOnce();
-    expect(recharger).not.toHaveBeenCalled();
+    expect(activate).toHaveBeenCalledOnce();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it("dit qu’une installation a échoué, dans le bandeau", async () => {
-    activer.mockRejectedValue("installation-echouee");
-    const vue = await monter();
-    await annoncer();
-    (vue.find(".bandeau-version button").element as HTMLElement).click();
+    activate.mockRejectedValue("installation-echouee");
+    const view = await mountView();
+    await announce();
+    (view.find(".bandeau-version button").element as HTMLElement).click();
     await flushPromises();
-    expect(vue.find(".bandeau-version").text()).toContain(
+    expect(view.find(".bandeau-version").text()).toContain(
       "n’a pas pu s’installer",
     );
   });
 
   it("dit qu’un jeton que le coffre a refusé ne sera pas retrouvé au lancement suivant", async () => {
-    const vue = await monter();
-    inject(TokenService).coffreRefuse.set("ecriture");
+    const view = await mountView();
+    inject(TokenService).vaultRefused.set("ecriture");
     await nextTick();
-    const b = vue.find(".bandeau-coffre");
+    const b = view.find(".bandeau-coffre");
     expect(b.exists()).toBe(true);
     expect(b.text()).toContain("ne sera pas retrouvé au lancement suivant");
   });
@@ -348,39 +351,39 @@ describe("Coquille du bureau", () => {
  * Ce qu'un livrable ajoute à la coquille, par une extension factice : l'interface commune ne sait pas ce qu'elle rend — ADR-extensions-commerciales.
  */
 describe("Points d'extension de la coquille", () => {
-  const alerte = signal(false);
+  const alert = signal(false);
   const visible = signal(true);
-  const activer = vi.fn();
-  const texteBandeau = signal("Un bandeau apporté");
+  const activate = vi.fn();
+  const bannerText = signal("Un bandeau apporté");
 
   beforeEach(() => {
     provideHttpTesting();
-    alerte.set(false);
+    alert.set(false);
     visible.set(true);
-    activer.mockClear();
-    texteBandeau.set("Un bandeau apporté");
+    activate.mockClear();
+    bannerText.set("Un bandeau apporté");
     provide(
       COMPOSITION,
-      composer([
+      compose([
         {
           id: "factice",
-          coquille: {
-            actionsDeBarre: [
+          shell: {
+            toolbarActions: [
               {
                 id: "action-factice",
-                libelle: "Une action apportée",
-                icone: () => (alerte() ? "warning" : "star"),
-                titre: () => (alerte() ? "En alerte" : "Au repos"),
-                alerte: () => alerte(),
+                label: "Une action apportée",
+                icon: () => (alert() ? "warning" : "star"),
+                title: () => (alert() ? "En alerte" : "Au repos"),
+                alert: () => alert(),
                 visible: () => visible(),
-                activer,
+                activate,
               },
             ],
-            bandeaux: [
+            banners: [
               {
                 id: "bandeau-factice",
-                icone: "info",
-                texte: () => texteBandeau(),
+                icon: "info",
+                text: () => bannerText(),
               },
             ],
           },
@@ -389,61 +392,63 @@ describe("Points d'extension de la coquille", () => {
     );
   });
 
-  async function monter() {
-    const routeur = createRouteur(createMemoryHistory());
-    await routeur.push("/");
-    await routeur.isReady();
-    const vue = mount(App, { global: { plugins: [routeur] } });
+  async function mountView() {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/");
+    await router.isReady();
+    const view = mount(App, { global: { plugins: [router] } });
     await nextTick();
-    return vue;
+    return view;
   }
 
   it("rend une action de barre apportée, qui suit ses signaux", async () => {
-    const vue = await monter();
-    const bouton = vue.find('.barre [aria-label="Une action apportée"]');
-    expect(bouton.exists()).toBe(true);
-    expect(bouton.attributes("title")).toBe("Au repos");
-    expect(bouton.text()).toContain("star");
-    expect(bouton.classes()).not.toContain("alerte");
+    const view = await mountView();
+    const button = view.find('.barre [aria-label="Une action apportée"]');
+    expect(button.exists()).toBe(true);
+    expect(button.attributes("title")).toBe("Au repos");
+    expect(button.text()).toContain("star");
+    expect(button.classes()).not.toContain("alerte");
 
-    alerte.set(true);
+    alert.set(true);
     await nextTick();
-    expect(bouton.attributes("title")).toBe("En alerte");
-    expect(bouton.text()).toContain("warning");
-    expect(bouton.classes()).toContain("alerte");
+    expect(button.attributes("title")).toBe("En alerte");
+    expect(button.text()).toContain("warning");
+    expect(button.classes()).toContain("alerte");
 
-    await bouton.trigger("click");
-    expect(activer).toHaveBeenCalledOnce();
+    await button.trigger("click");
+    expect(activate).toHaveBeenCalledOnce();
   });
 
   it("place l'action apportée avant la connexion à GitHub", async () => {
-    const vue = await monter();
-    const libelles = vue
+    const view = await mountView();
+    const labels = view
       .findAll(".barre [aria-label]")
       .map((b) => b.attributes("aria-label"));
-    expect(libelles.indexOf("Une action apportée")).toBeGreaterThan(-1);
-    expect(libelles.indexOf("Une action apportée")).toBeLessThan(
-      libelles.indexOf("Se connecter à GitHub"),
+    expect(labels.indexOf("Une action apportée")).toBeGreaterThan(-1);
+    expect(labels.indexOf("Une action apportée")).toBeLessThan(
+      labels.indexOf("Se connecter à GitHub"),
     );
   });
 
   it("cache une action que son extension dit invisible", async () => {
-    const vue = await monter();
-    expect(vue.find('[aria-label="Une action apportée"]').exists()).toBe(true);
+    const view = await mountView();
+    expect(view.find('[aria-label="Une action apportée"]').exists()).toBe(true);
     visible.set(false);
     await nextTick();
-    expect(vue.find('[aria-label="Une action apportée"]').exists()).toBe(false);
+    expect(view.find('[aria-label="Une action apportée"]').exists()).toBe(
+      false,
+    );
   });
 
   it("rend un bandeau apporté dans le style de la coquille, tant qu'il a quelque chose à dire", async () => {
-    const vue = await monter();
-    const bandeau = vue.find('.bandeau-quota[data-apport="bandeau-factice"]');
-    expect(bandeau.text()).toContain("Un bandeau apporté");
-    expect(bandeau.attributes("role")).toBe("status");
+    const view = await mountView();
+    const banner = view.find('.bandeau-quota[data-apport="bandeau-factice"]');
+    expect(banner.text()).toContain("Un bandeau apporté");
+    expect(banner.attributes("role")).toBe("status");
 
-    texteBandeau.set("");
+    bannerText.set("");
     await nextTick();
-    expect(vue.find('[data-apport="bandeau-factice"]').exists()).toBe(false);
+    expect(view.find('[data-apport="bandeau-factice"]').exists()).toBe(false);
   });
 });
 
@@ -458,103 +463,101 @@ describe("Bandeau de la passkey", () => {
     tokens = inject(TokenService);
   });
 
-  async function monter() {
-    const routeur = createRouteur(createMemoryHistory());
-    await routeur.push("/");
-    await routeur.isReady();
-    const vue = mount(App, { global: { plugins: [routeur] } });
+  async function mountView() {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/");
+    await router.isReady();
+    const view = mount(App, { global: { plugins: [router] } });
     await nextTick();
-    return vue;
+    return view;
   }
 
   it("ne montre rien tant que le jeton n’attend rien de la passkey", async () => {
-    const vue = await monter();
-    expect(vue.find(".bandeau-passkey").exists()).toBe(false);
+    const view = await mountView();
+    expect(view.find(".bandeau-passkey").exists()).toBe(false);
   });
 
   it("sollicite la passkey dès l’ouverture, puis relit le dépôt", async () => {
-    vi.spyOn(tokens, "verrouille").mockReturnValue(true);
-    const deverrouiller = vi
-      .spyOn(tokens, "deverrouillerSansGeste")
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    const unlock = vi
+      .spyOn(tokens, "unlockWithoutGesture")
       .mockResolvedValue("ouvert");
-    const relire = vi
-      .spyOn(inject(ReferentielStore), "loadReferentiel")
+    const reread = vi
+      .spyOn(inject(SpecificationStore), "loadSpecification")
       .mockResolvedValue();
-    await monter();
+    await mountView();
     await flushPromises();
-    expect(deverrouiller).toHaveBeenCalledOnce();
-    expect(relire).toHaveBeenCalled();
+    expect(unlock).toHaveBeenCalledOnce();
+    expect(reread).toHaveBeenCalled();
   });
 
   it("propose de déverrouiller des jetons scellés, puis relit le dépôt", async () => {
-    vi.spyOn(tokens, "verrouille").mockReturnValue(true);
-    vi.spyOn(tokens, "deverrouillerSansGeste").mockResolvedValue("annule");
-    const deverrouiller = vi
-      .spyOn(tokens, "deverrouiller")
-      .mockResolvedValue("ouvert");
-    const relire = vi
-      .spyOn(inject(ReferentielStore), "loadReferentiel")
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    vi.spyOn(tokens, "unlockWithoutGesture").mockResolvedValue("annule");
+    const unlock = vi.spyOn(tokens, "unlock").mockResolvedValue("ouvert");
+    const reread = vi
+      .spyOn(inject(SpecificationStore), "loadSpecification")
       .mockResolvedValue();
-    const vue = await monter();
-    const bandeau = vue.find(".bandeau-passkey");
-    expect(bandeau.text()).toContain("protégés par une passkey");
-    await bandeau
+    const view = await mountView();
+    const banner = view.find(".bandeau-passkey");
+    expect(banner.text()).toContain("protégés par une passkey");
+    await banner
       .findAll("button")
       .find((b) => b.text() === "Déverrouiller")!
       .trigger("click");
     await flushPromises();
-    expect(deverrouiller).toHaveBeenCalled();
-    expect(relire).toHaveBeenCalled();
+    expect(unlock).toHaveBeenCalled();
+    expect(reread).toHaveBeenCalled();
   });
 
   it("propose d’oublier des jetons que la passkey n’ouvre plus", async () => {
-    vi.spyOn(tokens, "verrouille").mockReturnValue(true);
-    vi.spyOn(tokens, "echecPasskey").mockReturnValue("illisible");
-    const effacer = vi.spyOn(tokens, "effacer").mockImplementation(() => {});
-    const vue = await monter();
-    const bandeau = vue.find(".bandeau-passkey");
-    expect(bandeau.text()).toContain("ne les ouvre plus");
-    await bandeau
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    vi.spyOn(tokens, "passkeyFailure").mockReturnValue("illisible");
+    const erase = vi.spyOn(tokens, "erase").mockImplementation(() => {});
+    const view = await mountView();
+    const banner = view.find(".bandeau-passkey");
+    expect(banner.text()).toContain("ne les ouvre plus");
+    await banner
       .findAll("button")
       .find((b) => b.text() === "Oublier ces jetons")!
       .trigger("click");
-    expect(effacer).toHaveBeenCalled();
+    expect(erase).toHaveBeenCalled();
   });
 
   it("dit qu’un projet exige la passkey, et propose de protéger le jeton", async () => {
-    vi.spyOn(tokens, "forme").mockReturnValue("session");
-    vi.spyOn(tokens, "aucunAcces").mockReturnValue(false);
-    const proteger = vi.spyOn(tokens, "proteger").mockResolvedValue("scelle");
-    const vue = await monter();
-    const bandeau = vue.find(".bandeau-passkey");
-    expect(bandeau.text()).toContain("exige");
-    expect(bandeau.text()).toContain("pour cet onglet");
-    await bandeau
+    vi.spyOn(tokens, "form").mockReturnValue("session");
+    vi.spyOn(tokens, "noAccess").mockReturnValue(false);
+    const protect = vi.spyOn(tokens, "protect").mockResolvedValue("scelle");
+    const view = await mountView();
+    const banner = view.find(".bandeau-passkey");
+    expect(banner.text()).toContain("exige");
+    expect(banner.text()).toContain("pour cet onglet");
+    await banner
       .findAll("button")
       .find((b) => b.text() === "Protéger par une passkey")!
       .trigger("click");
-    expect(proteger).toHaveBeenCalled();
+    expect(protect).toHaveBeenCalled();
   });
 
   it("nomme ce qui reste quand ce navigateur ne sait pas protéger le jeton", async () => {
-    vi.spyOn(tokens, "forme").mockReturnValue("session");
-    vi.spyOn(tokens, "aucunAcces").mockReturnValue(false);
-    vi.spyOn(tokens, "echecPasskey").mockReturnValue("impossible");
-    const vue = await monter();
-    expect(vue.find(".bandeau-passkey").text()).toContain(
+    vi.spyOn(tokens, "form").mockReturnValue("session");
+    vi.spyOn(tokens, "noAccess").mockReturnValue(false);
+    vi.spyOn(tokens, "passkeyFailure").mockReturnValue("impossible");
+    const view = await mountView();
+    expect(view.find(".bandeau-passkey").text()).toContain(
       "l’application de bureau",
     );
   });
 
   it("dit en clair un jeton dont la passkey n’a pas été créée, et propose de réessayer", async () => {
-    vi.spyOn(tokens, "forme").mockReturnValue("en-clair");
-    vi.spyOn(tokens, "echecPasskey").mockReturnValue("annule");
-    vi.spyOn(tokens, "aucunAcces").mockReturnValue(false);
-    const vue = await monter();
-    const bandeau = vue.find(".bandeau-passkey");
-    expect(bandeau.text()).toContain("en clair");
-    expect(
-      bandeau.findAll("button").some((b) => b.text() === "Réessayer"),
-    ).toBe(true);
+    vi.spyOn(tokens, "form").mockReturnValue("en-clair");
+    vi.spyOn(tokens, "passkeyFailure").mockReturnValue("annule");
+    vi.spyOn(tokens, "noAccess").mockReturnValue(false);
+    const view = await mountView();
+    const banner = view.find(".bandeau-passkey");
+    expect(banner.text()).toContain("en clair");
+    expect(banner.findAll("button").some((b) => b.text() === "Réessayer")).toBe(
+      true,
+    );
   });
 });

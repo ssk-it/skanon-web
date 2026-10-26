@@ -9,23 +9,23 @@
  *
  * Sans `valeur`, elle est indéterminée : l'avancement n'est pas connu, seule l'activité l'est.
  */
-defineProps<{ valeur?: number | null }>();
+defineProps<{ value?: number | null }>();
 </script>
 
 <template>
   <div
     class="ui-barre"
-    :class="{ 'ui-barre--indeterminee': valeur == null }"
+    :class="{ 'ui-barre--indeterminee': value == null }"
     role="progressbar"
     aria-valuemin="0"
     aria-valuemax="100"
-    :aria-valuenow="valeur == null ? undefined : Math.round(valeur)"
+    :aria-valuenow="value == null ? undefined : Math.round(value)"
   >
     <div
-      v-if="valeur != null"
+      v-if="value != null"
       class="ui-barre__indicateur"
       :style="{
-        transform: `scaleX(${Math.min(100, Math.max(0, valeur)) / 100})`,
+        transform: `scaleX(${Math.min(100, Math.max(0, value)) / 100})`,
       }"
     ></div>
     <template v-else>

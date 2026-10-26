@@ -3,8 +3,8 @@ import DOMPurify from "dompurify";
 import { onMounted, ref, watch } from "vue";
 import { inject } from "../../core/injection";
 import { ThemeService } from "../../core/ui/theme.service";
-import { extraireDiagrammes, themeMermaid } from "./diagramme";
-import { rendreMarkdown } from "./markdown";
+import { extractDiagrams, themeMermaid } from "./diagramme";
+import { renderMarkdownSync } from "./markdown";
 
 /**
  * Affiche du Markdown, en dessinant les diagrammes qu'il contient.
@@ -15,55 +15,55 @@ import { rendreMarkdown } from "./markdown";
  *
  * L'élément racine est `div.markdown-rendu`, l'hôte `pc-markdown` de SSK Canon.
  */
-const props = defineProps<{ texte?: string | null }>();
+const props = defineProps<{ text?: string | null }>();
 
 const theme = inject(ThemeService);
-const hote = ref<HTMLElement | null>(null);
+const host = ref<HTMLElement | null>(null);
 
 onMounted(() => {
   // Le thème est suivi ici, non lu dans `rendre` : une bascule redessine les diagrammes. Un thème lu au moment du rendu seul laisserait les schémas déjà affichés dans l'ancien.
   watch(
-    [() => props.texte, () => theme.effectif()],
-    ([valeur, effectif]) => void rendre(valeur ?? "", effectif),
+    [() => props.text, () => theme.effective()],
+    ([value, effective]) => void render(value ?? "", effective),
     { immediate: true },
   );
 });
 
-async function rendre(
-  texte: string,
-  effectif: "clair" | "sombre",
+async function render(
+  text: string,
+  effective: "clair" | "sombre",
 ): Promise<void> {
-  const element = hote.value;
+  const element = host.value;
   if (!element) return;
-  if (!texte.trim()) {
+  if (!text.trim()) {
     element.innerHTML = "";
     return;
   }
 
-  const html = rendreMarkdown(texte);
-  const diagrammes = extraireDiagrammes(html);
+  const html = renderMarkdownSync(text);
+  const diagrams = extractDiagrams(html);
 
   // Rien à dessiner : on s'arrête avant de charger quoi que ce soit.
-  if (!diagrammes.length) {
+  if (!diagrams.length) {
     element.innerHTML = html;
     return;
   }
 
-  element.innerHTML = diagrammes[diagrammes.length - 1].html;
+  element.innerHTML = diagrams[diagrams.length - 1].html;
 
-  const mermaid = await chargerMoteur(effectif);
-  for (const d of diagrammes) {
-    const cible = element.querySelector(`[data-diagramme="${d.id}"]`);
-    if (!cible) continue;
+  const mermaid = await loadEngine(effective);
+  for (const d of diagrams) {
+    const target = element.querySelector(`[data-diagramme="${d.id}"]`);
+    if (!target) continue;
     try {
       const { svg } = await mermaid.render(`mermaid-${d.id}`, d.source);
       // Le moteur produit du balisage à partir d'un texte que l'application ne contrôle pas : il passe par le même assainissement que le reste.
-      cible.innerHTML = DOMPurify.sanitize(svg, {
+      target.innerHTML = DOMPurify.sanitize(svg, {
         USE_PROFILES: { svg: true, svgFilters: true },
       });
-      rendreAgrandissable(cible as HTMLElement);
+      makeEnlargeable(target as HTMLElement);
     } catch (e) {
-      cible.outerHTML = messageErreur(e);
+      target.outerHTML = errorMessage(e);
     }
   }
 }
@@ -75,20 +75,20 @@ async function rendre(
  *
  * Deux diagrammes sur une même page, ou deux pages successives, ne doivent pas déclencher deux chargements : le module est mis en cache par le navigateur, mais l'initialisation ne l'est pas.
  */
-let moteur: Promise<typeof import("mermaid").default> | null = null;
-let themeApplique: "clair" | "sombre" | null = null;
+let engine: Promise<typeof import("mermaid").default> | null = null;
+let appliedTheme: "clair" | "sombre" | null = null;
 
-async function chargerMoteur(effectif: "clair" | "sombre") {
-  moteur ??= import("mermaid").then((m) => m.default);
-  const mermaid = await moteur;
+async function loadEngine(effective: "clair" | "sombre") {
+  engine ??= import("mermaid").then((m) => m.default);
+  const mermaid = await engine;
 
   // `initialize` est global au moteur : le rappeler au changement de thème est ce qui fait suivre les diagrammes, et le rappeler sans changement réinitialiserait inutilement un état partagé.
-  if (themeApplique !== effectif) {
+  if (appliedTheme !== effective) {
     mermaid.initialize({
       startOnLoad: false,
       // `loose` autoriserait les clics et le HTML dans les libellés, sur un texte venu d'un dépôt. `strict` est le seul mode compatible avec le fait que ce contenu n'est pas contrôlé.
       securityLevel: "strict",
-      theme: themeMermaid(effectif),
+      theme: themeMermaid(effective),
       // Les libellés sont dessinés en SVG, non en HTML dans un `foreignObject`.
       //
       // DOMPurify retire `foreignObject` — c'est du HTML injecté au milieu d'un SVG, et sa suppression est délibérée. Les diagrammes s'affichaient donc complets et muets : des formes sans texte, ce qu'on prend pour le schéma voulu plutôt que pour un défaut.
@@ -98,7 +98,7 @@ async function chargerMoteur(effectif: "clair" | "sombre") {
       flowchart: { htmlLabels: false },
       class: { htmlLabels: false },
     });
-    themeApplique = effectif;
+    appliedTheme = effective;
   }
   return mermaid;
 }
@@ -110,19 +110,19 @@ async function chargerMoteur(effectif: "clair" | "sombre") {
  *
  * Un survol et un rôle de bouton plutôt qu'une icône : la cible du clic est le diagramme entier, et rien n'indiquerait mieux qu'il est cliquable qu'un curseur qui change dessus.
  */
-function rendreAgrandissable(cible: HTMLElement): void {
-  cible.classList.add("pc-diagramme-cliquable");
-  cible.setAttribute("role", "button");
-  cible.setAttribute("tabindex", "0");
-  cible.setAttribute("title", "Agrandir le diagramme");
+function makeEnlargeable(target: HTMLElement): void {
+  target.classList.add("pc-diagramme-cliquable");
+  target.setAttribute("role", "button");
+  target.setAttribute("tabindex", "0");
+  target.setAttribute("title", "Agrandir le diagramme");
 
-  const ouvrir = () => agrandir(cible.innerHTML);
-  cible.addEventListener("click", ouvrir);
-  cible.addEventListener("keydown", (e) => {
+  const open = () => enlarge(target.innerHTML);
+  target.addEventListener("click", open);
+  target.addEventListener("keydown", (e) => {
     // Au clavier, ce qu'on attend d'un élément annoncé comme un bouton.
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      ouvrir();
+      open();
     }
   });
 }
@@ -132,26 +132,26 @@ function rendreAgrandissable(cible: HTMLElement): void {
  *
  * Le contenu est celui déjà assaini et affiché : le réassainir ne changerait rien, le régénérer ferait dépendre l'agrandissement d'un second rendu qui pourrait différer.
  */
-function agrandir(svgAssaini: string): void {
-  const fond = document.createElement("div");
-  fond.className = "pc-diagramme-agrandi";
-  fond.innerHTML = `<div class="pc-diagramme-agrandi-contenu">${svgAssaini}</div>`;
+function enlarge(sanitizedSvg: string): void {
+  const background = document.createElement("div");
+  background.className = "pc-diagramme-agrandi";
+  background.innerHTML = `<div class="pc-diagramme-agrandi-contenu">${sanitizedSvg}</div>`;
 
-  const fermer = () => {
-    fond.remove();
-    document.removeEventListener("keydown", surTouche);
+  const close = () => {
+    background.remove();
+    document.removeEventListener("keydown", onKey);
   };
-  const surTouche = (e: KeyboardEvent) => {
-    if (e.key === "Escape") fermer();
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === "Escape") close();
   };
 
   // Le fond referme, le contenu non : cliquer sur le diagramme agrandi pour le regarder de plus près ne doit pas le faire disparaître.
-  fond.addEventListener("click", (e) => {
-    if (e.target === fond) fermer();
+  background.addEventListener("click", (e) => {
+    if (e.target === background) close();
   });
-  document.addEventListener("keydown", surTouche);
+  document.addEventListener("keydown", onKey);
 
-  document.body.appendChild(fond);
+  document.body.appendChild(background);
 }
 
 /**
@@ -159,18 +159,18 @@ function agrandir(svgAssaini: string): void {
  *
  * À l'endroit où il devait paraître, et sans emporter la page : un schéma illustre un propos, il ne le porte pas.
  */
-function messageErreur(e: unknown): string {
+function errorMessage(e: unknown): string {
   const cause = e instanceof Error ? e.message : String(e);
-  const propre = DOMPurify.sanitize(cause, {
+  const own = DOMPurify.sanitize(cause, {
     ALLOWED_TAGS: [],
     ALLOWED_ATTR: [],
   });
-  return `<div class="pc-diagramme-erreur">Ce diagramme n’a pas pu être dessiné : <code>${propre}</code></div>`;
+  return `<div class="pc-diagramme-erreur">Ce diagramme n’a pas pu être dessiné : <code>${own}</code></div>`;
 }
 </script>
 
 <template>
-  <div ref="hote" class="markdown-rendu"></div>
+  <div ref="host" class="markdown-rendu"></div>
 </template>
 
 <style>

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { load } from "js-yaml";
-import { ecrireReglages } from "./config-ecriture";
+import { writeSettings } from "./config-ecriture";
 
 /**
  * Ce fichier se relit sur la plateforme, et ses commentaires expliquent à quoi
  * servent les réglages. Réécrire le document entier les détruirait — mesuré,
  * cinq disparaissent — d'où un remplacement par blocs, que ces cas éprouvent.
  */
-const FICHIER = `# Configuration du projet — lue par l'application et par les Actions
+const FILE = `# Configuration du projet — lue par l'application et par les Actions
 schema_version: 1
 
 projet:
@@ -36,24 +36,30 @@ attachments:
 `;
 
 const BASE = {
-  acces: "jeton_personnel" as const,
-  identite: null,
-  depotsCode: [],
+  access: "jeton_personnel" as const,
+  identity: null,
+  codeRepos: [],
 };
 
-const IDENTITE = {
-  emetteur: "https://identite.exemple.fr/realms/projet",
+const IDENTITY = {
+  issuer: "https://identite.exemple.fr/realms/projet",
   client: "mon-application",
-  echange: "https://echange.exemple.fr",
+  exchange: "https://echange.exemple.fr",
+};
+// Le même bloc, tel que le fichier de configuration l'écrit.
+const IDENTITY_BLOCK = {
+  emetteur: IDENTITY.issuer,
+  client: IDENTITY.client,
+  echange: IDENTITY.exchange,
 };
 
 describe("écriture des réglages dans le fichier de configuration", () => {
   it("retire les réglages du cycle, commentaires compris", () => {
     // Ils ne règlent plus rien depuis 2026-045 : les laisser dans le fichier
     // ferait croire que le cycle se configure encore.
-    const out = ecrireReglages(FICHIER, {
-      acces: "jeton_personnel",
-      identite: null,
+    const out = writeSettings(FILE, {
+      access: "jeton_personnel",
+      identity: null,
     });
     const data = load(out) as Record<string, unknown>;
     expect(data["transitions"]).toBeUndefined();
@@ -68,10 +74,10 @@ describe("écriture des réglages dans le fichier de configuration", () => {
   });
 
   it("conserve ce que l’application ne règle pas", () => {
-    const out = ecrireReglages(FICHIER, {
-      acces: "jeton_personnel",
-      identite: null,
-      depotsCode: [],
+    const out = writeSettings(FILE, {
+      access: "jeton_personnel",
+      identity: null,
+      codeRepos: [],
     });
     const data = load(out) as Record<string, unknown>;
     expect(data["schema_version"]).toBe(1);
@@ -84,9 +90,9 @@ describe("écriture des réglages dans le fichier de configuration", () => {
 
   it("ne touche pas aux textes longs des autres blocs", () => {
     // js-yaml les reformaterait en réécrivant le document entier
-    const out = ecrireReglages(FICHIER, {
-      acces: "jeton_personnel",
-      identite: null,
+    const out = writeSettings(FILE, {
+      access: "jeton_personnel",
+      identity: null,
     });
     expect(out).toContain(
       "Un texte long, que reformater changerait\n    sans que personne l'ait demandé.",
@@ -94,9 +100,9 @@ describe("écriture des réglages dans le fichier de configuration", () => {
   });
 
   it("conserve les commentaires des blocs qu’il ne touche pas", () => {
-    const out = ecrireReglages(FICHIER, {
-      acces: "jeton_personnel",
-      identite: null,
+    const out = writeSettings(FILE, {
+      access: "jeton_personnel",
+      identity: null,
     });
     expect(out).toContain(
       "# Configuration du projet — lue par l'application et par les Actions",
@@ -104,21 +110,21 @@ describe("écriture des réglages dans le fichier de configuration", () => {
   });
 
   it("remplace le commentaire du bloc qu’il réécrit, sans le dupliquer", () => {
-    const premier = ecrireReglages(FICHIER, {
-      acces: "jeton_personnel",
-      identite: null,
+    const first = writeSettings(FILE, {
+      access: "jeton_personnel",
+      identity: null,
     });
-    const second = ecrireReglages(premier, { acces: "relais", identite: null });
+    const second = writeSettings(first, { access: "relais", identity: null });
     const occurrences =
       second.split("Comment les rédacteurs obtiennent").length - 1;
     expect(occurrences).toBe(1);
   });
 
   it("ajoute les blocs absents plutôt que d’échouer", () => {
-    const sans = "schema_version: 1\n\nprojet:\n  nom: Neuf\n";
-    const out = ecrireReglages(sans, {
-      acces: "jeton_personnel",
-      identite: null,
+    const without = "schema_version: 1\n\nprojet:\n  nom: Neuf\n";
+    const out = writeSettings(without, {
+      access: "jeton_personnel",
+      identity: null,
     });
     const data = load(out) as Record<string, unknown>;
     expect(data["acces"]).toBe("jeton_personnel");
@@ -126,26 +132,26 @@ describe("écriture des réglages dans le fichier de configuration", () => {
   });
 
   it("termine toujours par une fin de ligne", () => {
-    const out = ecrireReglages("schema_version: 1", {
-      acces: "jeton_personnel",
-      identite: null,
+    const out = writeSettings("schema_version: 1", {
+      access: "jeton_personnel",
+      identity: null,
     });
     expect(out.endsWith("\n")).toBe(true);
   });
 
   it("écrit le mode d’accès, et le relit", () => {
-    const out = ecrireReglages(FICHIER, {
-      acces: "relais",
-      identite: null,
+    const out = writeSettings(FILE, {
+      access: "relais",
+      identity: null,
     });
     expect((load(out) as Record<string, unknown>)["acces"]).toBe("relais");
   });
 
   it("ajoute le mode d’accès à un fichier qui n’en a pas", () => {
     // les projets existants n'ont pas cette clé : l'ajouter, pas échouer
-    const out = ecrireReglages(FICHIER, {
-      acces: "identite_tierce",
-      identite: IDENTITE,
+    const out = writeSettings(FILE, {
+      access: "identite_tierce",
+      identity: IDENTITY,
     });
     const data = load(out) as Record<string, unknown>;
     expect(data["acces"]).toBe("identite_tierce");
@@ -153,36 +159,36 @@ describe("écriture des réglages dans le fichier de configuration", () => {
   });
 
   it("écrit le bloc identite, et le relit", () => {
-    const out = ecrireReglages(FICHIER, {
-      acces: "identite_tierce",
-      identite: IDENTITE,
+    const out = writeSettings(FILE, {
+      access: "identite_tierce",
+      identity: IDENTITY,
     });
     expect((load(out) as Record<string, unknown>)["identite"]).toEqual(
-      IDENTITE,
+      IDENTITY_BLOCK,
     );
   });
 
   it("retire le bloc identite quand le mode ne l’emploie plus", () => {
     // le laisser décrirait une configuration que le projet n'applique plus
-    const avec = ecrireReglages(FICHIER, {
-      acces: "identite_tierce",
-      identite: IDENTITE,
+    const withValue = writeSettings(FILE, {
+      access: "identite_tierce",
+      identity: IDENTITY,
     });
-    const sans = ecrireReglages(avec, {
-      acces: "jeton_personnel",
-      identite: null,
+    const without = writeSettings(withValue, {
+      access: "jeton_personnel",
+      identity: null,
     });
-    const data = load(sans) as Record<string, unknown>;
+    const data = load(without) as Record<string, unknown>;
     expect(data["identite"]).toBeUndefined();
     expect(data["acces"]).toBe("jeton_personnel");
-    expect(sans).not.toContain("Où les identités sont vérifiées");
+    expect(without).not.toContain("Où les identités sont vérifiées");
   });
 
   it("ne laisse pas de trou en retirant un bloc absent", () => {
-    const out = ecrireReglages(FICHIER, {
-      acces: "jeton_personnel",
-      identite: null,
-      depotsCode: [],
+    const out = writeSettings(FILE, {
+      access: "jeton_personnel",
+      identity: null,
+      codeRepos: [],
     });
     expect((load(out) as Record<string, unknown>)["schema_version"]).toBe(1);
   });
@@ -195,9 +201,9 @@ describe("écriture des réglages dans le fichier de configuration", () => {
  */
 describe("écriture des dépôts de code", () => {
   it("écrit un bloc que la lecture retrouve", () => {
-    const out = ecrireReglages(FICHIER, {
+    const out = writeSettings(FILE, {
       ...BASE,
-      depotsCode: [
+      codeRepos: [
         { repo: "orga/front", role: "Application web" },
         { repo: "orga/back", role: "API" },
       ],
@@ -211,30 +217,30 @@ describe("écriture des dépôts de code", () => {
   });
 
   it("omet le rôle quand il n’est pas renseigné", () => {
-    const out = ecrireReglages(FICHIER, {
+    const out = writeSettings(FILE, {
       ...BASE,
-      depotsCode: [{ repo: "orga/depot", role: "" }],
+      codeRepos: [{ repo: "orga/depot", role: "" }],
     });
     expect(load(out)).toMatchObject({ depots_code: [{ repo: "orga/depot" }] });
   });
 
   it("retire le bloc quand plus aucun dépôt n’est déclaré", () => {
     // Le laisser en place décrirait un projet qui n'en déclare plus.
-    const avec = ecrireReglages(FICHIER, {
+    const withValue = writeSettings(FILE, {
       ...BASE,
-      depotsCode: [{ repo: "orga/depot", role: "API" }],
+      codeRepos: [{ repo: "orga/depot", role: "API" }],
     });
-    const sans = ecrireReglages(avec, { ...BASE, depotsCode: [] });
-    expect(sans).not.toContain("depots_code");
+    const without = writeSettings(withValue, { ...BASE, codeRepos: [] });
+    expect(without).not.toContain("depots_code");
     expect(
-      (load(sans) as Record<string, unknown>)["depots_code"],
+      (load(without) as Record<string, unknown>)["depots_code"],
     ).toBeUndefined();
   });
 
   it("n’abîme pas le reste du fichier", () => {
-    const out = ecrireReglages(FICHIER, {
+    const out = writeSettings(FILE, {
       ...BASE,
-      depotsCode: [{ repo: "orga/depot", role: "API" }],
+      codeRepos: [{ repo: "orga/depot", role: "API" }],
     });
     const data = load(out) as Record<string, unknown>;
     expect(data["schema_version"]).toBe(1);
@@ -247,9 +253,9 @@ describe("écriture des dépôts de code", () => {
   it("reste stable d’une écriture à l’autre", () => {
     // Réécrire à l'identique ne doit rien changer : sinon chaque proposition de
     // réglages ferait apparaître un écart que personne n'a demandé.
-    const depotsCode = [{ repo: "orga/depot", role: "API" }];
-    const premier = ecrireReglages(FICHIER, { ...BASE, depotsCode });
-    const second = ecrireReglages(premier, { ...BASE, depotsCode });
-    expect(second).toBe(premier);
+    const codeRepos = [{ repo: "orga/depot", role: "API" }];
+    const first = writeSettings(FILE, { ...BASE, codeRepos });
+    const second = writeSettings(first, { ...BASE, codeRepos });
+    expect(second).toBe(first);
   });
 });

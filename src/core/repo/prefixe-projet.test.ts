@@ -6,8 +6,8 @@ import { inject, resetInjection } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RepoLoader } from "./repo-loader";
 import {
-  afficherIdentifiant,
-  extraireIdentifiantCadrage,
+  displayIdentifier,
+  extractScopingIdentifier,
 } from "./reference-cadrage";
 
 /**
@@ -27,9 +27,9 @@ describe("préfixe déclaré par le projet", () => {
     httpMock = provideHttpTesting();
   });
 
-  async function chargerAvecConfig(config: string) {
+  async function loadWithConfig(config: string) {
     const loader = inject(RepoLoader);
-    const attendu = loader.loadReferentiel({
+    const expected = loader.loadSpecification({
       owner: "org",
       repo: "projet",
       ref: "main",
@@ -52,34 +52,34 @@ describe("préfixe déclaré par le projet", () => {
       )
       .flush(config);
 
-    return attendu;
+    return expected;
   }
 
   it("lit le préfixe déclaré sous le projet", async () => {
-    const referentiel = await chargerAvecConfig(
+    const specification = await loadWithConfig(
       "schema_version: 1\nprojet:\n  nom: Prime\n  prefixe: PRMCO\n",
     );
 
-    expect(referentiel.projet.prefixe).toBe("PRMCO");
+    expect(specification.project.prefix).toBe("PRMCO");
   });
 
   it("laisse le préfixe vide quand le projet n’en déclare pas", async () => {
     // Le cas de tous les projets existants : rien ne doit changer pour eux.
-    const referentiel = await chargerAvecConfig(
+    const specification = await loadWithConfig(
       "schema_version: 1\nprojet:\n  nom: Prime\n",
     );
 
-    expect(referentiel.projet.prefixe).toBeNull();
+    expect(specification.project.prefix).toBeNull();
   });
 });
 
 describe("affichage d’un identifiant", () => {
   it("préfixe l’identifiant quand le projet en déclare un", () => {
-    expect(afficherIdentifiant("2026-002", "PRMCO")).toBe("PRMCO-2026-002");
+    expect(displayIdentifier("2026-002", "PRMCO")).toBe("PRMCO-2026-002");
   });
 
   it("rend l’identifiant nu quand aucun préfixe n’est déclaré", () => {
-    expect(afficherIdentifiant("2026-002", null)).toBe("2026-002");
+    expect(displayIdentifier("2026-002", null)).toBe("2026-002");
   });
 });
 
@@ -92,13 +92,13 @@ describe("affichage d’un identifiant", () => {
  */
 describe("adresse préfixée", () => {
   it("mène au même cadrage que l’adresse nue", () => {
-    expect(extraireIdentifiantCadrage("PRMCO-2026-002", "PRMCO")).toBe(
+    expect(extractScopingIdentifier("PRMCO-2026-002", "PRMCO")).toBe(
       "2026-002",
     );
-    expect(extraireIdentifiantCadrage("2026-002", "PRMCO")).toBe("2026-002");
+    expect(extractScopingIdentifier("2026-002", "PRMCO")).toBe("2026-002");
   });
 
   it("refuse le préfixe d’un autre projet", () => {
-    expect(extraireIdentifiantCadrage("AUTRE-2026-002", "PRMCO")).toBeNull();
+    expect(extractScopingIdentifier("AUTRE-2026-002", "PRMCO")).toBeNull();
   });
 });

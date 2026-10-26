@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch, watchEffect } from "vue";
-import type { RefDepot } from "../../core/github/github-client";
+import type { RepoRef } from "../../core/github/github-client";
 import { inject } from "../../core/injection";
-import type { VarianteIdentite } from "../../core/repo/identite-noms";
-import { IdentitesService } from "../../core/repo/identites.service";
+import type { IdentityVariant } from "../../core/repo/identite-noms";
+import { ProjectIdentityService } from "../../core/repo/identites.service";
 import { ThemeService } from "../../core/ui/theme.service";
-import UiIcone from "../../ui/UiIcone.vue";
-import AvatarOrganisation from "./AvatarOrganisation.vue";
+import UiIcon from "../../ui/UiIcone.vue";
+import OrganizationAvatar from "./AvatarOrganisation.vue";
 
 /**
  * Le symbole d'un projet, là où l'application le désigne.
@@ -19,47 +19,49 @@ import AvatarOrganisation from "./AvatarOrganisation.vue";
  */
 const props = withDefaults(
   defineProps<{
-    depot: RefDepot;
+    repoRef: RepoRef;
     /** Côté de la case, en pixels d'affichage. */
-    taille?: number;
+    size?: number;
     /** Ce qui se montre sans symbole : l'avatar, une icône de Material, ou rien. */
-    repli?: "avatar" | "folder" | "folder_open" | "aucun";
+    fallback?: "avatar" | "folder" | "folder_open" | "aucun";
     /**
      * Le fond sur lequel le symbole se pose, quand il ne suit pas le thème — la marque de la barre, sombre dans les deux. La variante se choisit d'après le fond : c'est ainsi que l'identité les nomme.
      */
-    fond?: VarianteIdentite | null;
+    background?: IdentityVariant | null;
   }>(),
-  { taille: 18, repli: "avatar", fond: null },
+  { size: 18, fallback: "avatar", background: null },
 );
 
-const identites = inject(IdentitesService);
+const identities = inject(ProjectIdentityService);
 const theme = inject(ThemeService);
 
-const variante = computed(() => props.fond ?? theme.effectif());
+const variant = computed(() => props.background ?? theme.effective());
 
-const lue = computed(() => identites.findSymbole(props.depot, variante.value));
+const read = computed(() =>
+  identities.findSymbol(props.repoRef, variant.value),
+);
 
 // L'échec appartient à une image, pas au composant : un symbole remplacé dans le dépôt doit avoir sa chance plutôt que garder le repli du précédent.
-const echoue = ref(false);
-watch(lue, () => (echoue.value = false));
+const failed = ref(false);
+watch(read, () => (failed.value = false));
 
-const source = computed(() => (echoue.value ? null : lue.value));
-const vide = computed(() => !source.value && props.repli === "aucun");
+const source = computed(() => (failed.value ? null : read.value));
+const empty = computed(() => !source.value && props.fallback === "aucun");
 
 watchEffect(() => {
   // Lue pour être suivie : un retour à l'accueil ou un accès retiré redemande l'identité.
-  identites.generation();
-  void identites.demander(props.depot, variante.value);
+  identities.generation();
+  void identities.request(props.repoRef, variant.value);
 });
 </script>
 
 <template>
   <span
     class="symbole-projet"
-    :class="{ vide }"
+    :class="{ vide: empty }"
     :style="{
-      '--taille-symbole': `${taille}px`,
-      '--taille-avatar': `${taille}px`,
+      '--taille-symbole': `${size}px`,
+      '--taille-avatar': `${size}px`,
     }"
   >
     <img
@@ -69,14 +71,14 @@ watchEffect(() => {
       alt=""
       aria-hidden="true"
       decoding="async"
-      @error="echoue = true"
+      @error="failed = true"
     />
-    <AvatarOrganisation
-      v-else-if="repli === 'avatar'"
-      :owner="depot.owner"
-      :taille="taille"
+    <OrganizationAvatar
+      v-else-if="fallback === 'avatar'"
+      :owner="repoRef.owner"
+      :size="size"
     />
-    <UiIcone v-else-if="repli !== 'aucun'" :nom="repli" />
+    <UiIcon v-else-if="fallback !== 'aucun'" :name="fallback" />
   </span>
 </template>
 

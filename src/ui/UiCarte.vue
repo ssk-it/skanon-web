@@ -9,13 +9,13 @@
  *
  * SSK Canon importe `MatCardModule` dans l'écran du référentiel sans y poser de `mat-card` : la carte est là pour qu'un portage qui en trouverait une n'ait pas à réinventer ses couleurs.
  */
-withDefaults(defineProps<{ apparence?: "elevated" | "outlined" }>(), {
-  apparence: "elevated",
+withDefaults(defineProps<{ appearance?: "elevated" | "outlined" }>(), {
+  appearance: "elevated",
 });
 </script>
 
 <template>
-  <div class="ui-carte" :class="`ui-carte--${apparence}`"><slot /></div>
+  <div class="ui-carte" :class="`ui-carte--${appearance}`"><slot /></div>
 </template>
 
 <style>

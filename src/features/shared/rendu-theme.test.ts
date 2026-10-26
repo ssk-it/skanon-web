@@ -3,9 +3,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { inject } from "../../core/injection";
 import { ThemeService } from "../../core/ui/theme.service";
-import MarkdownRendu from "./MarkdownRendu.vue";
+import RenderedMarkdown from "./MarkdownRendu.vue";
 
-const TEXTE = "Un texte.\n\n```mermaid\nflowchart LR\n  A --> B\n```";
+const TEXT = "Un texte.\n\n```mermaid\nflowchart LR\n  A --> B\n```";
 
 /**
  * Le comportement du composant autour du rendu.
@@ -19,11 +19,11 @@ beforeAll(async () => {
 
 describe("composant de rendu", () => {
   it("laisse la page lisible quand un diagramme ne peut pas être dessiné", async () => {
-    const vue = mount(MarkdownRendu, { props: { texte: TEXTE } });
+    const view = mount(RenderedMarkdown, { props: { text: TEXT } });
     await flushPromises();
     await new Promise((r) => setTimeout(r, 300));
 
-    const html = vue.html();
+    const html = view.html();
     // Le propos demeure : un schéma illustre, il ne porte pas.
     expect(html).toContain("Un texte.");
     // Et l'échec se dit, plutôt que de laisser un vide qu'on prendrait pour un cadrage qui n'aurait rien écrit à cet endroit.
@@ -32,14 +32,14 @@ describe("composant de rendu", () => {
 
   it("suit le thème effectif de l’application", async () => {
     const theme = inject(ThemeService);
-    const vue = mount(MarkdownRendu, { props: { texte: TEXTE } });
+    const view = mount(RenderedMarkdown, { props: { text: TEXT } });
 
     theme.theme.set("sombre");
     await nextTick();
     await new Promise((r) => setTimeout(r, 200));
 
     // Le thème est lu dans l'effet de rendu : une bascule le relance. Sans cela, les diagrammes déjà affichés resteraient dans l'ancien thème.
-    expect(theme.effectif()).toBe("sombre");
-    expect(vue.html()).toContain("Un texte.");
+    expect(theme.effective()).toBe("sombre");
+    expect(view.html()).toContain("Un texte.");
   });
 });

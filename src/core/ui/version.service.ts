@@ -1,7 +1,7 @@
-import { PLATEFORME } from "../../plateforme/jeton";
+import { PLATFORM } from "../../plateforme/jeton";
 import {
-  INSTALLATION_ECHOUEE,
-  type CauseSansVersion,
+  INSTALLATION_FAILED,
+  type NoVersionCause,
 } from "../../plateforme/ports";
 import { InjectionToken, inject, onDestroy } from "../injection";
 import { signal } from "../signaux";
@@ -11,20 +11,20 @@ import { signal } from "../signaux";
  *
  * `prete` : une version plus récente est téléchargée, et n'attend qu'un rechargement. `perdue` : le service worker ne peut plus servir la version en cours, et une vue chargée à la demande peut refuser de s'ouvrir.
  */
-export type EtatVersion = "courante" | "prete" | "perdue";
+export type VersionState = "courante" | "prete" | "perdue";
 
 /** Une heure : la fenêtre qui ne quitte jamais l'écran doit aussi l'apprendre. */
-export const INTERVALLE_VERIFICATION = 60 * 60 * 1000;
+export const CHECK_INTERVAL = 60 * 60 * 1000;
 
 /**
  * Le rechargement de la page, isolé pour que les tests puissent l'observer : celui de jsdom n'est ni remplaçable ni observable.
  */
-export const RECHARGER_PAGE = new InjectionToken<() => void>("RECHARGER_PAGE", {
+export const RELOAD_PAGE = new InjectionToken<() => void>("RECHARGER_PAGE", {
   factory: () => () => document.location.reload(),
 });
 
 /** Les vues où le rédacteur tient une saisie que le rechargement effacerait. */
-const VUES_DE_SAISIE = [
+const INPUT_VIEWS = [
   /^cadrages\/nouveau$/,
   /^cadrages\/[^/]+\/editer$/,
   /^reglages$/,
@@ -35,14 +35,14 @@ const VUES_DE_SAISIE = [
  *
  * Le bandeau s'en sert pour avertir, non pour décider : il ne sait pas si la saisie a changé, et n'a pas à le savoir pour prévenir qu'elle serait perdue.
  */
-export function estUrlDeSaisie(url: string): boolean {
+export function isInputUrl(url: string): boolean {
   // les deux premiers segments sont l'organisation et le dépôt, jamais une vue
-  const vue = (url.split(/[?#]/)[0] ?? "")
+  const view = (url.split(/[?#]/)[0] ?? "")
     .split("/")
     .filter(Boolean)
     .slice(2)
     .join("/");
-  return VUES_DE_SAISIE.some((motif) => motif.test(vue));
+  return INPUT_VIEWS.some((pattern) => pattern.test(view));
 }
 
 /**
@@ -53,45 +53,42 @@ export function estUrlDeSaisie(url: string): boolean {
  * Il ne recharge ni ne relance jamais de lui-même. Un rechargement efface la saisie en cours et l'accès obtenu par une identité vérifiée : seul le rédacteur sait s'il peut se le permettre maintenant (2026-049, décision 01).
  */
 export class VersionService {
-  private readonly annonceur = inject(PLATEFORME).version;
-  private readonly rechargerPage = inject(RECHARGER_PAGE);
+  private readonly announcer = inject(PLATFORM).version;
+  private readonly reloadPage = inject(RELOAD_PAGE);
 
-  readonly etat = signal<EtatVersion>("courante");
+  readonly state = signal<VersionState>("courante");
 
   /** Pourquoi aucune version n'est annoncée, telle que l'annonceur la nomme ; le livrable qui la connaît la formule. `null` quand la dernière vérification a abouti, et toujours sur le web. */
-  readonly cause = signal<CauseSansVersion | null>(null);
+  readonly cause = signal<NoVersionCause | null>(null);
 
   /** Vrai quand passer à la version prête relance l'application : le bandeau dit « relancer » plutôt que « recharger ». */
-  readonly relance = this.annonceur.relance;
+  readonly relaunches = this.announcer.relaunches;
 
   constructor() {
-    if (!this.annonceur.actif) return;
+    if (!this.announcer.active) return;
 
-    const cesserCause = this.annonceur.listenCause((cause) =>
+    const stopCause = this.announcer.listenCause((cause) =>
       this.cause.set(cause),
     );
 
-    const cesser = this.annonceur.listen((annonce) => {
-      if (annonce === "perdue") this.etat.set("perdue");
+    const stop = this.announcer.listen((announcement) => {
+      if (announcement === "perdue") this.state.set("perdue");
       // une version perdue reste le message : c'est elle qu'il faut expliquer
-      else if (this.etat() === "courante") this.etat.set("prete");
+      else if (this.state() === "courante") this.state.set("prete");
     });
 
     // Au premier plan pour la fenêtre retrouvée après une nuit, chaque heure pour celle qui ne quitte jamais l'écran (2026-049, décision 02).
-    const auPremierPlan = () => {
+    const inForeground = () => {
       if (document.visibilityState === "visible") void this.checkVersion();
     };
-    document.addEventListener("visibilitychange", auPremierPlan);
-    const minuterie = setInterval(
-      () => void this.checkVersion(),
-      INTERVALLE_VERIFICATION,
-    );
+    document.addEventListener("visibilitychange", inForeground);
+    const timer = setInterval(() => void this.checkVersion(), CHECK_INTERVAL);
 
     onDestroy(() => {
-      cesser();
-      cesserCause();
-      document.removeEventListener("visibilitychange", auPremierPlan);
-      clearInterval(minuterie);
+      stop();
+      stopCause();
+      document.removeEventListener("visibilitychange", inForeground);
+      clearInterval(timer);
     });
   }
 
@@ -102,7 +99,7 @@ export class VersionService {
    */
   async checkVersion(): Promise<void> {
     try {
-      await this.annonceur.check();
+      await this.announcer.check();
     } catch {
       // rien à dire : voir ci-dessus
     }
@@ -116,26 +113,26 @@ export class VersionService {
    * Sur le bureau, l'activation installe la version et relance l'application : il n'y a rien à recharger. Une installation qui échoue se dit, et la version reste prête.
    */
   async reloadVersion(): Promise<void> {
-    if (this.relance) {
+    if (this.relaunches) {
       await this.relaunchVersion();
       return;
     }
-    if (this.etat() === "prete") {
+    if (this.state() === "prete") {
       try {
-        await this.annonceur.activate();
+        await this.announcer.activate();
       } catch {
         // voir ci-dessus
       }
     }
-    this.rechargerPage();
+    this.reloadPage();
   }
 
   private async relaunchVersion(): Promise<void> {
-    if (this.etat() !== "prete") return;
+    if (this.state() !== "prete") return;
     try {
-      await this.annonceur.activate();
+      await this.announcer.activate();
     } catch {
-      this.cause.set(INSTALLATION_ECHOUEE);
+      this.cause.set(INSTALLATION_FAILED);
     }
   }
 }

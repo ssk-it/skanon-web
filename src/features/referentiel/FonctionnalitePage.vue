@@ -4,16 +4,16 @@
  *
  * Les énoncés sont coupés vers 80 colonnes : le premier paragraphe se recolle avant d'y chercher la fin de phrase, un point suivi d'un blanc.
  */
-export function buildExtrait(enonce: string): string {
-  const paragraphe =
-    enonce
+export function buildExcerpt(statement: string): string {
+  const paragraph =
+    statement
       .replace(/\*\*/g, "")
       .replace(/`/g, "")
       .split(/\n\s*\n/)
       .find((p) => p.trim())
       ?.replace(/\s+/g, " ")
       .trim() ?? "";
-  return paragraphe.match(/^.*?[.!?…](?=\s|$)/)?.[0] ?? paragraphe;
+  return paragraph.match(/^.*?[.!?…](?=\s|$)/)?.[0] ?? paragraph;
 }
 </script>
 
@@ -21,69 +21,69 @@ export function buildExtrait(enonce: string): string {
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import PistesSection from "./PistesSection.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
+import RoadmapItemsSection from "./PistesSection.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
 
 const route = useRoute();
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 
 const id = computed(() => String(route.params["id"]));
-const fonctionnalite = computed(() => store.findFonctionnalite(id.value));
-const regles = computed(() => store.listReglesByFonctionnalite(id.value));
+const feature = computed(() => store.findFeature(id.value));
+const rules = computed(() => store.listRulesByFeature(id.value));
 </script>
 
 <template>
   <div class="page-fonctionnalite">
-    <EtatVue v-if="store.etat() !== 'pret'" />
-    <template v-else-if="fonctionnalite">
-      <RouterLink class="retour" :to="liens.chemin('referentiel')">
-        <UiIcone nom="arrow_back" /> Référentiel
+    <ViewState v-if="store.state() !== 'pret'" />
+    <template v-else-if="feature">
+      <RouterLink class="retour" :to="links.path('referentiel')">
+        <UiIcon name="arrow_back" /> Référentiel
       </RouterLink>
 
       <header class="entete">
         <p class="type">Fonctionnalité</p>
-        <h1>{{ fonctionnalite.nom }}</h1>
+        <h1>{{ feature.name }}</h1>
         <div class="domaines">
           <RouterLink
-            v-for="d in fonctionnalite.domaines"
+            v-for="d in feature.domains"
             :key="d"
             class="pastille"
-            :to="liens.chemin('referentiel', 'domaine', d)"
+            :to="links.path('referentiel', 'domaine', d)"
           >
-            {{ store.findDomaine(d)?.nom ?? d }}
+            {{ store.findDomain(d)?.name ?? d }}
           </RouterLink>
         </div>
-        <MarkdownRendu class="md" :texte="fonctionnalite.description" />
+        <RenderedMarkdown class="md" :text="feature.description" />
       </header>
 
       <h2 class="section">Règles de gestion</h2>
       <div class="liste">
         <RouterLink
-          v-for="r in regles"
+          v-for="r in rules"
           :key="r.id"
           class="ligne"
-          :class="{ abrogee: r.statut === 'abroge' }"
-          :to="liens.chemin('referentiel', 'regle', r.id)"
+          :class="{ abrogee: r.status === 'abroge' }"
+          :to="links.path('referentiel', 'regle', r.id)"
         >
           <div class="principal">
             <span class="rid">{{ r.id }}</span>
-            <span class="extrait">{{ buildExtrait(r.enonce) }}</span>
+            <span class="extrait">{{ buildExcerpt(r.statement) }}</span>
           </div>
-          <span v-if="r.statut === 'abroge'" class="marque-abrogee"
+          <span v-if="r.status === 'abroge'" class="marque-abrogee"
             >abrogée</span
           >
         </RouterLink>
-        <p v-if="!regles.length" class="vide">
+        <p v-if="!rules.length" class="vide">
           Aucune règle rattachée à cette fonctionnalité.
         </p>
       </div>
 
-      <PistesSection :id="id" :key="id" collection="features" />
+      <RoadmapItemsSection :id="id" :key="id" collection="features" />
     </template>
     <p v-else class="vide">Fonctionnalité introuvable : {{ id }}</p>
   </div>

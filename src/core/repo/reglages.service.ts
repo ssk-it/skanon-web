@@ -1,15 +1,15 @@
 import { inject } from "../injection";
 import { GithubClient, GithubError } from "../github/github-client";
-import { ReferentielStore } from "./referentiel.store";
-import { ReglagesEditables, ecrireReglages } from "./config-ecriture";
+import { SpecificationStore } from "./referentiel.store";
+import { EditableSettings, writeSettings } from "./config-ecriture";
 
-export const NOM_CONFIG = "ssk-canon.yml";
+export const CONFIG_NAME = "ssk-canon.yml";
 
 /** Branche portant une modification des réglages, distincte de tout cadrage. */
-const BRANCHE_REGLAGES = "reglages";
+const SETTINGS_BRANCH = "reglages";
 
-export interface ReglagesProposes {
-  readonly branche: string;
+export interface ProposedSettings {
+  readonly branch: string;
   readonly pullRequest: number;
   readonly url: string;
 }
@@ -22,9 +22,9 @@ export interface ReglagesProposes {
  * la branche principale contournerait la relecture — pour un fichier qui décide
  * du comportement de l'outil pour tout le monde.
  */
-export class ReglagesService {
+export class SettingsService {
   private readonly github = inject(GithubClient);
-  private readonly store = inject(ReferentielStore);
+  private readonly store = inject(SpecificationStore);
 
   /**
    * Propose une modification des réglages.
@@ -33,52 +33,50 @@ export class ReglagesService {
    * successives avant relecture appartiennent à la même proposition, et ouvrir
    * une seconde demande obligerait à en fermer une.
    */
-  async proposerReglages(
-    reglages: ReglagesEditables,
-  ): Promise<ReglagesProposes> {
-    const depot = this.store.depot();
-    const base = (await this.github.loadDepot(depot)).defaultBranch;
+  async proposeSettings(settings: EditableSettings): Promise<ProposedSettings> {
+    const repoRef = this.store.repoRef();
+    const base = (await this.github.loadRepo(repoRef)).defaultBranch;
 
-    const branche = BRANCHE_REGLAGES;
-    const dejaOuverte = (
-      await this.github.listBranches(depot, branche)
-    ).includes(branche);
+    const branch = SETTINGS_BRANCH;
+    const alreadyOpen = (
+      await this.github.listBranches(repoRef, branch)
+    ).includes(branch);
 
-    if (!dejaOuverte) {
-      const depuis = await this.github.shaDeBranche(depot, base);
+    if (!alreadyOpen) {
+      const from = await this.github.branchSha(repoRef, base);
       try {
-        await this.github.createBranche(depot, branche, depuis);
+        await this.github.createBranch(repoRef, branch, from);
       } catch (e) {
         // Une branche déjà là n'est pas un échec — elle porte une proposition en
         // cours. Tout le reste l'est, et le taire ferait échouer la lecture
         // suivante sur une branche absente, loin de la cause.
-        if (e instanceof GithubError && e.statut !== 422) throw e;
+        if (e instanceof GithubError && e.status !== 422) throw e;
       }
     }
 
     // Lu depuis la branche des réglages, non depuis la principale : une
     // proposition en cours doit se compléter, pas s'écraser.
-    const { contenu, sha } = await this.github.loadFichierEditable(
-      depot,
-      NOM_CONFIG,
-      branche,
+    const { content, sha } = await this.github.loadEditableFile(
+      repoRef,
+      CONFIG_NAME,
+      branch,
     );
 
-    await this.github.commitFichier(
-      depot,
-      branche,
-      NOM_CONFIG,
-      ecrireReglages(contenu, reglages),
+    await this.github.commitFile(
+      repoRef,
+      branch,
+      CONFIG_NAME,
+      writeSettings(content, settings),
       "Modifie les réglages du projet",
       sha,
     );
 
-    const ouverte = await this.github.findPullRequestDeBranche(depot, branche);
+    const open = await this.github.findPullRequestForBranch(repoRef, branch);
     const pullRequest =
-      ouverte?.numero ??
+      open?.number ??
       (await this.github.createPullRequest(
-        depot,
-        branche,
+        repoRef,
+        branch,
         base,
         "Modifie les réglages du projet",
         "Mode d’accès, protection du jeton et dépôts de code du projet.\n\nCes réglages valent " +
@@ -86,9 +84,9 @@ export class ReglagesService {
       ));
 
     return {
-      branche,
+      branch,
       pullRequest,
-      url: `https://github.com/${depot.owner}/${depot.repo}/pull/${pullRequest}`,
+      url: `https://github.com/${repoRef.owner}/${repoRef.repo}/pull/${pullRequest}`,
     };
   }
 }

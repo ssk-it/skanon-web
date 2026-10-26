@@ -7,38 +7,38 @@
  * Comme chez Material, la ligne d'indication ne réserve que 16 px, et une indication longue déborde sur ce qui suit : d'où la marge de 10 px sous chaque champ, que `styles.scss` de SSK Canon posait sur `.mat-mdc-form-field`.
  */
 defineProps<{
-  libelle?: string;
+  label?: string;
   /** L'identifiant du contrôle, pour que le libellé le désigne. */
-  idControle: string;
-  flotte: boolean;
+  controlId: string;
+  floating: boolean;
   focus: boolean;
-  erreur?: string | null;
-  indice?: string | null;
-  desactive?: boolean;
+  error?: string | null;
+  hint?: string | null;
+  disabled?: boolean;
 }>();
 
-defineEmits<{ activer: [] }>();
+defineEmits<{ activate: [] }>();
 </script>
 
 <template>
   <div
     class="ui-champ"
     :class="{
-      'ui-champ--flotte': flotte,
+      'ui-champ--flotte': floating,
       'ui-champ--focus': focus,
-      'ui-champ--erreur': !!erreur,
-      'ui-champ--desactive': desactive,
-      'ui-champ--sans-libelle': !libelle,
+      'ui-champ--erreur': !!error,
+      'ui-champ--desactive': disabled,
+      'ui-champ--sans-libelle': !label,
     }"
   >
-    <div class="ui-champ__boite" @click="$emit('activer')">
+    <div class="ui-champ__boite" @click="$emit('activate')">
       <fieldset class="ui-champ__contour" aria-hidden="true">
-        <legend v-if="libelle">
-          <span>{{ libelle }}</span>
+        <legend v-if="label">
+          <span>{{ label }}</span>
         </legend>
       </fieldset>
-      <label v-if="libelle" class="ui-champ__libelle" :for="idControle">{{
-        libelle
+      <label v-if="label" class="ui-champ__libelle" :for="controlId">{{
+        label
       }}</label>
       <div class="ui-champ__controle">
         <slot />
@@ -46,11 +46,11 @@ defineEmits<{ activer: [] }>();
     </div>
     <div class="ui-champ__sous">
       <div class="ui-champ__indices">
-        <span v-if="erreur" class="ui-champ__erreur" role="alert">{{
-          erreur
+        <span v-if="error" class="ui-champ__erreur" role="alert">{{
+          error
         }}</span>
         <slot v-else name="indice">
-          <span v-if="indice" class="ui-champ__indice">{{ indice }}</span>
+          <span v-if="hint" class="ui-champ__indice">{{ hint }}</span>
         </slot>
       </div>
     </div>

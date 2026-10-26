@@ -4,55 +4,55 @@ import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { inject } from "../../core/injection";
 import {
-  TAGS_LIENS_PAR_DEFAUT,
-  type ModeAcces,
-  type ProtectionDuJeton,
-  type Referentiel,
+  DEFAULT_LINK_TAGS,
+  type AccessMode,
+  type TokenProtection,
+  type Specification,
 } from "../../core/model/model";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { ReglagesService } from "../../core/repo/reglages.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { SettingsService } from "../../core/repo/reglages.service";
 import { RepoConfig } from "../../core/repo/repo-config";
-import { createRouteur } from "../../routeur";
-import ReglagesPage from "./ReglagesPage.vue";
+import { createAppRouter } from "../../routeur";
+import SettingsPage from "./ReglagesPage.vue";
 
-function referentiel(
-  protectionDuJeton: ProtectionDuJeton,
-  acces: ModeAcces = "jeton_personnel",
-): Referentiel {
+function specification(
+  tokenProtection: TokenProtection,
+  access: AccessMode = "jeton_personnel",
+): Specification {
   return {
-    projet: { nom: "Test", description: "", depotsCode: [], prefixe: null },
-    reglages: {
-      acces,
-      identite:
-        acces === "identite_tierce"
-          ? { emetteur: "https://e", client: "c", echange: "https://x" }
+    project: { name: "Test", description: "", codeRepos: [], prefix: null },
+    settings: {
+      access,
+      identity:
+        access === "identite_tierce"
+          ? { issuer: "https://e", client: "c", exchange: "https://x" }
           : null,
-      protectionDuJeton,
-      tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+      tokenProtection,
+      linkTags: DEFAULT_LINK_TAGS,
     },
-    domaines: new Map(),
-    fonctionnalites: new Map(),
-    regles: new Map(),
+    domains: new Map(),
+    features: new Map(),
+    rules: new Map(),
     decisions: new Map(),
     architecture: new Map(),
-    cadrages: new Map(),
+    scopings: new Map(),
     anomalies: [],
   };
 }
 
-async function monter(
-  protection: ProtectionDuJeton = "proposee",
-  acces: ModeAcces = "jeton_personnel",
+async function mountView(
+  protection: TokenProtection = "proposee",
+  access: AccessMode = "jeton_personnel",
 ) {
-  const store = inject(ReferentielStore);
-  store.referentiel.set(referentiel(protection, acces));
-  store.etat.set("pret");
-  const routeur = createRouteur(createMemoryHistory());
-  await routeur.push("/org/depot/reglages");
-  await routeur.isReady();
-  const vue = mount(ReglagesPage, { global: { plugins: [routeur] } });
+  const store = inject(SpecificationStore);
+  store.specification.set(specification(protection, access));
+  store.state.set("pret");
+  const router = createAppRouter(createMemoryHistory());
+  await router.push("/org/depot/reglages");
+  await router.isReady();
+  const view = mount(SettingsPage, { global: { plugins: [router] } });
   await flushPromises();
-  return vue;
+  return view;
 }
 
 /**
@@ -61,71 +61,71 @@ async function monter(
 describe("Réglages : la protection du jeton", () => {
   beforeEach(() => {
     provideHttpTesting();
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
-  const section = (vue: Awaited<ReturnType<typeof monter>>) =>
-    vue.find(".protection-du-jeton");
+  const section = (view: Awaited<ReturnType<typeof mountView>>) =>
+    view.find(".protection-du-jeton");
 
-  const choix = (vue: Awaited<ReturnType<typeof monter>>, valeur: string) =>
-    section(vue).find(`input[type=radio][value=${valeur}]`);
+  const choice = (view: Awaited<ReturnType<typeof mountView>>, value: string) =>
+    section(view).find(`input[type=radio][value=${value}]`);
 
   it("propose la passkey par défaut, sans l’exiger", async () => {
-    const vue = await monter();
-    expect((choix(vue, "proposee").element as HTMLInputElement).checked).toBe(
+    const view = await mountView();
+    expect((choice(view, "proposee").element as HTMLInputElement).checked).toBe(
       true,
     );
-    expect((choix(vue, "exigee").element as HTMLInputElement).checked).toBe(
+    expect((choice(view, "exigee").element as HTMLInputElement).checked).toBe(
       false,
     );
   });
 
   it("montre l’exigence que le projet déclare", async () => {
-    const vue = await monter("exigee");
-    expect((choix(vue, "exigee").element as HTMLInputElement).checked).toBe(
+    const view = await mountView("exigee");
+    expect((choice(view, "exigee").element as HTMLInputElement).checked).toBe(
       true,
     );
   });
 
   it("décrit chaque façon de garder le jeton, ce qu’elle protège et ce qu’elle laisse", async () => {
-    const texte = section(await monter()).text();
-    expect(texte).toContain("En clair, dans le navigateur");
-    expect(texte).toContain("Sous passkey, dans le navigateur");
-    expect(texte).toContain("Dans le coffre du système");
-    expect(texte).toContain("Pour la session seulement");
+    const text = section(await mountView()).text();
+    expect(text).toContain("En clair, dans le navigateur");
+    expect(text).toContain("Sous passkey, dans le navigateur");
+    expect(text).toContain("Dans le coffre du système");
+    expect(text).toContain("Pour la session seulement");
     // ce qui ne change pas, quelle que soit la forme
-    expect(texte).toContain("script");
-    expect(texte).toContain("révocation");
+    expect(text).toContain("script");
+    expect(text).toContain("révocation");
   });
 
   it("dit que l’exigence est celle de l’application, non de GitHub", async () => {
-    const texte = section(await monter()).text();
-    expect(texte).toContain("non de GitHub");
-    expect(texte).toContain("durée de vie");
+    const text = section(await mountView()).text();
+    expect(text).toContain("non de GitHub");
+    expect(text).toContain("durée de vie");
   });
 
   it("propose l’exigence par une demande de fusion", async () => {
-    const proposer = vi
-      .spyOn(inject(ReglagesService), "proposerReglages")
+    const proposed = vi
+      .spyOn(inject(SettingsService), "proposeSettings")
       .mockResolvedValue({
-        branche: "reglages",
+        branch: "reglages",
         pullRequest: 7,
         url: "https://github.com/org/depot/pull/7",
       });
-    const vue = await monter();
-    await choix(vue, "exigee").setValue(true);
-    await vue
+    const view = await mountView();
+    await choice(view, "exigee").setValue(true);
+    await view
       .findAll("button")
       .find((b) => b.text() === "Proposer ces réglages")!
       .trigger("click");
     await flushPromises();
-    expect(proposer).toHaveBeenCalledWith(
-      expect.objectContaining({ protectionDuJeton: "exigee" }),
+    expect(proposed).toHaveBeenCalledWith(
+      expect.objectContaining({ tokenProtection: "exigee" }),
     );
   });
 
   it("ne se montre pas sous une identité tierce, dont l’accès ne dure que la session", async () => {
-    const vue = await monter("proposee", "identite_tierce");
-    expect(section(vue).exists()).toBe(false);
+    const view = await mountView("proposee", "identite_tierce");
+    expect(section(view).exists()).toBe(false);
   });
 });

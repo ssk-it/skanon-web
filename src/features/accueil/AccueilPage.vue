@@ -1,78 +1,76 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import type { RefDepot } from "../../core/github/github-client";
+import type { RepoRef } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
 import {
-  DepotsConnusService,
-  groupDepotsByOrganisation,
+  KnownReposService,
+  groupReposByOrganization,
 } from "../../core/repo/depots-connus.service";
-import { IdentitesService } from "../../core/repo/identites.service";
+import { ProjectIdentityService } from "../../core/repo/identites.service";
 import { RepoConfig } from "../../core/repo/repo-config";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiChamp from "../../ui/UiChamp.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import UiButton from "../../ui/UiBouton.vue";
+import UiTextField from "../../ui/UiChamp.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 import UiSpinner from "../../ui/UiSpinner.vue";
-import AideJeton from "../shared/AideJeton.vue";
-import AvatarOrganisation from "../shared/AvatarOrganisation.vue";
-import { ouvrirConnexion } from "../shared/ouvrir-connexion";
-import SymboleProjet from "../shared/SymboleProjet.vue";
+import TokenHelp from "../shared/AideJeton.vue";
+import OrganizationAvatar from "../shared/AvatarOrganisation.vue";
+import { openSignIn } from "../shared/ouvrir-connexion";
+import ProjectSymbol from "../shared/SymboleProjet.vue";
 
 /**
  * Le seuil de l'application : choisir le projet avant d'y entrer.
  *
  * Aucun dépôt n'est ouvert d'office. Chaque vue vit sous l'adresse de son projet, et entrer par la racine sans avoir choisi afficherait un référentiel dont rien ne dirait lequel c'est.
  */
-const connus = inject(DepotsConnusService);
+const known = inject(KnownReposService);
 const tokens = inject(TokenService);
 const config = inject(RepoConfig);
 const router = useRouter();
 
-const saisie = ref("");
-const erreur = ref<string | null>(null);
+const input = ref("");
+const error = ref<string | null>(null);
 
-const cadres = computed(() =>
-  groupDepotsByOrganisation(connus.depots().filter((d) => d.cadre || d.recent)),
+const framedRepos = computed(() =>
+  groupReposByOrganization(known.repos().filter((d) => d.framed || d.recent)),
 );
-const autres = computed(() =>
-  groupDepotsByOrganisation(
-    connus.depots().filter((d) => !d.cadre && !d.recent),
-  ),
+const others = computed(() =>
+  groupReposByOrganization(known.repos().filter((d) => !d.framed && !d.recent)),
 );
-const nombreAutres = computed(() =>
-  autres.value.reduce((total, g) => total + g.depots.length, 0),
+const otherCount = computed(() =>
+  others.value.reduce((total, g) => total + g.repos.length, 0),
 );
 
-void connus.rafraichir();
+void known.refresh();
 // Revenir à l'accueil redemande chaque identité, sous condition : c'est là qu'on cherche le projet à ouvrir.
-inject(IdentitesService).relire();
+inject(ProjectIdentityService).reread();
 
-function ouvrir(depot: RefDepot): void {
+function open(repoRef: RepoRef): void {
   void router.push(
-    `/${encodeURIComponent(depot.owner)}/${encodeURIComponent(depot.repo)}/referentiel`,
+    `/${encodeURIComponent(repoRef.owner)}/${encodeURIComponent(repoRef.repo)}/referentiel`,
   );
 }
 
-function oublier(depot: RefDepot): void {
-  config.oublier(depot);
-  void connus.rafraichir();
+function forget(repoRef: RepoRef): void {
+  config.forget(repoRef);
+  void known.refresh();
 }
 
 /** Un accès enregistré change les dépôts autorisés : la liste se relit. */
-function connecter(): void {
-  void ouvrirConnexion().then((change) => {
-    if (change) void connus.rafraichir();
+function signIn(): void {
+  void openSignIn().then((change) => {
+    if (change) void known.refresh();
   });
 }
 
-function validateDepot(): void {
-  const depot = RepoConfig.parseDepot(saisie.value);
-  if (!depot) {
-    erreur.value = "Format attendu : organisation/depot";
+function validateRepo(): void {
+  const repoRef = RepoConfig.parseRepo(input.value);
+  if (!repoRef) {
+    error.value = "Format attendu : organisation/depot";
     return;
   }
-  ouvrir(depot);
+  open(repoRef);
 }
 </script>
 
@@ -86,66 +84,72 @@ function validateDepot(): void {
       </p>
     </header>
 
-    <div v-if="cadres.length" class="cadres groupes">
+    <div v-if="framedRepos.length" class="cadres groupes">
       <section
-        v-for="g of cadres"
-        :key="g.organisation"
+        v-for="g of framedRepos"
+        :key="g.organization"
         class="organisation"
-        :class="{ etendue: g.depots.length > 8 }"
+        :class="{ etendue: g.repos.length > 8 }"
       >
         <h2>
-          <AvatarOrganisation :owner="g.organisation" :taille="20" />
-          <span>{{ g.organisation }}</span>
+          <OrganizationAvatar :owner="g.organization" :size="20" />
+          <span>{{ g.organization }}</span>
         </h2>
         <ul class="depots">
-          <li v-for="d of g.depots" :key="d.depot.repo">
-            <button type="button" class="depot" @click="ouvrir(d.depot)">
-              <SymboleProjet :depot="d.depot" :taille="20" repli="folder" />
-              <span class="nom" :title="d.depot.repo">{{ d.depot.repo }}</span>
+          <li v-for="d of g.repos" :key="d.repoRef.repo">
+            <button type="button" class="depot" @click="open(d.repoRef)">
+              <ProjectSymbol
+                :repo-ref="d.repoRef"
+                :size="20"
+                fallback="folder"
+              />
+              <span class="nom" :title="d.repoRef.repo">{{
+                d.repoRef.repo
+              }}</span>
               <span v-if="d.recent" class="marque">déjà ouvert</span>
             </button>
-            <UiBouton
+            <UiButton
               v-if="d.recent"
               class="oublier"
-              variante="icon"
+              variant="icon"
               aria-label="Retirer de la liste"
-              @click="oublier(d.depot)"
+              @click="forget(d.repoRef)"
             >
-              <UiIcone nom="close" />
-            </UiBouton>
+              <UiIcon name="close" />
+            </UiButton>
           </li>
         </ul>
       </section>
     </div>
 
-    <p v-if="connus.enCours()" class="attente">
-      <UiSpinner :diametre="16" />
+    <p v-if="known.inProgress()" class="attente">
+      <UiSpinner :diameter="16" />
       <span>Recherche des dépôts autorisés…</span>
     </p>
 
-    <p v-if="connus.erreur()" class="echec">
-      <UiIcone nom="error_outline" /> <span>{{ connus.erreur() }}</span>
+    <p v-if="known.error()" class="echec">
+      <UiIcon name="error_outline" /> <span>{{ known.error() }}</span>
     </p>
 
-    <details v-if="autres.length" class="autres">
-      <summary>Autres dépôts autorisés ({{ nombreAutres }})</summary>
+    <details v-if="others.length" class="autres">
+      <summary>Autres dépôts autorisés ({{ otherCount }})</summary>
       <div class="groupes">
         <section
-          v-for="g of autres"
-          :key="g.organisation"
+          v-for="g of others"
+          :key="g.organization"
           class="organisation"
-          :class="{ etendue: g.depots.length > 8 }"
+          :class="{ etendue: g.repos.length > 8 }"
         >
           <h2>
-            <AvatarOrganisation :owner="g.organisation" :taille="20" />
-            <span>{{ g.organisation }}</span>
+            <OrganizationAvatar :owner="g.organization" :size="20" />
+            <span>{{ g.organization }}</span>
           </h2>
           <ul class="depots">
-            <li v-for="d of g.depots" :key="d.depot.repo">
-              <button type="button" class="depot" @click="ouvrir(d.depot)">
-                <UiIcone nom="folder_open" />
-                <span class="nom" :title="d.depot.repo">{{
-                  d.depot.repo
+            <li v-for="d of g.repos" :key="d.repoRef.repo">
+              <button type="button" class="depot" @click="open(d.repoRef)">
+                <UiIcon name="folder_open" />
+                <span class="nom" :title="d.repoRef.repo">{{
+                  d.repoRef.repo
                 }}</span>
               </button>
             </li>
@@ -158,21 +162,21 @@ function validateDepot(): void {
       </p>
     </details>
 
-    <form class="saisie" @submit.prevent="validateDepot()">
-      <UiChamp
-        v-model="saisie"
-        libelle="Ou saisir un dépôt"
+    <form class="saisie" @submit.prevent="validateRepo()">
+      <UiTextField
+        v-model="input"
+        label="Ou saisir un dépôt"
         name="depot"
         placeholder="organisation/depot"
         autocomplete="off"
-        :erreur="erreur"
-        indice="Un nom court, ou une URL GitHub complète"
+        :error="error"
+        hint="Un nom court, ou une URL GitHub complète"
       />
-      <UiBouton variante="filled" type="submit">Ouvrir</UiBouton>
+      <UiButton variant="filled" type="submit">Ouvrir</UiButton>
     </form>
 
     <!-- RG-connexion-optionnelle, RG-modes-acces : l'aide se propose, sous la liste, sans se poser en préalable — un dépôt public se lit sans jeton, et un projet en identité tierce n'en demande aucun. -->
-    <section v-if="tokens.aucunAcces()" class="connexion">
+    <section v-if="tokens.noAccess()" class="connexion">
       <h2>Connexion à GitHub, facultative</h2>
       <p class="aide">
         Les dépôts publics se lisent sans connexion. Un jeton personnel ouvre
@@ -181,11 +185,11 @@ function validateDepot(): void {
         les identités auprès de son propre fournisseur n’en demande aucun : sa
         connexion se propose une fois le projet ouvert.
       </p>
-      <UiBouton variante="outlined" @click="connecter()">
-        <UiIcone nom="key" />
+      <UiButton variant="outlined" @click="signIn()">
+        <UiIcon name="key" />
         Saisir un jeton
-      </UiBouton>
-      <AideJeton coller-ou="par « Saisir un jeton », ci-dessus" />
+      </UiButton>
+      <TokenHelp paste-where="par « Saisir un jeton », ci-dessus" />
     </section>
   </div>
 </template>

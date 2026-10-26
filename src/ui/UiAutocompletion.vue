@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useAttrs, useId } from "vue";
-import UiChamp from "./UiChamp.vue";
-import UiListeOptions from "./UiListeOptions.vue";
-import { placerSous, useSuperposition, type Position } from "./superposition";
+import UiTextField from "./UiChamp.vue";
+import UiOptionList from "./UiListeOptions.vue";
+import { placeBelow, useOverlay, type Position } from "./superposition";
 
 /**
  * Un champ de saisie qui propose des valeurs : `matInput` et son `mat-autocomplete`.
@@ -15,145 +15,140 @@ import { placerSous, useSuperposition, type Position } from "./superposition";
  */
 defineOptions({ inheritAttrs: false });
 
-const modele = defineModel<string>({ default: "" });
+const model = defineModel<string>({ default: "" });
 
 const props = defineProps<{
   options: readonly string[];
-  libelle?: string;
+  label?: string;
   placeholder?: string;
-  indice?: string | null;
-  erreur?: string | null;
+  hint?: string | null;
+  error?: string | null;
   disabled?: boolean;
 }>();
 
 const attrs = useAttrs();
 const id = useId();
-const idListe = `${id}-liste`;
-const champ = ref<InstanceType<typeof UiChamp> | null>(null);
-const liste = ref<InstanceType<typeof UiListeOptions> | null>(null);
+const listId = `${id}-liste`;
+const field = ref<InstanceType<typeof UiTextField> | null>(null);
+const list = ref<InstanceType<typeof UiOptionList> | null>(null);
 
-const ouvert = ref(false);
-const actif = ref(-1);
+const opened = ref(false);
+const active = ref(-1);
 const position = ref<Position>({ top: "0px", left: "0px" });
 
-const visible = computed(() => ouvert.value && props.options.length > 0);
-const optionsAffichees = computed(() =>
-  props.options.map((libelle) => ({ libelle })),
+const visible = computed(() => opened.value && props.options.length > 0);
+const shownOptions = computed(() =>
+  props.options.map((label) => ({ label: label })),
 );
 
-function boite(): HTMLElement | null {
-  return champ.value?.element?.closest(".ui-champ__boite") ?? null;
+function box(): HTMLElement | null {
+  return field.value?.element?.closest(".ui-champ__boite") ?? null;
 }
 
-function replacer(): void {
-  const ancre = boite()?.getBoundingClientRect();
-  if (!ancre) return;
-  const panneau = liste.value?.element?.getBoundingClientRect();
-  position.value = placerSous(
-    ancre,
-    { width: panneau?.width ?? 0, height: panneau?.height ?? 0 },
-    { largeurAncre: true },
+function reposition(): void {
+  const anchor = box()?.getBoundingClientRect();
+  if (!anchor) return;
+  const panel = list.value?.element?.getBoundingClientRect();
+  position.value = placeBelow(
+    anchor,
+    { width: panel?.width ?? 0, height: panel?.height ?? 0 },
+    { anchorWidth: true },
   );
 }
 
-async function ouvrir(): Promise<void> {
+async function open(): Promise<void> {
   if (props.disabled) return;
-  if (!ouvert.value) actif.value = -1;
-  ouvert.value = true;
-  replacer();
+  if (!opened.value) active.value = -1;
+  opened.value = true;
+  reposition();
   await nextTick();
-  replacer();
+  reposition();
 }
 
-function fermer(): void {
-  ouvert.value = false;
-  actif.value = -1;
+function close(): void {
+  opened.value = false;
+  active.value = -1;
 }
 
-function choisir(i: number): void {
-  const valeur = props.options[i];
-  if (valeur !== undefined) modele.value = valeur;
-  fermer();
+function choose(i: number): void {
+  const value = props.options[i];
+  if (value !== undefined) model.value = value;
+  close();
 }
 
-useSuperposition(
-  ouvert,
-  () => [boite(), liste.value?.element],
-  fermer,
-  replacer,
-);
+useOverlay(opened, () => [box(), list.value?.element], close, reposition);
 
-function surTouche(e: KeyboardEvent): void {
+function onKey(e: KeyboardEvent): void {
   const total = props.options.length;
   switch (e.key) {
     case "ArrowDown":
       e.preventDefault();
-      if (!visible.value) void ouvrir();
-      else if (total) actif.value = (actif.value + 1) % total;
+      if (!visible.value) void open();
+      else if (total) active.value = (active.value + 1) % total;
       break;
     case "ArrowUp":
       e.preventDefault();
-      if (!visible.value) void ouvrir();
+      if (!visible.value) void open();
       else if (total)
-        actif.value = actif.value <= 0 ? total - 1 : actif.value - 1;
+        active.value = active.value <= 0 ? total - 1 : active.value - 1;
       break;
     case "Enter":
-      if (visible.value && actif.value >= 0) {
+      if (visible.value && active.value >= 0) {
         e.preventDefault();
-        choisir(actif.value);
+        choose(active.value);
       }
       break;
     case "Escape":
       if (visible.value) {
         e.preventDefault();
         e.stopPropagation();
-        fermer();
+        close();
       }
       break;
     case "Tab":
-      fermer();
+      close();
       break;
   }
 }
 
-function surSaisie(): void {
-  actif.value = -1;
-  void ouvrir();
+function onInput(): void {
+  active.value = -1;
+  void open();
 }
 </script>
 
 <template>
-  <UiChamp
-    ref="champ"
-    v-model="modele"
+  <UiTextField
+    ref="field"
+    v-model="model"
     v-bind="attrs"
-    :libelle="libelle"
+    :label="label"
     :placeholder="placeholder"
-    :indice="indice"
-    :erreur="erreur"
+    :hint="hint"
+    :error="error"
     :disabled="disabled"
     role="combobox"
     aria-autocomplete="list"
     :aria-expanded="visible"
-    :aria-controls="visible ? idListe : undefined"
+    :aria-controls="visible ? listId : undefined"
     :aria-activedescendant="
-      visible && actif >= 0 ? `${idListe}-${actif}` : undefined
+      visible && active >= 0 ? `${listId}-${active}` : undefined
     "
-    @focus="ouvrir"
-    @input="surSaisie"
-    @keydown="surTouche"
+    @focus="open"
+    @input="onInput"
+    @keydown="onKey"
   >
     <template v-if="$slots.indice" #indice><slot name="indice" /></template>
-    <UiListeOptions
+    <UiOptionList
       v-if="visible"
-      :id="idListe"
-      ref="liste"
-      :options="optionsAffichees"
-      :actif="actif"
+      :id="listId"
+      ref="list"
+      :options="shownOptions"
+      :active="active"
       :position="position"
-      :libelle="libelle"
-      @choisir="choisir"
-      @survoler="actif = $event"
+      :label="label"
+      @choose="choose"
+      @hover="active = $event"
     />
-  </UiChamp>
+  </UiTextField>
 </template>

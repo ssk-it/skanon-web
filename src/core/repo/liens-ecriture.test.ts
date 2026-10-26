@@ -1,41 +1,41 @@
 import { describe, expect, it } from "vitest";
 import {
-  serializeCadrage,
-  CadrageEditable,
-  avecLien,
-  avecLienModifie,
-  sansLien,
+  serializeScoping,
+  EditableScoping,
+  withLink,
+  withLinkModified,
+  withoutLink,
 } from "./redaction.service";
-import { parseTagsLiens } from "./repo-loader";
-import { splitFrontmatter, estIllisible } from "./frontmatter";
+import { parseLinkTags } from "./repo-loader";
+import { splitFrontmatter, isUnreadable } from "./frontmatter";
 import {
-  LienExterne,
-  LIBELLE_TAG_LIEN,
-  TAGS_LIENS_PAR_DEFAUT,
+  ExternalLink,
+  LINK_TAG_LABEL,
+  DEFAULT_LINK_TAGS,
 } from "../model/model";
-import { normaliserTag } from "./tag-lien";
-import { unionTagsLiens } from "./referentiel.store";
-import { Cadrage } from "../model/model";
+import { normalizeTag } from "./tag-lien";
+import { unionLinkTags } from "./referentiel.store";
+import { Scoping } from "../model/model";
 
 /** Relit ce qui vient d'être écrit, en échouant clairement s'il est illisible. */
-function relireLiens(texte: string): LienExterne[] {
-  const parse = splitFrontmatter(texte);
+function rereadLinks(text: string): ExternalLink[] {
+  const parse = splitFrontmatter(text);
   if (parse === null) throw new Error("aucun frontmatter produit");
-  if (estIllisible(parse))
-    throw new Error(`frontmatter illisible : ${parse.erreur}`);
-  const brut = (parse.data as Record<string, unknown>)["liens"];
-  return ((brut as Array<Record<string, unknown>>) ?? []).map((l) => ({
+  if (isUnreadable(parse))
+    throw new Error(`frontmatter illisible : ${parse.error}`);
+  const raw = (parse.data as Record<string, unknown>)["liens"];
+  return ((raw as Array<Record<string, unknown>>) ?? []).map((l) => ({
     tag: String(l["tag"] ?? ""),
     url: String(l["url"] ?? ""),
-    nom: String(l["nom"] ?? ""),
+    name: String(l["nom"] ?? ""),
   }));
 }
 
-const base: CadrageEditable = {
-  titre: "Un cadrage quelconque",
-  domaines: ["referentiel"],
-  objectif: "Ce qu’il vise.",
-  parcours: "Comment on y arrive.",
+const base: EditableScoping = {
+  title: "Un cadrage quelconque",
+  domains: ["referentiel"],
+  goal: "Ce qu’il vise.",
+  journey: "Comment on y arrive.",
   impacts: [],
 };
 
@@ -45,32 +45,32 @@ const base: CadrageEditable = {
  */
 describe("écriture des liens externes", () => {
   it("rend un lien tel qu’il a été saisi", () => {
-    const lien = {
+    const link = {
       tag: "issue_github",
-      nom: "Migration du stockage",
+      name: "Migration du stockage",
       url: "https://github.com/ssk-it/ssk-canon/issues/12",
     };
     expect(
-      relireLiens(serializeCadrage("2026-001", { ...base, liens: [lien] })),
-    ).toEqual([lien]);
+      rereadLinks(serializeScoping("2026-001", { ...base, links: [link] })),
+    ).toEqual([link]);
   });
 
   it("échappe un nom que YAML lirait de travers", () => {
     // Un « : » suivi d'une espace ferait du nom une clé, et le lien deviendrait
     // illisible — un titre en porte presque toujours un.
-    const lien = {
+    const link = {
       tag: "document",
-      nom: "Stockage : ce qu’on retient",
+      name: "Stockage : ce qu’on retient",
       url: "https://example.org/n",
     };
     expect(
-      relireLiens(serializeCadrage("2026-001", { ...base, liens: [lien] })),
-    ).toEqual([lien]);
+      rereadLinks(serializeScoping("2026-001", { ...base, links: [link] })),
+    ).toEqual([link]);
   });
 
   it("rend une liste vide quand le cadrage ne porte aucun lien", () => {
     expect(
-      relireLiens(serializeCadrage("2026-001", { ...base, liens: [] })),
+      rereadLinks(serializeScoping("2026-001", { ...base, links: [] })),
     ).toEqual([]);
   });
 
@@ -79,20 +79,24 @@ describe("écriture des liens externes", () => {
    * relus les perdrait en silence, et rien dans l'écran ne le dirait.
    */
   it("conserve les liens existants au fil des réécritures", () => {
-    const liens = [
-      { tag: "carte_trello", nom: "La carte", url: "https://trello.com/c/abc" },
+    const links = [
+      {
+        tag: "carte_trello",
+        name: "La carte",
+        url: "https://trello.com/c/abc",
+      },
       {
         tag: "maquette",
-        nom: "L’écran de saisie",
+        name: "L’écran de saisie",
         url: "https://figma.com/f/1",
       },
     ];
-    const premier = serializeCadrage("2026-001", { ...base, liens });
-    const second = serializeCadrage("2026-001", {
+    const first = serializeScoping("2026-001", { ...base, links });
+    const second = serializeScoping("2026-001", {
       ...base,
-      liens: relireLiens(premier),
+      links: rereadLinks(first),
     });
-    expect(second).toBe(premier);
+    expect(second).toBe(first);
   });
 
   /**
@@ -101,28 +105,28 @@ describe("écriture des liens externes", () => {
    * là où personne n'a rien touché — le bruit qui décrédibilise une revue.
    */
   it("écrit un lien sous la forme qu’a le référentiel", () => {
-    const texte = serializeCadrage("2026-001", {
+    const text = serializeScoping("2026-001", {
       ...base,
-      liens: [
+      links: [
         {
           tag: "issue_github",
-          nom: "",
+          name: "",
           url: "https://github.com/ssk-it/ssk-canon",
         },
       ],
     });
-    expect(texte).toContain(
+    expect(text).toContain(
       "  - { tag: issue_github, url: 'https://github.com/ssk-it/ssk-canon' }",
     );
   });
 
   it("écarte un lien sans adresse : il ne mènerait nulle part", () => {
-    const liens = [
-      { tag: "document", nom: "Sans adresse", url: "" },
-      { tag: "document", nom: "Avec adresse", url: "https://example.org/d" },
+    const links = [
+      { tag: "document", name: "Sans adresse", url: "" },
+      { tag: "document", name: "Avec adresse", url: "https://example.org/d" },
     ];
     expect(
-      relireLiens(serializeCadrage("2026-001", { ...base, liens })).length,
+      rereadLinks(serializeScoping("2026-001", { ...base, links })).length,
     ).toBe(1);
   });
 
@@ -131,21 +135,21 @@ describe("écriture des liens externes", () => {
    * doit rendre un lien valide, que l'affichage nommera par son tag.
    */
   it("accepte un lien sans nom, écrit avant que le champ existe", () => {
-    const lien = {
+    const link = {
       tag: "issue_github",
-      nom: "",
+      name: "",
       url: "https://github.com/ssk-it/ssk-canon",
     };
-    const relu = relireLiens(
-      serializeCadrage("2026-001", { ...base, liens: [lien] }),
+    const reread = rereadLinks(
+      serializeScoping("2026-001", { ...base, links: [link] }),
     );
-    expect(relu).toEqual([lien]);
+    expect(reread).toEqual([link]);
   });
 });
 
 describe("natures de lien déclarées par le projet", () => {
   it("retient celles du fichier de configuration", () => {
-    expect(parseTagsLiens(["carte_trello", "ticket_jira"])).toEqual([
+    expect(parseLinkTags(["carte_trello", "ticket_jira"])).toEqual([
       "carte_trello",
       "ticket_jira",
     ]);
@@ -155,14 +159,14 @@ describe("natures de lien déclarées par le projet", () => {
   // doit se proposer d'emblée, sans quoi chacun la saisirait à sa façon
   // (cadrage 2026-058, RG-piste-etat-deduit).
   it("propose la nature piste par défaut, avec son libellé", () => {
-    expect(TAGS_LIENS_PAR_DEFAUT).toContain("piste");
-    expect(LIBELLE_TAG_LIEN["piste"]).toBe("Piste");
+    expect(DEFAULT_LINK_TAGS).toContain("piste");
+    expect(LINK_TAG_LABEL["piste"]).toBe("Piste");
   });
 
   // Sans repli, la saisie d'un lien n'offrirait aucun choix.
   it("rend celles par défaut quand le projet n’en déclare aucune", () => {
-    expect(parseTagsLiens(undefined)).toEqual(TAGS_LIENS_PAR_DEFAUT);
-    expect(parseTagsLiens([])).toEqual(TAGS_LIENS_PAR_DEFAUT);
+    expect(parseLinkTags(undefined)).toEqual(DEFAULT_LINK_TAGS);
+    expect(parseLinkTags([])).toEqual(DEFAULT_LINK_TAGS);
   });
 });
 
@@ -175,7 +179,7 @@ describe("natures de lien déclarées par le projet", () => {
  */
 describe("normalisation d’une nature saisie", () => {
   it("laisse une nature connue inchangée", () => {
-    for (const t of TAGS_LIENS_PAR_DEFAUT) expect(normaliserTag(t)).toBe(t);
+    for (const t of DEFAULT_LINK_TAGS) expect(normalizeTag(t)).toBe(t);
   });
 
   /**
@@ -187,49 +191,49 @@ describe("normalisation d’une nature saisie", () => {
    * différente de celle choisie, et rien ne le signalerait à la saisie.
    */
   it("ramène chaque libellé à la nature qu’il désigne", () => {
-    for (const [tag, libelle] of Object.entries(LIBELLE_TAG_LIEN)) {
-      expect(normaliserTag(libelle)).toBe(tag);
+    for (const [tag, label] of Object.entries(LINK_TAG_LABEL)) {
+      expect(normalizeTag(label)).toBe(tag);
     }
   });
 
   it("replie la casse, les accents et les séparateurs", () => {
-    expect(normaliserTag("Ticket Jira")).toBe("ticket_jira");
-    expect(normaliserTag("Spécification détaillée")).toBe(
+    expect(normalizeTag("Ticket Jira")).toBe("ticket_jira");
+    expect(normalizeTag("Spécification détaillée")).toBe(
       "specification_detaillee",
     );
-    expect(normaliserTag("note-de-cadrage")).toBe("note_de_cadrage");
-    expect(normaliserTag("  Maquette  ")).toBe("maquette");
+    expect(normalizeTag("note-de-cadrage")).toBe("note_de_cadrage");
+    expect(normalizeTag("  Maquette  ")).toBe("maquette");
   });
 
   // Le champ ne portant rien de retenable ne doit pas produire une nature vide
   // ni faite de soulignés : le lien s'écrirait avec une clé que rien ne nomme.
   it("ne rend rien quand il ne reste aucun caractère utile", () => {
-    expect(normaliserTag("   ")).toBe("");
-    expect(normaliserTag("—")).toBe("");
-    expect(normaliserTag("!?")).toBe("");
+    expect(normalizeTag("   ")).toBe("");
+    expect(normalizeTag("—")).toBe("");
+    expect(normalizeTag("!?")).toBe("");
   });
 });
 
 /** Un cadrage réduit à ce que l'union regarde : ses liens. */
-function cadrageAvecLiens(id: string, tags: readonly string[]): Cadrage {
+function scopingWithLinks(id: string, tags: readonly string[]): Scoping {
   return {
     id,
-    liens: tags.map((tag) => ({
+    links: tags.map((tag) => ({
       tag,
-      nom: "",
+      name: "",
       url: `https://exemple.test/${tag}`,
     })),
-  } as unknown as Cadrage;
+  } as unknown as Scoping;
 }
 
 describe("natures proposées à la saisie", () => {
   it("ajoute aux natures déclarées celles que les cadrages emploient", () => {
     expect(
-      unionTagsLiens(
+      unionLinkTags(
         ["carte_trello", "document"],
         [
-          cadrageAvecLiens("2026-001", ["ticket_jira"]),
-          cadrageAvecLiens("2026-002", ["note"]),
+          scopingWithLinks("2026-001", ["ticket_jira"]),
+          scopingWithLinks("2026-002", ["note"]),
         ],
       ),
     ).toEqual(["carte_trello", "document", "note", "ticket_jira"]);
@@ -239,16 +243,16 @@ describe("natures proposées à la saisie", () => {
   // la voir deux fois dans la liste laisserait croire à deux natures.
   it("ne répète pas une nature à la fois déclarée et employée", () => {
     expect(
-      unionTagsLiens(
+      unionLinkTags(
         ["carte_trello", "document"],
-        [cadrageAvecLiens("2026-001", ["document"])],
+        [scopingWithLinks("2026-001", ["document"])],
       ),
     ).toEqual(["carte_trello", "document"]);
   });
 
   it("ignore les liens dont la nature est vide", () => {
     expect(
-      unionTagsLiens(["document"], [cadrageAvecLiens("2026-001", ["", "  "])]),
+      unionLinkTags(["document"], [scopingWithLinks("2026-001", ["", "  "])]),
     ).toEqual(["document"]);
   });
 });
@@ -261,22 +265,22 @@ describe("natures proposées à la saisie", () => {
 describe("liste des liens d’un cadrage", () => {
   const trello = {
     tag: "carte_trello",
-    nom: "La carte",
+    name: "La carte",
     url: "https://trello.com/c/abc",
   };
   const figma = {
     tag: "maquette",
-    nom: "L’écran",
+    name: "L’écran",
     url: "https://figma.com/f/1",
   };
 
   it("ajoute un lien à la suite des existants", () => {
-    expect(avecLien([trello], figma)).toEqual([trello, figma]);
+    expect(withLink([trello], figma)).toEqual([trello, figma]);
   });
 
   it("remplace celui qui portait déjà cette adresse plutôt que de doubler", () => {
-    const repris = { ...trello, nom: "La carte, renommée" };
-    expect(avecLien([trello, figma], repris)).toEqual([figma, repris]);
+    const resumed = { ...trello, name: "La carte, renommée" };
+    expect(withLink([trello, figma], resumed)).toEqual([figma, resumed]);
   });
 
   /**
@@ -284,17 +288,17 @@ describe("liste des liens d’un cadrage", () => {
    * ferait douter de ce qui a été écrit.
    */
   it("corrige un lien sans le déplacer", () => {
-    const corrige = { ...trello, nom: "Un autre nom" };
-    expect(avecLienModifie([trello, figma], trello.url, corrige)).toEqual([
-      corrige,
+    const corrected = { ...trello, name: "Un autre nom" };
+    expect(withLinkModified([trello, figma], trello.url, corrected)).toEqual([
+      corrected,
       figma,
     ]);
   });
 
   it("corrige l’adresse d’un lien, l’ancienne servant à le retrouver", () => {
-    const deplace = { ...trello, url: "https://trello.com/c/xyz" };
-    expect(avecLienModifie([trello, figma], trello.url, deplace)).toEqual([
-      deplace,
+    const moved = { ...trello, url: "https://trello.com/c/xyz" };
+    expect(withLinkModified([trello, figma], trello.url, moved)).toEqual([
+      moved,
       figma,
     ]);
   });
@@ -304,12 +308,12 @@ describe("liste des liens d’un cadrage", () => {
    * seul : les garder tous deux romprait l'unicité que l'ajout maintient.
    */
   it("ne laisse pas deux liens sur une même adresse après correction", () => {
-    const vers = {
+    const to = {
       tag: "maquette",
-      nom: "Finalement la maquette",
+      name: "Finalement la maquette",
       url: figma.url,
     };
-    expect(avecLienModifie([trello, figma], trello.url, vers)).toEqual([vers]);
+    expect(withLinkModified([trello, figma], trello.url, to)).toEqual([to]);
   });
 
   /**
@@ -318,17 +322,16 @@ describe("liste des liens d’un cadrage", () => {
    * pire que de l'ajouter.
    */
   it("ajoute le lien corrigé quand l’ancienne adresse n’est plus là", () => {
-    expect(avecLienModifie([figma], trello.url, trello)).toEqual([
+    expect(withLinkModified([figma], trello.url, trello)).toEqual([
       figma,
       trello,
     ]);
   });
 
   it("retire le lien portant l’adresse donnée, et lui seul", () => {
-    expect(sansLien([trello, figma], trello.url)).toEqual([figma]);
-    expect(sansLien([trello, figma], "https://example.org/inconnue")).toEqual([
-      trello,
-      figma,
-    ]);
+    expect(withoutLink([trello, figma], trello.url)).toEqual([figma]);
+    expect(
+      withoutLink([trello, figma], "https://example.org/inconnue"),
+    ).toEqual([trello, figma]);
   });
 });

@@ -3,19 +3,19 @@ import { computed } from "vue";
 import { TokenService } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
 import { COMPOSITION } from "../../extension/composer";
-import { PLATEFORME } from "../../plateforme/jeton";
-import UiIcone from "../../ui/UiIcone.vue";
+import { PLATFORM } from "../../plateforme/jeton";
+import UiIcon from "../../ui/UiIcone.vue";
 
 /**
  * Le fonctionnement de Skanon, en une page : ce qu'il fait des jetons, ce qu'il garde sur le poste, comment il trouve les projets, à qui il parle.
  *
  * Une annonce, au sens de RG-secret-conserve-localement : chaque phrase doit rester vraie du code. Ce qui diffère d'une cible à l'autre est dit pour la cible où l'on se trouve, non pour les deux — le lecteur n'a pas à savoir laquelle il utilise pour comprendre ce qui le concerne (RG-aide-fidele).
  */
-const auBureau = inject(PLATEFORME).cible === "bureau";
+const onDesktop = inject(PLATFORM).target === "bureau";
 /** Ce que le livrable dit de lui-même — son hébergement, ses mises à jour, sa licence —, que la page rend sans le connaître (ADR-extensions-commerciales). */
-const aide = inject(COMPOSITION).aide;
+const help = inject(COMPOSITION).help;
 /** Dans le navigateur, les jetons sont scellés par une passkey ou gardés en clair : l'aide dit ce qui est (RG-secret-conserve-localement). */
-const scelles = computed(() => inject(TokenService).forme() === "scelle");
+const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
 </script>
 
 <template>
@@ -30,19 +30,19 @@ const scelles = computed(() => inject(TokenService).forme() === "scelle");
     </header>
 
     <section>
-      <h2><UiIcone nom="key" />Jetons</h2>
+      <h2><UiIcon name="key" />Jetons</h2>
       <ul>
         <li>
           Un dépôt public se lit sans connexion. Se connecter lève la limite
           d’appels de GitHub (60 par heure sans jeton, 5 000 avec), ouvre les
           dépôts privés, et permet d’écrire.
         </li>
-        <li v-if="auBureau">
+        <li v-if="onDesktop">
           Le jeton est rangé dans le coffre du système — le Trousseau sur macOS,
           le gestionnaire d’identifiants sur Windows. Si le coffre refuse de le
           garder, il ne vaut que pour la session, et un bandeau le dit.
         </li>
-        <template v-else-if="scelles">
+        <template v-else-if="sealedTokens">
           <li>
             Vos jetons sont protégés par une passkey : ce navigateur n’en garde
             que le chiffré, que Touch ID ou le code de l’appareil ouvrent dans
@@ -72,7 +72,7 @@ const scelles = computed(() => inject(TokenService).forme() === "scelle");
             vaut alors que pour l’onglet.
           </li>
         </template>
-        <li v-if="!auBureau">
+        <li v-if="!onDesktop">
           Dans tous les cas, préférez un jeton limité aux dépôts utiles, en
           lecture seule si vous ne faites que lire, et qui expire.
         </li>
@@ -93,12 +93,12 @@ const scelles = computed(() => inject(TokenService).forme() === "scelle");
           Se déconnecter efface les jetons, l’accès temporaire, et les contenus
           privés gardés en cache.
         </li>
-        <li v-for="phrase in aide.jetons" :key="phrase">{{ phrase }}</li>
+        <li v-for="phrase in help.jetons" :key="phrase">{{ phrase }}</li>
       </ul>
     </section>
 
     <section>
-      <h2><UiIcone nom="cached" />Mise en cache</h2>
+      <h2><UiIcon name="cached" />Mise en cache</h2>
       <ul>
         <li>
           Les fichiers lus sont gardés sur ce poste, sous leur empreinte : un
@@ -126,19 +126,19 @@ const scelles = computed(() => inject(TokenService).forme() === "scelle");
           durent autant que l’accès qui les a lus ; ceux qu’une identité
           vérifiée a lus ne sont pas gardés du tout.
         </li>
-        <li v-if="!auBureau && scelles">
+        <li v-if="!onDesktop && sealedTokens">
           Les contenus privés sont gardés sous la même clé que les jetons, et ne
           se lisent qu’une fois l’onglet déverrouillé.
         </li>
         <li>
           Les douze derniers projets ouverts sont retenus, pour l’accueil.
         </li>
-        <li v-for="phrase in aide.cache" :key="phrase">{{ phrase }}</li>
+        <li v-for="phrase in help.cache" :key="phrase">{{ phrase }}</li>
       </ul>
     </section>
 
     <section>
-      <h2><UiIcone nom="travel_explore" />Découverte des projets</h2>
+      <h2><UiIcon name="travel_explore" />Découverte des projets</h2>
       <ul>
         <li>
           L’accueil montre d’abord les projets déjà ouverts sur ce poste, sans
@@ -162,7 +162,7 @@ const scelles = computed(() => inject(TokenService).forme() === "scelle");
     </section>
 
     <section>
-      <h2><UiIcone nom="lan" />Communications extérieures</h2>
+      <h2><UiIcon name="lan" />Communications extérieures</h2>
       <ul>
         <li>
           <code>api.github.com</code> — lecture, écriture et découverte, avec
@@ -181,7 +181,7 @@ const scelles = computed(() => inject(TokenService).forme() === "scelle");
           seulement pour ce projet, et seulement si l’on entre par son identité
           vérifiée.
         </li>
-        <li v-for="phrase in aide.communications" :key="phrase">
+        <li v-for="phrase in help.communications" :key="phrase">
           {{ phrase }}
         </li>
         <li>

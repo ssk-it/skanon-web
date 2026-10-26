@@ -2,8 +2,8 @@ import { inject, provide, resetInjection } from "../injection";
 import { describe, expect, it } from "vitest";
 import { GithubClient } from "../github/github-client";
 import { RepoConfig } from "./repo-config";
-import { ReferentielStore } from "./referentiel.store";
-import { AmorcageService } from "./amorcage.service";
+import { SpecificationStore } from "./referentiel.store";
+import { BootstrapService } from "./amorcage.service";
 
 /**
  * L'amorçage d'un dépôt vide — RG-amorcage-depot, RG-statuts-cadrage.
@@ -14,29 +14,32 @@ import { AmorcageService } from "./amorcage.service";
  */
 describe("L’amorçage d’un dépôt", () => {
   it("n’écrit dans la configuration que ce qui se lit", async () => {
-    const ecrits = new Map<string, string>();
+    const written = new Map<string, string>();
     resetInjection();
     provide(GithubClient, {
-      loadDepot: async () => ({ defaultBranch: "main", description: null }),
-      commitFichier: async (
-        _depot: unknown,
-        _branche: string,
-        chemin: string,
-        contenu: string,
+      loadRepo: async () => ({ defaultBranch: "main", description: null }),
+      commitFile: async (
+        _repo: unknown,
+        _branch: string,
+        path: string,
+        content: string,
       ) => {
-        ecrits.set(chemin, contenu);
-        return { commit: "c", fichier: "f" };
+        written.set(path, content);
+        return { commit: "c", file: "f" };
       },
     });
-    provide(ReferentielStore, {
-      depot: () => ({ owner: "org", repo: "depot" }),
-      loadReferentiel: async () => undefined,
+    provide(SpecificationStore, {
+      repoRef: () => ({ owner: "org", repo: "depot" }),
+      loadSpecification: async () => undefined,
     });
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
 
-    await inject(AmorcageService).amorcer({ nom: "Essai", description: "" });
+    await inject(BootstrapService).bootstrapProject({
+      name: "Essai",
+      description: "",
+    });
 
-    const config = ecrits.get("ssk-canon.yml") ?? "";
+    const config = written.get("ssk-canon.yml") ?? "";
     expect(config).toContain("nom: Essai");
     expect(config).toContain("tags_liens:");
     // Une piste se cite depuis le cadrage qui la réalise (cadrage 2026-058).

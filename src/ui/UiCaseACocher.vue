@@ -8,7 +8,7 @@
  *
  * Une vraie case `<input type="checkbox">`, rendue invisible sous le dessin de Material 3 : le clavier, le libellé cliquable et les lecteurs d'écran restent ceux du navigateur.
  */
-const coche = defineModel<boolean>({ default: false });
+const checked = defineModel<boolean>({ default: false });
 
 defineProps<{ disabled?: boolean }>();
 </script>
@@ -17,7 +17,7 @@ defineProps<{ disabled?: boolean }>();
   <label class="ui-case" :class="{ 'ui-case--desactive': disabled }">
     <span class="ui-case__zone">
       <input
-        v-model="coche"
+        v-model="checked"
         class="ui-case__natif"
         type="checkbox"
         :disabled="disabled"

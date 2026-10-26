@@ -1,5 +1,5 @@
 import { load } from "js-yaml";
-import { SectionDivers } from "../model/model";
+import { MiscSection } from "../model/model";
 
 /**
  * Découpage frontmatter / corps.
@@ -14,21 +14,21 @@ import { SectionDivers } from "../model/model";
  */
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
 
-export interface ParsedFichier<T = Record<string, unknown>> {
+export interface ParsedFile<T = Record<string, unknown>> {
   readonly data: T;
   readonly body: string;
 }
 
 /** Un bloc présent mais illisible : distinct d'un bloc absent. */
-export interface FrontmatterIllisible {
-  readonly erreur: string;
+export interface UnreadableFrontmatter {
+  readonly error: string;
   readonly body: string;
 }
 
-export function estIllisible(
-  parse: ParsedFichier | FrontmatterIllisible | null,
-): parse is FrontmatterIllisible {
-  return parse !== null && "erreur" in parse;
+export function isUnreadable(
+  parse: ParsedFile | UnreadableFrontmatter | null,
+): parse is UnreadableFrontmatter {
+  return parse !== null && "error" in parse;
 }
 
 /**
@@ -37,14 +37,14 @@ export function estIllisible(
  * qui en a un, et prive le lecteur de la seule information utile : où corriger.
  */
 export function splitFrontmatter<T = Record<string, unknown>>(
-  texte: string,
-): ParsedFichier<T> | FrontmatterIllisible | null {
-  const m = FRONTMATTER.exec(texte);
+  text: string,
+): ParsedFile<T> | UnreadableFrontmatter | null {
+  const m = FRONTMATTER.exec(text);
   if (!m) return null;
   try {
     return { data: (load(m[1]) ?? {}) as T, body: m[2] };
   } catch (e) {
-    return { erreur: formatErreurYaml(e), body: m[2] };
+    return { error: formatYamlError(e), body: m[2] };
   }
 }
 
@@ -54,39 +54,39 @@ export function splitFrontmatter<T = Record<string, unknown>>(
  * Son `message` embarque un extrait multiligne du document, illisible dans une
  * liste d'anomalies : on garde la première ligne et les coordonnées.
  */
-function formatErreurYaml(e: unknown): string {
+function formatYamlError(e: unknown): string {
   const err = e as {
     reason?: string;
     message?: string;
     mark?: { line?: number };
   };
-  let raison = String(err?.reason ?? err?.message ?? e)
+  let reason = String(err?.reason ?? err?.message ?? e)
     .split("\n")[0]
     .trim();
 
   // Cause de loin la plus fréquente, et dont le message d'origine ne dit rien :
   // un « : » suivi d'une espace dans une valeur non quotée, que YAML lit comme
   // un séparateur. Un titre de décision en contient presque toujours un.
-  if (/bad indentation of a mapping entry/.test(raison)) {
-    raison += " — une valeur contenant « : » doit être entre apostrophes";
+  if (/bad indentation of a mapping entry/.test(reason)) {
+    reason += " — une valeur contenant « : » doit être entre apostrophes";
   }
 
   // `line` est indexée à zéro et relative au bloc : le `---` d'ouverture décale
   // d'une ligne de plus pour retrouver le numéro dans le fichier.
-  const ligne = err?.mark?.line;
-  return typeof ligne === "number"
-    ? `frontmatter illisible ligne ${ligne + 2} : ${raison}`
-    : `frontmatter illisible : ${raison}`;
+  const line = err?.mark?.line;
+  return typeof line === "number"
+    ? `frontmatter illisible ligne ${line + 2} : ${reason}`
+    : `frontmatter illisible : ${reason}`;
 }
 
 /** Extrait une section de niveau 2 par son titre, sans le titre lui-même. */
-export function extractSection(corps: string, titre: string): string {
-  const echappe = titre.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export function extractSection(body: string, title: string): string {
+  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(
-    `^##[ \\t]+${echappe}[ \\t]*$([\\s\\S]*?)(?=^##[ \\t]|$(?![\\s\\S]))`,
+    `^##[ \\t]+${escaped}[ \\t]*$([\\s\\S]*?)(?=^##[ \\t]|$(?![\\s\\S]))`,
     "m",
   );
-  return re.exec(corps)?.[1].trim() ?? "";
+  return re.exec(body)?.[1].trim() ?? "";
 }
 
 /**
@@ -95,7 +95,7 @@ export function extractSection(corps: string, titre: string): string {
  *
  * Tout le reste est libre : c'est ce que rend `extractSectionsLibres`.
  */
-export const SECTIONS_CONNUES = [
+export const KNOWN_SECTIONS = [
   "Objectif",
   "Parcours utilisateur",
   "Énoncés",
@@ -111,18 +111,18 @@ export const SECTIONS_CONNUES = [
  * seules sections connues les effacerait sans le dire, et la fiche laisserait
  * hors de vue du texte que quelqu'un a écrit là pour être lu.
  */
-export function extractSectionsLibres(
-  corps: string,
-  connues: readonly string[],
-): SectionDivers[] {
-  const normalise = (s: string) => s.trim().toLowerCase();
-  const jeu = new Set(connues.map(normalise));
+export function extractFreeSections(
+  body: string,
+  known: readonly string[],
+): MiscSection[] {
+  const normalized = (s: string) => s.trim().toLowerCase();
+  const set = new Set(known.map(normalized));
 
-  const sections: SectionDivers[] = [];
+  const sections: MiscSection[] = [];
   const re = /^##[ \t]+(.+?)[ \t]*$([\s\S]*?)(?=^##[ \t]|$(?![\s\S]))/gm;
-  for (const m of corps.matchAll(re)) {
-    if (!jeu.has(normalise(m[1]))) {
-      sections.push({ titre: m[1].trim(), corps: m[2].trim() });
+  for (const m of body.matchAll(re)) {
+    if (!set.has(normalized(m[1]))) {
+      sections.push({ title: m[1].trim(), body: m[2].trim() });
     }
   }
   return sections;
@@ -134,16 +134,16 @@ export function extractSectionsLibres(
  * Sert à ne rien perdre en réécrivant : le texte revient dans le fichier tel
  * qu'il en est sorti.
  */
-export function extractSectionsAutres(
-  corps: string,
-  connues: readonly string[],
+export function extractOtherSections(
+  body: string,
+  known: readonly string[],
 ): string {
   return (
-    extractSectionsLibres(corps, connues)
+    extractFreeSections(body, known)
       // Le corps est normalisé : une ligne vide après le titre, aucune à la fin.
       // Sans cela, réécrire ajoute une ligne à chaque enregistrement, l'espace du
       // séparateur s'ajoutant à celui que le bloc portait déjà.
-      .map((s) => `## ${s.titre}\n\n${s.corps}`)
+      .map((s) => `## ${s.title}\n\n${s.body}`)
       .join("\n\n")
   );
 }
@@ -154,8 +154,8 @@ export function extractSectionsAutres(
  *
  * Attention : `\Z` n'existe pas en JavaScript. Il faut `$(?![\s\S])`.
  */
-export function extractEnonces(corps: string): Map<string, string> {
-  const section = extractSection(corps, "Énoncés");
+export function extractStatements(body: string): Map<string, string> {
+  const section = extractSection(body, "Énoncés");
   const out = new Map<string, string>();
   if (!section) return out;
 
@@ -165,11 +165,11 @@ export function extractEnonces(corps: string): Map<string, string> {
 }
 
 /** Découpe les sous-sections de niveau 3 d'une section de niveau 2. */
-export function extractSousSections(
-  corps: string,
-  titre: string,
+export function extractSubsections(
+  body: string,
+  title: string,
 ): Map<string, string> {
-  const section = extractSection(corps, titre);
+  const section = extractSection(body, title);
   const out = new Map<string, string>();
   if (!section) return out;
 

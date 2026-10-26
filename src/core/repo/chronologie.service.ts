@@ -1,23 +1,23 @@
 import { inject } from "../injection";
-import { GithubClient, RefDepot } from "../github/github-client";
+import { GithubClient, RepoRef } from "../github/github-client";
 
 /** Une entrée de la chronologie d'une règle. */
-export interface EntreeChronologie {
+export interface TimelineEntry {
   /** Identifiant du cadrage responsable du changement. */
-  readonly cadrage: string;
+  readonly scoping: string;
   /** Données Git, absentes si aucun commit ne correspond au cadrage. */
-  readonly commit: CommitChronologie | null;
+  readonly commit: TimelineCommit | null;
 }
 
-export interface CommitChronologie {
+export interface TimelineCommit {
   readonly oid: string;
   readonly date: string;
-  readonly auteur: string | null;
+  readonly author: string | null;
   readonly login: string | null;
-  readonly titre: string;
+  readonly title: string;
   readonly pullRequest: number | null;
   /** Énoncé de la règle tel qu'il était à ce commit. */
-  readonly contenu: string | null;
+  readonly content: string | null;
 }
 
 /**
@@ -27,7 +27,7 @@ export interface CommitChronologie {
  * contre autant d'appels REST que de commits. C'est le cas d'école qui justifie
  * la répartition REST / GraphQL.
  */
-const REQUETE_HISTORIQUE = `
+const HISTORY_QUERY = `
 query($owner:String!,$repo:String!,$path:String!,$max:Int!){
   repository(owner:$owner,name:$repo){
     defaultBranchRef{target{... on Commit{
@@ -44,7 +44,7 @@ query($owner:String!,$repo:String!,$path:String!,$max:Int!){
   }
 }`;
 
-interface ReponseHistorique {
+interface HistoryResponse {
   repository: {
     defaultBranchRef: {
       target: {
@@ -83,7 +83,7 @@ const MAX_COMMITS = 30;
  * Git : c'est le cas d'un référentiel rédigé après coup, et le masquer
  * reviendrait à prétendre que la décision n'a pas eu lieu.
  */
-export class ChronologieService {
+export class TimelineService {
   private readonly github = inject(GithubClient);
 
   /**
@@ -92,30 +92,27 @@ export class ChronologieService {
    * Le contenu de chaque version n'est pas chargé ici : il coûte un alias par
    * commit et n'a d'intérêt que déplié. Voir `loadEnonceAuCommit`.
    */
-  async loadHistoriqueRegle(
-    depot: RefDepot,
-    idRegle: string,
-  ): Promise<CommitChronologie[]> {
-    const reponse = await this.github.graphql<ReponseHistorique>(
-      REQUETE_HISTORIQUE,
-      {
-        owner: depot.owner,
-        repo: depot.repo,
-        path: `rules/${idRegle}.md`,
-        max: MAX_COMMITS,
-      },
-    );
+  async loadRuleHistory(
+    repoRef: RepoRef,
+    ruleId: string,
+  ): Promise<TimelineCommit[]> {
+    const response = await this.github.graphql<HistoryResponse>(HISTORY_QUERY, {
+      owner: repoRef.owner,
+      repo: repoRef.repo,
+      path: `rules/${ruleId}.md`,
+      max: MAX_COMMITS,
+    });
 
-    const noeuds =
-      reponse.repository?.defaultBranchRef?.target?.history?.nodes ?? [];
-    return noeuds.map((n) => ({
+    const nodes =
+      response.repository?.defaultBranchRef?.target?.history?.nodes ?? [];
+    return nodes.map((n) => ({
       oid: n.oid,
       date: n.committedDate,
-      auteur: n.author?.name ?? null,
+      author: n.author?.name ?? null,
       login: n.author?.user?.login ?? null,
-      titre: n.messageHeadline,
+      title: n.messageHeadline,
       pullRequest: n.associatedPullRequests.nodes[0]?.number ?? null,
-      contenu: null,
+      content: null,
     }));
   }
 
@@ -126,32 +123,32 @@ export class ChronologieService {
    * versions d'avance ferait payer à chaque visite un coût dont le lecteur
    * n'utilise qu'une fraction.
    */
-  async loadEnonceAuCommit(
-    depot: RefDepot,
-    idRegle: string,
+  async loadStatementAtCommit(
+    repoRef: RepoRef,
+    ruleId: string,
     oid: string,
   ): Promise<string | null> {
-    const reponse = await this.github.graphql<{
+    const response = await this.github.graphql<{
       repository: { object: { text: string } | null } | null;
     }>(
       `query($owner:String!,$repo:String!,$expr:String!){
         repository(owner:$owner,name:$repo){object(expression:$expr){... on Blob{text}}}
       }`,
       {
-        owner: depot.owner,
-        repo: depot.repo,
-        expr: `${oid}:rules/${idRegle}.md`,
+        owner: repoRef.owner,
+        repo: repoRef.repo,
+        expr: `${oid}:rules/${ruleId}.md`,
       },
     );
-    return reponse.repository?.object?.text ?? null;
+    return response.repository?.object?.text ?? null;
   }
 
   /** Voir `apparierChronologie`. */
-  apparier(
-    cadrages: readonly string[],
-    commits: readonly CommitChronologie[],
-  ): EntreeChronologie[] {
-    return apparierChronologie(cadrages, commits);
+  match(
+    scopings: readonly string[],
+    commits: readonly TimelineCommit[],
+  ): TimelineEntry[] {
+    return matchTimeline(scopings, commits);
   }
 }
 
@@ -166,16 +163,16 @@ export class ChronologieService {
  * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
  * l'éprouver ne doit pas demander de construire un service.
  */
-export function apparierChronologie(
-  cadrages: readonly string[],
-  commits: readonly CommitChronologie[],
-): EntreeChronologie[] {
-  const restants = [...commits];
-  return cadrages.map((cadrage) => {
-    const i = restants.findIndex((c) => c.titre.includes(cadrage));
+export function matchTimeline(
+  scopings: readonly string[],
+  commits: readonly TimelineCommit[],
+): TimelineEntry[] {
+  const remaining = [...commits];
+  return scopings.map((scoping) => {
+    const i = remaining.findIndex((c) => c.title.includes(scoping));
     // splice : un commit ne sert qu'une fois, sinon un message citant deux
     // cadrages daterait les deux entrées du même commit
-    const commit = i >= 0 ? restants.splice(i, 1)[0] : null;
-    return { cadrage, commit };
+    const commit = i >= 0 ? remaining.splice(i, 1)[0] : null;
+    return { scoping: scoping, commit };
   });
 }

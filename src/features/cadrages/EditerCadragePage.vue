@@ -4,40 +4,40 @@ import { RouterLink, useRoute } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
 import { inject } from "../../core/injection";
 import {
-  LIBELLE_OPERATION,
-  LIBELLE_STATUT_CADRAGE,
-  LIBELLE_STATUT_DECISION,
-  STATUTS_DECISION,
-  type LienExterne as LienPorte,
-  type NatureCible,
-  type OperationImpact,
-  type Referentiel,
-  type StatutCadrage,
+  OPERATION_LABEL,
+  SCOPING_STATUS_LABEL,
+  DECISION_STATUS_LABEL,
+  DECISION_STATUSES,
+  type ExternalLink as LienPorte,
+  type TargetKind,
+  type ImpactOperation,
+  type Specification,
+  type ScopingStatus,
 } from "../../core/model/model";
 import {
-  SECTIONS_CONNUES,
-  estIllisible,
-  extractEnonces,
+  KNOWN_SECTIONS,
+  isUnreadable,
+  extractStatements,
   extractSection,
-  extractSectionsAutres,
+  extractOtherSections,
   splitFrontmatter,
 } from "../../core/repo/frontmatter";
-import { LiensService } from "../../core/repo/liens.service";
+import { LinksService } from "../../core/repo/liens.service";
 import {
-  RedactionService,
-  estSurSaBranche,
+  AuthoringService,
+  isOnItsBranch,
   serializeDecision,
-  type DecisionEditable,
-  type ImpactSaisi,
-  type OptionEditable,
-  type SourceCadrage,
+  type EditableDecision,
+  type ImpactInput,
+  type EditableOption,
+  type ScopingSource,
 } from "../../core/repo/redaction.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { VerificationService } from "../../core/repo/verification.service";
 import { linkedSignal } from "../../core/signaux";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiChamp from "../../ui/UiChamp.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import UiButton from "../../ui/UiBouton.vue";
+import UiTextField from "../../ui/UiChamp.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 import UiSelect from "../../ui/UiSelect.vue";
 
 /**
@@ -48,39 +48,39 @@ import UiSelect from "../../ui/UiSelect.vue";
  * Le statut n'est volontairement pas modifiable ici : faire avancer un cadrage dans son cycle est une décision, pas une saisie, et mérite son propre parcours.
  */
 
-const OPERATIONS: OperationImpact[] = ["cree", "modifie", "abroge", "touche"];
+const OPERATIONS: ImpactOperation[] = ["cree", "modifie", "abroge", "touche"];
 
 /**
  * Les natures qu'un impact peut viser, dans l'ordre où on les cherche à la relecture d'un fichier. Le même que dans le chargeur et le vérificateur.
  */
-const NATURES_IMPACT = ["regle", "adr", "architecture"] as const;
+const IMPACT_KINDS = ["regle", "adr", "architecture"] as const;
 
-const LIBELLE_NATURE: Record<NatureCible, string> = {
+const KIND_LABEL: Record<TargetKind, string> = {
   regle: "Règle",
   adr: "Décision",
   architecture: "Document",
 };
 
 /** Opérations dont la propagation tire une écriture, donc un énoncé obligatoire. */
-const A_ENONCE = new Set<OperationImpact>(["cree", "modifie"]);
+const WITH_STATEMENT = new Set<ImpactOperation>(["cree", "modifie"]);
 
 /** Une décision en cours d'édition, et sa provenance dans le dépôt. */
-interface DecisionSaisie extends DecisionEditable {
+interface DecisionInput extends EditableDecision {
   /** Chemin du fichier existant, `null` pour une décision nouvelle. */
-  readonly fichier: string | null;
+  readonly file: string | null;
   readonly sha: string | undefined;
   /** L'identifiant, qui donne son nom au fichier et ne se renomme jamais. */
   readonly id: string;
   /** Le texte tel qu'il est dans le dépôt, pour ne réécrire que ce qui change. */
-  readonly texteEnregistre?: string;
+  readonly savedText?: string;
 }
 
 const route = useRoute();
 const id = computed(() => String(route.params["id"]));
 
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
-const redaction = inject(RedactionService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
+const authoring = inject(AuthoringService);
 const verification = inject(VerificationService);
 
 /**
@@ -88,149 +88,149 @@ const verification = inject(VerificationService);
  *
  * Sert à vérifier ce qu'on écrit : un cadrage crée souvent le domaine et les règles qu'il déclare, absents de la branche principale. Les vérifier contre celle-ci les signalerait comme inconnus.
  */
-const contexte = ref<Referentiel | null>(null);
+const context = ref<Specification | null>(null);
 
 /**
  * Les décisions du cadrage, telles qu'on les édite.
  *
  * Chacune garde le nom de son fichier et le SHA d'où elle vient : le premier ne se renomme jamais — un fichier déplacé perd son historique — et le second est le contrôle de concurrence de la plateforme.
  */
-const decisions = ref<readonly DecisionSaisie[]>([]);
-const decisionsSupprimees = ref<readonly string[]>([]);
+const decisions = ref<readonly DecisionInput[]>([]);
+const deletedDecisions = ref<readonly string[]>([]);
 
-const optionsStatutDecision = STATUTS_DECISION.map((s) => ({
-  valeur: s,
-  libelle: LIBELLE_STATUT_DECISION[s],
+const decisionStatusOptions = DECISION_STATUSES.map((s) => ({
+  value: s,
+  label: DECISION_STATUS_LABEL[s],
 }));
 
-function ajouterDecision(): void {
+function addDecision(): void {
   // Numérotée dans l'ordre d'apparition : c'est ce qui ordonne les fichiers, et l'ordre où les questions se sont posées se relit ainsi.
-  const suivant = String(decisions.value.length + 1).padStart(2, "0");
+  const next = String(decisions.value.length + 1).padStart(2, "0");
   decisions.value = [
     ...decisions.value,
     {
-      fichier: null,
+      file: null,
       sha: undefined,
-      id: `${suivant}-`,
-      titre: "",
-      statut: "ouverte",
+      id: `${next}-`,
+      title: "",
+      status: "ouverte",
       description: "",
       options: [],
-      optionRetenue: null,
+      chosenOption: null,
       decision: "",
     },
   ];
 }
 
-function majDecision(i: number, champs: Partial<DecisionSaisie>): void {
+function updateDecision(i: number, fields: Partial<DecisionInput>): void {
   decisions.value = decisions.value.map((x, n) =>
-    n === i ? { ...x, ...champs } : x,
+    n === i ? { ...x, ...fields } : x,
   );
 }
 
-function retirerDecision(i: number): void {
-  const cible = decisions.value[i];
+function removeDecision(i: number): void {
+  const target = decisions.value[i];
   // Un fichier déjà enregistré doit être retiré du dépôt, non seulement de l'écran : sans cela, il réapparaîtrait au rechargement.
-  if (cible?.fichier) {
-    decisionsSupprimees.value = [...decisionsSupprimees.value, cible.fichier];
+  if (target?.file) {
+    deletedDecisions.value = [...deletedDecisions.value, target.file];
   }
   decisions.value = decisions.value.filter((_, n) => n !== i);
 }
 
-function ajouterOption(i: number): void {
-  majDecision(i, {
-    options: [...decisions.value[i].options, { id: "", corps: "" }],
+function addOption(i: number): void {
+  updateDecision(i, {
+    options: [...decisions.value[i].options, { id: "", body: "" }],
   });
 }
 
-function majOption(
+function updateOption(
   i: number,
   j: number,
-  champs: Partial<OptionEditable>,
+  fields: Partial<EditableOption>,
 ): void {
   const d = decisions.value[i];
-  const options = d.options.map((o, n) => (n === j ? { ...o, ...champs } : o));
+  const options = d.options.map((o, n) => (n === j ? { ...o, ...fields } : o));
 
   // Renommer l'option retenue doit la garder retenue : sans cela, corriger une faute de frappe déferait le choix sans rien dire.
-  const ancien = d.options[j]?.id.trim();
-  const retenue =
-    champs.id !== undefined && ancien && d.optionRetenue === ancien
-      ? champs.id.trim() || null
-      : d.optionRetenue;
+  const previousValue = d.options[j]?.id.trim();
+  const chosen =
+    fields.id !== undefined && previousValue && d.chosenOption === previousValue
+      ? fields.id.trim() || null
+      : d.chosenOption;
 
-  majDecision(i, { options, optionRetenue: retenue });
+  updateDecision(i, { options, chosenOption: chosen });
 }
 
-function retirerOption(i: number, j: number): void {
+function removeOption(i: number, j: number): void {
   const d = decisions.value[i];
-  const partante = d.options[j]?.id.trim();
-  majDecision(i, {
+  const leaving = d.options[j]?.id.trim();
+  updateDecision(i, {
     options: d.options.filter((_, n) => n !== j),
-    optionRetenue: d.optionRetenue === partante ? null : d.optionRetenue,
+    chosenOption: d.chosenOption === leaving ? null : d.chosenOption,
   });
 }
 
 /** Désigne l'option retenue, ou la libère si elle l'était déjà. */
-function basculerRetenue(i: number, idOption: string): void {
-  const propre = idOption.trim();
-  if (!propre) return;
+function toggleChosen(i: number, idOption: string): void {
+  const own = idOption.trim();
+  if (!own) return;
   const d = decisions.value[i];
-  majDecision(i, {
-    optionRetenue: d.optionRetenue === propre ? null : propre,
+  updateDecision(i, {
+    chosenOption: d.chosenOption === own ? null : own,
   });
 }
 
-function estRetenue(d: DecisionSaisie, idOption: string): boolean {
-  return idOption.trim() === d.optionRetenue;
+function isChosen(d: DecisionInput, idOption: string): boolean {
+  return idOption.trim() === d.chosenOption;
 }
 
 /** La branche principale, pour dire si le cadrage vit ailleurs. */
-const branchePrincipale = ref("");
+const mainBranch = ref("");
 
 /** Les sections que l'éditeur ne présente pas, conservées telles quelles. */
-const sectionsInconnues = ref("");
+const unknownSections = ref("");
 
 /**
  * Les liens externes, conservés tels qu'ils étaient.
  *
  * L'éditeur ne les présente pas — ils se saisissent depuis la fiche — mais la sérialisation reconstruit tout le frontmatter : ne pas les relire les effacerait au premier enregistrement.
  */
-const liensPortes = ref<readonly LienPorte[]>([]);
+const carriedLinks = ref<readonly LienPorte[]>([]);
 
-const optionsNature = NATURES_IMPACT.map((n) => ({
-  valeur: n as NatureCible,
-  libelle: LIBELLE_NATURE[n],
+const kindOptions = IMPACT_KINDS.map((n) => ({
+  value: n as TargetKind,
+  label: KIND_LABEL[n],
 }));
-const optionsOperation = OPERATIONS.map((op) => ({
-  valeur: op,
-  libelle: LIBELLE_OPERATION[op],
+const operationOptions = OPERATIONS.map((op) => ({
+  value: op,
+  label: OPERATION_LABEL[op],
 }));
-const libelleNature = (n: NatureCible) => LIBELLE_NATURE[n];
-const demandeEnonce = (op: OperationImpact) => A_ENONCE.has(op);
+const kindLabel = (n: TargetKind) => KIND_LABEL[n];
+const requiresStatement = (op: ImpactOperation) => WITH_STATEMENT.has(op);
 
-const titre = ref("");
-const domaines = ref("");
-const objectif = ref("");
-const parcours = ref("");
-const impacts = ref<ImpactSaisi[]>([]);
+const title = ref("");
+const domains = ref("");
+const goal = ref("");
+const journey = ref("");
+const impacts = ref<ImpactInput[]>([]);
 
 /**
  * Le statut tel que le dépôt l'établit — RG-statuts-cadrage.
  *
  * Lu sur le cadrage que le store a déduit de sa demande de fusion, et non dans le fichier, qui ne le porte plus. Il suit le store quand les branches finissent d'arriver ; une bascule réussie l'emporte jusqu'à la relecture suivante.
  */
-const statut = linkedSignal<StatutCadrage>(
-  () => store.findCadrage(id.value)?.statut ?? "brouillon",
+const status = linkedSignal<ScopingStatus>(
+  () => store.findScoping(id.value)?.status ?? "brouillon",
 );
 const transition = ref(false);
-const basculeEchouee = ref(false);
+const toggleFailed = ref(false);
 
-const source = ref<SourceCadrage | null>(null);
-const chargement = ref(true);
-const erreurChargement = ref<string | null>(null);
-const envoi = ref(false);
-const erreur = ref<string | null>(null);
-const enregistre = ref(false);
+const source = ref<ScopingSource | null>(null);
+const loading = ref(true);
+const loadError = ref<string | null>(null);
+const sending = ref(false);
+const error = ref<string | null>(null);
+const saved = ref(false);
 
 /**
  * Statuts vers lesquels ce cadrage peut aller.
@@ -240,16 +240,16 @@ const enregistre = ref(false);
  * « Sa propre branche » se reconnaît à ce qu'elle n'est pas la principale, et non à son nom — voir RG-branche-par-cadrage. Le test portait sur le préfixe « cadrage/ », que pas une branche réelle ne porte : toutes suivent « cadrage-<id> », et les boutons étaient donc absents partout.
  */
 const transitions = computed(() =>
-  redaction.transitionsPossibles(
-    statut(),
-    estSurSaBranche(source.value?.branche, branchePrincipale.value),
+  authoring.possibleTransitions(
+    status(),
+    isOnItsBranch(source.value?.branch, mainBranch.value),
   ),
 );
 
-const libelleStatut = (s: StatutCadrage) => LIBELLE_STATUT_CADRAGE[s];
+const statusLabel = (s: ScopingStatus) => SCOPING_STATUS_LABEL[s];
 
-function domainesSaisis(): string[] {
-  return domaines.value
+function enteredDomains(): string[] {
+  return domains.value
     .split(",")
     .map((d) => d.trim())
     .filter(Boolean);
@@ -260,79 +260,81 @@ function domainesSaisis(): string[] {
  *
  * Les règles viennent du même module que l'Action exécute avant chaque livraison : ce qui est signalé ici est exactement ce qui bloquerait là-bas, sans qu'aucune règle n'existe en double.
  */
-const problemes = computed(() => {
-  const manquants = [
-    ["un titre", titre.value],
-    ["un objectif", objectif.value],
-    ["un parcours", parcours.value],
+const problems = computed(() => {
+  const missing = [
+    ["un titre", title.value],
+    ["un objectif", goal.value],
+    ["un parcours", journey.value],
   ]
     .filter(([, v]) => !v.trim())
-    .map(([nom]) => `Il manque ${nom}.`);
+    .map(([name]) => `Il manque ${name}.`);
 
   // Les impacts sans règle désignée sont écartés avant la vérification : elle les rapporterait sous un identifiant vide, illisible pour le rédacteur.
-  const designes = impacts.value.filter((i) => i.cible.trim());
-  const sansRegle = impacts.value.length - designes.length;
+  const designated = impacts.value.filter((i) => i.target.trim());
+  const withoutRule = impacts.value.length - designated.length;
 
-  const { erreurs } = verification.verifierCadrage(
+  const { errors } = verification.checkScoping(
     {
       id: id.value,
-      titre: titre.value,
-      domaines: domainesSaisis(),
-      impacts: designes.map((i) => ({
-        cible: i.cible.trim(),
-        nature: i.nature ?? "regle",
+      title: title.value,
+      domains: enteredDomains(),
+      impacts: designated.map((i) => ({
+        target: i.target.trim(),
+        kind: i.kind ?? "regle",
         operation: i.operation,
       })),
-      enonces: new Map(
-        designes
-          .filter((i) => i.enonce.trim())
-          .map((i) => [i.cible.trim(), i.enonce.trim()]),
+      statements: new Map(
+        designated
+          .filter((i) => i.statement.trim())
+          .map((i) => [i.target.trim(), i.statement.trim()]),
       ),
     },
     // Le référentiel de la branche éditée : c'est là que vivent le domaine et les règles que ce cadrage crée.
-    contexte.value ?? undefined,
+    context.value ?? undefined,
   );
 
   return [
-    ...manquants,
-    ...(sansRegle ? [`${sansRegle} impact(s) ne désignent aucune règle.`] : []),
-    ...erreurs,
+    ...missing,
+    ...(withoutRule
+      ? [`${withoutRule} impact(s) ne désignent aucune règle.`]
+      : []),
+    ...errors,
   ];
 });
 
 /** Le cadrage déjà porté par le formulaire, pour ne pas le relire pour rien. */
-let chargeId: string | null = null;
+let loadId: string | null = null;
 
 watch(
-  [id, () => store.etat()],
-  ([idCourant, etat]) => {
-    if (etat !== "pret") return;
+  [id, () => store.state()],
+  ([currentId, state]) => {
+    if (state !== "pret") return;
     // La surveillance porte sur l'état du magasin : sans ce garde, tout rechargement du référentiel — celui qui suit un enregistrement, comme le bouton de la barre — relirait le cadrage et écraserait la saisie en cours.
-    if (chargeId === idCourant) return;
-    chargeId = idCourant;
-    void charger(idCourant);
+    if (loadId === currentId) return;
+    loadId = currentId;
+    void load(currentId);
   },
   { immediate: true },
 );
 
-function ajouterImpact(): void {
+function addImpact(): void {
   impacts.value = [
     ...impacts.value,
-    { cible: "", nature: "regle", operation: "modifie", enonce: "" },
+    { target: "", kind: "regle", operation: "modifie", statement: "" },
   ];
-  enregistre.value = false;
+  saved.value = false;
 }
 
-function retirerImpact(index: number): void {
+function removeImpact(index: number): void {
   impacts.value = impacts.value.filter((_, i) => i !== index);
-  enregistre.value = false;
+  saved.value = false;
 }
 
-function majImpact(index: number, champ: Partial<ImpactSaisi>): void {
+function updateImpact(index: number, field: Partial<ImpactInput>): void {
   impacts.value = impacts.value.map((i, n) =>
-    n === index ? { ...i, ...champ } : i,
+    n === index ? { ...i, ...field } : i,
   );
-  enregistre.value = false;
+  saved.value = false;
 }
 
 /**
@@ -340,26 +342,26 @@ function majImpact(index: number, champ: Partial<ImpactSaisi>): void {
  *
  * Rien n'est tenté tant que le cadrage n'est pas cohérent : un statut avancé sur un cadrage que la vérification refuserait ne ferait que déplacer le problème plus près de la livraison.
  */
-async function allerVers(vers: StatutCadrage): Promise<void> {
+async function goToward(to: ScopingStatus): Promise<void> {
   if (
     transition.value ||
-    envoi.value ||
-    problemes.value.length ||
+    sending.value ||
+    problems.value.length ||
     !source.value
   )
     return;
 
   transition.value = true;
-  erreur.value = null;
-  basculeEchouee.value = false;
+  error.value = null;
+  toggleFailed.value = false;
   try {
     // Rien n'est écrit dans le fichier : le statut vit sur la demande de fusion, et c'est elle que la bascule change. La source reste donc valide, contrairement à ce qui se passait quand le statut y était écrit.
-    const resultat = await redaction.changerStatut(id.value, vers);
+    const result = await authoring.changeStatus(id.value, to);
     // La demande porte le statut : si elle n'a pas basculé, rien n'a changé.
-    if (!resultat.basculeEchouee) statut.set(vers);
-    basculeEchouee.value = resultat.basculeEchouee;
+    if (!result.toggleFailed) status.set(to);
+    toggleFailed.value = result.toggleFailed;
   } catch (e) {
-    erreur.value =
+    error.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
         : "Le changement de statut a échoué.";
@@ -368,167 +370,163 @@ async function allerVers(vers: StatutCadrage): Promise<void> {
   }
 }
 
-async function charger(idCharge: string): Promise<void> {
-  chargement.value = true;
-  erreurChargement.value = null;
+async function load(loadedId: string): Promise<void> {
+  loading.value = true;
+  loadError.value = null;
   try {
-    const lu = await redaction.loadPourEdition(idCharge);
-    if (id.value !== idCharge) return;
+    const readAt = await authoring.loadForEditing(loadedId);
+    if (id.value !== loadedId) return;
 
-    const parse = splitFrontmatter(lu.contenu);
+    const parse = splitFrontmatter(readAt.content);
     if (!parse) throw new Error("Ce cadrage n’a pas de frontmatter.");
-    if (estIllisible(parse)) throw new Error(parse.erreur);
+    if (isUnreadable(parse)) throw new Error(parse.error);
 
     const data = parse.data as Record<string, unknown>;
-    const enonces = extractEnonces(parse.body);
+    const statements = extractStatements(parse.body);
 
-    source.value = lu.source;
-    contexte.value = lu.contexte;
-    branchePrincipale.value = lu.branchePrincipale;
+    source.value = readAt.source;
+    context.value = readAt.context;
+    mainBranch.value = readAt.mainBranch;
 
     // Depuis la branche du cadrage : une décision écrite en même temps que lui n'existe nulle part ailleurs.
     try {
-      const lues = await redaction.loadDecisions(idCharge, lu.source.branche);
-      decisions.value = lues.map((l) => {
-        const idDecision = (l.fichier.split("/").pop() ?? "").replace(
-          /\.md$/,
-          "",
-        );
+      const read = await authoring.loadDecisions(
+        loadedId,
+        readAt.source.branch,
+      );
+      decisions.value = read.map((l) => {
+        const idDecision = (l.file.split("/").pop() ?? "").replace(/\.md$/, "");
         return {
           ...l.decision,
-          fichier: l.fichier,
+          file: l.file,
           sha: l.sha,
           id: idDecision,
           // Ce que produirait une réécriture à l'identique : le comparer évite d'enregistrer une décision que personne n'a touchée.
-          texteEnregistre: serializeDecision(idDecision, l.decision),
+          savedText: serializeDecision(idDecision, l.decision),
         };
       });
     } catch {
       // Ne pas empêcher d'éditer le cadrage : les décisions rejoindront l'écran au prochain chargement.
       decisions.value = [];
     }
-    titre.value = String(data["titre"] ?? "");
-    domaines.value = ((data["domaines"] as string[]) ?? []).join(", ");
-    objectif.value = extractSection(parse.body, "Objectif");
+    title.value = String(data["titre"] ?? "");
+    domains.value = ((data["domaines"] as string[]) ?? []).join(", ");
+    goal.value = extractSection(parse.body, "Objectif");
     // Ce que l'éditeur ne sait pas présenter doit lui survivre : sans cela, réenregistrer effacerait des sections que quelqu'un a écrites.
-    sectionsInconnues.value = extractSectionsAutres(
-      parse.body,
-      SECTIONS_CONNUES,
-    );
-    parcours.value = extractSection(parse.body, "Parcours utilisateur");
-    liensPortes.value = (
+    unknownSections.value = extractOtherSections(parse.body, KNOWN_SECTIONS);
+    journey.value = extractSection(parse.body, "Parcours utilisateur");
+    carriedLinks.value = (
       (data["liens"] as Array<Record<string, unknown>>) ?? []
     )
       .filter((l) => !!l && typeof l === "object")
       .map((l) => ({
         tag: String(l["tag"] ?? ""),
         url: String(l["url"] ?? ""),
-        nom: String(l["nom"] ?? ""),
+        name: String(l["nom"] ?? ""),
       }))
       .filter((l) => l.url);
     impacts.value = ((data["impacts"] as Array<Record<string, unknown>>) ?? [])
       .filter((i) => !!i && typeof i === "object")
       .map((i) => {
-        const nature =
-          NATURES_IMPACT.find((n) => i[n] !== undefined) ?? "regle";
-        const brut = i[nature];
-        const cible = typeof brut === "string" ? brut : "";
+        const kind = IMPACT_KINDS.find((n) => i[n] !== undefined) ?? "regle";
+        const raw = i[kind];
+        const target = typeof raw === "string" ? raw : "";
         return {
-          cible,
-          nature,
-          operation: i["operation"] as OperationImpact,
-          enonce: enonces.get(cible) ?? "",
+          target: target,
+          kind: kind,
+          operation: i["operation"] as ImpactOperation,
+          statement: statements.get(target) ?? "",
         };
       });
   } catch (e) {
     // Oublier ce qui a échoué : un rechargement du référentiel doit pouvoir retenter la lecture, sinon l'écran reste en erreur jusqu'à la navigation.
-    chargeId = null;
-    erreurChargement.value =
+    loadId = null;
+    loadError.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
         : "Le cadrage n’a pas pu être chargé.";
   } finally {
-    chargement.value = false;
+    loading.value = false;
   }
 }
 
-async function enregistrer(): Promise<void> {
-  const origine = source.value;
-  if (envoi.value || problemes.value.length || !origine) return;
+async function save(): Promise<void> {
+  const origin = source.value;
+  if (sending.value || problems.value.length || !origin) return;
 
-  envoi.value = true;
-  erreur.value = null;
-  enregistre.value = false;
+  sending.value = true;
+  error.value = null;
+  saved.value = false;
   try {
-    const apres = await redaction.saveCadrage(
+    const after = await authoring.saveScoping(
       id.value,
-      origine,
+      origin,
       {
-        titre: titre.value,
-        domaines: domainesSaisis(),
-        objectif: objectif.value,
-        parcours: parcours.value,
+        title: title.value,
+        domains: enteredDomains(),
+        goal: goal.value,
+        journey: journey.value,
         impacts: impacts.value,
-        liens: liensPortes.value,
-        sectionsInconnues: sectionsInconnues.value,
+        links: carriedLinks.value,
+        unknownSections: unknownSections.value,
       },
-      contexte.value ?? undefined,
+      context.value ?? undefined,
     );
     // Le SHA rendu par l'écriture est celui sur lequel la suivante se fonde : l'appliquer évite un rechargement, et la course qu'il introduisait.
-    source.value = apres;
+    source.value = after;
 
     // Les décisions après le cadrage : elles vivent dans son répertoire, qui doit exister. Une par enregistrement, le SHA rendu servant au suivant. Seules celles qui ont changé : réécrire les autres produirait des enregistrements sans objet et toucherait des fichiers que personne n'a modifiés, ce qui rend l'historique illisible.
-    const ecrites: DecisionSaisie[] = [];
+    const written: DecisionInput[] = [];
     for (const d of decisions.value) {
       const idDecision = d.id.trim();
       if (!idDecision) continue;
 
-      const texte = serializeDecision(idDecision, d);
-      if (d.fichier && texte === d.texteEnregistre) {
-        ecrites.push(d);
+      const text = serializeDecision(idDecision, d);
+      if (d.file && text === d.savedText) {
+        written.push(d);
         continue;
       }
 
-      const sha = await redaction.saveDecision(
+      const sha = await authoring.saveDecision(
         id.value,
         idDecision,
-        origine.branche,
+        origin.branch,
         d,
         d.sha,
       );
-      ecrites.push({
+      written.push({
         ...d,
-        fichier: `cadrages/${id.value}/decisions/${idDecision}.md`,
+        file: `cadrages/${id.value}/decisions/${idDecision}.md`,
         sha,
-        texteEnregistre: texte,
+        savedText: text,
       });
     }
-    decisions.value = ecrites;
+    decisions.value = written;
 
-    for (const chemin of decisionsSupprimees.value) {
-      await redaction.supprimerDecision(origine.branche, chemin);
+    for (const path of deletedDecisions.value) {
+      await authoring.deleteDecision(origin.branch, path);
     }
-    decisionsSupprimees.value = [];
+    deletedDecisions.value = [];
 
-    enregistre.value = true;
+    saved.value = true;
 
     // La vue lecture n'affiche que ce que le magasin porte : sans ce rechargement, revenir au cadrage montrerait l'état d'avant l'enregistrement jusqu'à ce que quelqu'un recharge à la main. Les contenus étant lus au commit, ce qui revient est bien ce qu'on vient d'écrire.
-    void store.loadReferentiel();
+    void store.loadSpecification();
   } catch (e) {
-    erreur.value =
+    error.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
         : "L’enregistrement a échoué.";
   } finally {
-    envoi.value = false;
+    sending.value = false;
   }
 }
 </script>
 
 <template>
   <div class="editer-cadrage-page">
-    <RouterLink class="retour" :to="liens.chemin('cadrages')">
-      <UiIcone nom="arrow_back" /> Cadrages
+    <RouterLink class="retour" :to="links.path('cadrages')">
+      <UiIcon name="arrow_back" /> Cadrages
     </RouterLink>
 
     <header class="entete">
@@ -536,77 +534,82 @@ async function enregistrer(): Promise<void> {
       <h1>{{ id }}</h1>
       <!-- Toujours sa branche : un cadrage que la principale porte est livré, et ne se charge pas ici (RG-cadrage-livre-immuable). -->
       <p v-if="source" class="sous-titre">
-        Chargé depuis <code>{{ source.branche }}</code
+        Chargé depuis <code>{{ source.branch }}</code
         >. Les écritures y restent jusqu’à la livraison.
       </p>
     </header>
 
-    <template v-if="!chargement && !erreurChargement && transitions.length">
+    <template v-if="!loading && !loadError && transitions.length">
       <section class="cycle">
         <div class="cycle-etat">
           <span class="cycle-libelle">Statut</span>
-          <strong>{{ libelleStatut(statut()) }}</strong>
+          <strong>{{ statusLabel(status()) }}</strong>
         </div>
         <div class="cycle-actions">
-          <UiBouton
+          <UiButton
             v-for="vers of transitions"
             :key="vers"
-            variante="outlined"
-            :disabled="transition || envoi || problemes.length > 0"
-            @click="allerVers(vers)"
+            variant="outlined"
+            :disabled="transition || sending || problems.length > 0"
+            @click="goToward(vers)"
           >
-            {{ libelleStatut(vers) }}
-          </UiBouton>
+            {{ statusLabel(vers) }}
+          </UiButton>
         </div>
       </section>
-      <p v-if="problemes.length" class="cycle-bloque">
+      <p v-if="problems.length" class="cycle-bloque">
         Le cadrage doit être cohérent avant de changer de statut.
       </p>
-      <p v-if="basculeEchouee" class="cycle-bloque">
+      <p v-if="toggleFailed" class="cycle-bloque">
         La demande de fusion n’a pas basculé : le statut n’a pas changé.
         Réessayer, ou basculer la demande sur la plateforme.
       </p>
     </template>
 
-    <p v-if="chargement" class="attente">Chargement du cadrage…</p>
-    <p v-else-if="erreurChargement" class="erreur">
-      <UiIcone nom="error_outline" /> <span>{{ erreurChargement }}</span>
+    <p v-if="loading" class="attente">Chargement du cadrage…</p>
+    <p v-else-if="loadError" class="erreur">
+      <UiIcon name="error_outline" /> <span>{{ loadError }}</span>
     </p>
-    <form v-else class="formulaire" @submit.prevent="enregistrer()">
-      <UiChamp v-model="titre" libelle="Titre" name="titre" :disabled="envoi" />
-
-      <UiChamp
-        v-model="domaines"
-        libelle="Domaines"
-        name="domaines"
-        indice="Séparés par des virgules."
-        :disabled="envoi"
+    <form v-else class="formulaire" @submit.prevent="save()">
+      <UiTextField
+        v-model="title"
+        label="Titre"
+        name="titre"
+        :disabled="sending"
       />
 
-      <UiChamp
-        v-model="objectif"
-        libelle="Objectif"
-        multiligne
+      <UiTextField
+        v-model="domains"
+        label="Domaines"
+        name="domaines"
+        hint="Séparés par des virgules."
+        :disabled="sending"
+      />
+
+      <UiTextField
+        v-model="goal"
+        label="Objectif"
+        multiline
         :rows="5"
         name="objectif"
-        :disabled="envoi"
+        :disabled="sending"
       />
 
-      <UiChamp
-        v-model="parcours"
-        libelle="Parcours utilisateur"
-        multiligne
+      <UiTextField
+        v-model="journey"
+        label="Parcours utilisateur"
+        multiline
         :rows="5"
         name="parcours"
-        :disabled="envoi"
+        :disabled="sending"
       />
 
       <section class="impacts">
         <div class="impacts-tete">
           <h2 class="section">Impacts sur les règles</h2>
-          <UiBouton :disabled="envoi" @click="ajouterImpact()">
-            <UiIcone nom="add" /> Ajouter
-          </UiBouton>
+          <UiButton :disabled="sending" @click="addImpact()">
+            <UiIcon name="add" /> Ajouter
+          </UiButton>
         </div>
 
         <p v-if="!impacts.length" class="vide">
@@ -618,54 +621,54 @@ async function enregistrer(): Promise<void> {
           <div class="impact-tete">
             <UiSelect
               class="nature"
-              :model-value="i.nature ?? 'regle'"
-              libelle="Nature"
-              :options="optionsNature"
+              :model-value="i.kind ?? 'regle'"
+              label="Nature"
+              :options="kindOptions"
               :name="'nature' + index"
-              :disabled="envoi"
-              @update:model-value="majImpact(index, { nature: $event })"
+              :disabled="sending"
+              @update:model-value="updateImpact(index, { kind: $event })"
             />
 
-            <UiChamp
+            <UiTextField
               class="regle"
-              :model-value="i.cible"
-              :libelle="libelleNature(i.nature ?? 'regle')"
+              :model-value="i.target"
+              :label="kindLabel(i.kind ?? 'regle')"
               :name="'cible' + index"
-              :disabled="envoi"
-              @update:model-value="majImpact(index, { cible: $event })"
+              :disabled="sending"
+              @update:model-value="updateImpact(index, { target: $event })"
             />
 
             <UiSelect
               class="operation"
               :model-value="i.operation"
-              libelle="Opération"
-              :options="optionsOperation"
+              label="Opération"
+              :options="operationOptions"
               :name="'op' + index"
-              :disabled="envoi"
-              @update:model-value="majImpact(index, { operation: $event })"
+              :disabled="sending"
+              @update:model-value="updateImpact(index, { operation: $event })"
             />
 
-            <UiBouton
-              variante="icon"
-              :disabled="envoi"
+            <UiButton
+              variant="icon"
+              :disabled="sending"
               aria-label="Retirer cet impact"
-              @click="retirerImpact(index)"
+              @click="removeImpact(index)"
             >
-              <UiIcone nom="close" />
-            </UiBouton>
+              <UiIcon name="close" />
+            </UiButton>
           </div>
 
-          <UiChamp
-            v-if="demandeEnonce(i.operation)"
+          <UiTextField
+            v-if="requiresStatement(i.operation)"
             class="enonce"
-            :model-value="i.enonce"
-            libelle="Énoncé de la règle"
-            multiligne
+            :model-value="i.statement"
+            label="Énoncé de la règle"
+            multiline
             :rows="4"
             :name="'enonce' + index"
-            indice="Le texte de la règle après ce cadrage. C’est lui que la propagation écrira au référentiel."
-            :disabled="envoi"
-            @update:model-value="majImpact(index, { enonce: $event })"
+            hint="Le texte de la règle après ce cadrage. C’est lui que la propagation écrira au référentiel."
+            :disabled="sending"
+            @update:model-value="updateImpact(index, { statement: $event })"
           />
         </div>
       </section>
@@ -673,9 +676,9 @@ async function enregistrer(): Promise<void> {
       <section class="impacts">
         <div class="impacts-tete">
           <h2 class="section">Décisions</h2>
-          <UiBouton :disabled="envoi" @click="ajouterDecision()">
-            <UiIcone nom="add" /> Ajouter
-          </UiBouton>
+          <UiButton :disabled="sending" @click="addDecision()">
+            <UiIcon name="add" /> Ajouter
+          </UiButton>
         </div>
 
         <p v-if="!decisions.length" class="vide">
@@ -685,74 +688,74 @@ async function enregistrer(): Promise<void> {
 
         <div v-for="(d, iD) of decisions" :key="iD" class="impact decision">
           <div class="impact-tete">
-            <UiChamp
+            <UiTextField
               class="regle"
-              :model-value="d.titre"
-              libelle="La question posée"
+              :model-value="d.title"
+              label="La question posée"
               :name="'dtitre' + iD"
-              :disabled="envoi"
-              @update:model-value="majDecision(iD, { titre: $event })"
+              :disabled="sending"
+              @update:model-value="updateDecision(iD, { title: $event })"
             />
 
             <UiSelect
               class="operation"
-              :model-value="d.statut"
-              libelle="Statut"
-              :options="optionsStatutDecision"
+              :model-value="d.status"
+              label="Statut"
+              :options="decisionStatusOptions"
               :name="'dstatut' + iD"
-              :disabled="envoi"
-              @update:model-value="majDecision(iD, { statut: $event })"
+              :disabled="sending"
+              @update:model-value="updateDecision(iD, { status: $event })"
             />
 
-            <UiBouton
-              variante="icon"
-              :disabled="envoi"
+            <UiButton
+              variant="icon"
+              :disabled="sending"
               aria-label="Retirer cette décision"
-              @click="retirerDecision(iD)"
+              @click="removeDecision(iD)"
             >
-              <UiIcone nom="close" />
-            </UiBouton>
+              <UiIcon name="close" />
+            </UiButton>
           </div>
 
-          <UiChamp
+          <UiTextField
             class="enonce"
             :model-value="d.description"
-            libelle="Ce qui rendait la question ouverte"
-            multiligne
+            label="Ce qui rendait la question ouverte"
+            multiline
             :rows="3"
             :name="'ddesc' + iD"
-            :disabled="envoi"
-            @update:model-value="majDecision(iD, { description: $event })"
+            :disabled="sending"
+            @update:model-value="updateDecision(iD, { description: $event })"
           />
 
           <div class="options-tete">
             <h3>Options</h3>
-            <UiBouton :disabled="envoi" @click="ajouterOption(iD)">
-              <UiIcone nom="add" /> Option
-            </UiBouton>
+            <UiButton :disabled="sending" @click="addOption(iD)">
+              <UiIcon name="add" /> Option
+            </UiButton>
           </div>
 
           <div
             v-for="(o, iO) of d.options"
             :key="iO"
             class="option"
-            :class="{ retenue: estRetenue(d, o.id) }"
+            :class="{ retenue: isChosen(d, o.id) }"
           >
             <button
               type="button"
               class="marque"
-              :disabled="envoi || !o.id.trim()"
-              :aria-pressed="estRetenue(d, o.id)"
+              :disabled="sending || !o.id.trim()"
+              :aria-pressed="isChosen(d, o.id)"
               :title="
-                estRetenue(d, o.id)
+                isChosen(d, o.id)
                   ? 'Option retenue — cliquer pour ne plus la retenir'
                   : 'Désigner comme retenue'
               "
-              @click="basculerRetenue(iD, o.id)"
+              @click="toggleChosen(iD, o.id)"
             >
-              <UiIcone
-                :nom="
-                  estRetenue(d, o.id)
+              <UiIcon
+                :name="
+                  isChosen(d, o.id)
                     ? 'radio_button_checked'
                     : 'radio_button_unchecked'
                 "
@@ -760,72 +763,72 @@ async function enregistrer(): Promise<void> {
             </button>
 
             <div class="option-champs">
-              <UiChamp
+              <UiTextField
                 :model-value="o.id"
-                libelle="Nom de l’option"
+                label="Nom de l’option"
                 :name="'oid' + iD + '-' + iO"
-                indice="En minuscules, avec des tirets — il ne se renomme plus."
-                :disabled="envoi"
-                @update:model-value="majOption(iD, iO, { id: $event })"
+                hint="En minuscules, avec des tirets — il ne se renomme plus."
+                :disabled="sending"
+                @update:model-value="updateOption(iD, iO, { id: $event })"
               />
 
-              <UiChamp
-                :model-value="o.corps"
-                libelle="Ce qu’elle propose, pour et contre"
-                multiligne
+              <UiTextField
+                :model-value="o.body"
+                label="Ce qu’elle propose, pour et contre"
+                multiline
                 :rows="3"
                 :name="'ocorps' + iD + '-' + iO"
-                :disabled="envoi"
-                @update:model-value="majOption(iD, iO, { corps: $event })"
+                :disabled="sending"
+                @update:model-value="updateOption(iD, iO, { body: $event })"
               />
             </div>
 
-            <UiBouton
-              variante="icon"
-              :disabled="envoi"
+            <UiButton
+              variant="icon"
+              :disabled="sending"
               aria-label="Retirer cette option"
-              @click="retirerOption(iD, iO)"
+              @click="removeOption(iD, iO)"
             >
-              <UiIcone nom="close" />
-            </UiBouton>
+              <UiIcon name="close" />
+            </UiButton>
           </div>
 
-          <UiChamp
+          <UiTextField
             class="enonce"
             :model-value="d.decision"
-            libelle="Ce qui a tranché"
-            multiligne
+            label="Ce qui a tranché"
+            multiline
             :rows="3"
             :name="'dtranche' + iD"
-            indice="Le critère qui a fait pencher, non la liste des avantages."
-            :disabled="envoi"
-            @update:model-value="majDecision(iD, { decision: $event })"
+            hint="Le critère qui a fait pencher, non la liste des avantages."
+            :disabled="sending"
+            @update:model-value="updateDecision(iD, { decision: $event })"
           />
         </div>
       </section>
 
-      <ul v-if="problemes.length" class="problemes">
-        <li v-for="p of problemes" :key="p">{{ p }}</li>
+      <ul v-if="problems.length" class="problemes">
+        <li v-for="p of problems" :key="p">{{ p }}</li>
       </ul>
 
-      <p v-if="erreur" class="erreur">
-        <UiIcone nom="error_outline" /> <span>{{ erreur }}</span>
+      <p v-if="error" class="erreur">
+        <UiIcon name="error_outline" /> <span>{{ error }}</span>
       </p>
 
-      <p v-if="enregistre" class="succes">
-        <UiIcone nom="check_circle" />
+      <p v-if="saved" class="succes">
+        <UiIcon name="check_circle" />
         <span>Cadrage enregistré sur sa branche.</span>
       </p>
 
       <div class="actions">
-        <UiBouton :to="liens.chemin('cadrages')">Fermer</UiBouton>
-        <UiBouton
-          variante="filled"
+        <UiButton :to="links.path('cadrages')">Fermer</UiButton>
+        <UiButton
+          variant="filled"
           type="submit"
-          :disabled="envoi || problemes.length > 0"
+          :disabled="sending || problems.length > 0"
         >
-          {{ envoi ? "Enregistrement…" : "Enregistrer" }}
-        </UiBouton>
+          {{ sending ? "Enregistrement…" : "Enregistrer" }}
+        </UiButton>
       </div>
     </form>
   </div>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMemoryHistory, type Router } from "vue-router";
-import { createRouteur } from "../../routeur";
-import { parseLienCanon } from "./lien-canon";
+import { createAppRouter } from "../../routeur";
+import { parseDeepLink } from "./lien-canon";
 
 /**
  * L'ouverture par protocole — RG-ouverture-par-protocole.
@@ -14,7 +14,7 @@ import { parseLienCanon } from "./lien-canon";
 describe("analyse d’un lien web+canon", () => {
   it("lit le chemin de l’adresse https, sans l’hôte", () => {
     expect(
-      parseLienCanon("web+canon:ssk-it/ssk-canon/cadrages/2026-047"),
+      parseDeepLink("web+canon:ssk-it/ssk-canon/cadrages/2026-047"),
     ).toEqual({
       segments: ["ssk-it", "ssk-canon", "cadrages", "2026-047"],
       fragment: null,
@@ -23,7 +23,7 @@ describe("analyse d’un lien web+canon", () => {
 
   it("ouvre toute vue d’un projet, pas seulement les cadrages", () => {
     expect(
-      parseLienCanon(
+      parseDeepLink(
         "web+canon:ssk-it/ssk-canon/referentiel/regle/RG-prefixe-projet",
       ),
     )?.toEqual({
@@ -42,12 +42,12 @@ describe("analyse d’un lien web+canon", () => {
     // La résolution du préfixe vit dans la page du cadrage, comme pour une
     // adresse tapée : le lien n'a pas à la refaire.
     expect(
-      parseLienCanon("web+canon:org/prime/cadrages/PRMCO-2026-012")?.segments,
+      parseDeepLink("web+canon:org/prime/cadrages/PRMCO-2026-012")?.segments,
     ).toEqual(["org", "prime", "cadrages", "PRMCO-2026-012"]);
   });
 
   it("accepte un projet seul, que le routage mène au référentiel", () => {
-    expect(parseLienCanon("web+canon:ssk-it/ssk-canon")?.segments).toEqual([
+    expect(parseDeepLink("web+canon:ssk-it/ssk-canon")?.segments).toEqual([
       "ssk-it",
       "ssk-canon",
     ]);
@@ -55,13 +55,13 @@ describe("analyse d’un lien web+canon", () => {
 
   it("tolère les barres obliques de tête et de fin", () => {
     expect(
-      parseLienCanon("web+canon:/ssk-it/ssk-canon/cadrages/")?.segments,
+      parseDeepLink("web+canon:/ssk-it/ssk-canon/cadrages/")?.segments,
     ).toEqual(["ssk-it", "ssk-canon", "cadrages"]);
   });
 
   it("garde l’ancre, qui mène à une décision dans son cadrage", () => {
     expect(
-      parseLienCanon(
+      parseDeepLink(
         "web+canon:ssk-it/ssk-canon/cadrages/2026-047#02-ce-que-le-lien-designe",
       ),
     ).toEqual({
@@ -72,13 +72,12 @@ describe("analyse d’un lien web+canon", () => {
 
   it("décode les segments que l’adresse https encodait", () => {
     expect(
-      parseLienCanon("web+canon:ssk-it/ssk-canon/cadrages/2026%2D047")
-        ?.segments,
+      parseDeepLink("web+canon:ssk-it/ssk-canon/cadrages/2026%2D047")?.segments,
     ).toEqual(["ssk-it", "ssk-canon", "cadrages", "2026-047"]);
   });
 
   it("reconnaît le schéma quel que soit sa casse", () => {
-    expect(parseLienCanon("WEB+Canon:ssk-it/ssk-canon")?.segments).toEqual([
+    expect(parseDeepLink("WEB+Canon:ssk-it/ssk-canon")?.segments).toEqual([
       "ssk-it",
       "ssk-canon",
     ]);
@@ -87,7 +86,7 @@ describe("analyse d’un lien web+canon", () => {
   it("reconnaît le « + » du schéma lu comme une espace", () => {
     // Dans une chaîne de requête, un « + » non encodé se lit comme une espace :
     // un lien collé tel quel dans la barre d'adresse arrive ainsi.
-    expect(parseLienCanon("web canon:ssk-it/ssk-canon")?.segments).toEqual([
+    expect(parseDeepLink("web canon:ssk-it/ssk-canon")?.segments).toEqual([
       "ssk-it",
       "ssk-canon",
     ]);
@@ -119,8 +118,8 @@ describe("analyse d’un lien web+canon", () => {
         "une barre oblique encodée dans un segment",
         "web+canon:ssk-it%2Fssk-canon/cadrages",
       ],
-    ])("%s", (_cas, lien) => {
-      expect(parseLienCanon(lien)).toBeNull();
+    ])("%s", (_case, link) => {
+      expect(parseDeepLink(link)).toBeNull();
     });
   });
 });
@@ -128,16 +127,16 @@ describe("analyse d’un lien web+canon", () => {
 describe("adresse de réception /ouvrir", () => {
   let router: Router;
 
-  async function ouvrir(adresse: string): Promise<string> {
-    router = createRouteur(createMemoryHistory());
-    await router.push(adresse);
+  async function open(address: string): Promise<string> {
+    router = createAppRouter(createMemoryHistory());
+    await router.push(address);
     return router.currentRoute.value.fullPath;
   }
 
   it("ouvre la page désignée par le lien que le système a encodé", async () => {
     // Le lien entier arrive encodé comme un composant d'adresse : « + », « : » et « / » en %2B, %3A, %2F.
     expect(
-      await ouvrir(
+      await open(
         "/ouvrir?lien=web%2Bcanon%3Assk-it%2Fssk-canon%2Fcadrages%2F2026-047",
       ),
     ).toBe("/ssk-it/ssk-canon/cadrages/2026-047");
@@ -145,40 +144,40 @@ describe("adresse de réception /ouvrir", () => {
 
   it("ouvre aussi un lien skanon:", async () => {
     expect(
-      await ouvrir("/ouvrir?lien=skanon%3Assk-it%2Fssk-canon%2Fcadrages"),
+      await open("/ouvrir?lien=skanon%3Assk-it%2Fssk-canon%2Fcadrages"),
     ).toBe("/ssk-it/ssk-canon/cadrages");
   });
 
   it("porte l’ancre jusqu’à la page", async () => {
     expect(
-      await ouvrir(
+      await open(
         "/ouvrir?lien=web%2Bcanon%3Assk-it%2Fssk-canon%2Fcadrages%2F2026-047%2302-ce-que-le-lien-designe",
       ),
     ).toBe("/ssk-it/ssk-canon/cadrages/2026-047#02-ce-que-le-lien-designe");
   });
 
   it("ramène au choix du projet un lien qui n’en porte pas", async () => {
-    expect(await ouvrir("/ouvrir?lien=web%2Bcanon%3A2026-047")).toBe("/");
+    expect(await open("/ouvrir?lien=web%2Bcanon%3A2026-047")).toBe("/");
   });
 
   it("ne suit pas un hôte porté par le lien", async () => {
     expect(
-      await ouvrir(
+      await open(
         "/ouvrir?lien=web%2Bcanon%3Ahttps%3A%2F%2Fevil.example%2Fa%2Fb",
       ),
     ).toBe("/");
   });
 
   it("ne laisse pas l’adresse de réception dans l’historique", async () => {
-    await ouvrir("/ssk-it/ssk-canon/referentiel");
+    await open("/ssk-it/ssk-canon/referentiel");
     await router.push(
       "/ouvrir?lien=web%2Bcanon%3Assk-it%2Fssk-canon%2Fcadrages",
     );
 
     router.back();
     await new Promise<void>((r) => {
-      const arret = router.afterEach(() => {
-        arret();
+      const stop = router.afterEach(() => {
+        stop();
         r();
       });
     });

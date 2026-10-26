@@ -17,7 +17,7 @@
  * règle à un seul endroit.
  */
 
-import { ProvenanceCadrage, StatutCadrage } from "../model/model";
+import { ScopingProvenance, ScopingStatus } from "../model/model";
 
 /**
  * Le statut qui découle de l'endroit où vit un cadrage.
@@ -29,14 +29,14 @@ import { ProvenanceCadrage, StatutCadrage } from "../model/model";
  * brouillon : c'est l'état le moins engageant, et le seul qu'on puisse affirmer
  * quand rien n'indique qu'une relecture a commencé.
  */
-export function deriverStatut(provenance?: ProvenanceCadrage): StatutCadrage {
+export function deriveStatus(provenance?: ScopingProvenance): ScopingStatus {
   if (!provenance) return "livree";
-  if (provenance.brouillon) return "brouillon";
+  if (provenance.draft) return "brouillon";
 
   // Une demande approuvée vaut validation ; tout le reste — avis non rendu,
   // changements demandés, appel en échec — reste en relecture. On ne déduit
   // jamais une validation d'une absence d'information.
-  if (provenance.approbation === "APPROVED") return "validee";
+  if (provenance.approval === "APPROVED") return "validee";
 
   return "en_relecture";
 }

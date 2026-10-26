@@ -5,20 +5,19 @@
  * respecter le format, pour qu'une seule description de ce format existe. Deux
  * copies divergeraient dès la première correction.
  */
-export const DEPOT_SKILL = "ssk-it/ssk-canon-action";
+export const SKILL_REPO = "ssk-it/ssk-canon-action";
 
 /** Ce qui compose le skill, tel qu'il vit dans le dépôt. */
-export const FICHIERS_SKILL: ReadonlyArray<{ chemin: string; source: string }> =
-  [
-    {
-      chemin: "cadrage-canon/SKILL.md",
-      source: "skills/cadrage-canon/SKILL.md",
-    },
-    {
-      chemin: "cadrage-canon/scripts/situer.mjs",
-      source: "skills/cadrage-canon/scripts/situer.mjs",
-    },
-  ];
+export const SKILL_FILES: ReadonlyArray<{ path: string; source: string }> = [
+  {
+    path: "cadrage-canon/SKILL.md",
+    source: "skills/cadrage-canon/SKILL.md",
+  },
+  {
+    path: "cadrage-canon/scripts/situer.mjs",
+    source: "skills/cadrage-canon/scripts/situer.mjs",
+  },
+];
 
 /**
  * Commande d'installation, à coller dans un terminal.
@@ -27,12 +26,12 @@ export const FICHIERS_SKILL: ReadonlyArray<{ chemin: string; source: string }> =
  * obligerait à recomposer les répertoires à la main, et une erreur de placement
  * rend le skill invisible sans rien dire.
  */
-export function commandeInstallation(): string {
+export function installCommand(): string {
   // Coupée court : une ligne qui déborde de son cadre paraît tronquée, alors
   // qu'elle ne fait que défiler.
   return [
     `git clone -q --depth 1 \\`,
-    `  https://github.com/${DEPOT_SKILL} /tmp/canon \\`,
+    `  https://github.com/${SKILL_REPO} /tmp/canon \\`,
     "  && mkdir -p ~/.claude/skills \\",
     "  && cp -R /tmp/canon/skills/cadrage-canon ~/.claude/skills/ \\",
     "  && rm -rf /tmp/canon",
@@ -46,8 +45,8 @@ export function commandeInstallation(): string {
  * cloné. Ce qui est vrai du projet, lui, est déclaré dans `ssk-canon.yml`, du
  * côté qui a autorité.
  */
-export function configurationExemple(nomDepot: string): string {
-  return `{\n  "projets": [\n    "~/chemin/vers/${nomDepot}"\n  ]\n}\n`;
+export function sampleConfiguration(repoName: string): string {
+  return `{\n  "projets": [\n    "~/chemin/vers/${repoName}"\n  ]\n}\n`;
 }
 
 /**
@@ -56,10 +55,10 @@ export function configurationExemple(nomDepot: string): string {
  * Sans lui, un dépôt de code invoquant le skill ne se rattache à aucun projet :
  * c'est ce bloc, et lui seul, qui fait le lien du référentiel vers son code.
  */
-export function exempleDepotsCode(
-  depots: readonly { repo: string; role: string }[],
+export function sampleCodeRepos(
+  repos: readonly { repo: string; role: string }[],
 ): string {
-  if (depots.length === 0) {
+  if (repos.length === 0) {
     return [
       "depots_code:",
       "  - { repo: organisation/depot-front, role: Application web }",
@@ -68,7 +67,7 @@ export function exempleDepotsCode(
   }
   return [
     "depots_code:",
-    ...depots.map(
+    ...repos.map(
       (d) => `  - { repo: ${d.repo}${d.role ? `, role: ${d.role}` : ""} }`,
     ),
   ].join("\n");

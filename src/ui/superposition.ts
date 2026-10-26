@@ -7,10 +7,10 @@ import { onBeforeUnmount, watch, type Ref } from "vue";
  */
 
 /** Au-dessus des dialogues (`z-index: 1000`), sous un diagramme agrandi (1200). */
-export const Z_PANNEAU = 1100;
+export const Z_PANEL = 1100;
 
 /** La marge qu'un panneau garde avec les bords de la fenêtre. */
-const MARGE = 8;
+const MARGIN = 8;
 
 export interface Position {
   readonly top: string;
@@ -21,60 +21,57 @@ export interface Position {
 /**
  * Pose un panneau sous son ancre, aligné à gauche — ou au-dessus quand il ne tient pas en dessous, et décalé vers la gauche quand il déborderait à droite.
  */
-export function placerSous(
-  ancre: DOMRect,
-  panneau: { width: number; height: number },
-  options: { largeurAncre?: boolean } = {},
+export function placeBelow(
+  anchor: DOMRect,
+  panel: { width: number; height: number },
+  options: { anchorWidth?: boolean } = {},
 ): Position {
-  const hauteurFenetre = window.innerHeight;
-  const largeurFenetre = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  const windowWidth = window.innerWidth;
   const top =
-    ancre.bottom + panneau.height > hauteurFenetre - MARGE &&
-    ancre.top - panneau.height >= MARGE
-      ? ancre.top - panneau.height
-      : ancre.bottom;
-  const largeur = Math.max(
-    panneau.width,
-    options.largeurAncre ? ancre.width : 0,
-  );
+    anchor.bottom + panel.height > windowHeight - MARGIN &&
+    anchor.top - panel.height >= MARGIN
+      ? anchor.top - panel.height
+      : anchor.bottom;
+  const width = Math.max(panel.width, options.anchorWidth ? anchor.width : 0);
   const left =
-    ancre.left + largeur > largeurFenetre - MARGE
-      ? Math.max(MARGE, ancre.right - largeur)
-      : ancre.left;
+    anchor.left + width > windowWidth - MARGIN
+      ? Math.max(MARGIN, anchor.right - width)
+      : anchor.left;
   return {
     top: `${Math.round(top)}px`,
     left: `${Math.round(left)}px`,
-    minWidth: options.largeurAncre ? `${Math.round(ancre.width)}px` : undefined,
+    minWidth: options.anchorWidth ? `${Math.round(anchor.width)}px` : undefined,
   };
 }
 
 /**
  * Tant que `ouvert` vaut vrai, un appui hors des éléments donnés referme le panneau, et un défilement ou un redimensionnement le replace.
  */
-export function useSuperposition(
-  ouvert: Ref<boolean>,
+export function useOverlay(
+  opened: Ref<boolean>,
   elements: () => readonly (HTMLElement | null | undefined)[],
-  fermer: () => void,
-  replacer: () => void,
+  close: () => void,
+  reposition: () => void,
 ): void {
-  const surAppui = (e: PointerEvent) => {
-    const cible = e.target as Node | null;
-    if (elements().some((el) => el && cible && el.contains(cible))) return;
-    fermer();
+  const onPointerDown = (e: PointerEvent) => {
+    const target = e.target as Node | null;
+    if (elements().some((el) => el && target && el.contains(target))) return;
+    close();
   };
-  const surMouvement = () => replacer();
+  const onMove = () => reposition();
 
-  const brancher = () => {
-    document.addEventListener("pointerdown", surAppui, true);
-    window.addEventListener("scroll", surMouvement, true);
-    window.addEventListener("resize", surMouvement);
+  const connect = () => {
+    document.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
   };
-  const debrancher = () => {
-    document.removeEventListener("pointerdown", surAppui, true);
-    window.removeEventListener("scroll", surMouvement, true);
-    window.removeEventListener("resize", surMouvement);
+  const disconnect = () => {
+    document.removeEventListener("pointerdown", onPointerDown, true);
+    window.removeEventListener("scroll", onMove, true);
+    window.removeEventListener("resize", onMove);
   };
 
-  watch(ouvert, (o) => (o ? brancher() : debrancher()));
-  onBeforeUnmount(debrancher);
+  watch(opened, (o) => (o ? connect() : disconnect()));
+  onBeforeUnmount(disconnect);
 }

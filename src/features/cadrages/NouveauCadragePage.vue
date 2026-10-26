@@ -4,94 +4,94 @@ import { RouterLink, useRouter } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { RedactionService } from "../../core/repo/redaction.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { PLATEFORME } from "../../plateforme/jeton";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiChamp from "../../ui/UiChamp.vue";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { AuthoringService } from "../../core/repo/redaction.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { PLATFORM } from "../../plateforme/jeton";
+import UiButton from "../../ui/UiBouton.vue";
+import UiTextField from "../../ui/UiChamp.vue";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
 
 /**
  * Ouverture d'un cadrage.
  *
  * Le formulaire ne demande que ce qu'un cadrage doit porter dès sa création : un titre, ce qu'il vise, et le parcours attendu. Les décisions, les impacts et les énoncés se rédigent ensuite, au fil de la relecture — les exiger d'emblée confondrait l'ouverture d'un sujet avec sa conclusion.
  */
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
-const redaction = inject(RedactionService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
+const authoring = inject(AuthoringService);
 const tokens = inject(TokenService);
-const ouvreur = inject(PLATEFORME).ouvreur;
+const opener = inject(PLATFORM).opener;
 const router = useRouter();
 
-const titre = ref("");
-const domaines = ref("");
-const objectif = ref("");
-const parcours = ref("");
+const title = ref("");
+const domains = ref("");
+const goal = ref("");
+const journey = ref("");
 
-const envoi = ref(false);
-const erreur = ref<string | null>(null);
+const sending = ref(false);
+const error = ref<string | null>(null);
 
-const domainesConnus = computed(() => store.domaines().map((d) => d.id));
+const knownDomains = computed(() => store.domains().map((d) => d.id));
 
 /**
  * Ce qui manque encore, nommé plutôt que signalé par un bouton inerte.
  *
  * Un bouton désactivé sans explication laisse le rédacteur chercher lequel des quatre champs le bloque.
  */
-const manquant = computed(() => {
-  const absents = [
-    ["un titre", titre.value],
-    ["un objectif", objectif.value],
-    ["un parcours", parcours.value],
+const missing = computed(() => {
+  const absent = [
+    ["un titre", title.value],
+    ["un objectif", goal.value],
+    ["un parcours", journey.value],
   ]
-    .filter(([, valeur]) => !valeur.trim())
-    .map(([nom]) => nom);
-  return absents.length ? absents.join(", ") : null;
+    .filter(([, value]) => !value.trim())
+    .map(([name]) => name);
+  return absent.length ? absent.join(", ") : null;
 });
 
-async function creer(): Promise<void> {
-  if (envoi.value || manquant.value) return;
+async function create(): Promise<void> {
+  if (sending.value || missing.value) return;
 
-  envoi.value = true;
-  erreur.value = null;
+  sending.value = true;
+  error.value = null;
   try {
-    const cree = await redaction.createCadrage({
-      titre: titre.value,
-      domaines: domaines.value
+    const cree = await authoring.createScoping({
+      title: title.value,
+      domains: domains.value
         .split(",")
         .map((d) => d.trim())
         .filter(Boolean),
-      objectif: objectif.value,
-      parcours: parcours.value,
+      goal: goal.value,
+      journey: journey.value,
     });
 
     // Le cadrage vit sur sa branche, invisible du référentiel chargé : on renvoie vers la demande de fusion, qui est l'endroit où il se relit et se commente jusqu'à sa livraison. Par l'ouvreur de la plateforme : dans l'application de bureau, `window.open` ne mène nulle part.
-    void ouvreur.open(cree.url);
-    await router.push(liens.chemin("cadrages"));
+    void opener.open(cree.url);
+    await router.push(links.path("cadrages"));
   } catch (e) {
-    erreur.value =
+    error.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
         : "La création du cadrage a échoué.";
   } finally {
-    envoi.value = false;
+    sending.value = false;
   }
 }
 </script>
 
 <template>
   <div class="nouveau-cadrage-page">
-    <EtatVue v-if="store.etat() !== 'pret'" />
+    <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
-      <RouterLink class="retour" :to="liens.chemin('cadrages')">
-        <UiIcone nom="arrow_back" /> Cadrages
+      <RouterLink class="retour" :to="links.path('cadrages')">
+        <UiIcon name="arrow_back" /> Cadrages
       </RouterLink>
 
       <header class="entete">
         <p class="type">Nouveau cadrage</p>
-        <h1>{{ redaction.prochainId() }}</h1>
+        <h1>{{ authoring.nextId() }}</h1>
         <p class="sous-titre">
           L’identifiant est attribué à la création et ne changera plus, même si
           le titre est réécrit.
@@ -99,7 +99,7 @@ async function creer(): Promise<void> {
       </header>
 
       <p v-if="!tokens.present()" class="avertissement">
-        <UiIcone nom="lock" />
+        <UiIcon name="lock" />
         <span>
           Écrire dans le dépôt demande une connexion, avec un jeton autorisant
           l’écriture. Le jeton de lecture seule conseillé pour la consultation
@@ -107,67 +107,67 @@ async function creer(): Promise<void> {
         </span>
       </p>
 
-      <form class="formulaire" @submit.prevent="creer()">
-        <UiChamp
-          v-model="titre"
-          libelle="Titre"
+      <form class="formulaire" @submit.prevent="create()">
+        <UiTextField
+          v-model="title"
+          label="Titre"
           name="titre"
-          indice="Ce que ce cadrage change, en une ligne."
-          :disabled="envoi"
+          hint="Ce que ce cadrage change, en une ligne."
+          :disabled="sending"
         />
 
-        <UiChamp
-          v-model="domaines"
-          libelle="Domaines"
+        <UiTextField
+          v-model="domains"
+          label="Domaines"
           name="domaines"
-          :indice="`Séparés par des virgules. Connus : ${domainesConnus.join(', ')}`"
-          :disabled="envoi"
+          :hint="`Séparés par des virgules. Connus : ${knownDomains.join(', ')}`"
+          :disabled="sending"
         />
 
-        <UiChamp
-          v-model="objectif"
-          libelle="Objectif"
-          multiligne
+        <UiTextField
+          v-model="goal"
+          label="Objectif"
+          multiline
           :rows="5"
           name="objectif"
-          indice="Le problème à résoudre, et pourquoi il mérite d’être traité."
-          :disabled="envoi"
+          hint="Le problème à résoudre, et pourquoi il mérite d’être traité."
+          :disabled="sending"
         />
 
-        <UiChamp
-          v-model="parcours"
-          libelle="Parcours utilisateur"
-          multiligne
+        <UiTextField
+          v-model="journey"
+          label="Parcours utilisateur"
+          multiline
           :rows="5"
           name="parcours"
-          indice="Ce que fait l’utilisateur, étape par étape."
-          :disabled="envoi"
+          hint="Ce que fait l’utilisateur, étape par étape."
+          :disabled="sending"
         />
 
-        <p v-if="erreur" class="erreur">
-          <UiIcone nom="error_outline" /> <span>{{ erreur }}</span>
+        <p v-if="error" class="erreur">
+          <UiIcon name="error_outline" /> <span>{{ error }}</span>
         </p>
 
-        <p v-if="manquant" class="incomplet">
-          Il manque encore : {{ manquant }}.
+        <p v-if="missing" class="incomplet">
+          Il manque encore : {{ missing }}.
         </p>
 
         <div class="actions">
-          <UiBouton :to="liens.chemin('cadrages')">Annuler</UiBouton>
-          <UiBouton
-            variante="filled"
+          <UiButton :to="links.path('cadrages')">Annuler</UiButton>
+          <UiButton
+            variant="filled"
             type="submit"
-            :disabled="envoi || !!manquant"
+            :disabled="sending || !!missing"
           >
-            {{ envoi ? "Création…" : "Créer le cadrage" }}
-          </UiBouton>
+            {{ sending ? "Création…" : "Créer le cadrage" }}
+          </UiButton>
         </div>
       </form>
 
       <p class="note">
         La création ouvre une branche
-        <code>cadrage/{{ redaction.prochainId() }}</code> et une demande de
-        fusion. Rien n’entre dans le référentiel avant sa livraison.
+        <code>cadrage/{{ authoring.nextId() }}</code> et une demande de fusion.
+        Rien n’entre dans le référentiel avant sa livraison.
       </p>
     </template>
   </div>

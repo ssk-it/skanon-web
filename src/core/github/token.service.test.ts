@@ -10,25 +10,25 @@ import { TokenService } from "./token.service";
  * mémoire pour contrôler l'état, et un cas vérifie explicitement le repli.
  */
 function stubStorage(): Map<string, string> {
-  const donnees = new Map<string, string>();
+  const data = new Map<string, string>();
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
     value: {
-      getItem: (k: string) => donnees.get(k) ?? null,
-      setItem: (k: string, v: string) => void donnees.set(k, v),
-      removeItem: (k: string) => void donnees.delete(k),
-      clear: () => donnees.clear(),
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+      removeItem: (k: string) => void data.delete(k),
+      clear: () => data.clear(),
     },
   });
-  return donnees;
+  return data;
 }
 
 describe("TokenService", () => {
   let service: TokenService;
-  let stockage: Map<string, string>;
+  let storage: Map<string, string>;
 
   beforeEach(() => {
-    stockage = stubStorage();
+    storage = stubStorage();
     resetInjection();
     service = inject(TokenService);
   });
@@ -36,46 +36,46 @@ describe("TokenService", () => {
   it("démarre sans jeton", () => {
     expect(service.present()).toBe(false);
     expect(service.source()).toBe("aucune");
-    expect(service.empreinte()).toBeNull();
+    expect(service.fingerprint()).toBeNull();
   });
 
   it("conserve un jeton et n’en expose que les derniers caractères", () => {
-    service.definir("ghp_abcdefghijklmnopqrst1234");
+    service.set("ghp_abcdefghijklmnopqrst1234");
     expect(service.present()).toBe(true);
     expect(service.source()).toBe("personnel");
     // l'empreinte identifie le jeton sans le divulguer
-    expect(service.empreinte()).toBe("…1234");
-    expect(service.empreinte()).not.toContain("abcdefgh");
+    expect(service.fingerprint()).toBe("…1234");
+    expect(service.fingerprint()).not.toContain("abcdefgh");
   });
 
   it("efface le jeton et le stockage", () => {
-    service.definir("ghp_abcdefghijklmnopqrst1234");
-    service.effacer();
+    service.set("ghp_abcdefghijklmnopqrst1234");
+    service.erase();
     expect(service.present()).toBe(false);
-    expect(stockage.has("ssk-canon.token")).toBe(false);
+    expect(storage.has("ssk-canon.token")).toBe(false);
   });
 
   /** RG-acces-par-portee, RG-acces-temporaire : un jeton d'une seule organisation, ou un accès temporaire, est déjà un accès en place. */
   it("ne dit aucun accès en place que sans jeton, de quelque portée, ni accès temporaire", () => {
-    expect(service.aucunAcces()).toBe(true);
+    expect(service.noAccess()).toBe(true);
 
-    service.definirPourPortee("ssk-it", "ghp_abcdefghijklmnopqrst1234");
-    service.cibler({ owner: "Wayne-Corp", repo: "wayne-devis-cadrage" });
+    service.setForScope("ssk-it", "ghp_abcdefghijklmnopqrst1234");
+    service.targetRepo({ owner: "Wayne-Corp", repo: "wayne-devis-cadrage" });
     expect(service.present()).toBe(false);
-    expect(service.aucunAcces()).toBe(false);
+    expect(service.noAccess()).toBe(false);
 
-    service.effacer();
-    service.definirAcces({
-      jeton: "ghs_temporaire",
-      valideJusqua: new Date(Date.now() + 3_600_000).toISOString(),
-      depots: ["ssk-it/ssk-canon"],
-      identite: { identifiant: "ssk", nom: "SSK", courriel: null },
+    service.erase();
+    service.setAccess({
+      token: "ghs_temporaire",
+      validUntil: new Date(Date.now() + 3_600_000).toISOString(),
+      repos: ["ssk-it/ssk-canon"],
+      identity: { identifier: "ssk", name: "SSK", email: null },
     });
-    expect(service.aucunAcces()).toBe(false);
+    expect(service.noAccess()).toBe(false);
   });
 
   it("ignore une saisie vide", () => {
-    service.definir("   ");
+    service.set("   ");
     expect(service.present()).toBe(false);
   });
 
@@ -99,74 +99,74 @@ describe("TokenService", () => {
     resetInjection();
     const s = inject(TokenService);
 
-    expect(() => s.definir("ghp_abcdefghijklmnopqrst1234")).not.toThrow();
+    expect(() => s.set("ghp_abcdefghijklmnopqrst1234")).not.toThrow();
     expect(s.present()).toBe(true);
-    expect(() => s.effacer()).not.toThrow();
+    expect(() => s.erase()).not.toThrow();
     expect(s.present()).toBe(false);
   });
 
   describe("un coffre qui refuse — RG-secret-conserve-localement", () => {
-    function bloquer(): void {
-      const refuser = () => {
+    function block(): void {
+      const deny = () => {
         throw new Error("bloqué");
       };
       Object.defineProperty(globalThis, "localStorage", {
         configurable: true,
-        value: { getItem: refuser, setItem: refuser, removeItem: refuser },
+        value: { getItem: deny, setItem: deny, removeItem: deny },
       });
       resetInjection();
     }
 
     it("se tait quand le coffre garde le jeton", async () => {
-      service.definir("ghp_abcdefghijklmnopqrst1234");
+      service.set("ghp_abcdefghijklmnopqrst1234");
       await flushPromises();
-      expect(service.coffreRefuse()).toBeNull();
+      expect(service.vaultRefused()).toBeNull();
     });
 
     it("dit que le jeton ne vaut que pour la session", async () => {
-      bloquer();
+      block();
       const s = inject(TokenService);
-      s.definir("ghp_abcdefghijklmnopqrst1234");
+      s.set("ghp_abcdefghijklmnopqrst1234");
       await flushPromises();
-      expect(s.coffreRefuse()).toBe("ecriture");
+      expect(s.vaultRefused()).toBe("ecriture");
       expect(s.present()).toBe(true);
     });
 
     it("dit qu’un jeton oublié reste dans le coffre", async () => {
-      bloquer();
+      block();
       const s = inject(TokenService);
-      s.effacer();
+      s.erase();
       await flushPromises();
-      expect(s.coffreRefuse()).toBe("effacement");
+      expect(s.vaultRefused()).toBe("effacement");
       expect(s.present()).toBe(false);
     });
 
     it("cesse de le dire quand le coffre accepte de nouveau", async () => {
-      bloquer();
+      block();
       const s = inject(TokenService);
-      s.definir("ghp_abcdefghijklmnopqrst1234");
+      s.set("ghp_abcdefghijklmnopqrst1234");
       await flushPromises();
       stubStorage();
-      s.definir("ghp_abcdefghijklmnopqrst5678");
+      s.set("ghp_abcdefghijklmnopqrst5678");
       await flushPromises();
-      expect(s.coffreRefuse()).toBeNull();
+      expect(s.vaultRefused()).toBeNull();
     });
   });
 
   describe("vérification de forme", () => {
     it("accepte les préfixes GitHub connus", () => {
-      expect(TokenService.verifierForme("ghp_abcdefghijklmnopqrst")).toBeNull();
+      expect(TokenService.checkForm("ghp_abcdefghijklmnopqrst")).toBeNull();
       expect(
-        TokenService.verifierForme("github_pat_11ABCDEFG0abcdefghij"),
+        TokenService.checkForm("github_pat_11ABCDEFG0abcdefghij"),
       ).toBeNull();
     });
 
     it("refuse ce qui ne ressemble pas à un jeton", () => {
       // erreur de saisie la plus fréquente : coller autre chose que le jeton
-      expect(TokenService.verifierForme("mon-identifiant")).toContain("ghp_");
-      expect(TokenService.verifierForme("")).toContain("Saisir");
-      expect(TokenService.verifierForme("ghp_abc def")).toContain("espace");
-      expect(TokenService.verifierForme("ghp_court")).toContain("incomplet");
+      expect(TokenService.checkForm("mon-identifiant")).toContain("ghp_");
+      expect(TokenService.checkForm("")).toContain("Saisir");
+      expect(TokenService.checkForm("ghp_abc def")).toContain("espace");
+      expect(TokenService.checkForm("ghp_court")).toContain("incomplet");
     });
   });
 });

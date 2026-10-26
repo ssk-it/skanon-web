@@ -2,15 +2,15 @@
 import { RouterLink } from "vue-router";
 import { inject } from "../../core/injection";
 import { COMPOSITION } from "../../extension/composer";
-import LienExterne from "../../ui/LienExterne.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import ExternalLink from "../../ui/LienExterne.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 
 /**
  * Les mentions légales de l'éditeur, reprises de https://www.ssk-it.fr/mentions-legales/ : un changement de l'une se reporte dans l'autre.
  *
  * Comme l'aide, elles ne disent que ce qui vaut pour le livrable où l'on se trouve (2026-054, décision 03) : son hébergeur, ce qu'il présente à l'éditeur et sa licence viennent de son extension (ADR-extensions-commerciales). Ce qui touche aux données reste d'accord avec la page « Fonctionnement », qui le détaille (RG-aide-fidele).
  */
-const mentions = inject(COMPOSITION).mentions;
+const legalNotice = inject(COMPOSITION).legalNotice;
 </script>
 
 <template>
@@ -20,7 +20,7 @@ const mentions = inject(COMPOSITION).mentions;
     </header>
 
     <section>
-      <h2><UiIcone nom="badge" />Éditeur</h2>
+      <h2><UiIcon name="badge" />Éditeur</h2>
       <dl>
         <dt>Nom</dt>
         <dd>Sébastien Skorupski</dd>
@@ -41,25 +41,25 @@ const mentions = inject(COMPOSITION).mentions;
       </dl>
     </section>
 
-    <section v-if="mentions.hebergeur">
-      <h2><UiIcone nom="cloud" />Hébergeur</h2>
-      <p>{{ mentions.hebergeur }}</p>
+    <section v-if="legalNotice.host">
+      <h2><UiIcon name="cloud" />Hébergeur</h2>
+      <p>{{ legalNotice.host }}</p>
     </section>
 
     <section>
-      <h2><UiIcone nom="copyright" />Propriété intellectuelle</h2>
+      <h2><UiIcon name="copyright" />Propriété intellectuelle</h2>
       <p>
         Les droits d’auteur sur Skanon appartiennent à Sébastien Skorupski.
         Chaque partie est publiée sous sa propre licence.
       </p>
-      <template v-for="(phrase, rang) in mentions.propriete" :key="rang">
+      <template v-for="(phrase, rang) in legalNotice.ownership" :key="rang">
         <p v-if="typeof phrase === 'string'">{{ phrase }}</p>
         <p v-else>
-          {{ phrase.avant
-          }}<LienExterne :href="phrase.lien.href">{{
-            phrase.lien.libelle
-          }}</LienExterne
-          >{{ phrase.apres }}
+          {{ phrase.before
+          }}<ExternalLink :href="phrase.link.href">{{
+            phrase.link.label
+          }}</ExternalLink
+          >{{ phrase.after }}
         </p>
       </template>
       <p>
@@ -70,12 +70,12 @@ const mentions = inject(COMPOSITION).mentions;
     </section>
 
     <section>
-      <h2><UiIcone nom="shield" />Données personnelles</h2>
+      <h2><UiIcon name="shield" />Données personnelles</h2>
       <p>
         Skanon ne dépose aucun cookie et n’emploie aucun outil de mesure
         d’audience. Il n’a pas de serveur qui garde vos données : ce qu’il lit,
         il le tient de GitHub, et le garde sur ce poste.
-        <template v-for="phrase in mentions.donnees" :key="phrase">
+        <template v-for="phrase in legalNotice.data" :key="phrase">
           {{ phrase }}
         </template>
       </p>

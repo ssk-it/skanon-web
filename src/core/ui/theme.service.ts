@@ -11,7 +11,7 @@ import { computed, effect, signal } from "../signaux";
 export type Theme = "clair" | "sombre" | "systeme";
 
 const THEMES: readonly Theme[] = ["clair", "sombre", "systeme"];
-const CLE = "ssk-canon.theme";
+const KEY = "ssk-canon.theme";
 
 /**
  * Le thème d'affichage, et sa mémoire.
@@ -24,7 +24,7 @@ const CLE = "ssk-canon.theme";
  */
 export class ThemeService {
   /** Le choix, tel qu'il a été fait. */
-  readonly theme = signal<Theme>(this.lireMemoire());
+  readonly theme = signal<Theme>(this.readStored());
 
   /**
    * Ce que le système demande, observé en continu.
@@ -33,40 +33,39 @@ export class ThemeService {
    * réglage de l'appareil pendant que l'application est ouverte est le cas
    * ordinaire, pas l'exception.
    */
-  private readonly systemeSombre = signal(this.mediaSombre?.matches ?? false);
+  private readonly systemDark = signal(this.darkMedia?.matches ?? false);
 
   /** Le thème réellement appliqué, une fois `systeme` résolu. */
-  readonly effectif = computed<"clair" | "sombre">(() => {
+  readonly effective = computed<"clair" | "sombre">(() => {
     const t = this.theme();
     if (t !== "systeme") return t;
-    return this.systemeSombre() ? "sombre" : "clair";
+    return this.systemDark() ? "sombre" : "clair";
   });
 
-  private get mediaSombre(): MediaQueryList | null {
+  private get darkMedia(): MediaQueryList | null {
     return typeof matchMedia === "function"
       ? matchMedia("(prefers-color-scheme: dark)")
       : null;
   }
 
   constructor() {
-    this.mediaSombre?.addEventListener("change", (e) =>
-      this.systemeSombre.set(e.matches),
+    this.darkMedia?.addEventListener("change", (e) =>
+      this.systemDark.set(e.matches),
     );
 
     effect(() => {
       const t = this.theme();
-      const racine = document.documentElement;
+      const root = document.documentElement;
 
       // Aucun attribut quand on suit le système : la feuille de style bascule
       // alors d'elle-même. En poser un obligerait à réécrire ici ce que le CSS
       // sait déjà faire, et à le tenir d'accord avec lui.
-      if (t === "systeme") racine.removeAttribute("data-theme");
-      else
-        racine.setAttribute("data-theme", t === "sombre" ? "sombre" : "clair");
+      if (t === "systeme") root.removeAttribute("data-theme");
+      else root.setAttribute("data-theme", t === "sombre" ? "sombre" : "clair");
 
       try {
-        if (t === "systeme") localStorage.removeItem(CLE);
-        else localStorage.setItem(CLE, t);
+        if (t === "systeme") localStorage.removeItem(KEY);
+        else localStorage.setItem(KEY, t);
       } catch {
         // Navigation privée, stockage refusé : le thème vaut pour la session.
         // Perdre la mémoire d'un choix d'affichage ne justifie pas d'échouer.
@@ -75,15 +74,15 @@ export class ThemeService {
   }
 
   /** Passe au thème suivant : clair → sombre → système. */
-  basculer(): void {
+  toggle(): void {
     const i = THEMES.indexOf(this.theme());
     this.theme.set(THEMES[(i + 1) % THEMES.length]);
   }
 
-  private lireMemoire(): Theme {
+  private readStored(): Theme {
     try {
-      const brut = localStorage.getItem(CLE);
-      return THEMES.includes(brut as Theme) ? (brut as Theme) : "systeme";
+      const raw = localStorage.getItem(KEY);
+      return THEMES.includes(raw as Theme) ? (raw as Theme) : "systeme";
     } catch {
       return "systeme";
     }

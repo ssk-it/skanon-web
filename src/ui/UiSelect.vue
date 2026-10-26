@@ -1,16 +1,16 @@
 <script lang="ts">
 /** Une option de la liste : sa valeur, et ce qui s'en affiche. */
-export interface OptionSelect<V> {
-  readonly valeur: V;
-  readonly libelle: string;
+export interface SelectOption<V> {
+  readonly value: V;
+  readonly label: string;
 }
 </script>
 
 <script setup lang="ts" generic="T">
 import { computed, nextTick, ref, useId } from "vue";
-import UiCadreChamp from "./UiCadreChamp.vue";
-import UiListeOptions from "./UiListeOptions.vue";
-import { placerSous, useSuperposition, type Position } from "./superposition";
+import UiFieldFrame from "./UiCadreChamp.vue";
+import UiOptionList from "./UiListeOptions.vue";
+import { placeBelow, useOverlay, type Position } from "./superposition";
 
 /**
  * Une liste de choix : `mat-form-field appearance="outline"` et son `mat-select`.
@@ -31,196 +31,191 @@ import { placerSous, useSuperposition, type Position } from "./superposition";
  */
 defineOptions({ inheritAttrs: false });
 
-const modele = defineModel<T>({ required: true });
+const model = defineModel<T>({ required: true });
 
 const props = withDefaults(
   defineProps<{
-    options: readonly OptionSelect<T>[];
-    libelle?: string;
-    indice?: string | null;
+    options: readonly SelectOption<T>[];
+    label?: string;
+    hint?: string | null;
     disabled?: boolean;
   }>(),
   {
     disabled: false,
-    libelle: undefined,
-    indice: null,
+    label: undefined,
+    hint: null,
   },
 );
 
 const id = useId();
-const idListe = `${id}-liste`;
-const declencheur = ref<HTMLElement | null>(null);
-const liste = ref<InstanceType<typeof UiListeOptions> | null>(null);
+const listId = `${id}-liste`;
+const trigger = ref<HTMLElement | null>(null);
+const list = ref<InstanceType<typeof UiOptionList> | null>(null);
 
 const focus = ref(false);
-const ouvert = ref(false);
-const actif = ref(-1);
+const opened = ref(false);
+const active = ref(-1);
 const position = ref<Position>({ top: "0px", left: "0px" });
 
-const indexChoisi = computed(() =>
-  props.options.findIndex((o) => o.valeur === modele.value),
+const selectedIndex = computed(() =>
+  props.options.findIndex((o) => o.value === model.value),
 );
-const libelleChoisi = computed(
-  () => props.options[indexChoisi.value]?.libelle ?? "",
+const selectedLabel = computed(
+  () => props.options[selectedIndex.value]?.label ?? "",
 );
-const optionsAffichees = computed(() =>
+const shownOptions = computed(() =>
   props.options.map((o, i) => ({
-    libelle: o.libelle,
-    selectionne: i === indexChoisi.value,
+    label: o.label,
+    selected: i === selectedIndex.value,
   })),
 );
 
-function boite(): HTMLElement | null {
-  return declencheur.value?.closest(".ui-champ__boite") ?? null;
+function box(): HTMLElement | null {
+  return trigger.value?.closest(".ui-champ__boite") ?? null;
 }
 
-function replacer(): void {
-  const ancre = boite()?.getBoundingClientRect();
-  if (!ancre) return;
-  const panneau = liste.value?.element?.getBoundingClientRect();
-  position.value = placerSous(
-    ancre,
-    { width: panneau?.width ?? 0, height: panneau?.height ?? 0 },
-    { largeurAncre: true },
+function reposition(): void {
+  const anchor = box()?.getBoundingClientRect();
+  if (!anchor) return;
+  const panel = list.value?.element?.getBoundingClientRect();
+  position.value = placeBelow(
+    anchor,
+    { width: panel?.width ?? 0, height: panel?.height ?? 0 },
+    { anchorWidth: true },
   );
 }
 
-async function ouvrir(): Promise<void> {
-  if (props.disabled || ouvert.value) return;
-  actif.value = Math.max(0, indexChoisi.value);
-  ouvert.value = true;
-  declencheur.value?.focus();
-  replacer();
+async function open(): Promise<void> {
+  if (props.disabled || opened.value) return;
+  active.value = Math.max(0, selectedIndex.value);
+  opened.value = true;
+  trigger.value?.focus();
+  reposition();
   await nextTick();
-  replacer();
+  reposition();
 }
 
-function fermer(): void {
-  ouvert.value = false;
+function close(): void {
+  opened.value = false;
 }
 
-function choisir(i: number): void {
+function choose(i: number): void {
   const option = props.options[i];
-  if (option) modele.value = option.valeur;
-  fermer();
-  declencheur.value?.focus();
+  if (option) model.value = option.value;
+  close();
+  trigger.value?.focus();
 }
 
-useSuperposition(
-  ouvert,
-  () => [boite(), liste.value?.element],
-  fermer,
-  replacer,
-);
+useOverlay(opened, () => [box(), list.value?.element], close, reposition);
 
-function surTouche(e: KeyboardEvent): void {
+function onKey(e: KeyboardEvent): void {
   if (props.disabled) return;
   const total = props.options.length;
-  if (!ouvert.value) {
+  if (!opened.value) {
     if (
       e.key === "Enter" ||
       e.key === " " ||
       (e.altKey && e.key.startsWith("Arrow"))
     ) {
       e.preventDefault();
-      void ouvrir();
+      void open();
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       if (!total) return;
-      const pas = e.key === "ArrowDown" ? 1 : -1;
-      const suivant = Math.min(total - 1, Math.max(0, indexChoisi.value + pas));
-      modele.value = props.options[suivant].valeur;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      const next = Math.min(total - 1, Math.max(0, selectedIndex.value + step));
+      model.value = props.options[next].value;
     }
     return;
   }
   switch (e.key) {
     case "ArrowDown":
       e.preventDefault();
-      actif.value = Math.min(total - 1, actif.value + 1);
+      active.value = Math.min(total - 1, active.value + 1);
       break;
     case "ArrowUp":
       e.preventDefault();
-      actif.value = Math.max(0, actif.value - 1);
+      active.value = Math.max(0, active.value - 1);
       break;
     case "Home":
       e.preventDefault();
-      actif.value = 0;
+      active.value = 0;
       break;
     case "End":
       e.preventDefault();
-      actif.value = total - 1;
+      active.value = total - 1;
       break;
     case "Enter":
     case " ":
       e.preventDefault();
-      choisir(actif.value);
+      choose(active.value);
       break;
     case "Escape":
       // La liste se referme seule : le dialogue qui la porte, lui, reste ouvert.
       e.preventDefault();
       e.stopPropagation();
-      fermer();
+      close();
       break;
     case "Tab":
-      fermer();
+      close();
       break;
   }
 }
 
-defineExpose({ focus: () => declencheur.value?.focus() });
+defineExpose({ focus: () => trigger.value?.focus() });
 </script>
 
 <template>
-  <UiCadreChamp
+  <UiFieldFrame
     class="ui-select"
-    :class="[$attrs.class, { 'ui-select--ouvert': ouvert }]"
+    :class="[$attrs.class, { 'ui-select--ouvert': opened }]"
     :style="$attrs.style"
-    :libelle="libelle"
-    :id-controle="id"
-    :flotte="indexChoisi >= 0 || ouvert"
-    :focus="focus || ouvert"
-    :indice="indice"
-    :desactive="disabled"
-    @activer="ouvert ? fermer() : ouvrir()"
+    :label="label"
+    :control-id="id"
+    :floating="selectedIndex >= 0 || opened"
+    :focus="focus || opened"
+    :hint="hint"
+    :disabled="disabled"
+    @activate="opened ? close() : open()"
   >
     <div
       :id="id"
-      ref="declencheur"
+      ref="trigger"
       class="ui-champ__saisie ui-select__declencheur"
       role="combobox"
       :tabindex="disabled ? -1 : 0"
       aria-haspopup="listbox"
-      :aria-expanded="ouvert"
-      :aria-controls="ouvert ? idListe : undefined"
+      :aria-expanded="opened"
+      :aria-controls="opened ? listId : undefined"
       :aria-activedescendant="
-        ouvert && actif >= 0 ? `${idListe}-${actif}` : undefined
+        opened && active >= 0 ? `${listId}-${active}` : undefined
       "
       :aria-disabled="disabled || undefined"
-      :aria-label="libelle"
+      :aria-label="label"
       v-bind="{ ...$attrs, class: undefined, style: undefined }"
-      @keydown="surTouche"
+      @keydown="onKey"
       @focus="focus = true"
       @blur="focus = false"
     >
-      <span class="ui-select__valeur">{{ libelleChoisi }}</span>
+      <span class="ui-select__valeur">{{ selectedLabel }}</span>
       <span class="ui-select__fleche" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="24" height="24" focusable="false">
           <path d="M7 10l5 5 5-5z" />
         </svg>
       </span>
     </div>
-    <UiListeOptions
-      v-if="ouvert"
-      :id="idListe"
-      ref="liste"
-      :options="optionsAffichees"
-      :actif="actif"
+    <UiOptionList
+      v-if="opened"
+      :id="listId"
+      ref="list"
+      :options="shownOptions"
+      :active="active"
       :position="position"
-      :libelle="libelle"
-      @choisir="choisir"
-      @survoler="actif = $event"
+      :label="label"
+      @choose="choose"
+      @hover="active = $event"
     />
-  </UiCadreChamp>
+  </UiFieldFrame>
 </template>
 
 <style>

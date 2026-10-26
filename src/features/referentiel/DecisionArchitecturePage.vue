@@ -2,11 +2,11 @@
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
 
 /**
  * Une décision d'architecture, et les cadrages qui l'ont produite.
@@ -14,46 +14,46 @@ import MarkdownRendu from "../shared/MarkdownRendu.vue";
  * L'énoncé affiché est l'état courant. Le raisonnement — options écartées, critère qui a tranché — vit dans le cadrage, et c'est par lui qu'on y accède : le recopier ici créerait deux textes qui finiraient par se contredire.
  */
 const route = useRoute();
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 
 const id = computed(() => String(route.params["id"]));
-const decision = computed(() => store.findDecisionArchitecture(id.value));
-const cadrages = computed(() =>
-  store.listCadragesImpactantCible(id.value, "adr"),
+const decision = computed(() => store.findArchitectureDecision(id.value));
+const scopings = computed(() =>
+  store.listScopingsImpactingTarget(id.value, "adr"),
 );
 </script>
 
 <template>
   <div class="page-decision-architecture">
-    <EtatVue v-if="store.etat() !== 'pret'" />
+    <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="decision">
-      <RouterLink class="retour" :to="liens.chemin('architecture')">
-        <UiIcone nom="arrow_back" /> Architecture
+      <RouterLink class="retour" :to="links.path('architecture')">
+        <UiIcon name="arrow_back" /> Architecture
       </RouterLink>
 
       <header class="entete">
         <p class="type">Décision d’architecture</p>
         <h1>{{ decision.id }}</h1>
-        <p v-if="decision.statut === 'abroge'" class="abroge">
+        <p v-if="decision.status === 'abroge'" class="abroge">
           Cette décision ne s’applique plus.
         </p>
       </header>
 
-      <MarkdownRendu class="md" :texte="decision.enonce" />
+      <RenderedMarkdown class="md" :text="decision.statement" />
 
       <h2 class="section">Cadrages</h2>
       <div class="liste">
         <RouterLink
-          v-for="c in cadrages"
-          :key="c.cadrage.id"
+          v-for="c in scopings"
+          :key="c.scoping.id"
           class="ligne"
-          :to="liens.chemin('cadrages', c.cadrage.id)"
+          :to="links.path('cadrages', c.scoping.id)"
         >
-          <span class="nom">{{ c.cadrage.id }}</span>
+          <span class="nom">{{ c.scoping.id }}</span>
           <span class="compte">{{ c.operation }}</span>
         </RouterLink>
-        <p v-if="!cadrages.length" class="vide">
+        <p v-if="!scopings.length" class="vide">
           Aucun cadrage ne la déclare — voir la vérification d’intégrité.
         </p>
       </div>

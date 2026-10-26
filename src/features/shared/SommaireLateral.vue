@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
-export interface EntreeSommaire {
+export interface TocEntry {
   /** Ancre, sans dièse. */
   readonly id: string;
-  readonly libelle: string;
+  readonly label: string;
   /** 0 pour une section, 1 pour un élément à l'intérieur. */
-  readonly niveau: 0 | 1;
+  readonly level: 0 | 1;
   /** Pastille courte affichée à droite : opération d'impact, statut… */
-  readonly marque?: string;
+  readonly badge?: string;
 }
 
 /**
@@ -23,44 +23,44 @@ export interface EntreeSommaire {
  * L’élément racine est `div.sommaire`, l’hôte `pc-sommaire` de SSK Canon. Le composant s’appelait `Sommaire` : un nom d’un seul mot, que la règle `vue/multi-word-component-names` refuse.
  */
 const props = withDefaults(
-  defineProps<{ entrees: readonly EntreeSommaire[]; titre?: string }>(),
-  { titre: "Sommaire" },
+  defineProps<{ entries: readonly TocEntry[]; title?: string }>(),
+  { title: "Sommaire" },
 );
 
-const actif = ref("");
-let observateur: IntersectionObserver | null = null;
+const active = ref("");
+let observer: IntersectionObserver | null = null;
 
 // les ancres n'existent qu'une fois la fiche rendue
 onMounted(() => void nextTick(observeSections));
 // et la liste change quand on passe d'un cadrage à un autre
 watch(
-  () => props.entrees,
+  () => props.entries,
   () => queueMicrotask(observeSections),
 );
 
-onBeforeUnmount(() => observateur?.disconnect());
+onBeforeUnmount(() => observer?.disconnect());
 
 function observeSections(): void {
   if (typeof IntersectionObserver === "undefined") return;
-  observateur?.disconnect();
+  observer?.disconnect();
 
-  const cibles = props.entrees
+  const targets = props.entries
     .map((e) => document.getElementById(e.id))
     .filter((el): el is HTMLElement => el !== null);
-  if (!cibles.length) return;
+  if (!targets.length) return;
 
-  const visibles = new Set<string>();
-  const nouveau = new IntersectionObserver(
-    (entrees) => {
-      for (const e of entrees) {
-        if (e.isIntersecting) visibles.add(e.target.id);
-        else visibles.delete(e.target.id);
+  const visibleOnes = new Set<string>();
+  const next = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) visibleOnes.add(e.target.id);
+        else visibleOnes.delete(e.target.id);
       }
       // Un enfant visible l'emporte sur sa section : quand on lit une décision précise, marquer « Décisions » n'apprend rien, alors que le titre de la décision situe la lecture. À défaut, la section.
-      const liste = props.entrees;
-      const enfant = liste.find((e) => e.niveau === 1 && visibles.has(e.id));
-      const premier = enfant ?? liste.find((e) => visibles.has(e.id));
-      if (premier) actif.value = premier.id;
+      const list = props.entries;
+      const child = list.find((e) => e.level === 1 && visibleOnes.has(e.id));
+      const first = child ?? list.find((e) => visibleOnes.has(e.id));
+      if (first) active.value = first.id;
     },
     {
       // Bande de lecture : sous la barre collante, et s'arrêtant au premier tiers de l'écran. Un élément devient actif quand il atteint le haut de la zone lue, pas quand il affleure le bas.
@@ -68,42 +68,41 @@ function observeSections(): void {
       threshold: 0,
     },
   );
-  cibles.forEach((c) => nouveau.observe(c));
-  observateur = nouveau;
+  targets.forEach((c) => next.observe(c));
+  observer = next;
 }
 
 /** Défilement doux sans polluer l'historique de navigation. */
-function scrollToEntree(evenement: Event, id: string): void {
-  const cible = document.getElementById(id);
-  if (!cible) return;
-  evenement.preventDefault();
+function scrollToEntry(event: Event, id: string): void {
+  const target = document.getElementById(id);
+  if (!target) return;
+  event.preventDefault();
 
-  const doux = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  cible.scrollIntoView({ behavior: doux ? "smooth" : "auto", block: "start" });
-  actif.value = id;
+  const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({
+    behavior: smooth ? "smooth" : "auto",
+    block: "start",
+  });
+  active.value = id;
   // rend la cible focalisable pour les lecteurs d'écran, sans contour visible
-  cible.setAttribute("tabindex", "-1");
-  cible.focus({ preventScroll: true });
+  target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
 }
 </script>
 
 <template>
   <div class="sommaire">
     <nav class="navigation" aria-label="Sommaire">
-      <p class="titre">{{ titre }}</p>
+      <p class="titre">{{ title }}</p>
       <ol>
-        <li
-          v-for="e in entrees"
-          :key="e.id"
-          :class="{ enfant: e.niveau === 1 }"
-        >
+        <li v-for="e in entries" :key="e.id" :class="{ enfant: e.level === 1 }">
           <a
             :href="'#' + e.id"
-            :class="{ actif: e.id === actif }"
-            @click="scrollToEntree($event, e.id)"
+            :class="{ actif: e.id === active }"
+            @click="scrollToEntry($event, e.id)"
           >
-            <span class="libelle">{{ e.libelle }}</span>
-            <span v-if="e.marque" class="marque">{{ e.marque }}</span>
+            <span class="libelle">{{ e.label }}</span>
+            <span v-if="e.badge" class="marque">{{ e.badge }}</span>
           </a>
         </li>
       </ol>

@@ -3,35 +3,35 @@ import { computed, watchEffect } from "vue";
 import { RouterLink } from "vue-router";
 import { TokenService } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
-import type { Cadrage } from "../../core/model/model";
-import { LiensService } from "../../core/repo/liens.service";
-import { afficherIdentifiant } from "../../core/repo/reference-cadrage";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { styleDomaine } from "../../core/ui/couleur-domaine";
+import type { Scoping } from "../../core/model/model";
+import { LinksService } from "../../core/repo/liens.service";
+import { displayIdentifier } from "../../core/repo/reference-cadrage";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { domainStyle } from "../../core/ui/couleur-domaine";
 import { DialogService } from "../../ui/dialog.service";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import StatutChip from "../shared/StatutChip.vue";
-import { FiltreCadrages } from "./filtre-cadrages";
-import { etatDatesLivres, filtrerCadrages, grouperCadrages } from "./groupes";
+import UiButton from "../../ui/UiBouton.vue";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
+import StatusChip from "../shared/StatutChip.vue";
+import { ScopingFilter } from "./filtre-cadrages";
+import { deliveredDatesState, filterScopings, groupScopings } from "./groupes";
 
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
-const filtre = inject(FiltreCadrages);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
+const filter = inject(ScopingFilter);
 const tokens = inject(TokenService);
 const dialog = inject(DialogService);
 
 /** L'ensemble du dépôt : une teinte se calcule par rapport aux autres. */
-const idsDomaines = computed(() => store.domaines().map((d) => d.id));
+const domainIds = computed(() => store.domains().map((d) => d.id));
 
 /** Les cadrages que le filtre retient, dans l'ordre de la liste. */
-const retenus = computed(() =>
-  filtrerCadrages(
-    store.cadrages(),
-    filtre.texte(),
-    filtre.domaines(),
-    store.referentiel().projet.prefixe,
+const kept = computed(() =>
+  filterScopings(
+    store.scopings(),
+    filter.text(),
+    filter.domains(),
+    store.specification().project.prefix,
   ),
 );
 
@@ -40,49 +40,49 @@ const retenus = computed(() =>
  *
  * Recalculé quand les dates arrivent — elles sont chargées après la liste, si bien que les premiers rendus placent les cadrages sous « Date inconnue » avant qu'ils ne rejoignent leur trimestre.
  */
-const groupes = computed(() =>
-  grouperCadrages(retenus.value, (id) => store.dateCreation(id)),
+const groups = computed(() =>
+  groupScopings(kept.value, (id) => store.creationDate(id)),
 );
 
-const enCoursRetenus = computed(
-  () => retenus.value.filter((c) => c.statut !== "livree").length,
+const inProgressKept = computed(
+  () => kept.value.filter((c) => c.status !== "livree").length,
 );
 
 /** Sur toute la liste, non sur le filtre : les dates manquent ou non au dépôt. */
-const etatDates = computed(() =>
-  etatDatesLivres(store.cadrages(), (id) => store.dateCreation(id)),
+const datesState = computed(() =>
+  deliveredDatesState(store.scopings(), (id) => store.creationDate(id)),
 );
 
 // Le pipe `date` d'Angular en locale fr : les formats `'long'` et `'d MMM yyyy'`.
-const DATE_LONGUE = new Intl.DateTimeFormat("fr-FR", {
+const LONG_DATE = new Intl.DateTimeFormat("fr-FR", {
   dateStyle: "long",
   timeStyle: "long",
 });
-const DATE_COURTE = new Intl.DateTimeFormat("fr-FR", {
+const SHORT_DATE = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
   month: "short",
   year: "numeric",
 });
 
-function formatDateLongue(iso: string): string {
-  return DATE_LONGUE.format(new Date(iso));
+function formatLongDate(iso: string): string {
+  return LONG_DATE.format(new Date(iso));
 }
 
-function formatDateCourte(iso: string): string {
-  return DATE_COURTE.format(new Date(iso));
+function formatShortDate(iso: string): string {
+  return SHORT_DATE.format(new Date(iso));
 }
 
 /** « 2 décisions · 3 impacts · 1 pièce jointe », sans les compteurs à zéro. */
-function formatCompteurs(c: Cadrage): string {
-  const pluriel = (n: number, un: string, plusieurs: string) =>
-    `${n} ${n > 1 ? plusieurs : un}`;
+function formatCounts(c: Scoping): string {
+  const plural = (n: number, one: string, several: string) =>
+    `${n} ${n > 1 ? several : one}`;
   return [
     c.decisions.length
-      ? pluriel(c.decisions.length, "décision", "décisions")
+      ? plural(c.decisions.length, "décision", "décisions")
       : "",
-    c.impacts.length ? pluriel(c.impacts.length, "impact", "impacts") : "",
-    c.piecesJointes.length
-      ? pluriel(c.piecesJointes.length, "pièce jointe", "pièces jointes")
+    c.impacts.length ? plural(c.impacts.length, "impact", "impacts") : "",
+    c.attachments.length
+      ? plural(c.attachments.length, "pièce jointe", "pièces jointes")
       : "",
   ]
     .filter(Boolean)
@@ -96,36 +96,36 @@ function openTokenDialog(): void {
       const change = await dialog.open<boolean>(TokenDialog, {
         focus: "dialogue",
       });
-      if (change) void store.loadReferentiel();
+      if (change) void store.loadSpecification();
     },
   );
 }
 
 // Les dates viennent de l'historique Git, un appel par cadrage. On les demande à l'affichage de cette liste plutôt qu'au chargement du référentiel : la liste apparaît immédiatement, les dates la rejoignent.
 watchEffect(() => {
-  if (store.etat() !== "pret") return;
-  const ids = store.cadrages().map((c) => c.id);
-  void store.loadDatesCreation(ids);
+  if (store.state() !== "pret") return;
+  const ids = store.scopings().map((c) => c.id);
+  void store.loadCreationDates(ids);
 });
 
 /** L'identifiant tel qu'il se donne à lire, préfixé si le projet en déclare un. */
-function afficher(id: string): string {
-  return afficherIdentifiant(id, store.referentiel().projet.prefixe);
+function show(id: string): string {
+  return displayIdentifier(id, store.specification().project.prefix);
 }
 
-function saisirFiltre(evenement: Event): void {
-  filtre.setTexte((evenement.target as HTMLInputElement).value);
+function enterFilter(event: Event): void {
+  filter.setText((event.target as HTMLInputElement).value);
 }
 </script>
 
 <template>
-  <EtatVue v-if="store.etat() !== 'pret'" />
+  <ViewState v-if="store.state() !== 'pret'" />
   <template v-else>
     <header class="entete">
       <div class="titre-ligne">
         <h1>Cadrages</h1>
-        <UiBouton variante="filled" :to="liens.chemin('cadrages', 'nouveau')"
-          >Nouveau cadrage</UiBouton
+        <UiButton variant="filled" :to="links.path('cadrages', 'nouveau')"
+          >Nouveau cadrage</UiButton
         >
       </div>
       <p class="sous-titre">
@@ -133,14 +133,14 @@ function saisirFiltre(evenement: Event): void {
         l’ont façonnée, et ses impacts sur les règles de gestion.
       </p>
       <p class="compte">
-        <template v-if="filtre.actif()">
-          {{ retenus.length }}
-          {{ retenus.length > 1 ? "cadrages" : "cadrage" }} sur
-          {{ store.cadrages().length }} · {{ enCoursRetenus }} en cours
+        <template v-if="filter.active()">
+          {{ kept.length }}
+          {{ kept.length > 1 ? "cadrages" : "cadrage" }} sur
+          {{ store.scopings().length }} · {{ inProgressKept }} en cours
         </template>
         <template v-else>
-          {{ store.cadrages().length }} cadrages ·
-          {{ store.cadragesEnCours().length }} en cours
+          {{ store.scopings().length }} cadrages ·
+          {{ store.scopingsInProgress().length }} en cours
         </template>
       </p>
     </header>
@@ -148,39 +148,39 @@ function saisirFiltre(evenement: Event): void {
     <!-- RG-liste-cadrages-filtrable : parcourir un ensemble, là où la palette de recherche mène à un élément. -->
     <div class="filtre" role="search" aria-label="Filtrer les cadrages">
       <label class="champ">
-        <UiIcone nom="filter_list" />
+        <UiIcon name="filter_list" />
         <span class="lecteur-ecran">Filtrer par identifiant ou titre</span>
         <input
           type="text"
           autocomplete="off"
           placeholder="Filtrer par identifiant ou titre"
-          :value="filtre.texte()"
-          @input="saisirFiltre"
+          :value="filter.text()"
+          @input="enterFilter"
         />
       </label>
       <div
-        v-if="store.domaines().length > 1"
+        v-if="store.domains().length > 1"
         class="domaines"
         role="group"
         aria-label="Domaines"
       >
         <button
-          v-for="d in store.domaines()"
+          v-for="d in store.domains()"
           :key="d.id"
           type="button"
           class="domaine"
-          :style="styleDomaine(d.id, idsDomaines)"
-          :aria-pressed="filtre.domaines().has(d.id)"
-          @click="filtre.toggleDomaine(d.id)"
+          :style="domainStyle(d.id, domainIds)"
+          :aria-pressed="filter.domains().has(d.id)"
+          @click="filter.toggleDomain(d.id)"
         >
-          {{ d.nom }}
+          {{ d.name }}
         </button>
       </div>
     </div>
 
     <!-- Une fois, à part : un en-tête « Pas encore daté » sur toute la liste passait pour une catégorie de cadrages — RG-liste-cadrages-sobre. -->
-    <p v-if="etatDates === 'indisponibles'" class="note-dates" role="status">
-      <UiIcone nom="schedule" />
+    <p v-if="datesState === 'indisponibles'" class="note-dates" role="status">
+      <UiIcon name="schedule" />
       <span>
         Les dates de création n’ont pas pu être lues.
         <template v-if="!tokens.present()">
@@ -194,47 +194,47 @@ function saisirFiltre(evenement: Event): void {
     </p>
 
     <div class="liste">
-      <template v-if="groupes.length">
-        <template v-for="g in groupes" :key="g.cle">
+      <template v-if="groups.length">
+        <template v-for="g in groups" :key="g.key">
           <p class="groupe">
-            {{ g.libelle
-            }}<span class="compte-groupe">{{ g.cadrages.length }}</span>
+            {{ g.label
+            }}<span class="compte-groupe">{{ g.scopings.length }}</span>
           </p>
           <RouterLink
-            v-for="c in g.cadrages"
+            v-for="c in g.scopings"
             :key="c.id"
             class="ligne"
-            :to="liens.chemin('cadrages', c.id)"
+            :to="links.path('cadrages', c.id)"
           >
-            <span class="cid">{{ afficher(c.id) }}</span>
+            <span class="cid">{{ show(c.id) }}</span>
             <div class="principal">
-              <span class="titre">{{ c.titre }}</span>
+              <span class="titre">{{ c.title }}</span>
               <span class="detail">
                 <span
-                  v-for="d in c.domaines"
+                  v-for="d in c.domains"
                   :key="d"
                   class="dom"
-                  :style="styleDomaine(d, idsDomaines)"
+                  :style="domainStyle(d, domainIds)"
                 >
-                  {{ store.findDomaine(d)?.nom ?? d }}
+                  {{ store.findDomain(d)?.name ?? d }}
                 </span>
                 <span
-                  v-if="store.dateCreation(c.id)"
+                  v-if="store.creationDate(c.id)"
                   class="date"
                   :title="
-                    'Créé le ' + formatDateLongue(store.dateCreation(c.id)!)
+                    'Créé le ' + formatLongDate(store.creationDate(c.id)!)
                   "
                 >
-                  {{ formatDateCourte(store.dateCreation(c.id)!) }}
+                  {{ formatShortDate(store.creationDate(c.id)!) }}
                 </span>
                 <!-- Nommés : une icône suivie d'un nombre se devine, et se devine mal — RG-liste-cadrages-sobre. -->
                 <span
-                  v-if="store.dateCreation(c.id) && formatCompteurs(c)"
+                  v-if="store.creationDate(c.id) && formatCounts(c)"
                   class="sep"
                   aria-hidden="true"
                   >·</span
                 >
-                <span class="compteurs">{{ formatCompteurs(c) }}</span>
+                <span class="compteurs">{{ formatCounts(c) }}</span>
                 <span v-if="!c.impacts.length" class="sans-impact"
                   >aucun impact déclaré</span
                 >
@@ -245,26 +245,26 @@ function saisirFiltre(evenement: Event): void {
               <span
                 v-if="c.provenance"
                 class="branche"
-                :title="'Sur la branche ' + c.provenance.branche"
+                :title="'Sur la branche ' + c.provenance.branch"
               >
-                <UiIcone nom="call_split" />
+                <UiIcon name="call_split" />
                 <span
                   >{{
                     c.provenance.pullRequest
                       ? "#" + c.provenance.pullRequest
-                      : c.provenance.branche
-                  }}{{ c.provenance.brouillon ? " · brouillon" : "" }}</span
+                      : c.provenance.branch
+                  }}{{ c.provenance.draft ? " · brouillon" : "" }}</span
                 >
               </span>
               <!-- Répété sur chaque livré, le statut n'apprend rien : il ne s'affiche que là où il distingue la ligne de son groupe. -->
-              <StatutChip v-if="c.statut !== 'livree'" :statut="c.statut" />
+              <StatusChip v-if="c.status !== 'livree'" :status="c.status" />
             </span>
           </RouterLink>
         </template>
       </template>
-      <p v-else-if="filtre.actif()" class="vide">
+      <p v-else-if="filter.active()" class="vide">
         Aucun cadrage ne correspond à ce filtre.
-        <button type="button" class="lien" @click="filtre.clear()">
+        <button type="button" class="lien" @click="filter.clear()">
           Effacer le filtre
         </button>
       </p>

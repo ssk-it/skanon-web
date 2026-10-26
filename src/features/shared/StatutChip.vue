@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import {
-  LIBELLE_STATUT_CADRAGE,
-  type StatutCadrage,
+  SCOPING_STATUS_LABEL,
+  type ScopingStatus,
 } from "../../core/model/model";
 
 /**
  * Le statut d'un cadrage, encodé par la forme autant que par le texte : la couleur seule ne suffit pas à distinguer quatre états d'un coup d'œil.
  */
-const props = defineProps<{ statut: StatutCadrage }>();
+const props = defineProps<{ status: ScopingStatus }>();
 
-const libelle = computed(() => LIBELLE_STATUT_CADRAGE[props.statut]);
+const label = computed(() => SCOPING_STATUS_LABEL[props.status]);
 </script>
 
 <template>
-  <span class="statut-chip chip" :class="'s-' + statut">{{ libelle }}</span>
+  <span class="statut-chip chip" :class="'s-' + status">{{ label }}</span>
 </template>
 
 <style scoped>

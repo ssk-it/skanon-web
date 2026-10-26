@@ -29,7 +29,7 @@
  * Un bleu, pour que le premier domaine d'un dépôt s'accorde au primaire du
  * thème plutôt que de jurer avec.
  */
-const TEINTE_ORIGINE = 235;
+const HUE_ORIGIN = 235;
 
 /**
  * La bande écartée, en degrés : les jaunes verdâtres.
@@ -39,10 +39,10 @@ const TEINTE_ORIGINE = 235;
  * l'amplitude de la roue ne suffisait pas — cela ne fait que déplacer l'endroit
  * où elle tombe. La bande est donc franchement sautée.
  */
-const EXCLU_DEBUT = 95;
-const EXCLU_FIN = 155;
-const EXCLU_LARGEUR = EXCLU_FIN - EXCLU_DEBUT;
-const UTILE = 360 - EXCLU_LARGEUR;
+const EXCLUDED_START = 95;
+const EXCLUDED_END = 155;
+const EXCLUDED_WIDTH = EXCLUDED_END - EXCLUDED_START;
+const USABLE = 360 - EXCLUDED_WIDTH;
 
 /**
  * Teinte d'un domaine à un rang donné, parmi `total` domaines.
@@ -51,12 +51,12 @@ const UTILE = 360 - EXCLU_LARGEUR;
  * est replacée : ainsi les couleurs restent également espacées, et aucune ne
  * tombe dans la zone illisible.
  */
-export function teinteAuRang(rang: number, total: number): number {
-  if (total <= 0) return TEINTE_ORIGINE;
-  const pas = UTILE / Math.max(total, 1);
+export function hueAtRank(rank: number, total: number): number {
+  if (total <= 0) return HUE_ORIGIN;
+  const step = USABLE / Math.max(total, 1);
   // Position sur la roue utile, comptée depuis l'origine.
-  const brut = (TEINTE_ORIGINE - EXCLU_FIN + rang * pas + UTILE) % UTILE;
-  return Math.round((EXCLU_FIN + brut) % 360);
+  const raw = (HUE_ORIGIN - EXCLUDED_END + rank * step + USABLE) % USABLE;
+  return Math.round((EXCLUDED_END + raw) % 360);
 }
 
 /**
@@ -66,21 +66,21 @@ export function teinteAuRang(rang: number, total: number): number {
  * dépend de l'arborescence renvoyée par la plateforme, et une couleur qui
  * changerait au gré d'un ajout de fichier ne serait plus un repère.
  */
-export function rangsDomaines(
+export function domainRanks(
   ids: readonly string[],
 ): ReadonlyMap<string, number> {
-  const tries = [...new Set(ids)].sort((a, b) => a.localeCompare(b));
-  return new Map(tries.map((id, i) => [id, i]));
+  const sorted = [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+  return new Map(sorted.map((id, i) => [id, i]));
 }
 
 /** La teinte d'un domaine, en degrés, parmi l'ensemble des domaines du dépôt. */
-export function teinteDomaine(id: string, tous: readonly string[]): number {
-  const rangs = rangsDomaines(tous);
-  const rang = rangs.get(id);
+export function domainHue(id: string, all: readonly string[]): number {
+  const ranks = domainRanks(all);
+  const rank = ranks.get(id);
   // Un domaine inconnu de la liste — un rattachement qui pointe vers un fichier
   // absent — garde une couleur neutre plutôt que d'en emprunter une autre.
-  if (rang === undefined) return TEINTE_ORIGINE;
-  return teinteAuRang(rang, rangs.size);
+  if (rank === undefined) return HUE_ORIGIN;
+  return hueAtRank(rank, ranks.size);
 }
 
 /**
@@ -94,11 +94,11 @@ export function teinteDomaine(id: string, tous: readonly string[]): number {
  * Les valeurs sont posées en style inline : les teintes ne sont pas connues à la
  * compilation, elles dépendent des domaines du dépôt ouvert.
  */
-export function styleDomaine(
+export function domainStyle(
   id: string,
-  tous: readonly string[],
+  all: readonly string[],
 ): Record<string, string> {
-  const t = teinteDomaine(id, tous);
+  const t = domainHue(id, all);
   return {
     "--pc-domaine-h": `${t}`,
     "--pc-domaine": `oklch(var(--pc-domaine-l) var(--pc-domaine-c) ${t})`,
