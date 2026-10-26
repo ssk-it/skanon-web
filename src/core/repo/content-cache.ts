@@ -39,6 +39,8 @@ export const INDEXEDDB_FACTORY = new InjectionToken<IDBFactory | null>(
 );
 
 const DATABASE_NAME = "ssk-canon.cache";
+/** How long a tab waits for its storage before doing without: an opening that is answered at all is answered well within it. */
+const OPEN_PATIENCE_MS = 2000;
 const CONTENTS = "contenus";
 const STATES = "etats";
 const IDENTITIES = "identites";
@@ -374,8 +376,25 @@ export class ContentCache {
   // --- browser storage ---
 
   private open(): Promise<IDBDatabase | null> {
-    this.base ??= new Promise((resolve) => {
-      if (!this.factory) return resolve(null);
+    this.base ??= new Promise((answer) => {
+      if (!this.factory) return answer(null);
+      // An opening queued behind an upgrade that another tab blocks receives no event at all, for as long as that tab stays open: past this delay, the tab does without storage rather than waiting on it.
+      let settled = false;
+      const resolve = (db: IDBDatabase | null): void => {
+        if (settled) {
+          // Given up on, then obtained: closed, so as to hold nothing that a later version would wait for.
+          db?.close();
+          return;
+        }
+        settled = true;
+        clearTimeout(patience);
+        if (db) {
+          // A later version, opened in another tab, asks for the database: let it go.
+          db.onversionchange = () => db.close();
+        }
+        answer(db);
+      };
+      const patience = setTimeout(() => resolve(null), OPEN_PATIENCE_MS);
       try {
         // Version 3: record fields took their English names (`repoRef`, `content`, `private`…). Those of an earlier version can no longer be read back: a cache can be rebuilt, its stores start empty.
         const request = this.factory.open(DATABASE_NAME, 3);

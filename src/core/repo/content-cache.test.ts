@@ -74,6 +74,51 @@ describe("content cache", () => {
     expect(await newVisit().loadContent(PUBLIC, "a1")).toBe("un énoncé");
   });
 
+  // A tab left open on version 2 holds the database and never lets it go: the upgrade to version 3 waits for it, and every opening after it waits behind, with no event at all. Loading a repo awaited it, and stayed on « Chargement du référentiel… ».
+  it("answers without storage while a tab of an earlier version holds the database", async () => {
+    await new Promise<void>((resolve, reject) => {
+      const request = factory!.open("ssk-canon.cache", 2);
+      request.onupgradeneeded = () =>
+        request.result.createObjectStore("contenus", {
+          keyPath: ["depot", "sha"],
+        });
+      // Kept open, without `onversionchange`: the code of version 2 never closed it.
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    const first = newVisit();
+    expect(await first.loadState(PUBLIC, "HEAD")).toBeNull();
+    const second = newVisit();
+    expect(await second.loadState(PUBLIC, "HEAD")).toBeNull();
+    await second.saveContent(PUBLIC, "a1", "un énoncé", {
+      private: false,
+      persist: true,
+    });
+    expect(await second.loadContent(PUBLIC, "a1")).toBe("un énoncé");
+  });
+
+  // The same trap, the other way round: an open tab of this version must not hold back the next one.
+  it("lets a later version of the database open while a tab still uses it", async () => {
+    const cache = newVisit();
+    await cache.saveContent(PUBLIC, "a1", "un énoncé", {
+      private: false,
+      persist: true,
+    });
+
+    const events = await new Promise<string[]>((resolve) => {
+      const seen: string[] = [];
+      const request = factory!.open("ssk-canon.cache", 4);
+      request.onblocked = () => seen.push("blocked");
+      request.onsuccess = () => {
+        request.result.close();
+        resolve([...seen, "success"]);
+      };
+      request.onerror = () => resolve([...seen, "error"]);
+    });
+    expect(events).toEqual(["success"]);
+  });
+
   it("serves a content again on the next visit, under its fingerprint", async () => {
     await newVisit().saveContent(PUBLIC, "a1", "un énoncé", {
       private: false,
