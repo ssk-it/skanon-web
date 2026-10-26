@@ -36,11 +36,6 @@ export const repoMessages = defineMessages({
       `${config} : identite.${field} manquant.`,
     identityFieldNotAddress: (config: string, field: string) =>
       `${config} : identite.${field} n'est pas une adresse valide.`,
-    unreadableFrontmatter: (reason: string, line?: number) =>
-      line === undefined
-        ? `frontmatter illisible : ${reason}`
-        : `frontmatter illisible ligne ${line} : ${reason}`,
-    quoteColonHint: " — une valeur contenant « : » doit être entre apostrophes",
 
     // Loading and listing
     repoNotAnswering:
@@ -96,11 +91,6 @@ export const repoMessages = defineMessages({
       `${config}: identite.${field} missing.`,
     identityFieldNotAddress: (config: string, field: string) =>
       `${config}: identite.${field} is not a valid address.`,
-    unreadableFrontmatter: (reason: string, line?: number) =>
-      line === undefined
-        ? `unreadable frontmatter: ${reason}`
-        : `unreadable frontmatter, line ${line}: ${reason}`,
-    quoteColonHint: " — a value containing “:” must be in quotes",
 
     repoNotAnswering:
       "The repo is not answering: the state shown is the last one read, and " +

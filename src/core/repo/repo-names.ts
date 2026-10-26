@@ -1,3 +1,4 @@
+import { formaterAnomalie, type Anomalie } from "@ssk-it/canon-check";
 import { load } from "js-yaml";
 import {
   NOMS_PAR_DEFAUT,
@@ -5,6 +6,8 @@ import {
   verifierDossiersDeclares,
 } from "@ssk-it/canon-check/noms";
 import type { Noms } from "@ssk-it/canon-check/noms";
+import { LocaleService } from "../i18n/locale.service";
+import { inject } from "../injection";
 
 /**
  * The names of a repo's folders and conventional files are declared in
@@ -22,7 +25,19 @@ export type RepoNames = Noms;
 /** The format's names, which every undeclared key keeps. */
 export const DEFAULT_NAMES: RepoNames = NOMS_PAR_DEFAUT;
 
-export { verifierDossiersDeclares as checkDeclaredFolders };
+/** The library's anomalies, said in the displayed language (RG-anomalies-codees): like Skanon's own loading anomalies, they carry the language shown when they are found. */
+function say(anomalies: readonly Anomalie[]): string[] {
+  const language = inject(LocaleService).language();
+  return anomalies.map((a) => formaterAnomalie(a, language));
+}
+
+/** A folder declared but absent while the format's one is still there. */
+export function checkDeclaredFolders(
+  names: RepoNames,
+  paths: readonly string[],
+): string[] {
+  return say(verifierDossiersDeclares(names, paths));
+}
 
 /** The names a configuration declares, and what is wrong with the declaration. */
 export function resolveNames(config: unknown): {
@@ -30,7 +45,7 @@ export function resolveNames(config: unknown): {
   readonly anomalies: readonly string[];
 } {
   const { erreurs, ...names } = resoudreNoms(config);
-  return { names, anomalies: erreurs };
+  return { names, anomalies: say(erreurs) };
 }
 
 /**
