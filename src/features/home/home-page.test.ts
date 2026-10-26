@@ -70,6 +70,14 @@ describe("« Ouvrir un projet » screen", () => {
   const texts = (root: Element, selector: string) =>
     [...root.querySelectorAll(selector)].map((e) => e.textContent?.trim());
 
+  /** RG-amorcage-depot (scoping 2026-062): whoever arrives without a specification finds where to start. */
+  it("offers to create a specification", async () => {
+    const page = await mountView([]);
+    expect(page.querySelector("button.creer")?.textContent).toContain(
+      "Créer un référentiel",
+    );
+  });
+
   it("shows specifications grouped by organisation", async () => {
     const page = await mountView([
       known("ssk-it/skift-cadrage", true, true),
