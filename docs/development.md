@@ -148,7 +148,7 @@ In headless Chromium, without a window: the test serves the SSK Canon build, wai
 
 ## Checks
 
-`.github/workflows/controles.yml`, on every pull request, on GitHub's runners: the repo is public, and the code of a pull request coming from a fork must not run on any ssk-it machine.
+`.github/workflows/controles.yml`, on every pull request, on GitHub's runners: the repo is public, and the code of a pull request coming from a fork must not run on any ssk-it machine. The browser job runs in Playwright's image, `mcr.microsoft.com/playwright:v<version>-noble`: its tag follows the `playwright` version of `package.json`, and is bumped with it.
 
 ## What must be green before a pull request
 
