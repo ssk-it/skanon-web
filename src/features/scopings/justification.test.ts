@@ -29,6 +29,13 @@ de ce qui est connu.
     expect(extractJustification(body)).toBe("Un gras, un code et un lien.");
   });
 
+  // `\[([^\]]+)\]` retries from each opening bracket up to the last one: two
+  // hundred thousand of them take a quarter of a minute, past the timeout.
+  it("stays linear on a long run of opening brackets", () => {
+    const brackets = "[".repeat(200_000);
+    expect(extractJustification(`**Retenue.** ${brackets}`)).toBe(brackets);
+  });
+
   it("accepts the marker without a period", () => {
     expect(extractJustification("**Retenue** Le texte.")).toBe("Le texte.");
   });

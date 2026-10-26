@@ -28,13 +28,17 @@ export function extractJustification(body: string): string {
   return normalizeText(raw);
 }
 
-/** Folds Markdown line breaks and removes inline markup. */
+/**
+ * Folds Markdown line breaks and removes inline markup.
+ *
+ * A link's text excludes `[`: an attempt then stops at the next bracket instead of scanning to the last one, which made a long run of brackets quadratic.
+ */
 function normalizeText(raw: string): string {
   return raw
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/\*(.+?)\*/g, "$1")
     .replace(/`(.+?)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^[\]]+)\]\([^)]*\)/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
 }
