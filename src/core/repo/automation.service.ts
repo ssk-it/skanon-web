@@ -3,13 +3,19 @@ import { signal } from "../signals";
 import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { SpecificationStore } from "./specification.store";
 
+/** The files the installation writes, which the bootstrap lists before writing. */
+export const WORKFLOW_PATHS: readonly string[] = [
+  ".github/workflows/verification-depot-cadre.yml",
+  ".github/workflows/propagation-depot-cadre.yml",
+];
+
 /** What marks an equipped repo, whatever name the files are given. */
 const ACTION = "ssk-it/ssk-canon-action";
 
 /** Where the workflows live, and what each one brings. */
 const WORKFLOWS: ReadonlyArray<{ path: string; content: string }> = [
   {
-    path: ".github/workflows/verification-depot-cadre.yml",
+    path: WORKFLOW_PATHS[0],
     content: `# Vérifie qu'un cadrage est cohérent avant de pouvoir être livré.
 #
 # À configurer comme contrôle requis dans les règles de protection de la branche
@@ -45,7 +51,7 @@ jobs:
 `,
   },
   {
-    path: ".github/workflows/propagation-depot-cadre.yml",
+    path: WORKFLOW_PATHS[1],
     content: `# Applique au référentiel les impacts des cadrages livrés, à chaque
 # arrivée sur la branche principale — donc à chaque merge de cadrage.
 #
