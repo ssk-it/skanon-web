@@ -55,6 +55,12 @@ pnpm vitest run --project jsdom src/core/signals.test.ts
 pnpm test:watch src/core/http
 ```
 
+The jsdom tests' coverage, written to `coverage/` (`lcov.info` and an HTML report):
+
+```bash
+pnpm test:coverage
+```
+
 Headless browser tests (Playwright's WebKit):
 
 ```bash
@@ -136,7 +142,7 @@ The service worker is registered only by the built web version (`src/platform/we
 
 ## Checks
 
-`.github/workflows/controles.yml`, on every pull request, on GitHub's runners: the repo is public, and the code of a pull request coming from a fork must not run on any ssk-it machine. The browser job runs in Playwright's image, `mcr.microsoft.com/playwright:v<version>-noble`: its tag follows the `playwright` version of `package.json`, and is bumped with it.
+`.github/workflows/controles.yml`, on every pull request, on GitHub's runners: the repo is public, and the code of a pull request coming from a fork must not run on any ssk-it machine. The interface job runs the tests with coverage and hands it to SonarCloud (`sonar-project.properties`), when the `SONAR_TOKEN` secret is there — never for a pull request from a fork; SonarCloud's automatic analysis is off, since it cannot coexist with this one. The browser job runs in Playwright's image, `mcr.microsoft.com/playwright:v<version>-noble`: its tag follows the `playwright` version of `package.json`, and is bumped with it.
 
 ## What must be green before a pull request
 
