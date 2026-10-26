@@ -8,8 +8,9 @@
 
 What the code does not own, and the names it shares with it.
 
-- **What the user reads**: interface texts, in templates, until internationalisation. They are the product's text, addressed to French-speaking authors; translating them is a product decision, which will come with an i18n mechanism, not a by-product of renaming.
-- **What the SSK Canon format reads or writes**: YAML keys (`cree_par`, `option_retenue`, `depots_code`), status and operation values (`"brouillon"`, `"livree"`, `"cree"`, `"abroge"`), folder names (`cadrages/`, `identite/`), and routes that mirror the addresses of the published site (`…/cadrages/2026-001`). The format is shared with `@ssk-it/canon-check`, the automation and every existing project repo, and its addresses are cited in issues and scopings: renaming on our side alone would make the application unable to read existing repos, and break links already written (`INV-1`, `INV-7`).
+- **What the SSK Canon format reads or writes**: YAML keys (`cree_par`, `option_retenue`, `depots_code`), status and operation values (`"brouillon"`, `"livree"`, `"cree"`, `"abroge"`), link-kind keys (`carte_trello`), folder names (`cadrages/`, `identite/`), and routes that mirror the addresses of the published site (`…/cadrages/2026-001`). The format is shared with `@ssk-it/canon-check`, the automation and every existing project repo, and its addresses are cited in issues and scopings: renaming on our side alone would make the application unable to read existing repos, and break links already written (`INV-1`, `INV-7`).
+- **What the application writes into a repo**: commit messages, pull-request titles and bodies, the Markdown sections it writes (`## Énoncés`, `## Décision`), the automation's workflow, the bootstrap notes, the comments of `ssk-canon.yml`. A repo is reread by its whole team, whatever the language each one displays (RG-textes-traduits).
+- **Verification messages** from `@ssk-it/canon-check`: they stay in the exact terms of the pull request's check (RG-verification-a-la-saisie), and will be translated in the library, by anomaly code.
 - **Slot names and union-type values shared with the format** — the values of `ScopingStatus`, `ImpactOperation`, `HelpSection`, `VaultWrite`, the `"bureau"` / `"web"` target. They are the format's values, or are compared with them; a later pass may translate those that do not leave the code, with a mapping at the edge.
 
 The persisted formats on the user's machine also keep their names ([practices.md](practices.md#the-boundary-with-the-system)): renaming them would lose what is already stored.
@@ -33,7 +34,14 @@ Chosen verbs: `load` (read from GitHub, storage or the vault), `parse` / `serial
 
 ## Interface
 
-Everything the user reads is in French, accents included, in templates — never hard-coded in a service's logic.
+Everything the user reads is displayed in French or in English (RG-langue-choisie), and goes through a typed catalogue — never hard-coded in a template or a service.
+
+- **A catalogue per component or per folder**, next to it: `legal-notice.messages.ts` beside `LegalNoticePage.vue`, `defineMessages({ fr: {…}, en: {…} })` (`src/core/i18n/language.ts`). The English catalogue must have exactly the French one's shape: a missing or extra key does not compile (RG-textes-traduits). Keys are English camelCase; a message with parameters or a plural is a function.
+- **In a component**, `const t = useMessages(xMessages)` and `{{ t().key }}`; what is computed from a text reads `t()` inside a `computed`, so that it follows a language switch without remounting. Inline markup is split into pieces, never rendered with `v-html`.
+- **In a service**, a message is built from its catalogue when it is created, in the language displayed then: `inject(LocaleService).messages(xMessages)()`.
+- **Dates and numbers** are formatted with `locale.formatLocale()`, never a fixed locale.
+- **Model labels** (`SCOPING_STATUS_LABEL`, `LINK_TAG_LABEL`…) are localized, read as `X_LABEL[locale.language()][key]`. An entered link kind is recognised in the displayed language with `tagFromInput` (RG-nature-lien-normalisee): the key never derives from a translated label.
+- French texts keep their typography — accents, `’`, « guillemets ». Tests read French by default (`src/test-setup.ts`); each page's test file has an English case.
 
 ## Comments
 
