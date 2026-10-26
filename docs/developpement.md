@@ -36,7 +36,7 @@ Ce dépôt est aussi un paquet, `@ssk-it/skanon`, que l'application de bureau co
 "@ssk-it/skanon": "github:ssk-it/skanon-web#<commit>"
 ```
 
-Le paquet sert ses sources telles quelles, `.ts` et `.vue` : celui qui le consomme les compile avec les siennes. Ce qu'il peut importer est son API, et rien d'autre : le champ `exports` de `package.json` — le contrat d'extension, les ports, l'injection, le kit d'interface, quelques services et doublures de test. Vue, `vue-router` et `@vue/reactivity` sont des dépendances paires : une seule instance de Vue, la sienne. Élargir `exports` ou en changer une entrée est une décision ([pratiques.md](pratiques.md#ce-qui-tient-au-livrable)).
+Le paquet sert ses sources telles quelles, `.ts` et `.vue` : celui qui le consomme les compile avec les siennes. Ce qu'il peut importer est son API, et rien d'autre : le champ `exports` de `package.json` — le contrat d'extension, les ports, l'injection, le kit d'interface, quelques services et doublures de test. Vue, `vue-router` et `@vue/reactivity` sont des dépendances paires : une seule instance de Vue, la sienne. `@ssk-it/canon-check` aussi, que le consommateur déclare et épingle lui-même : pnpm refuse une dépendance tirée de Git sous le premier niveau (`blockExoticSubdeps`). Le consommateur définit enfin `VITE_CIBLE` et `VITE_VERSION` dans sa configuration de Vite, et leurs types (`src/env.d.ts`). Élargir `exports` ou en changer une entrée est une décision ([pratiques.md](pratiques.md#ce-qui-tient-au-livrable)).
 
 ## Lancer
 
