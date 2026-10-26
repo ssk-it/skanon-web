@@ -1,0 +1,58 @@
+name: Bug
+description: Report a Skanon behaviour that does not match what is expected.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      description: What Skanon should do.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What Skanon does instead. An error message or a screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The path that leads to the bug, one step per line.
+      placeholder: |
+        1. Open the referentiel…
+        2. Click on…
+        3. See…
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      description: Name and version, and whether Skanon was installed as an app.
+      placeholder: Chrome 141, installed as an app
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Skanon version
+      description: The commit shown in the bottom bar.
+      placeholder: 1a2b3c4
+    validations:
+      required: true
