@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { inject, provide, resetInjection } from "../injection";
+import { LocaleService } from "../i18n/locale.service";
+import { GithubClient } from "../github/github-client";
 import {
+  ComparisonService,
   compareRules,
   listScopingsDeliveredBetween,
 } from "./comparison.service";
@@ -162,5 +166,24 @@ describe("scopings delivered between two bounds", () => {
     const after = specification([], [scoping("2026-002", "brouillon")]);
 
     expect(listScopingsDeliveredBetween(before, after)).toEqual([]);
+  });
+});
+
+describe("A date before the repo existed", () => {
+  it("is reported in English, with the date in the English format", async () => {
+    resetInjection();
+    provide(GithubClient, { commitAtDate: async () => null });
+    inject(LocaleService).choice.set("en");
+
+    const date = new Date(2020, 0, 31);
+    await expect(
+      inject(ComparisonService).compare(
+        { owner: "org", repo: "depot" },
+        date,
+        date,
+      ),
+    ).rejects.toThrow(
+      "The repo has no record on 31/01/2020: this date precedes its creation.",
+    );
   });
 });

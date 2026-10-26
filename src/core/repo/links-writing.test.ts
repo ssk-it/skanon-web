@@ -202,9 +202,7 @@ describe("normalisation of an entered kind", () => {
     for (const language of ["fr", "en"] as const)
       for (const [tag, label] of Object.entries(LINK_TAG_LABEL[language]))
         expect(tagFromInput(label, LINK_TAG_LABEL[language])).toBe(tag);
-    expect(tagFromInput("Trello card", LINK_TAG_LABEL.en)).toBe(
-      "carte_trello",
-    );
+    expect(tagFromInput("Trello card", LINK_TAG_LABEL.en)).toBe("carte_trello");
     expect(tagFromInput("  trello-CARD ", LINK_TAG_LABEL.en)).toBe(
       "carte_trello",
     );

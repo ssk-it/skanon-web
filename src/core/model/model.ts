@@ -441,25 +441,23 @@ export const DECISION_STATUS_LABEL = defineMessages<
   Record<DecisionStatus, string>
 >({
   fr: { ouverte: "Ouverte", retenue: "Retenue", annulee: "Annulée" },
-  en: { ouverte: "Open", retenue: "Adopted", annulee: "Cancelled" },
+  en: { ouverte: "Open", retenue: "Chosen", annulee: "Cancelled" },
 });
 
-export const OPERATION_LABEL = defineMessages<Record<ImpactOperation, string>>(
-  {
-    fr: {
-      cree: "crée",
-      modifie: "modifie",
-      abroge: "abroge",
-      touche: "touche",
-    },
-    en: {
-      cree: "creates",
-      modifie: "modifies",
-      abroge: "repeals",
-      touche: "touches",
-    },
+export const OPERATION_LABEL = defineMessages<Record<ImpactOperation, string>>({
+  fr: {
+    cree: "crée",
+    modifie: "modifie",
+    abroge: "abroge",
+    touche: "touche",
   },
-);
+  en: {
+    cree: "creates",
+    modifie: "modifies",
+    abroge: "repeals",
+    touche: "touches",
+  },
+});
 
 /**
  * The link kinds of a project that declares none.
@@ -475,24 +473,22 @@ export const DEFAULT_LINK_TAGS: readonly string[] = [
   "document",
 ];
 
-export const LINK_TAG_LABEL = defineMessages<Readonly<Record<string, string>>>(
-  {
-    fr: {
-      carte_trello: "Carte Trello",
-      issue_github: "Issue GitHub",
-      piste: "Piste",
-      maquette: "Maquette",
-      document: "Document",
-    },
-    en: {
-      carte_trello: "Trello card",
-      issue_github: "GitHub issue",
-      piste: "Roadmap item",
-      maquette: "Mock-up",
-      document: "Document",
-    },
+export const LINK_TAG_LABEL = defineMessages<Readonly<Record<string, string>>>({
+  fr: {
+    carte_trello: "Carte Trello",
+    issue_github: "Issue GitHub",
+    piste: "Piste",
+    maquette: "Maquette",
+    document: "Document",
   },
-);
+  en: {
+    carte_trello: "Trello card",
+    issue_github: "GitHub issue",
+    piste: "Roadmap item",
+    maquette: "Mock-up",
+    document: "Document",
+  },
+});
 
 /**
  * Lifecycle order: draft, in review, approved, delivered.

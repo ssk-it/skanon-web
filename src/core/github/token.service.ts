@@ -9,6 +9,7 @@ import type {
 } from "../../platform/ports";
 import type { TokenProtection } from "../model/model";
 import { ContentCache } from "../repo/content-cache";
+import { githubText } from "./github.messages";
 
 /**
  * The key of the former encrypted vault, erased at startup.
@@ -487,12 +488,11 @@ export class TokenService {
    */
   static checkForm(token: string): string | null {
     const j = token.trim();
-    if (!j) return "Saisir un jeton.";
-    if (/\s/.test(j)) return "Un jeton ne contient pas d’espace.";
-    if (!/^(ghp_|github_pat_|gho_|ghu_|ghs_)/.test(j)) {
-      return "Un jeton GitHub commence par ghp_ ou github_pat_.";
-    }
-    if (j.length < 20) return "Ce jeton semble incomplet.";
+    const t = githubText();
+    if (!j) return t.tokenEmpty;
+    if (/\s/.test(j)) return t.tokenWithSpace;
+    if (!/^(ghp_|github_pat_|gho_|ghu_|ghs_)/.test(j)) return t.tokenPrefix;
+    if (j.length < 20) return t.tokenTooShort;
     return null;
   }
 }

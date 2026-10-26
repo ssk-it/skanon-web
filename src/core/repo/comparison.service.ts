@@ -2,6 +2,8 @@ import { inject } from "../injection";
 import { CommitDate, GithubClient, RepoRef } from "../github/github-client";
 import { RepoLoader } from "./repo-loader";
 import { Specification, Rule } from "../model/model";
+import { LocaleService } from "../i18n/locale.service";
+import { repoText } from "./repo.messages";
 
 /** What happened to a rule between two dates. */
 export type Evolution = "ajoutee" | "modifiee" | "abrogee" | "retiree";
@@ -44,6 +46,7 @@ export interface ComparisonBound {
 export class ComparisonService {
   private readonly github = inject(GithubClient);
   private readonly loader = inject(RepoLoader);
+  private readonly locale = inject(LocaleService);
 
   async compare(
     repoRef: RepoRef,
@@ -75,8 +78,9 @@ export class ComparisonService {
     const commit = await this.github.commitAtDate(repoRef, date);
     if (!commit) {
       throw new Error(
-        `Le dépôt n’a aucun enregistrement au ${date.toLocaleDateString("fr-FR")} : ` +
-          "cette date précède sa création.",
+        repoText().noRecordAt(
+          date.toLocaleDateString(this.locale.formatLocale()),
+        ),
       );
     }
     const specification = await this.loader.loadSpecification({

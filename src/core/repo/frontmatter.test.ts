@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { inject } from "../injection";
+import { LocaleService } from "../i18n/locale.service";
 import {
   splitFrontmatter,
   isUnreadable,
@@ -74,6 +76,18 @@ plusieurs lignes.
       "---\ntitre: Choisir : ceci ou cela\n---\ncorps",
     );
     expect(isUnreadable(r) && r.error).toContain("apostrophes");
+  });
+
+  it("says what to do about an unquoted « : » in English", () => {
+    inject(LocaleService).choice.set("en");
+    const r = splitFrontmatter(
+      "---\nid: x\ntitre: Choisir : ceci ou cela\n---\ncorps",
+    );
+    expect(isUnreadable(r) && r.error).toContain(
+      "unreadable frontmatter, line 3",
+    );
+    expect(isUnreadable(r) && r.error).toContain("must be in quotes");
+    expect(isUnreadable(r) && r.error).not.toContain("illisible");
   });
 
   it("accepts Windows line endings", () => {

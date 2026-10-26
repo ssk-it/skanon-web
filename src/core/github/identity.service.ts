@@ -3,6 +3,7 @@ import { signal } from "../signals";
 import { SpecificationStore } from "../repo/specification.store";
 import { TokenService, TemporaryAccess } from "./token.service";
 import { IdentitySettings } from "../model/model";
+import { githubText } from "./github.messages";
 
 /** What is kept between leaving for the issuer and coming back. */
 const PENDING_KEY = "ssk-canon.identite.attente";
@@ -68,9 +69,7 @@ export class IdentityService {
   private settings(): IdentitySettings {
     const r = this.store.specification().settings.identity;
     if (!r) {
-      throw new SignInRefused(
-        "Ce projet ne déclare pas où vérifier les identités. Voir ses réglages.",
-      );
+      throw new SignInRefused(githubText().identityNotDeclared);
     }
     return r;
   }
@@ -124,7 +123,7 @@ export class IdentityService {
       // The state ties this return to the request that produced it: without this check,
       // a code obtained elsewhere could be slipped into this session.
       if (params.get("state") !== pending.state) {
-        throw new SignInRefused("La réponse ne correspond pas à la demande.");
+        throw new SignInRefused(githubText().signInStateMismatch);
       }
 
       const identityToken = await this.exchangeCode(code, pending.verifier);
@@ -132,7 +131,7 @@ export class IdentityService {
       return true;
     } catch (e) {
       this.error.set(
-        e instanceof Error ? e.message : "La connexion n’a pas abouti.",
+        e instanceof Error ? e.message : githubText().signInFailed,
       );
       return true;
     } finally {
@@ -156,13 +155,12 @@ export class IdentityService {
     });
 
     if (!response.ok) {
-      throw new SignInRefused("L’émetteur d’identité a refusé la connexion.");
+      throw new SignInRefused(githubText().issuerRefused);
     }
     const { access_token } = (await response.json()) as {
       access_token?: string;
     };
-    if (!access_token)
-      throw new SignInRefused("L’émetteur n’a rendu aucune identité.");
+    if (!access_token) throw new SignInRefused(githubText().issuerNoIdentity);
     return access_token;
   }
 
@@ -184,7 +182,7 @@ export class IdentityService {
       // The component's message names the cause — identity refused, no project
       // open — and is worth more than an error code.
       throw new SignInRefused(
-        (body["erreur"] as string) ?? "L’accès au dépôt a été refusé.",
+        (body["erreur"] as string) ?? githubText().accessRefused,
       );
     }
     return body as unknown as TemporaryAccess;
