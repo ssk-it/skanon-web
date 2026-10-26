@@ -77,14 +77,14 @@ function specification(partial: Partial<Specification>): Specification {
 }
 
 /**
- * Les vues croisées de l'architecture.
+ * The cross views of the architecture.
  *
- * Ce qui distingue ces documents d'un wiki n'est pas qu'ils soient versionnés,
- * mais que les relations entre eux se calculent. Une liste « flux touchant ce
- * composant » tenue à la main serait fausse au premier flux ajouté, et son
- * inexactitude ne se verrait jamais.
+ * What sets these documents apart from a wiki is not that they are versioned,
+ * but that the relations between them are computed. A "flows touching this
+ * component" list kept by hand would be wrong at the first added flow, and
+ * its inaccuracy would never show.
  */
-describe("vues croisées de l’architecture", () => {
+describe("cross views of the architecture", () => {
   let store: SpecificationStore;
 
   beforeEach(() => {
@@ -93,7 +93,7 @@ describe("vues croisées de l’architecture", () => {
     store = inject(SpecificationStore);
   });
 
-  it("liste les flux qui touchent un composant", () => {
+  it("lists the flows that touch a component", () => {
     store.specification.set(
       specification({
         architecture: new Map([
@@ -108,18 +108,18 @@ describe("vues croisées de l’architecture", () => {
       }),
     );
 
-    // Ordre des documents du store : par identifiant, comme les règles.
+    // Order of the store's documents: by identifier, like rules.
     const flows = store.listFlowsByComponent("CMP-api");
     expect(flows.map((f) => f.id)).toEqual(["FLX-auth", "FLX-export"]);
   });
 
-  it("ne retient comme flux que les documents de cette nature", () => {
+  it("only keeps as flows the documents of that kind", () => {
     store.specification.set(
       specification({
         architecture: new Map([
           ["CMP-api", document("CMP-api", "composant")],
-          // Un contexte peut lui aussi citer des composants : il les cite tous,
-          // et le faire remonter parmi les flux noierait la vue qu'on consulte.
+          // A context can cite components too: it cites them all,
+          // and bringing it up among the flows would drown the view being consulted.
           ["CTX-global", document("CTX-global", "contexte", ["CMP-api"])],
           ["FLX-export", document("FLX-export", "flux", ["CMP-api"])],
         ]),
@@ -131,7 +131,7 @@ describe("vues croisées de l’architecture", () => {
     ]);
   });
 
-  it("liste les documents par nature", () => {
+  it("lists the documents by kind", () => {
     store.specification.set(
       specification({
         architecture: new Map([
@@ -153,7 +153,7 @@ describe("vues croisées de l’architecture", () => {
     ]);
   });
 
-  it("remonte d’une cible d’architecture aux cadrages qui l’ont produite", () => {
+  it("goes back from an architecture target to the scopings that produced it", () => {
     store.specification.set(
       specification({
         decisions: new Map([["ADR-stockage", decision("ADR-stockage")]]),
@@ -201,18 +201,18 @@ describe("vues croisées de l’architecture", () => {
       }),
     );
 
-    // Ordre des cadrages du store : cycle de vie, puis identifiant décroissant
-    // — le plus récent d'abord, ce qui vaut aussi pour cette remontée.
+    // Order of the store's scopings: lifecycle, then descending identifier
+    // — the most recent first, which also holds for this lookup.
     const scopings = store.listScopingsImpactingTarget("ADR-stockage");
     expect(scopings.map((c) => c.scoping.id)).toEqual(["2026-002", "2026-001"]);
     expect(scopings.map((c) => c.operation)).toEqual(["modifie", "cree"]);
   });
 
-  it("rend l’énoncé d’un impact visant une cible d’architecture", () => {
-    // Le défaut que ce cas protège : la résolution lisait `regle`, vide pour un
-    // impact d'architecture. L'énoncé existait dans le cadrage et n'était
-    // affiché nulle part — le pire des cas, puisque rien ne signale une section
-    // qu'on ne voit pas.
+  it("renders the statement of an impact targeting an architecture target", () => {
+    // The defect this case guards against: resolution read `regle`, empty for an
+    // architecture impact. The statement existed in the scoping and was
+    // displayed nowhere — the worst case, since nothing flags a section
+    // one does not see.
     const c = scoping("2026-001", [
       {
         target: "FLX-export",
@@ -239,20 +239,20 @@ describe("vues croisées de l’architecture", () => {
       "Un export nocturne.",
       "Une règle.",
     ]);
-    // La cible résolue accompagne l'énoncé : sans elle, la fiche ne pourrait pas
-    // signaler qu'un énoncé diverge de ce que la cible porte aujourd'hui.
+    // The resolved target comes with the statement: without it, the page could not
+    // flag that a statement diverges from what the target holds today.
     expect(lines[0].target?.id).toBe("FLX-export");
   });
 
-  it("ne confond pas une règle et une cible d’architecture de même identifiant", () => {
+  it("does not confuse a rule and an architecture target with the same identifier", () => {
     store.specification.set(
       specification({
         scopings: new Map([
           [
             "2026-001",
             scoping("2026-001", [
-              // Rien n'interdit qu'un identifiant se retrouve des deux côtés :
-              // la nature est ce qui les sépare, pas le nom.
+              // Nothing forbids an identifier from showing up on both sides:
+              // the kind is what separates them, not the name.
               { target: "X", kind: "regle", operation: "cree", rule: "X" },
               { target: "X", kind: "adr", operation: "modifie", rule: "" },
             ]),

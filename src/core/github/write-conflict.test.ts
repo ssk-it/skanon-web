@@ -7,12 +7,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { GithubClient, GithubError } from "./github-client";
 
 /**
- * RG-message-nomme-la-cause et RG-reprise-cadrage : GitHub répond 409 à deux
- * situations sans rapport — lire un dépôt sans aucun enregistrement, et écrire
- * sur une version qui n'est plus la dernière. Les confondre enverrait déposer
- * un README dans un dépôt qui en a déjà un, au lieu de recharger le cadrage.
+ * RG-message-nomme-la-cause and RG-reprise-cadrage: GitHub answers 409 to two
+ * unrelated situations — reading a repo without any commit, and writing
+ * on a version that is no longer the latest. Confusing them would send one to drop
+ * a README in a repo that already has one, instead of reloading the scoping.
  */
-describe("le 409 de GitHub", () => {
+describe("GitHub's 409", () => {
   const REPO = { owner: "org", repo: "projet" };
   const API = "https://api.github.com/repos/org/projet";
 
@@ -29,7 +29,7 @@ describe("le 409 de GitHub", () => {
     for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
   }
 
-  it("dit le dépôt vide à la lecture", async () => {
+  it("reports the empty repo on read", async () => {
     const read = client.loadTree(REPO).catch((e: unknown) => e);
     await waitFor();
     http
@@ -41,7 +41,7 @@ describe("le 409 de GitHub", () => {
     expect(error.message).toContain("Ce dépôt est vide");
   });
 
-  it("dit le conflit d’écriture quand la version lue n’est plus la dernière", async () => {
+  it("reports the write conflict when the version read is no longer the latest", async () => {
     const writing = client
       .commitFile(
         REPO,

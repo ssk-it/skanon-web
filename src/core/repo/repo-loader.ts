@@ -44,7 +44,7 @@ import {
   DEFAULT_LINK_TAGS,
 } from "../model/model";
 
-/** Répertoires portant des entités. Le reste (README…) est ignoré. */
+/** Directories carrying entities. The rest (README…) is ignored. */
 const DIRECTORIES = [
   "domains",
   "features",
@@ -55,15 +55,15 @@ const DIRECTORIES = [
 ] as const;
 
 /**
- * Les natures qu'un impact peut viser, dans l'ordre où on les cherche.
+ * The kinds an impact can target, in the order they are looked for.
  *
- * Le même ordre que `CIBLES` du vérificateur partagé : les deux lisent le même
- * format, et un désaccord se paierait par un impact compris différemment de
- * chaque côté.
+ * The same order as `CIBLES` in the shared verifier: both read the same
+ * format, and a disagreement would be paid for by an impact understood
+ * differently on each side.
  */
 const TARGET_KINDS = ["regle", "adr", "architecture"] as const;
 
-/** Fichier de configuration, à la racine d'un dépôt cadré. */
+/** Configuration file, at the root of a framed repo. */
 const CONFIG_NAME = "ssk-canon.yml";
 
 interface LoadedFile {
@@ -71,47 +71,46 @@ interface LoadedFile {
   readonly content: string;
 }
 
-/** Un état que le dépôt n'a pas confirmé, faute d'avoir répondu. */
+/** A state the repo has not confirmed, for lack of having responded. */
 export interface UnconfirmedState {
-  /** Instant de la lecture qui l'a produit, au format ISO. */
+  /** Instant of the read that produced it, in ISO format. */
   readonly readAt: string;
-  /** Pourquoi le dépôt n'a pas répondu, tel que l'erreur le dit. */
+  /** Why the repo did not respond, as the error says it. */
   readonly cause: string;
 }
 
-/** Ce qu'une lecture rend, au-delà du référentiel lui-même. */
+/** What a read returns, beyond the specification itself. */
 export interface SpecificationRead {
   readonly specification: Specification;
-  /** Les empreintes que cette lecture a citées : ce que le cache doit garder. */
+  /** The fingerprints this read cited: what the cache must keep. */
   readonly fingerprints: ReadonlySet<string>;
-  /** Présent quand le référentiel est le dernier lu, et non l'état courant. */
+  /** Present when the specification is the last one read, and not the current state. */
   readonly unconfirmed: UnconfirmedState | null;
 }
 
 export interface ReadOptions {
   readonly progression?: (loadedCount: number, total: number) => void;
   /**
-   * Garder l'arborescence lue : pour la redemander sous condition, et pour la
-   * montrer si le dépôt ne répond plus. Une lecture à un commit passé n'en a
-   * pas l'usage.
+   * Keep the tree read: to ask for it again conditionally, and to show it if
+   * the repo no longer responds. A read at a past commit has no use for it.
    */
   readonly remember?: boolean;
   /**
-   * Montrer le dernier état lu si le dépôt ne répond pas (RG-dernier-etat-connu).
-   * Réservé à la consultation du référentiel : une lecture faite pour écrire
-   * doit échouer plutôt que de se fonder sur un état non confirmé.
+   * Show the last state read if the repo does not respond (RG-dernier-etat-connu).
+   * Reserved for consulting the specification: a read made in order to write
+   * must fail rather than rely on an unconfirmed state.
    */
   readonly lastKnownState?: boolean;
 }
 
 /**
- * Charge un dépôt de projet et le transforme en modèle.
+ * Loads a project repo and turns it into a model.
  *
- * La stratégie : une requête pour l'arborescence complète, puis les seuls
- * contenus que le poste ne détient pas, en parallèle borné par le limiteur.
- * L'arborescence donne l'empreinte de chaque fichier ; un contenu déjà rangé
- * sous cette empreinte est resservi sans appel, sur l'un ou l'autre canal.
- * Voir `ContenusCache` et RG-contenus-par-empreinte.
+ * The strategy: one request for the full tree, then only the contents the
+ * machine does not hold, in parallel bounded by the limiter. The tree gives
+ * each file's fingerprint; a content already stored under that fingerprint is
+ * served again without a call, on either channel.
+ * See `ContentCache` and RG-contenus-par-empreinte.
  */
 export class RepoLoader {
   private readonly github = inject(GithubClient);
@@ -135,9 +134,9 @@ export class RepoLoader {
       options.remember || options.lastKnownState
         ? this.cache.loadState(repoRef, ref)
         : Promise.resolve(null);
-    // L'état connu n'est attendu avant l'arborescence que s'il sert à la
-    // demander sous condition, donc avec un jeton. Sinon, la demande part sans
-    // attendre le stockage, et l'état ne sert qu'après.
+    // The known state is awaited before the tree only if it serves to request
+    // it conditionally, hence with a token. Otherwise, the request leaves
+    // without waiting for storage, and the state only serves afterwards.
     const conditional = options.remember === true && this.tokens.present();
     const knownBefore = conditional ? await waiting : null;
 
@@ -148,8 +147,8 @@ export class RepoLoader {
       if (!(e instanceof GithubError) || !options.lastKnownState) throw e;
       const known = await waiting;
 
-      // Ce que le dépôt ne montre plus à quelqu'un, l'application ne le lui
-      // montre pas davantage — pas même comme dernier état connu.
+      // What the repo no longer shows to someone, the application does not show
+      // them either — not even as last known state.
       if (isDenial(e)) {
         await this.cache.clearRepo(repoRef);
         throw e;
@@ -180,13 +179,13 @@ export class RepoLoader {
     const config = tree.entries.find((e) => e.path === CONFIG_NAME);
     const toLoad: TreeEntry[] = config ? [config, ...relevant] : [...relevant];
 
-    // Les contenus manquants sont lus au commit que l'arborescence vient de
-    // résoudre, non au nom de la branche. `raw` sert avec `max-age: 300` :
-    // l'URL d'une branche rend l'ancienne version pendant cinq minutes après
-    // une écriture, alors que celle d'un commit est neuve à chaque écriture.
-    // C'est ce qui rend une relecture immédiatement fidèle à ce qu'on vient
-    // d'enregistrer ; le cache, rangé par empreinte de fichier, n'y change
-    // rien, puisqu'un fichier écrit a une empreinte neuve.
+    // Missing contents are read at the commit the tree has just resolved, not
+    // by the branch name. `raw` serves with `max-age: 300`: a branch's URL
+    // returns the old version for five minutes after a write, whereas a
+    // commit's is fresh on every write. This is what makes a re-read
+    // immediately faithful to what was just saved; the cache, stored by file
+    // fingerprint, changes nothing to it, since a written file has a fresh
+    // fingerprint.
     const pinned: RepoRef = { ...repoRef, ref: tree.sha };
     const known = await waiting;
     let isPrivate = known?.private ?? false;
@@ -197,7 +196,8 @@ export class RepoLoader {
         let content = await this.cache.loadContent(repoRef, e.sha);
         if (content === null) {
           content = await this.github.loadContent(pinned, e.path, e.sha);
-          // Lu par l'API : le canal public ne dessert pas ce dépôt, il est privé.
+          // Read through the API: the public channel does not serve this repo, it is
+          // private.
           isPrivate ||= this.github.contentsViaApi();
           await this.cache.saveContent(repoRef, e.sha, content, {
             private: isPrivate,
@@ -231,15 +231,15 @@ export class RepoLoader {
   }
 
   /**
-   * Les contenus d'un dépôt privé ne survivent pas à l'accès qui les a lus :
-   * sous un accès temporaire, ils restent dans l'onglet, comme lui.
-   * Voir RG-contenus-prives-au-repos.
+   * A private repo's contents do not outlive the access that read them: under
+   * a temporary access, they stay in the tab, like it.
+   * See RG-contenus-prives-au-repos.
    */
   private isPersistable(isPrivate: boolean): boolean {
     return !isPrivate || this.tokens.source() !== "identite_tierce";
   }
 
-  /** Les contenus d'une arborescence connue, s'ils sont tous encore détenus. */
+  /** The contents of a known tree, if they are all still held. */
   private async readFromCache(
     repoRef: RepoRef,
     entries: readonly TreeEntry[],
@@ -247,7 +247,7 @@ export class RepoLoader {
     const files: LoadedFile[] = [];
     for (const e of entries) {
       const content = await this.cache.loadContent(repoRef, e.sha);
-      // Un état partiel se présenterait comme complet : mieux vaut l'échec.
+      // A partial state would present itself as complete: failure is better.
       if (content === null) return null;
       files.push({ path: e.path, content });
     }
@@ -307,10 +307,9 @@ export class RepoLoader {
         continue;
       }
 
-      // Un README dans un répertoire de contenu n'est pas une entité : il
-      // explique ce que le répertoire attend, à qui ouvre le dépôt sur la
-      // plateforme. Le signaler comme mal formé encombrerait le chargement de
-      // documentation parfaitement valide.
+      // A README in a content directory is not an entity: it explains what the
+      // directory expects, to whoever opens the repo on the platform. Reporting
+      // it as malformed would clutter the load of perfectly valid documentation.
       if (f.path.endsWith("/README.md")) continue;
 
       const parse = splitFrontmatter(f.content);
@@ -318,9 +317,9 @@ export class RepoLoader {
         anomalies.push(`${f.path} : frontmatter absent.`);
         continue;
       }
-      // Un fichier illisible est écarté et signalé, sans interrompre les
-      // autres : un référentiel amputé d'une entité reste consultable, alors
-      // qu'un chargement interrompu ne montre rien du tout.
+      // An unreadable file is set aside and reported, without interrupting the
+      // others: a specification missing one entity stays readable, whereas an
+      // interrupted load shows nothing at all.
       if (isUnreadable(parse)) {
         anomalies.push(`${f.path} : ${parse.error}.`);
         continue;
@@ -371,9 +370,9 @@ export class RepoLoader {
         case "architecture":
           architecture.set(str(data["id"]), {
             id: str(data["id"]),
-            // Un document sans nature déclarée est un composant : c'est la
-            // nature qui n'a rien à relier, donc la seule qui se devine sans
-            // risque de se tromper sur ce que le document décrit.
+            // A document without a declared kind is a component: it is the kind with
+            // nothing to link, hence the only one that can be guessed without risk of
+            // being wrong about what the document describes.
             kind: (str(data["nature"]) || "composant") as DocumentKind,
             status: (str(data["statut"]) || "actif") as RuleStatus,
             components: toList(data["composants"]),
@@ -386,9 +385,9 @@ export class RepoLoader {
         case "cadrages": {
           const scopingId = segments[1];
           if (segments[2] === "cadrage.md") {
-            // Le vérificateur de l'Action refuse un statut déclaré. Le signaler
-            // ici fait voir depuis l'application ce qui, sinon, ne se découvre
-            // qu'en intégration continue, une fois la demande ouverte.
+            // The Action's verifier refuses a declared status. Reporting it here
+            // shows from the application what would otherwise only be discovered in
+            // continuous integration, once the pull request is open.
             if (data["statut"] !== undefined) {
               anomalies.push(
                 `${f.path} : le statut ne se déclare pas, il se déduit de l’état du dépôt.`,
@@ -412,10 +411,10 @@ export class RepoLoader {
       scopings.set(id, {
         id: str(data["id"]) || id,
         title: str(data["titre"]) || id,
-        // Pas de statut ici : il se déduit de l'état du dépôt, non du fichier.
-        // Le chargeur lit une référence sans savoir laquelle ; c'est le store,
-        // qui sait d'où vient chaque cadrage, qui tranche. « livree » est donc
-        // le statut de ce qu'on lit, et la provenance le corrige si besoin.
+        // No status here: it is derived from the repo's state, not from the file.
+        // The loader reads a ref without knowing which one; it is the store, which
+        // knows where each scoping comes from, that decides. « livree » is thus
+        // the status of what is read, and the provenance corrects it if needed.
         status: "livree" as ScopingStatus,
         domains: toList(data["domaines"]),
         links: this.parseLinks(data["liens"]),
@@ -445,11 +444,11 @@ export class RepoLoader {
   }
 
   /**
-   * Lit le fichier de configuration du projet.
+   * Reads the project's configuration file.
    *
-   * Un fichier absent, illisible ou incomplet ne bloque rien : le projet garde
-   * les réglages par défaut, et l'anomalie est signalée. Un référentiel se
-   * consulte même sans configuration valide.
+   * An absent, unreadable or incomplete file blocks nothing: the project keeps
+   * the default settings, and the anomaly is reported. A specification can be
+   * consulted even without a valid configuration.
    */
   private parseConfig(
     content: string,
@@ -473,7 +472,7 @@ export class RepoLoader {
 
     let data: Record<string, unknown> | undefined;
     try {
-      // le fichier n'a pas de frontmatter : c'est du YAML nu
+      // the file has no frontmatter: it is bare YAML
       data = load(content) as Record<string, unknown> | undefined;
     } catch (e) {
       return {
@@ -485,10 +484,10 @@ export class RepoLoader {
     }
 
     const rawProject = (data?.["projet"] ?? {}) as Record<string, unknown>;
-    // `transitions` et `reflet_demande_fusion` ne se lisent plus : le cycle
-    // n'est plus réglable (2026-045). Un projet qui les déclare encore les voit
-    // ignorés sans anomalie — ce sont des réglages devenus sans objet, non des
-    // réglages faux.
+    // `transitions` and `reflet_demande_fusion` are no longer read: the cycle
+    // is no longer configurable (2026-045). A project that still declares them
+    // sees them ignored without anomaly — they are settings that became
+    // pointless, not wrong settings.
     const anomalies: string[] = [];
     const readRepos = parseCodeRepos(data?.["depots_code"]);
     anomalies.push(...readRepos.anomalies);
@@ -564,13 +563,13 @@ export class RepoLoader {
     return raw
       .filter((i): i is Record<string, unknown> => !!i && typeof i === "object")
       .map((i) => {
-        // L'ordre suit celui de CIBLES dans le vérificateur partagé : un impact
-        // ne déclare qu'une cible, et c'est la première trouvée qui vaut.
+        // The order follows that of CIBLES in the shared verifier: an impact
+        // declares only one target, and the first one found is the one that counts.
         const kind = TARGET_KINDS.find((n) => i[n] !== undefined) ?? "regle";
         const target = str(i[kind]);
-        // `regle` reste renseigné pour les appelants qui le lisent encore ; il
-        // ne porte que les impacts de cette nature, jamais un identifiant
-        // d'architecture qu'ils traiteraient alors comme une règle.
+        // `rule` stays filled for callers that still read it; it carries only
+        // impacts of that kind, never an architecture identifier they would then
+        // treat as a rule.
         return {
           target: target,
           kind: kind,
@@ -606,11 +605,11 @@ function toList(v: unknown): string[] {
 }
 
 /**
- * Dépôts de code que ce projet réalise.
+ * Code repos this project implements.
  *
- * Un dépôt mal formé est écarté et signalé, sans faire échouer la lecture : la
- * liste sert à se situer, et une entrée douteuse ne doit pas rendre le
- * référentiel illisible.
+ * A malformed repo is set aside and reported, without failing the read: the
+ * list serves to find one's bearings, and a doubtful entry must not make the
+ * specification unreadable.
  */
 export function parseCodeRepos(raw: unknown): {
   repos: readonly CodeRepo[];
@@ -627,8 +626,8 @@ export function parseCodeRepos(raw: unknown): {
   const repos: CodeRepo[] = [];
   const anomalies: string[] = [];
   for (const entry of raw) {
-    // La forme courte — juste le nom du dépôt — est admise : le rôle n'apprend
-    // rien quand le projet n'en compte qu'un.
+    // The short form — just the repo name — is allowed: the role tells nothing
+    // when the project has only one.
     const repo =
       typeof entry === "string"
         ? entry
@@ -651,11 +650,11 @@ export function parseCodeRepos(raw: unknown): {
 }
 
 /**
- * Les natures de lien déclarées par le projet.
+ * The link kinds declared by the project.
  *
- * Une liste absente ou vide rend celle par défaut : un projet qui ne s'est pas
- * prononcé doit pouvoir référencer quelque chose, sinon la saisie d'un lien
- * n'offrirait aucun choix.
+ * An absent or empty list returns the default one: a project that has not
+ * expressed a choice must be able to reference something, otherwise entering
+ * a link would offer no choice.
  */
 export function parseLinkTags(raw: unknown): readonly string[] {
   if (!Array.isArray(raw)) return DEFAULT_LINK_TAGS;
@@ -664,14 +663,14 @@ export function parseLinkTags(raw: unknown): readonly string[] {
 }
 
 /**
- * Mode d'accès déclaré par le projet, ou le mode par défaut.
+ * Access mode declared by the project, or the default mode.
  *
- * Un mode inconnu est écarté et signalé : le subir silencieusement laisserait
- * croire au projet qu'il applique un réglage qu'il n'applique pas. Le jeton
- * personnel sert de recours — c'est le seul mode qui ne demande rien à héberger.
+ * An unknown mode is set aside and reported: putting up with it silently would
+ * let the project believe it applies a setting it does not apply. The personal
+ * token serves as fallback — it is the only mode that requires hosting nothing.
  *
- * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
- * l'éprouver ne doit pas demander de construire un chargeur.
+ * A free function rather than a method: it depends on no injection, and
+ * testing it must not require building a loader.
  */
 export function parseAccessMode(raw: unknown): {
   access: AccessMode;
@@ -693,9 +692,9 @@ export function parseAccessMode(raw: unknown): {
 }
 
 /**
- * Ce que le projet demande du jeton qui l'ouvre, ou la proposition par défaut.
+ * What the project requires of the token that opens it, or the default proposal.
  *
- * Une valeur inconnue est écartée et signalée, comme un mode d'accès inconnu : la subir laisserait croire au projet qu'il exige une protection qu'il n'exige pas (RG-protection-du-jeton-par-projet).
+ * An unknown value is set aside and reported, like an unknown access mode: putting up with it would let the project believe it requires a protection it does not require (RG-protection-du-jeton-par-projet).
  */
 export function parseTokenProtection(raw: unknown): {
   protection: TokenProtection;
@@ -716,18 +715,18 @@ export function parseTokenProtection(raw: unknown): {
   };
 }
 
-/** Champs attendus d'un bloc `identite`, et ce qu'ils désignent. */
+/** Fields expected in an `identite` block, and what they designate. */
 const IDENTITY_FIELDS = ["emetteur", "client", "echange"] as const;
 
 /**
- * Paramètres du mode « identité tierce », s'ils sont déclarés et complets.
+ * Parameters of the « identité tierce » mode, if declared and complete.
  *
- * Un bloc incomplet rend `null` plutôt qu'un objet à trous : la connexion
- * échouerait de toute façon, et échouer au chargement laisse au moins le
- * référentiel lisible et l'anomalie visible.
+ * An incomplete block returns `null` rather than an object with holes: sign-in
+ * would fail anyway, and failing at load at least leaves the specification
+ * readable and the anomaly visible.
  *
- * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
- * l'éprouver ne doit pas demander de construire un chargeur.
+ * A free function rather than a method: it depends on no injection, and
+ * testing it must not require building a loader.
  */
 export function parseIdentity(raw: unknown): {
   identity: IdentitySettings | null;
@@ -745,8 +744,8 @@ export function parseIdentity(raw: unknown): {
       anomalies.push(`${CONFIG_NAME} : identite.${field} manquant.`);
       continue;
     }
-    // Une adresse mal formée se découvrirait sinon au moment de la connexion,
-    // loin de sa cause.
+    // A malformed address would otherwise be discovered at sign-in time, far
+    // from its cause.
     if (field !== "client") {
       try {
         new URL(value);
@@ -763,7 +762,7 @@ export function parseIdentity(raw: unknown): {
   if (anomalies.length) return { identity: null, anomalies };
   return {
     identity: {
-      // une barre finale doublerait les séparateurs des adresses construites
+      // a trailing slash would double the separators of built addresses
       issuer: values["emetteur"].replace(/\/+$/, ""),
       client: values["client"],
       exchange: values["echange"].replace(/\/+$/, ""),
@@ -773,8 +772,8 @@ export function parseIdentity(raw: unknown): {
 }
 
 /**
- * La plateforme refuse l'accès : jeton refusé, droit manquant, dépôt hors de
- * portée. Une limite atteinte n'en est pas un — elle se lève d'elle-même.
+ * The platform refuses access: token refused, missing right, repo out of
+ * scope. A reached limit is not one — it lifts by itself.
  */
 function isDenial(e: GithubError): boolean {
   return (
@@ -784,7 +783,7 @@ function isDenial(e: GithubError): boolean {
   );
 }
 
-/** Le dépôt ne répond pas, sans rien dire de l'accès : réseau, limite, panne. */
+/** The repo does not respond, without saying anything about access: network, limit, outage. */
 function isUnreachable(e: GithubError): boolean {
   return e.status === 0 || e.quotaExhausted || e.status >= 500;
 }

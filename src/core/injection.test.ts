@@ -10,30 +10,30 @@ class Consumer {
 }
 
 describe("injection", () => {
-  it("rend une seule instance par service", () => {
+  it("returns a single instance per service", () => {
     expect(inject(Consumer).counter).toBe(inject(Counter));
   });
 
-  it("rend la doublure fournie à la place du service", () => {
+  it("returns the provided fake in place of the service", () => {
     const fake = { value: 42 };
     provide(Counter, fake);
     expect(inject(Consumer).counter.value).toBe(42);
   });
 
-  it("repart d'un conteneur vide après réinitialisation", () => {
+  it("starts again from an empty container after reset", () => {
     const first = inject(Counter);
     resetInjection();
     expect(inject(Counter)).not.toBe(first);
   });
 
-  it("emploie la fabrique d'un jeton, et refuse un jeton sans valeur", () => {
+  it("uses a token's factory, and refuses a token without a value", () => {
     expect(inject(new InjectionToken("avec", { factory: () => 3 }))).toBe(3);
     const without = new InjectionToken<number>("sans");
     expect(() => inject(without)).toThrow(/sans/);
     expect(inject(without, { optional: true })).toBeNull();
   });
 
-  it("signale une dépendance circulaire plutôt que de déborder la pile", () => {
+  it("reports a circular dependency rather than overflowing the stack", () => {
     class A {
       readonly b: unknown = inject(B);
     }

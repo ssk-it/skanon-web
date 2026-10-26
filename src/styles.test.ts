@@ -4,7 +4,7 @@ import process from "node:process";
 import { describe, expect, it } from "vitest";
 
 /**
- * Les jetons de `src/styles.css`. Le CSS n'a pas le mixin dont SSK Canon se servait pour écrire une fois le thème sombre et l'appliquer à deux sélecteurs : le bloc y est écrit deux fois, et ce test tient les deux copies d'accord.
+ * The tokens of `src/styles.css`. CSS lacks the mixin SSK Canon used to write the dark theme once and apply it to two selectors: the block is written twice there, and this test keeps the two copies in agreement.
  */
 const ROOT = join(process.cwd(), "src");
 const STYLES = readFileSync(join(ROOT, "styles.css"), "utf8").replace(
@@ -12,7 +12,7 @@ const STYLES = readFileSync(join(ROOT, "styles.css"), "utf8").replace(
   "",
 );
 
-/** Les déclarations de variables d'un bloc, sans `color-scheme`. */
+/** A block's variable declarations, without `color-scheme`. */
 function variables(block: string): Map<string, string> {
   return new Map(
     [...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [
@@ -43,8 +43,8 @@ function listFiles(folder: string): string[] {
   });
 }
 
-describe("jetons de style", () => {
-  it("donne au thème sombre les mêmes valeurs, que le système le demande ou que l’utilisateur le choisisse", () => {
+describe("style tokens", () => {
+  it("gives the dark theme the same values, whether the system asks for it or the user chooses it", () => {
     const system = variables(DARK_SYSTEM);
     expect(system.size).toBeGreaterThan(20);
     expect(Object.fromEntries(variables(DARK_CHOSEN))).toEqual(
@@ -52,7 +52,7 @@ describe("jetons de style", () => {
     );
   });
 
-  it("redéfinit en sombre chaque couleur du thème clair", () => {
+  it("redefines in dark each colour of the light theme", () => {
     const clair = [...variables(PLAIN).keys()].filter(
       (v) =>
         (v.startsWith("--mat-sys-") && !v.startsWith("--mat-sys-level")) ||
@@ -65,7 +65,7 @@ describe("jetons de style", () => {
     expect(clair.filter((v) => !dark.has(v))).toEqual([]);
   });
 
-  it("définit chaque variable `--mat-sys-*` que les sources emploient", () => {
+  it("defines every `--mat-sys-*` variable the sources use", () => {
     const defined = variables(PLAIN);
     const employees = new Set(
       listFiles(ROOT)

@@ -6,7 +6,7 @@ import {
 } from "../../core/model/model";
 
 /**
- * Le statut d'un cadrage, encodé par la forme autant que par le texte : la couleur seule ne suffit pas à distinguer quatre états d'un coup d'œil.
+ * A scoping's status, encoded by shape as much as by text: colour alone is not enough to tell four states apart at a glance.
  */
 const props = defineProps<{ status: ScopingStatus }>();
 

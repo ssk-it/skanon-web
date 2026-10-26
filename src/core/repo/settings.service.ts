@@ -5,7 +5,7 @@ import { EditableSettings, writeSettings } from "./config-writer";
 
 export const CONFIG_NAME = "ssk-canon.yml";
 
-/** Branche portant une modification des réglages, distincte de tout cadrage. */
+/** Branch carrying a change to the settings, distinct from any scoping. */
 const SETTINGS_BRANCH = "reglages";
 
 export interface ProposedSettings {
@@ -15,23 +15,23 @@ export interface ProposedSettings {
 }
 
 /**
- * Lecture et modification des réglages du projet.
+ * Reading and changing the project's settings.
  *
- * Les réglages vivent dans le dépôt, donc leur modification suit le même chemin
- * que toute autre : une branche, une demande de fusion. Écrire directement sur
- * la branche principale contournerait la relecture — pour un fichier qui décide
- * du comportement de l'outil pour tout le monde.
+ * The settings live in the repo, so changing them follows the same path as
+ * any other change: a branch, a pull request. Writing directly to the main
+ * branch would bypass review — for a file that decides the tool's behaviour
+ * for everyone.
  */
 export class SettingsService {
   private readonly github = inject(GithubClient);
   private readonly store = inject(SpecificationStore);
 
   /**
-   * Propose une modification des réglages.
+   * Proposes a change to the settings.
    *
-   * La branche est réutilisée si elle existe déjà : deux modifications
-   * successives avant relecture appartiennent à la même proposition, et ouvrir
-   * une seconde demande obligerait à en fermer une.
+   * The branch is reused if it already exists: two successive changes before
+   * review belong to the same proposal, and opening a second pull request
+   * would force one to close one.
    */
   async proposeSettings(settings: EditableSettings): Promise<ProposedSettings> {
     const repoRef = this.store.repoRef();
@@ -47,15 +47,15 @@ export class SettingsService {
       try {
         await this.github.createBranch(repoRef, branch, from);
       } catch (e) {
-        // Une branche déjà là n'est pas un échec — elle porte une proposition en
-        // cours. Tout le reste l'est, et le taire ferait échouer la lecture
-        // suivante sur une branche absente, loin de la cause.
+        // A branch already there is not a failure — it carries a proposal in
+        // progress. Anything else is, and keeping quiet about it would make the next
+        // read fail on an absent branch, far from the cause.
         if (e instanceof GithubError && e.status !== 422) throw e;
       }
     }
 
-    // Lu depuis la branche des réglages, non depuis la principale : une
-    // proposition en cours doit se compléter, pas s'écraser.
+    // Read from the settings branch, not from the main one: a proposal in
+    // progress must be completed, not overwritten.
     const { content, sha } = await this.github.loadEditableFile(
       repoRef,
       CONFIG_NAME,

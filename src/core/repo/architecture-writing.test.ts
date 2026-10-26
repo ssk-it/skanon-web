@@ -3,12 +3,12 @@ import { serializeScoping } from "./authoring.service";
 import type { EditableScoping } from "./authoring.service";
 
 /**
- * Ce qu'un cadrage écrit quand il vise une cible d'architecture.
+ * What a scoping writes when it targets an architecture target.
  *
- * Le champ employé — `regle`, `adr` ou `architecture` — est ce qui dit au
- * vérificateur et à la propagation dans quel répertoire écrire. L'écrire
- * toujours comme `regle` produirait un fichier accepté à la saisie, refusé à la
- * livraison, et le rédacteur ne l'apprendrait qu'une fois sa demande ouverte.
+ * The field used — `regle`, `adr` or `architecture` — is what tells the
+ * checker and the propagation which directory to write to. Always writing it
+ * as `regle` would produce a file accepted on input, rejected on delivery,
+ * and the author would only learn it once their pull request was open.
  */
 function scoping(partial: Partial<EditableScoping>): EditableScoping {
   return {
@@ -23,8 +23,8 @@ function scoping(partial: Partial<EditableScoping>): EditableScoping {
   } as unknown as EditableScoping;
 }
 
-describe("écriture d’un impact vers une cible d’architecture", () => {
-  it("écrit le champ correspondant à la nature visée", () => {
+describe("writing an impact towards an architecture target", () => {
+  it("writes the field matching the targeted kind", () => {
     const text = serializeScoping(
       "2026-001",
       scoping({
@@ -56,7 +56,7 @@ describe("écriture d’un impact vers une cible d’architecture", () => {
     expect(text).toContain("- { architecture: FLX-c, operation: modifie }");
   });
 
-  it("titre les énoncés par l’identifiant visé, quelle que soit la nature", () => {
+  it("titles the statements by the targeted identifier, whatever the kind", () => {
     const text = serializeScoping(
       "2026-001",
       scoping({
@@ -71,15 +71,15 @@ describe("écriture d’un impact vers une cible d’architecture", () => {
       }),
     );
 
-    // La propagation retrouve l'énoncé par l'identifiant de la cible : un titre
-    // portant autre chose la laisserait sans rien à écrire.
+    // Propagation finds the statement by the target's identifier: a title
+    // carrying anything else would leave it with nothing to write.
     expect(text).toContain("### ADR-b");
     expect(text).toContain("Une décision.");
   });
 
-  it("écrit « regle » pour un impact dont la nature n’est pas renseignée", () => {
-    // Les cadrages rédigés avant ce changement n'ont pas de nature. Les écrire
-    // sans champ de cible produirait un impact que rien ne peut résoudre.
+  it("writes « regle » for an impact whose kind is not set", () => {
+    // Scopings written before this change have no kind. Writing them
+    // without a target field would produce an impact that nothing can resolve.
     const text = serializeScoping(
       "2026-001",
       scoping({

@@ -3,15 +3,15 @@ import { CommitDate, GithubClient, RepoRef } from "../github/github-client";
 import { RepoLoader } from "./repo-loader";
 import { Specification, Rule } from "../model/model";
 
-/** Ce qui est arrivé à une règle entre deux dates. */
+/** What happened to a rule between two dates. */
 export type Evolution = "ajoutee" | "modifiee" | "abrogee" | "retiree";
 
 export interface ComparedRule {
   readonly id: string;
   readonly evolution: Evolution;
-  /** État à la date de départ. Absent si la règle n'existait pas encore. */
+  /** State at the start date. Absent if the rule did not exist yet. */
   readonly before: Rule | null;
-  /** État à la date d'arrivée. Absent si la règle a disparu du référentiel. */
+  /** State at the end date. Absent if the rule disappeared from the specification. */
   readonly after: Rule | null;
 }
 
@@ -19,7 +19,7 @@ export interface Comparison {
   readonly departure: ComparisonBound;
   readonly arrival: ComparisonBound;
   readonly rules: readonly ComparedRule[];
-  /** Cadrages livrés entre les deux bornes, qui expliquent les écarts. */
+  /** Scopings delivered between the two bounds, which explain the differences. */
   readonly deliveredScopings: readonly string[];
 }
 
@@ -30,16 +30,16 @@ export interface ComparisonBound {
 }
 
 /**
- * Comparaison du référentiel entre deux dates.
+ * Comparison of the specification between two dates.
  *
- * Chaque borne se reconstitue en deux appels décomptés : un pour résoudre la
- * date en commit, un pour l'arborescence à ce commit. Les contenus sont servis
- * hors quota, y compris adressés par un commit passé — mesuré, c'est ce qui rend
- * l'opération abordable quelle que soit la taille du référentiel.
+ * Each bound is rebuilt in two counted calls: one to resolve the
+ * date to a commit, one for the tree at that commit. Contents are served
+ * outside the quota, including when addressed by a past commit — measured, that is what makes
+ * the operation affordable whatever the size of the specification.
  *
- * La comparaison porte sur les règles de gestion, et non sur les fonctionnalités
- * ou les domaines : ce sont elles qui portent le comportement du produit, et
- * elles seules qu'un cadrage prétend transformer.
+ * The comparison is about business rules, not features
+ * or domains: they are what carries the product's behaviour, and
+ * the only thing a scoping claims to transform.
  */
 export class ComparisonService {
   private readonly github = inject(GithubClient);
@@ -50,8 +50,8 @@ export class ComparisonService {
     departure: Date,
     arrival: Date,
   ): Promise<Comparison> {
-    // Les deux bornes se chargent de front : elles ne dépendent pas l'une de
-    // l'autre, et la file d'attente de la couche d'accès borne déjà la charge.
+    // Both bounds load side by side: they do not depend on each
+    // other, and the access layer's queue already bounds the load.
     const [a, b] = await Promise.all([
       this.loadBound(repoRef, departure),
       this.loadBound(repoRef, arrival),
@@ -88,14 +88,14 @@ export class ComparisonService {
 }
 
 /**
- * Écarts entre deux états du référentiel, règle par règle.
+ * Differences between two states of the specification, rule by rule.
  *
- * Une règle inchangée ne produit aucune entrée : la comparaison répond à « qu'a
- * fait ce trimestre ? », pas « qu'existe-t-il ? ». Lister l'immobile noierait ce
- * qui a bougé.
+ * An unchanged rule produces no entry: the comparison answers "what did
+ * this quarter do?", not "what exists?". Listing what stayed still would drown what
+ * moved.
  *
- * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
- * l'éprouver ne doit pas demander de construire un service.
+ * A free function rather than a method: it depends on no injection, and
+ * exercising it should not require building a service.
  */
 export function compareRules(
   before: Specification,
@@ -110,9 +110,9 @@ export function compareRules(
       out.push({ id, evolution: "ajoutee", before: null, after: ruleAfter });
       continue;
     }
-    // L'abrogation prime sur la modification : c'est le changement dont la
-    // portée est la plus grande, et il s'accompagne presque toujours d'une
-    // réécriture de l'énoncé qui masquerait le reste.
+    // Repeal takes precedence over modification: it is the change with the
+    // widest reach, and it almost always comes with a
+    // rewrite of the statement that would mask the rest.
     if (ruleBefore.status !== "abroge" && ruleAfter.status === "abroge") {
       out.push({
         id,
@@ -132,9 +132,9 @@ export function compareRules(
     }
   }
 
-  // Une règle disparue est une anomalie — un chemin ne se renomme jamais et un
-  // fichier de règle ne se supprime pas — mais la taire priverait le lecteur du
-  // seul signal qu'il en a.
+  // A disappeared rule is an anomaly — a path is never renamed and a
+  // rule file is not deleted — but hiding it would deprive the reader of the
+  // only signal they have of it.
   for (const [id, ruleBefore] of before.rules) {
     if (!after.rules.has(id)) {
       out.push({ id, evolution: "retiree", before: ruleBefore, after: null });
@@ -145,11 +145,11 @@ export function compareRules(
 }
 
 /**
- * Cadrages passés à l'état livré entre les deux bornes.
+ * Scopings that moved to the delivered state between the two bounds.
  *
- * Ce sont eux qui expliquent les écarts : sans ce lien, la comparaison montre
- * que le référentiel a changé sans dire pourquoi, ce qui est exactement le vide
- * que le produit prétend combler.
+ * They are what explains the differences: without that link, the comparison shows
+ * that the specification changed without saying why, which is exactly the gap
+ * the product claims to fill.
  */
 export function listScopingsDeliveredBetween(
   before: Specification,

@@ -1,9 +1,9 @@
 /**
- * Réduit une nature de lien saisie à sa forme de clé.
+ * Reduces an entered link kind to its key form.
  *
- * Rend une chaîne vide quand il ne reste rien de retenable — un champ ne portant que de la ponctuation ne fait pas une nature.
+ * Returns an empty string when nothing keepable remains — a field carrying only punctuation does not make a kind.
  *
- * Dans SSK Canon, la fonction vivait dans le dialogue de saisie d'un lien ; elle n'a rien d'une vue, et l'écriture d'un cadrage l'emploie aussi.
+ * In SSK Canon, the function lived in the link entry dialog; it is nothing like a view, and writing a scoping uses it too.
  */
 export function normalizeTag(raw: string): string {
   return raw

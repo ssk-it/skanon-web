@@ -14,7 +14,7 @@ import OrganizationAvatar from "./OrganizationAvatar.vue";
 import ProjectSymbol from "./ProjectSymbol.vue";
 
 /**
- * Le choix du dépôt de projet à ouvrir : ceux qui portent un référentiel, les autres que le jeton ouvre, ou une saisie libre. Se ferme sur le dépôt choisi, ou sans réponse.
+ * The choice of the framing repo to open: those that carry a specification, the others the token opens, or free input. Closes on the chosen repo, or without an answer.
  */
 defineProps<{ data?: unknown }>();
 const emit = defineEmits<{ close: [depot?: RepoRef] }>();
@@ -27,7 +27,7 @@ const input = ref(`${config.repoRef().owner}/${config.repoRef().repo}`);
 const error = ref<string | null>(null);
 
 const framedRepos = computed(() =>
-  // Un récent est proposé même si le contrôle n'a pas encore répondu : il a déjà été ouvert, donc il porte un référentiel.
+  // A recent one is offered even if the check has not answered yet: it has already been opened, so it carries a specification.
   known.repos().filter((d) => d.framed || d.recent),
 );
 const others = computed(() =>
@@ -60,7 +60,7 @@ function validateRepo(): void {
 </script>
 
 <!--
-  Défaut hérité, porté tel quel (CLAUDE.md, « Porter sans changer ») : dans SSK Canon, le `mat-error` de la saisie ne s'affiche jamais — Material ne le montre que pour un champ invalide, et aucun validateur ne l'est. Une saisie mal formée efface donc l'indication sans rien dire. Ici aussi : le message est tenu dans `erreur`, et seule l'indication disparaît.
+  Inherited defect, ported as is (CLAUDE.md, « Porter sans changer »): in SSK Canon, the input's `mat-error` is never displayed — Material only shows it for an invalid field, and no validator makes it so. A malformed input therefore clears the hint without saying anything. Here too: the message is held in `error`, and only the hint disappears.
 -->
 <template>
   <UiDialog title="Ouvrir un dépôt de projet">

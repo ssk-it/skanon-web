@@ -7,44 +7,44 @@ import { RepoConfig } from "./repo-config";
 import { AuthoringService, listToggles } from "./authoring.service";
 
 /**
- * Les bascules de statut — RG-bascule-de-statut, cadrage 2026-045.
+ * Status toggles — RG-bascule-de-statut, scoping 2026-045.
  *
- * Le statut se lit sur la demande de fusion : en brouillon, le cadrage l'est.
- * L'application ne le déplace qu'entre brouillon et en relecture, sans réglage,
- * et un cadrage naît toujours en brouillon.
+ * The status is read on the pull request: as a draft, the scoping is one.
+ * The application moves it only between draft and in review, without a
+ * setting, and a scoping is always born as a draft.
  */
 
-describe("Les bascules de statut", () => {
-  it("ne mènent qu’entre brouillon et en relecture", () => {
+describe("Status toggles", () => {
+  it("only lead between draft and in review", () => {
     expect(listToggles("brouillon", true)).toEqual(["en_relecture"]);
     expect(listToggles("en_relecture", true)).toEqual(["brouillon"]);
   });
 
-  it("ne proposent jamais « validée » : c’est une relecture qui l’accorde", () => {
+  it("never offer « validée »: it is a review that grants it", () => {
     for (const from of ["brouillon", "en_relecture", "validee"] as const) {
       expect(listToggles(from, true)).not.toContain("validee");
     }
   });
 
-  it("laissent reprendre un cadrage validé", () => {
+  it("let an approved scoping be taken back", () => {
     expect(listToggles("validee", true)).toEqual(["brouillon"]);
   });
 
-  it("ne proposent jamais « livrée », et ne déplacent pas un cadrage livré", () => {
+  it("never offer « livrée », and do not move a delivered scoping", () => {
     expect(listToggles("livree", true)).toEqual([]);
     for (const from of ["brouillon", "en_relecture", "validee"] as const) {
       expect(listToggles(from, true)).not.toContain("livree");
     }
   });
 
-  it("ne déplacent pas un cadrage hors de sa branche", () => {
+  it("do not move a scoping off its branch", () => {
     expect(listToggles("brouillon", false)).toEqual([]);
     expect(listToggles("en_relecture", false)).toEqual([]);
   });
 });
 
-describe("Un cadrage qui naît", () => {
-  it("ouvre sa demande de fusion en brouillon", async () => {
+describe("A scoping being born", () => {
+  it("opens its pull request as a draft", async () => {
     let draft: boolean | undefined;
     resetInjection();
     provide(GithubClient, {
@@ -71,8 +71,8 @@ describe("Un cadrage qui naît", () => {
   });
 });
 
-describe("Un projet qui déclare encore les réglages retirés", () => {
-  it("se lit sans anomalie : les clés sont ignorées", async () => {
+describe("A project that still declares the removed settings", () => {
+  it("is read without anomaly: the keys are ignored", async () => {
     resetInjection();
 
     const config = `schema_version: 1

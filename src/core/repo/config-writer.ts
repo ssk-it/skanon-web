@@ -5,7 +5,7 @@ import {
   IdentitySettings,
 } from "../model/model";
 
-/** Ce que la page de réglages sait modifier. */
+/** What the settings page can modify. */
 const CODE_REPOS_COMMENT = [
   "# Les depots de code que ce projet realise. Le lien est declare ici, du cote",
   "# qui a autorite : le referentiel porte la vue projet, que plusieurs depots",
@@ -14,11 +14,11 @@ const CODE_REPOS_COMMENT = [
 
 export interface EditableSettings {
   readonly access: AccessMode;
-  /** Absent dans les modes qui n'en ont pas l'usage. */
+  /** Absent in the modes that have no use for it. */
   readonly identity: IdentitySettings | null;
-  /** Facultatif : un projet qui n'en déclare aucun est un cas ordinaire. */
+  /** Optional: a project that declares none is an ordinary case. */
   readonly codeRepos?: readonly CodeRepo[];
-  /** Facultatif : absent, le fichier garde ce qu'il déclarait. */
+  /** Optional: when absent, the file keeps what it declared. */
   readonly tokenProtection?: TokenProtection;
 }
 
@@ -40,15 +40,15 @@ const IDENTITY_COMMENT = [
 ].join("\n");
 
 /**
- * Remplace un bloc de premier niveau dans un document YAML, ou l'ajoute.
+ * Replaces a top-level block in a YAML document, or adds it.
  *
- * Le remplacement porte sur le texte, non sur l'arbre : réécrire le document
- * entier détruirait ses commentaires — mesuré, cinq disparaissent — et
- * reformaterait les textes longs. Or ce fichier se relit sur la plateforme, et
- * ses commentaires expliquent à quoi servent les réglages.
+ * The replacement works on the text, not on the tree: rewriting the whole
+ * document would destroy its comments — measured, five disappear — and
+ * would reformat long texts. Yet this file is re-read on the platform, and
+ * its comments explain what the settings are for.
  *
- * Le commentaire qui précède immédiatement le bloc est repris avec lui : il le
- * décrit, et le laisser en place ferait commenter un bloc absent.
+ * The comment immediately preceding the block is taken with it: it
+ * describes it, and leaving it in place would comment on a missing block.
  */
 export function replaceBlock(
   source: string,
@@ -59,17 +59,17 @@ export function replaceBlock(
   const lines = source.split("\n");
   const begin = lines.findIndex((l) => l.startsWith(`${key}:`));
 
-  // Un bloc à retirer qui n'est pas là : rien à faire.
+  // A block to remove that is not there: nothing to do.
   if (begin === -1 && block === null) return source;
 
   if (begin === -1) {
-    // Ajouté en fin de document, précédé de son commentaire : sans repère où
-    // l'insérer, la fin est le seul endroit qui ne bouscule rien.
+    // Added at the end of the document, preceded by its comment: with no marker for where
+    // to insert it, the end is the only place that disturbs nothing.
     const end = source.replace(/\s*$/, "");
     return `${end}\n\n${comment}\n${block}\n`;
   }
 
-  // le bloc s'étend jusqu'à la prochaine ligne non indentée et non vide
+  // the block extends up to the next non-indented, non-empty line
   let end = begin + 1;
   while (
     end < lines.length &&
@@ -77,24 +77,24 @@ export function replaceBlock(
   ) {
     end++;
   }
-  // les lignes vides finales appartiennent à la séparation, pas au bloc
+  // trailing blank lines belong to the separation, not to the block
   while (end > begin + 1 && lines[end - 1].trim() === "") end--;
 
-  // remonter sur le commentaire qui précède, pour le remplacer aussi
+  // go back up to the preceding comment, to replace it too
   let head = begin;
   while (head > 0 && lines[head - 1].trim().startsWith("#")) head--;
 
-  // Un commentaire déjà en place est conservé tel quel : le remplacer par un
-  // texte équivalent ferait apparaître des lignes modifiées dans chaque
-  // relecture, alors que rien n'y a changé. Celui du produit ne sert qu'à
-  // renseigner un bloc qui n'en avait pas.
+  // A comment already in place is kept as is: replacing it with an
+  // equivalent text would show modified lines in every
+  // review, whereas nothing changed there. The product's one is only used to
+  // document a block that had none.
   const existingComment = lines.slice(head, begin);
   const toWrite = existingComment.length
     ? existingComment
     : comment.split("\n");
 
-  // Retirer emporte aussi le commentaire et la ligne vide qui suivait, sans
-  // quoi le fichier garderait la trace d'un réglage disparu.
+  // Removing also takes the comment and the blank line that followed, without
+  // which the file would keep the trace of a vanished setting.
   if (block === null) {
     const after = lines.slice(end);
     while (after.length && after[0].trim() === "") after.shift();
@@ -110,25 +110,25 @@ export function replaceBlock(
 }
 
 /**
- * Applique les réglages à un fichier de configuration, en préservant le reste.
+ * Applies the settings to a configuration file, preserving the rest.
  *
- * Seuls les blocs concernés sont réécrits. Tout ce que le projet a mis dans ce
- * fichier — description, tags, stockage — est conservé tel quel, y compris ce
- * que l'application ne sait pas lire.
+ * Only the blocks concerned are rewritten. Everything the project put in this
+ * file — description, tags, storage — is kept as is, including what
+ * the application cannot read.
  */
 export function writeSettings(
   source: string,
   settings: EditableSettings,
 ): string {
-  // Les deux réglages du cycle ont disparu (2026-045) : le premier
-  // enregistrement les retire, commentaires compris, plutôt que de laisser dans
-  // le fichier des clés qui ne règlent plus rien. Cet enregistrement passe par
-  // une relecture : le retrait s'y voit.
+  // The two lifecycle settings are gone (2026-045): the first
+  // save removes them, comments included, rather than leaving in
+  // the file keys that no longer configure anything. That save goes through
+  // a review: the removal shows there.
   let out = replaceBlock(source, "transitions", null, "");
   out = replaceBlock(out, "reflet_demande_fusion", null, "");
   out = replaceBlock(out, "acces", `acces: ${settings.access}`, ACCESS_COMMENT);
 
-  // Seule l'exigence s'écrit : la proposition est le défaut, qu'un fichier muet vaut déjà.
+  // Only the requirement is written: the proposal is the default, which a silent file already means.
   if (settings.tokenProtection) {
     out = replaceBlock(
       out,
@@ -140,8 +140,8 @@ export function writeSettings(
     );
   }
 
-  // Le bloc n'est écrit que si le mode l'emploie : le laisser derrière soi
-  // décrirait une configuration que le projet n'applique plus.
+  // The block is only written if the mode uses it: leaving it behind
+  // would describe a configuration the project no longer applies.
   const i = settings.identity;
   out = replaceBlock(
     out,
@@ -156,8 +156,8 @@ export function writeSettings(
       : null,
     IDENTITY_COMMENT,
   );
-  // Les dépôts de code : le bloc disparaît quand la liste est vide, plutôt que
-  // de rester en place et de décrire un projet qui n'en déclare plus.
+  // Code repos: the block disappears when the list is empty, rather than
+  // staying in place and describing a project that no longer declares any.
   out = replaceBlock(
     out,
     "depots_code",

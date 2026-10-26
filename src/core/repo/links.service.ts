@@ -2,27 +2,27 @@ import { inject } from "../injection";
 import { RepoConfig } from "./repo-config";
 
 /**
- * Fabrique les liens internes, préfixés par le dépôt ouvert.
+ * Builds internal links, prefixed by the open repo.
  *
- * Toute vue de l'application appartient à un dépôt de projet, et l'adresse le
- * dit : `/organisation/depot/referentiel`. Un lien écrit en dur sortirait du
- * projet courant sans le signaler ; passer par ici garantit qu'il n'existe
- * qu'un seul endroit où le préfixe est construit.
+ * Every view of the application belongs to a framing repo, and the address
+ * says so: `/organisation/depot/referentiel`. A hard-coded link would leave the
+ * current project without flagging it; going through here guarantees there is
+ * only one place where the prefix is built.
  */
 export class LinksService {
   private readonly config = inject(RepoConfig);
 
   /**
-   * Un lien vers une vue du dépôt ouvert.
+   * A link to a view of the open repo.
    *
-   * `vers('cadrages', id)` donne `['/', owner, repo, 'cadrages', id]`.
+   * `to('cadrages', id)` gives `['/', owner, repo, 'cadrages', id]`.
    */
   to(...segments: readonly (string | number)[]): unknown[] {
     const d = this.config.repoRef();
     return ["/", d.owner, d.repo, ...segments];
   }
 
-  /** Le même lien, en une adresse : ce que prend `RouterLink`. */
+  /** The same link, as one address: what `RouterLink` takes. */
   path(...segments: readonly (string | number)[]): string {
     const d = this.config.repoRef();
     return (
@@ -34,14 +34,14 @@ export class LinksService {
   }
 
   /**
-   * L'adresse du dépôt de cadrage sur GitHub.
+   * The address of the framing repo on GitHub.
    *
-   * L'application ne montre du dépôt que ce qu'elle sait lire ; tout le reste —
-   * les issues, les pull requests en cours, les réglages, l'historique complet —
-   * se consulte sur GitHub. Le lien y mène sans faire retaper l'organisation et
-   * le dépôt, qui sont déjà dans l'adresse courante.
+   * The application only shows of the repo what it can read; everything else —
+   * issues, open pull requests, settings, full history —
+   * is consulted on GitHub. The link leads there without making one retype the organization and
+   * the repo, which are already in the current address.
    *
-   * `versGithub('issues')` donne `https://github.com/owner/repo/issues`.
+   * `toGithub('issues')` gives `https://github.com/owner/repo/issues`.
    */
   toGithub(...segments: readonly (string | number)[]): string {
     const d = this.config.repoRef();

@@ -3,9 +3,9 @@ import { load } from "js-yaml";
 import { writeSettings } from "./config-writer";
 
 /**
- * Ce fichier se relit sur la plateforme, et ses commentaires expliquent à quoi
- * servent les réglages. Réécrire le document entier les détruirait — mesuré,
- * cinq disparaissent — d'où un remplacement par blocs, que ces cas éprouvent.
+ * This file is re-read on the platform, and its comments explain what the
+ * settings are for. Rewriting the whole document would destroy them — measured,
+ * five disappear — hence a block-by-block replacement, which these cases exercise.
  */
 const FILE = `# Configuration du projet — lue par l'application et par les Actions
 schema_version: 1
@@ -46,17 +46,17 @@ const IDENTITY = {
   client: "mon-application",
   exchange: "https://echange.exemple.fr",
 };
-// Le même bloc, tel que le fichier de configuration l'écrit.
+// The same block, as the configuration file writes it.
 const IDENTITY_BLOCK = {
   emetteur: IDENTITY.issuer,
   client: IDENTITY.client,
   echange: IDENTITY.exchange,
 };
 
-describe("écriture des réglages dans le fichier de configuration", () => {
-  it("retire les réglages du cycle, commentaires compris", () => {
-    // Ils ne règlent plus rien depuis 2026-045 : les laisser dans le fichier
-    // ferait croire que le cycle se configure encore.
+describe("writing settings to the configuration file", () => {
+  it("removes the lifecycle settings, comments included", () => {
+    // They have configured nothing since 2026-045: leaving them in the file
+    // would suggest the lifecycle is still configurable.
     const out = writeSettings(FILE, {
       access: "jeton_personnel",
       identity: null,
@@ -66,14 +66,14 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     expect(data["reflet_demande_fusion"]).toBeUndefined();
     expect(out).not.toContain("Transitions de statut");
     expect(out).not.toContain("La demande de fusion reflète");
-    // le bloc qui suivait reste en place
+    // the block that followed stays in place
     expect(data["attachments"]).toEqual({
       provider: "scaleway",
       bucket: "ssk-canon-demo",
     });
   });
 
-  it("conserve ce que l’application ne règle pas", () => {
+  it("keeps what the application does not configure", () => {
     const out = writeSettings(FILE, {
       access: "jeton_personnel",
       identity: null,
@@ -88,8 +88,8 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     });
   });
 
-  it("ne touche pas aux textes longs des autres blocs", () => {
-    // js-yaml les reformaterait en réécrivant le document entier
+  it("does not touch the long texts of other blocks", () => {
+    // js-yaml would reformat them by rewriting the whole document
     const out = writeSettings(FILE, {
       access: "jeton_personnel",
       identity: null,
@@ -99,7 +99,7 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     );
   });
 
-  it("conserve les commentaires des blocs qu’il ne touche pas", () => {
+  it("keeps the comments of the blocks it does not touch", () => {
     const out = writeSettings(FILE, {
       access: "jeton_personnel",
       identity: null,
@@ -109,7 +109,7 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     );
   });
 
-  it("remplace le commentaire du bloc qu’il réécrit, sans le dupliquer", () => {
+  it("replaces the comment of the block it rewrites, without duplicating it", () => {
     const first = writeSettings(FILE, {
       access: "jeton_personnel",
       identity: null,
@@ -120,7 +120,7 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     expect(occurrences).toBe(1);
   });
 
-  it("ajoute les blocs absents plutôt que d’échouer", () => {
+  it("adds missing blocks rather than failing", () => {
     const without = "schema_version: 1\n\nprojet:\n  nom: Neuf\n";
     const out = writeSettings(without, {
       access: "jeton_personnel",
@@ -131,7 +131,7 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     expect(data["projet"]).toEqual({ nom: "Neuf" });
   });
 
-  it("termine toujours par une fin de ligne", () => {
+  it("always ends with a line ending", () => {
     const out = writeSettings("schema_version: 1", {
       access: "jeton_personnel",
       identity: null,
@@ -139,7 +139,7 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     expect(out.endsWith("\n")).toBe(true);
   });
 
-  it("écrit le mode d’accès, et le relit", () => {
+  it("writes the access mode, and reads it back", () => {
     const out = writeSettings(FILE, {
       access: "relais",
       identity: null,
@@ -147,8 +147,8 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     expect((load(out) as Record<string, unknown>)["acces"]).toBe("relais");
   });
 
-  it("ajoute le mode d’accès à un fichier qui n’en a pas", () => {
-    // les projets existants n'ont pas cette clé : l'ajouter, pas échouer
+  it("adds the access mode to a file that has none", () => {
+    // existing projects do not have this key: add it, do not fail
     const out = writeSettings(FILE, {
       access: "identite_tierce",
       identity: IDENTITY,
@@ -158,7 +158,7 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     expect(data["schema_version"]).toBe(1);
   });
 
-  it("écrit le bloc identite, et le relit", () => {
+  it("writes the identite block, and reads it back", () => {
     const out = writeSettings(FILE, {
       access: "identite_tierce",
       identity: IDENTITY,
@@ -168,8 +168,8 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     );
   });
 
-  it("retire le bloc identite quand le mode ne l’emploie plus", () => {
-    // le laisser décrirait une configuration que le projet n'applique plus
+  it("removes the identite block when the mode no longer uses it", () => {
+    // leaving it would describe a configuration the project no longer applies
     const withValue = writeSettings(FILE, {
       access: "identite_tierce",
       identity: IDENTITY,
@@ -184,7 +184,7 @@ describe("écriture des réglages dans le fichier de configuration", () => {
     expect(without).not.toContain("Où les identités sont vérifiées");
   });
 
-  it("ne laisse pas de trou en retirant un bloc absent", () => {
+  it("leaves no gap when removing a missing block", () => {
     const out = writeSettings(FILE, {
       access: "jeton_personnel",
       identity: null,
@@ -195,12 +195,12 @@ describe("écriture des réglages dans le fichier de configuration", () => {
 });
 
 /**
- * Les dépôts de code se saisissent depuis l'application, et ce qu'elle écrit est
- * commité dans le dépôt de quelqu'un. Ces cas éprouvent que le bloc produit se
- * relit, et que le reste du fichier n'en souffre pas.
+ * Code repos are entered from the application, and what it writes is
+ * committed to someone's repo. These cases check that the produced block
+ * reads back, and that the rest of the file does not suffer from it.
  */
-describe("écriture des dépôts de code", () => {
-  it("écrit un bloc que la lecture retrouve", () => {
+describe("writing code repos", () => {
+  it("writes a block that reading finds again", () => {
     const out = writeSettings(FILE, {
       ...BASE,
       codeRepos: [
@@ -216,7 +216,7 @@ describe("écriture des dépôts de code", () => {
     ]);
   });
 
-  it("omet le rôle quand il n’est pas renseigné", () => {
+  it("omits the role when it is not set", () => {
     const out = writeSettings(FILE, {
       ...BASE,
       codeRepos: [{ repo: "orga/depot", role: "" }],
@@ -224,8 +224,8 @@ describe("écriture des dépôts de code", () => {
     expect(load(out)).toMatchObject({ depots_code: [{ repo: "orga/depot" }] });
   });
 
-  it("retire le bloc quand plus aucun dépôt n’est déclaré", () => {
-    // Le laisser en place décrirait un projet qui n'en déclare plus.
+  it("removes the block when no repo is declared any more", () => {
+    // Leaving it in place would describe a project that no longer declares any.
     const withValue = writeSettings(FILE, {
       ...BASE,
       codeRepos: [{ repo: "orga/depot", role: "API" }],
@@ -237,7 +237,7 @@ describe("écriture des dépôts de code", () => {
     ).toBeUndefined();
   });
 
-  it("n’abîme pas le reste du fichier", () => {
+  it("does not damage the rest of the file", () => {
     const out = writeSettings(FILE, {
       ...BASE,
       codeRepos: [{ repo: "orga/depot", role: "API" }],
@@ -250,9 +250,9 @@ describe("écriture des dépôts de code", () => {
     expect(out).toContain("# Configuration du projet");
   });
 
-  it("reste stable d’une écriture à l’autre", () => {
-    // Réécrire à l'identique ne doit rien changer : sinon chaque proposition de
-    // réglages ferait apparaître un écart que personne n'a demandé.
+  it("stays stable from one write to the next", () => {
+    // Rewriting identically must change nothing: otherwise each settings
+    // proposal would show a difference nobody asked for.
     const codeRepos = [{ repo: "orga/depot", role: "API" }];
     const first = writeSettings(FILE, { ...BASE, codeRepos });
     const second = writeSettings(first, { ...BASE, codeRepos });

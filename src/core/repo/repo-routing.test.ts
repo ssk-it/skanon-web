@@ -10,13 +10,13 @@ import { LinksService } from "./links.service";
 import { RepoConfig } from "./repo-config";
 import { SpecificationStore } from "./specification.store";
 
-describe("Adressage par dépôt", () => {
+describe("Addressing by repo", () => {
   let httpMock: HttpTestingController;
   let router: Router;
 
-  // Le banc d'essai ne fournit qu'un `localStorage` incomplet, sans `clear` ni
-  // `removeItem`. On en substitue un vrai : ce qui est éprouvé ici est
-  // l'adressage, pas la capacité du navigateur à stocker.
+  // The test bench provides only an incomplete `localStorage`, without `clear`
+  // or `removeItem`. A real one is substituted: what is tested here is
+  // addressing, not the browser's ability to store.
   let storage: Record<string, string>;
 
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe("Adressage par dépôt", () => {
     router = createAppRouter(createMemoryHistory());
   });
 
-  it("ouvre le dépôt que porte l’adresse", async () => {
+  it("opens the repo the address carries", async () => {
     await router.push("/wayne-corp/wayne-devis-cadrage/referentiel");
 
     expect(inject(RepoConfig).repoRef()).toEqual({
@@ -45,7 +45,7 @@ describe("Adressage par dépôt", () => {
     expect(query.request.url).toContain("wayne-corp/wayne-devis-cadrage");
   });
 
-  it("ne recharge pas en naviguant à l’intérieur du même dépôt", async () => {
+  it("does not reload when navigating within the same repo", async () => {
     await router.push("/ssk-it/ssk-canon/referentiel");
     httpMock
       .expectOne((r) => r.url.includes("/git/trees/"))
@@ -54,12 +54,12 @@ describe("Adressage par dépôt", () => {
 
     await router.push("/ssk-it/ssk-canon/referentiel");
 
-    // Cinquante-huit lectures à chaque changement de vue seraient payées par le
-    // quota : le dépôt n'a pas changé, il n'y a rien à relire.
+    // Fifty-eight reads on every view change would be paid for by the quota:
+    // the repo has not changed, there is nothing to read again.
     httpMock.expectNone((r) => r.url.includes("/git/trees/"));
   });
 
-  it("préfixe les liens internes par le dépôt ouvert", () => {
+  it("prefixes internal links with the open repo", () => {
     inject(RepoConfig).saveRepo({ owner: "ssk-it", repo: "ssk-canon" });
 
     expect(inject(LinksService).to("referentiel", "regle", "RG-x")).toEqual([

@@ -21,15 +21,15 @@ function page(
 }
 
 /**
- * Toute vue d'un projet vit sous `/:owner/:repo/` : l'adresse porte le dépôt (RG-projet-dans-adresse). C'est ce qui rend un lien partageable — celui qui le reçoit voit le même projet, sans dépendre de ce que son poste avait mémorisé.
+ * Every view of a project lives under `/:owner/:repo/`: the address carries the repo (RG-projet-dans-adresse). This is what makes a link shareable — whoever receives it sees the same project, without depending on what their machine had remembered.
  */
 export const routes: RouteRecordRaw[] = [
   page("/", "Ouvrir un projet", () => import("./features/home/HomePage.vue")),
-  // L'adresse de réception des liens d'ouverture (RG-ouverture-par-protocole). Un seul segment : elle ne peut pas être prise pour un projet.
+  // The address receiving deep links (RG-ouverture-par-protocole). A single segment: it cannot be mistaken for a project.
   deepLinkRoute,
-  // Le fonctionnement de l'application, hors de tout projet comme l'accueil (RG-aide-a-portee). Un seul segment, comme ci-dessus.
+  // How the application works, outside any project like the home page (RG-aide-a-portee). A single segment, as above.
   page("/aide", "Fonctionnement", () => import("./features/help/HelpPage.vue")),
-  // L'éditeur, hors de tout projet comme l'aide, et atteint depuis la barre du bas.
+  // The publisher, outside any project like help, and reached from the bottom bar.
   page(
     "/mentions-legales",
     "Mentions légales",
@@ -116,7 +116,7 @@ export const routes: RouteRecordRaw[] = [
       },
     ],
   },
-  // Une adresse hors de tout projet ne peut pas deviner lequel : elle ramène au choix, plutôt que d'ouvrir un dépôt que personne n'a demandé.
+  // An address outside any project cannot guess which one: it leads back to the picker, rather than opening a repo nobody asked for.
   { path: "/:autre(.*)*", redirect: "/" },
 ];
 
@@ -126,7 +126,7 @@ export function createAppRouter(
   return createRouter({
     history,
     routes,
-    // Un résultat de recherche peut viser une décision à l'intérieur de son cadrage : l'ancre doit y mener.
+    // A search result may target a decision inside its scoping: the anchor must lead there.
     scrollBehavior: (to) => (to.hash ? { el: to.hash } : { top: 0 }),
   });
 }

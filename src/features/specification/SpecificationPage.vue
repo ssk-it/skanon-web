@@ -11,19 +11,19 @@ import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import StatusChip from "../shared/StatusChip.vue";
 
-/** Les derniers livrés montrés en tête : de quoi voir ce qui bouge, pas une liste. */
+/** The latest delivered ones shown at the top: enough to see what is moving, not a list. */
 const LATEST_DELIVERED = 3;
 
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
 
-/** La liste complète : une teinte se calcule par rapport à l'ensemble. */
+/** The complete list: a hue is computed relative to the whole. */
 const domainIds = computed(() => store.domains().map((d) => d.id));
 
 /**
- * Les derniers livrés, par identifiant décroissant.
+ * The latest delivered ones, by descending identifier.
  *
- * L'identifiant porte l'année et la séquence : il donne l'ordre sans coûter un appel, là où une date demanderait l'historique.
+ * The identifier carries the year and the sequence: it gives the order without costing a call, where a date would require the history.
  */
 const latestDelivered = computed(() =>
   store
@@ -33,7 +33,7 @@ const latestDelivered = computed(() =>
     .slice(0, LATEST_DELIVERED),
 );
 
-/** Les autres domaines d'une fonctionnalité partagée, par leur nom. */
+/** The other domains of a shared feature, by their name. */
 function formatOtherDomains(
   domains: readonly string[],
   current: string,
@@ -80,7 +80,7 @@ function show(id: string): string {
         </div>
       </div>
 
-      <!-- RG-vue-ensemble-fonctionnelle : ce qui bouge avant ce qui est. Celui qui ouvre un projet le connaît souvent déjà, et vient voir ce qui a changé ou ce qui se discute. -->
+      <!-- RG-vue-ensemble-fonctionnelle: what is moving before what is. Whoever opens a project often knows it already, and comes to see what has changed or what is under discussion. -->
       <section class="bouge" aria-label="Ce qui bouge">
         <div class="volet livres">
           <div class="volet-entete">
@@ -103,7 +103,7 @@ function show(id: string): string {
           </p>
         </div>
 
-        <!-- À part, et toujours là : un emplacement qui va et vient n'apprend pas qu'il existe — RG-cadrages-ouverts-visibles. -->
+        <!-- Separate, and always there: a slot that comes and goes does not teach that it exists — RG-cadrages-ouverts-visibles. -->
         <div class="volet en-cours">
           <h2 class="surtitre">En cours</h2>
           <RouterLink
@@ -140,7 +140,7 @@ function show(id: string): string {
       </section>
 
       <div class="grille">
-        <!-- Un article et non un lien : la carte mène au domaine par son nom, et à chacune de ses fonctionnalités, sans étape obligée. -->
+        <!-- An article and not a link: the card leads to the domain by its name, and to each of its features, with no mandatory step. -->
         <article
           v-for="d in store.domains()"
           :key="d.id"
@@ -242,7 +242,7 @@ h1 {
   border: 1px solid var(--mat-sys-outline-variant);
   background: var(--mat-sys-surface);
 }
-/* Le pointillé dit « pas encore » : ce qui s'y trouve n'appartient pas au référentiel. */
+/* The dotted line says "not yet": what is in it does not belong to the specification. */
 .volet.en-cours {
   border-style: dashed;
 }
@@ -287,7 +287,7 @@ h1 {
   align-items: center;
   gap: 8px;
 }
-/* Sur écran étroit, la demande de fusion et le statut passent sous le titre : à côté, ils le réduisaient à un mot par ligne. */
+/* On a narrow screen, the pull request and the status move below the title: beside it, they reduced it to one word per line. */
 @media (max-width: 640px) {
   .ligne {
     grid-template-columns: 76px minmax(0, 1fr);
@@ -325,7 +325,7 @@ h1 {
   border: 1px solid var(--mat-sys-outline-variant);
   background: var(--mat-sys-surface-container-low);
 }
-/* RG-couleur-porteuse : la puce et le nom disent le domaine. Une puce plutôt qu'un liseré : la carte porte désormais des liens, qu'un bord coloré sur toute sa hauteur rattacherait au domaine plus qu'il ne faut. */
+/* RG-couleur-porteuse: the dot and the name tell the domain. A dot rather than an edge stripe: the card now carries links, which a coloured border over its full height would tie to the domain more than it should. */
 .carte h2 {
   margin: 0;
   font-size: 17px;

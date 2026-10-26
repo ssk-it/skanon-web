@@ -11,14 +11,14 @@ import {
 } from "./scoping-reference";
 
 /**
- * Le préfixe de projet — RG-prefixe-projet.
+ * The project prefix — RG-prefixe-projet.
  *
- * Il s'ajoute à l'affichage et est accepté en entrée, sans rien changer à ce qui
- * est stocké. C'est cette asymétrie qui compte : les identifiants déjà posés
- * dans des issues, des demandes de fusion ou des cartes restent valides, et rien
- * ne peut les rattraper s'ils cessaient de l'être.
+ * It is added on display and accepted on input, without changing anything in
+ * what is stored. That asymmetry is what matters: identifiers already written
+ * in issues, pull requests or cards stay valid, and nothing could catch up
+ * with them if they stopped being so.
  */
-describe("préfixe déclaré par le projet", () => {
+describe("prefix declared by the project", () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -55,7 +55,7 @@ describe("préfixe déclaré par le projet", () => {
     return expected;
   }
 
-  it("lit le préfixe déclaré sous le projet", async () => {
+  it("reads the prefix declared under the project", async () => {
     const specification = await loadWithConfig(
       "schema_version: 1\nprojet:\n  nom: Prime\n  prefixe: PRMCO\n",
     );
@@ -63,8 +63,8 @@ describe("préfixe déclaré par le projet", () => {
     expect(specification.project.prefix).toBe("PRMCO");
   });
 
-  it("laisse le préfixe vide quand le projet n’en déclare pas", async () => {
-    // Le cas de tous les projets existants : rien ne doit changer pour eux.
+  it("leaves the prefix empty when the project declares none", async () => {
+    // The case of every existing project: nothing must change for them.
     const specification = await loadWithConfig(
       "schema_version: 1\nprojet:\n  nom: Prime\n",
     );
@@ -73,32 +73,32 @@ describe("préfixe déclaré par le projet", () => {
   });
 });
 
-describe("affichage d’un identifiant", () => {
-  it("préfixe l’identifiant quand le projet en déclare un", () => {
+describe("displaying an identifier", () => {
+  it("prefixes the identifier when the project declares a prefix", () => {
     expect(displayIdentifier("2026-002", "PRMCO")).toBe("PRMCO-2026-002");
   });
 
-  it("rend l’identifiant nu quand aucun préfixe n’est déclaré", () => {
+  it("returns the bare identifier when no prefix is declared", () => {
     expect(displayIdentifier("2026-002", null)).toBe("2026-002");
   });
 });
 
 /**
- * Le routage accepte les deux formes — RG-prefixe-projet.
+ * Routing accepts both forms — RG-prefixe-projet.
  *
- * L'adresse nue reste valide et reste canonique : c'est elle qui a été posée
- * dans les issues et les demandes de fusion, et rien ne peut la rattraper si
- * elle cessait de fonctionner. L'adresse préfixée s'ajoute.
+ * The bare address stays valid and stays canonical: it is the one written in
+ * issues and pull requests, and nothing could catch up with it if it stopped
+ * working. The prefixed address is added.
  */
-describe("adresse préfixée", () => {
-  it("mène au même cadrage que l’adresse nue", () => {
+describe("prefixed address", () => {
+  it("leads to the same scoping as the bare address", () => {
     expect(extractScopingIdentifier("PRMCO-2026-002", "PRMCO")).toBe(
       "2026-002",
     );
     expect(extractScopingIdentifier("2026-002", "PRMCO")).toBe("2026-002");
   });
 
-  it("refuse le préfixe d’un autre projet", () => {
+  it("refuses another project's prefix", () => {
     expect(extractScopingIdentifier("AUTRE-2026-002", "PRMCO")).toBeNull();
   });
 });

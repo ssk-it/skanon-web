@@ -1,9 +1,9 @@
 import type { TokenVault, VaultWrite, StoredTokens } from "./ports";
 
 /**
- * La version web : le stockage local du navigateur, en clair. Ce que cela vaut est dit dans RG-secret-conserve-localement : un jeton posé ici se lit dans le profil du navigateur, d'où le conseil de n'accorder qu'un jeton de moindre privilège.
+ * The web version: the browser's local storage, in plain text. What that is worth is stated in RG-secret-conserve-localement: a token stored here can be read in the browser profile, hence the advice to grant only a least-privilege token.
  *
- * Les clés sont celles de SSK Canon : sur un même hébergement, Skanon retrouve les jetons déjà saisis.
+ * The keys are SSK Canon's: on the same hosting, Skanon finds the tokens already entered.
  */
 const GENERAL_KEY = "ssk-canon.token";
 const SCOPES_KEY = "ssk-canon.jetons";
@@ -15,7 +15,7 @@ export class BrowserVault implements TokenVault {
       const raw = localStorage.getItem(SCOPES_KEY);
       return { general, byScope: toPairs(raw ? JSON.parse(raw) : []) };
     } catch {
-      // Stockage bloqué ou contenu corrompu : repartir de rien plutôt que de faire échouer le démarrage.
+      // Blocked storage or corrupted content: start from nothing rather than make startup fail.
       return { general: null, byScope: [] };
     }
   }
@@ -29,7 +29,7 @@ export class BrowserVault implements TokenVault {
       else localStorage.removeItem(SCOPES_KEY);
       return "faite";
     } catch {
-      // Stockage bloqué : les jetons ne valent que pour la session en mémoire, et l'interface le dit.
+      // Blocked storage: the tokens are only valid for the session in memory, and the interface says so.
       return "refusee";
     }
   }

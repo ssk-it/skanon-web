@@ -1,15 +1,15 @@
 import { onBeforeUnmount, watch, type Ref } from "vue";
 
 /**
- * Ce que partagent les panneaux du kit — liste de choix, autocomplétion, menu : ils se posent par-dessus la page, au plus près de ce qui les a ouverts, et se referment au clic dehors. C'est ce que la superposition du CDK faisait pour Material.
+ * What the kit's panels share — select, autocomplete, menu: they sit over the page, as close as possible to what opened them, and close on an outside click. This is what the CDK overlay did for Material.
  *
- * Un panneau est téléporté dans `body`, en position fixe : posé dans le flux, un dialogue qui défile le rognerait.
+ * A panel is teleported into `body`, in fixed position: placed in the flow, a scrolling dialog would clip it.
  */
 
-/** Au-dessus des dialogues (`z-index: 1000`), sous un diagramme agrandi (1200). */
+/** Above dialogs (`z-index: 1000`), below an enlarged diagram (1200). */
 export const Z_PANEL = 1100;
 
-/** La marge qu'un panneau garde avec les bords de la fenêtre. */
+/** The margin a panel keeps from the window edges. */
 const MARGIN = 8;
 
 export interface Position {
@@ -19,7 +19,7 @@ export interface Position {
 }
 
 /**
- * Pose un panneau sous son ancre, aligné à gauche — ou au-dessus quand il ne tient pas en dessous, et décalé vers la gauche quand il déborderait à droite.
+ * Places a panel below its anchor, left-aligned — or above when it does not fit below, and shifted to the left when it would overflow on the right.
  */
 export function placeBelow(
   anchor: DOMRect,
@@ -46,7 +46,7 @@ export function placeBelow(
 }
 
 /**
- * Tant que `ouvert` vaut vrai, un appui hors des éléments donnés referme le panneau, et un défilement ou un redimensionnement le replace.
+ * While `opened` is true, a press outside the given elements closes the panel, and a scroll or a resize repositions it.
  */
 export function useOverlay(
   opened: Ref<boolean>,

@@ -7,11 +7,11 @@ import { inject } from "../../core/injection";
 import { DialogService } from "../../ui/dialog.service";
 
 /**
- * L'accès à la recherche — RG-recherche-a-portee-de-clavier.
+ * Access to search — RG-recherche-a-portee-de-clavier.
  *
- * Un raccourci depuis toute vue d'un projet, et une icône pour qui n'a pas de clavier ou ne connaît pas le raccourci. Rien hors d'un projet : il n'y aurait rien dans quoi chercher.
+ * A shortcut from any view of a project, and an icon for those without a keyboard or who do not know the shortcut. Nothing outside a project: there would be nothing to search in.
  *
- * `pc-palette-recherche`, l'hôte Angular, est ici la racine `.palette-recherche` du composant, dans le panneau du dialogue — qui porte lui aussi cette classe, d'où le sélecteur `PALETTE`.
+ * `pc-palette-recherche`, the Angular host, is here the component's `.palette-recherche` root, inside the dialog panel — which carries that class too, hence the `PALETTE` selector.
  */
 const VuePlaceholder = { render: () => "vue" };
 
@@ -29,14 +29,14 @@ function shortcut(): KeyboardEvent {
   });
 }
 
-/** Laisse le temps à l'import différé de la palette d'aboutir. */
+/** Gives the palette's deferred import time to complete. */
 async function waitForOpen(): Promise<void> {
   for (let i = 0; i < 20 && !document.querySelector(PALETTE); i++) {
     await new Promise((r) => setTimeout(r, 10));
   }
 }
 
-describe("Accès à la recherche", () => {
+describe("Search access", () => {
   let router: Router;
   let view: VueWrapper | null = null;
 
@@ -64,10 +64,10 @@ describe("Accès à la recherche", () => {
     return view;
   }
 
-  it("propose une icône de recherche dans un projet", async () => {
+  it("offers a search icon within a project", async () => {
     const f = await mountView("/test/test/referentiel");
 
-    // La coquille a plusieurs racines : `find` les parcourt toutes.
+    // The shell has several roots: `find` goes through all of them.
     const button = f.find<HTMLButtonElement>("button.recherche");
     expect(button.exists()).toBe(true);
 
@@ -76,7 +76,7 @@ describe("Accès à la recherche", () => {
     expect(document.querySelector(PALETTE)).not.toBeNull();
   });
 
-  it("s’ouvre au raccourci clavier", async () => {
+  it("opens on the keyboard shortcut", async () => {
     await mountView("/test/test/cadrages");
 
     const e = shortcut();
@@ -84,11 +84,11 @@ describe("Accès à la recherche", () => {
     await waitForOpen();
 
     expect(document.querySelector(PALETTE)).not.toBeNull();
-    // le navigateur ne doit pas en faire autre chose
+    // the browser must not do anything else with it
     expect(e.defaultPrevented).toBe(true);
   });
 
-  it("ne s’ouvre qu’une fois, même au raccourci répété", async () => {
+  it("opens only once, even on a repeated shortcut", async () => {
     await mountView("/test/test/cadrages");
 
     document.dispatchEvent(shortcut());
@@ -99,7 +99,7 @@ describe("Accès à la recherche", () => {
     expect(document.querySelectorAll(PALETTE).length).toBe(1);
   });
 
-  it("n’est pas proposée hors d’un projet", async () => {
+  it("is not offered outside a project", async () => {
     const f = await mountView("/");
 
     expect(f.find("button.recherche").exists()).toBe(false);
@@ -108,7 +108,7 @@ describe("Accès à la recherche", () => {
     expect(document.querySelector(PALETTE)).toBeNull();
   });
 
-  it("prévient que la recherche porte sur aujourd’hui depuis la vue d’évolution", async () => {
+  it("warns that search covers today from the evolution view", async () => {
     await mountView("/test/test/evolution");
 
     document.dispatchEvent(shortcut());

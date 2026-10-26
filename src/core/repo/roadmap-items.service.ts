@@ -5,24 +5,24 @@ import { Scoping } from "../model/model";
 import { signal } from "../signals";
 
 /**
- * Une piste : ce qu'on envisage pour le produit, porté par une issue du dépôt
- * de référentiel étiquetée `piste` (cadrage 2026-058, RG-piste-definition).
+ * A roadmap item: what is envisaged for the product, carried by an issue of
+ * the specification repo labelled `piste` (scoping 2026-058, RG-piste-definition).
  *
- * Elle n'appartient pas au référentiel : elle n'a ni identifiant de cadrage,
- * ni statut, et ne se mêle jamais à ce que le dépôt contient.
+ * It does not belong to the specification: it has neither scoping identifier
+ * nor status, and never mixes with what the repo contains.
  */
 export interface RoadmapItemIssue {
   readonly number: number;
   readonly title: string;
   readonly url: string;
   readonly labels: readonly string[];
-  /** Le titre du jalon, qui porte l'horizon ; `null` sans jalon. */
+  /** The milestone's title, which carries the horizon; `null` without a milestone. */
   readonly milestone: string | null;
 }
 
-/** Une piste telle qu'une vue la montre : son état « en cours » déduit des cadrages. */
+/** A roadmap item as a view shows it: its « en cours » state derived from scopings. */
 export interface RoadmapItemView extends RoadmapItemIssue {
-  /** Les cadrages non livrés qui la citent par un lien `piste` — RG-piste-etat-deduit. */
+  /** The undelivered scopings that cite it through a `piste` link — RG-piste-etat-deduit. */
   readonly scopingsInProgress: readonly string[];
 }
 
@@ -36,7 +36,7 @@ export interface HorizonGroup {
 export type RoadmapItemsState =
   "inactif" | "chargement" | "pret" | "droit-manquant" | "erreur";
 
-/** Les horizons dans leur ordre d'affichage — RG-piste-horizon. */
+/** The horizons in their display order — RG-piste-horizon. */
 const HORIZON_ORDER: readonly Horizon[] = [
   "maintenant",
   "ensuite",
@@ -45,11 +45,11 @@ const HORIZON_ORDER: readonly Horizon[] = [
 ];
 
 /**
- * Lit l'horizon dans le titre d'un jalon.
+ * Reads the horizon in a milestone's title.
  *
- * La casse et les accents ne comptent pas : « Plus tard » et « plus-tard »
- * désignent le même horizon. Un jalon d'un autre nom ne dit pas d'horizon, et
- * sa piste se range avec les non classées plutôt que de passer devant.
+ * Case and accents do not count: « Plus tard » and « plus-tard » designate
+ * the same horizon. A milestone with another name gives no horizon, and its
+ * roadmap item is placed with the unclassified ones rather than ahead.
  */
 function horizonOfMilestone(milestone: string | null): Horizon {
   const key = (milestone ?? "")
@@ -64,7 +64,7 @@ function horizonOfMilestone(milestone: string | null): Horizon {
     : "non-classee";
 }
 
-/** Le numéro d'une issue de ce dépôt que désigne une adresse, ou `null`. */
+/** The number of an issue of this repo that an address designates, or `null`. */
 function issueNumber(url: string, repoRef: RepoRef): number | null {
   const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/.exec(
     url.trim(),
@@ -77,13 +77,13 @@ function issueNumber(url: string, repoRef: RepoRef): number | null {
 }
 
 /**
- * Les pistes rattachées à un domaine ou à une fonctionnalité, avec les
- * cadrages non livrés qui les citent.
+ * The roadmap items attached to a domain or a feature, with the undelivered
+ * scopings that cite them.
  *
- * Le rattachement se lit comme l'automatisation le vérifie, par la
- * bibliothèque commune (INV-7, RG-piste-rattachee). Le lien va du cadrage vers
- * la piste, jamais l'inverse : seul un lien de nature `piste` vers une issue
- * de ce dépôt compte.
+ * Attachment is read the way the automation checks it, through the shared
+ * library (INV-7, RG-piste-rattachee). The link goes from the scoping to the
+ * roadmap item, never the reverse: only a link of kind `piste` to an issue of
+ * this repo counts.
  */
 export function linkedRoadmapItems(
   issues: readonly RoadmapItemIssue[],
@@ -112,7 +112,7 @@ export function linkedRoadmapItems(
     .map((i) => ({ ...i, scopingsInProgress: inProgress.get(i.number) ?? [] }));
 }
 
-/** Range les pistes par horizon, sans groupe vide — RG-piste-horizon. */
+/** Groups roadmap items by horizon, without empty groups — RG-piste-horizon. */
 export function groupByHorizon(
   roadmapItems: readonly RoadmapItemView[],
 ): HorizonGroup[] {
@@ -125,11 +125,11 @@ export function groupByHorizon(
 }
 
 /**
- * La roadmap d'un projet : ses pistes, lues une fois par projet.
+ * A project's roadmap: its roadmap items, read once per project.
  *
- * Une seule liste sert toutes les vues : un lecteur qui passe d'un domaine à
- * l'autre ne repaie pas l'appel (RG-pistes-a-part). Elle passe par la file
- * régulée du client, comme tout appel à l'API (INV-6).
+ * A single list serves all views: a reader moving from one domain to another
+ * does not pay for the call again (RG-pistes-a-part). It goes through the
+ * client's regulated queue, like every API call (INV-6).
  */
 export class RoadmapItemsService {
   private readonly github = inject(GithubClient);
@@ -171,9 +171,9 @@ export class RoadmapItemsService {
       this.state.set("pret");
     } catch (e) {
       if (key !== this.key) return;
-      // Un 403 qui n'est pas un quota épuisé : le jeton n'a pas le droit de
-      // lire les issues. Le dire tel quel, plutôt qu'une section vide qui se
-      // lirait « rien n'est envisagé » (RG-message-nomme-la-cause).
+      // A 403 that is not an exhausted quota: the token has no right to read
+      // issues. Say so as is, rather than an empty section that would read
+      // « rien n'est envisagé » (RG-message-nomme-la-cause).
       if (e instanceof GithubError && e.status === 403 && !e.quotaExhausted) {
         this.state.set("droit-manquant");
         return;
@@ -182,7 +182,7 @@ export class RoadmapItemsService {
         e instanceof Error ? e.message : "Les pistes n'ont pas pu être lues.",
       );
       this.state.set("erreur");
-      // Une erreur ne se garde pas : la vue suivante retentera.
+      // An error is not kept: the next view will retry.
       this.inFlight = null;
     }
   }

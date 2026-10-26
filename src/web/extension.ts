@@ -1,7 +1,7 @@
 import type { Extension } from "../extension/extension";
 
 /**
- * Ce que la version web apporte à l'interface commune : ce qui tient à son hébergement, à son service worker et à sa licence (ADR-extensions-commerciales, RG-mentions-legales). Une autre racine qui servirait l'interface ailleurs nommerait son propre hébergeur.
+ * What the web version contributes to the shared interface: what belongs to its hosting, its service worker and its licence (ADR-extensions-commerciales, RG-mentions-legales). Another root serving the interface elsewhere would name its own host.
  */
 export function webExtension(): Extension {
   return {

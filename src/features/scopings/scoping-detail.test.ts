@@ -18,9 +18,9 @@ import { createAppRouter } from "../../router";
 import ScopingPage, { formatImpactCount } from "./ScopingPage.vue";
 
 /**
- * La fiche d'un cadrage — RG-en-tete-cadrage et RG-sommaire-fiche-longue.
+ * A scoping's page — RG-en-tete-cadrage and RG-sommaire-fiche-longue.
  *
- * L'en-tête dit d'un coup d'œil si le cadrage change le produit ou s'il le commente ; le sommaire garde en vue ce qu'il change, et regroupe ce qu'il ne fait que mentionner.
+ * The header tells at a glance whether the scoping changes the product or comments on it; the table of contents keeps in view what it changes, and groups what it merely mentions.
  */
 
 function impact(
@@ -76,7 +76,7 @@ function specification(scopings: Scoping[]): Specification {
   };
 }
 
-/** Monte la fiche à l'adresse du cadrage `id`, le référentiel portant `cadrages`. */
+/** Mounts the page at the address of scoping `id`, the specification carrying `scopings`. */
 async function mountAt(id: string, scopings: Scoping[]): Promise<HTMLElement> {
   const store = inject(SpecificationStore);
   store.specification.set(specification(scopings));
@@ -93,7 +93,7 @@ function mountView(c: Scoping): Promise<HTMLElement> {
   return mountAt(c.id, [c]);
 }
 
-/** La valeur d'une rangée de l'en-tête, par son intitulé. */
+/** The value of a header row, by its label. */
 function row(el: HTMLElement, heading: string): HTMLElement | null {
   const dt = [...el.querySelectorAll(".identite dt")].find(
     (d) => d.textContent?.trim() === heading,
@@ -101,20 +101,20 @@ function row(el: HTMLElement, heading: string): HTMLElement | null {
   return (dt?.nextElementSibling as HTMLElement) ?? null;
 }
 
-describe("Le décompte des impacts", () => {
-  it("se lit par opération, dans l’ordre de ce qui change le plus", () => {
+describe("The impact count", () => {
+  it("reads by operation, in order of what changes most", () => {
     expect(formatImpactCount(MIX)).toBe(
       "2 règles créées · 1 modifiée · 2 touchées",
     );
   });
 
-  it("accorde au singulier et omet ce qui est à zéro", () => {
+  it("agrees in the singular and omits what is zero", () => {
     expect(formatImpactCount([impact("RG-a", "abroge")])).toBe(
       "1 règle abrogée",
     );
   });
 
-  it("parle de cibles quand toutes ne sont pas des règles", () => {
+  it("speaks of targets when not all are rules", () => {
     expect(
       formatImpactCount([
         impact("RG-a", "cree"),
@@ -123,18 +123,18 @@ describe("Le décompte des impacts", () => {
     ).toBe("2 cibles créées");
   });
 
-  it("ne dit rien d’un cadrage sans impact", () => {
+  it("says nothing of a scoping without impacts", () => {
     expect(formatImpactCount([])).toBe("");
   });
 });
 
-describe("La fiche d’un cadrage", () => {
+describe("A scoping's page", () => {
   beforeEach(() => {
     provideHttpTesting();
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
-  it("dit dans l’en-tête ce que le cadrage change", async () => {
+  it("says in the header what the scoping changes", async () => {
     const el = await mountView(scoping("2026-001", { impacts: MIX }));
 
     expect(row(el, "Impacts")?.textContent?.trim()).toBe(
@@ -142,7 +142,7 @@ describe("La fiche d’un cadrage", () => {
     );
   });
 
-  it("mène à la demande de fusion d’un cadrage en cours", async () => {
+  it("leads to the pull request of a scoping in progress", async () => {
     const el = await mountView(
       scoping("2026-002", {
         status: "en_relecture",
@@ -161,7 +161,7 @@ describe("La fiche d’un cadrage", () => {
     expect(link?.href).toBe("https://github.com/org/depot/pull/9");
   });
 
-  it("liste d’abord ce qui change, puis ce qui est seulement touché", async () => {
+  it("lists first what changes, then what is only touched", async () => {
     const el = await mountView(scoping("2026-001", { impacts: MIX }));
 
     const order = [...el.querySelectorAll("#impacts .impact")].map((a) => a.id);
@@ -176,7 +176,7 @@ describe("La fiche d’un cadrage", () => {
     expect(touched?.querySelectorAll(".impact").length).toBe(2);
   });
 
-  it("regroupe au sommaire les impacts « touche » en une entrée", async () => {
+  it("groups the « touche » impacts into one table-of-contents entry", async () => {
     const el = await mountView(scoping("2026-001", { impacts: MIX }));
 
     const entries = [...el.querySelectorAll(".sommaire a")].map((a) => ({
@@ -191,7 +191,7 @@ describe("La fiche d’un cadrage", () => {
     );
   });
 
-  it("n’ouvre pas d’entrée de regroupement sans impact « touche »", async () => {
+  it("does not open a grouping entry without a « touche » impact", async () => {
     const el = await mountView(
       scoping("2026-001", { impacts: [impact("RG-a", "cree")] }),
     );
@@ -200,7 +200,7 @@ describe("La fiche d’un cadrage", () => {
     expect(el.querySelector("#impacts-touches")).toBeNull();
   });
 
-  it("ancre et replie un impact d’architecture par sa cible", async () => {
+  it("anchors and collapses an architecture impact by its target", async () => {
     const el = await mountView(
       scoping("2026-003", {
         impacts: [
@@ -210,7 +210,7 @@ describe("La fiche d’un cadrage", () => {
       }),
     );
 
-    // le champ `regle` est vide pour une cible d'architecture : s'en servir donnait aux deux impacts la même ancre, et un repli qui ne repliait rien
+    // the `rule` field is empty for an architecture target: using it gave both impacts the same anchor, and a collapse that collapsed nothing
     expect(
       [...el.querySelectorAll("#impacts .impact")].map((a) => a.id),
     ).toEqual(["impact-ADR-x", "impact-ADR-y"]);
@@ -220,8 +220,8 @@ describe("La fiche d’un cadrage", () => {
     expect(el.querySelector("#corps-impact-ADR-y")).not.toBeNull();
   });
 
-  describe("ouverte sur un cadrage en cours, avant que les branches soient lues", () => {
-    /** La branche principale est lue ; le cadrage demandé, lui, vit sur une branche. */
+  describe("opened on a scoping in progress, before the branches are read", () => {
+    /** The main branch is read; the requested scoping, though, lives on a branch. */
     async function mountWithout(loadingBranches: boolean): Promise<{
       el: HTMLElement;
       store: SpecificationStore;
@@ -232,14 +232,14 @@ describe("La fiche d’un cadrage", () => {
       return { el, store };
     }
 
-    it("dit que les cadrages en cours se lisent, et non que celui-ci n’existe pas", async () => {
+    it("says that scopings in progress are being read, not that this one does not exist", async () => {
       const { el } = await mountWithout(true);
 
       expect(el.textContent).not.toContain("introuvable");
       expect(el.textContent).toContain("Lecture des cadrages en cours");
     });
 
-    it("affiche le cadrage dès que sa branche est lue", async () => {
+    it("displays the scoping as soon as its branch is read", async () => {
       const { el, store } = await mountWithout(true);
 
       store.specification.update((r) => ({
@@ -258,7 +258,7 @@ describe("La fiche d’un cadrage", () => {
       expect(el.querySelector("h1")?.textContent).toBe("Sur sa branche");
     });
 
-    it("le dit introuvable une fois les branches lues sans lui", async () => {
+    it("says it is not found once the branches are read without it", async () => {
       const { el } = await mountWithout(false);
 
       expect(el.textContent).toContain("Cadrage introuvable : 2026-002");
@@ -267,17 +267,17 @@ describe("La fiche d’un cadrage", () => {
 });
 
 /**
- * RG-branches-survivantes-signalees : une branche qui porte encore un cadrage
- * livré est signalée sur lui, avec son nom. Le signalement informe, et
- * n'interdit rien.
+ * RG-branches-survivantes-signalees: a branch still carrying a delivered
+ * scoping is flagged on it, with its name. The flag informs, and forbids
+ * nothing.
  */
-describe("Une branche survivante", () => {
+describe("A stale branch", () => {
   beforeEach(() => {
     provideHttpTesting();
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
-  it("se signale sur la fiche du cadrage livré, avec son nom et un lien", async () => {
+  it("is flagged on the delivered scoping's page, with its name and a link", async () => {
     const el = await mountView(
       scoping("2026-032", { staleBranches: ["cadrage-2026-032"] }),
     );
@@ -290,7 +290,7 @@ describe("Une branche survivante", () => {
     );
   });
 
-  it("ne se montre pas quand aucune branche ne survit", async () => {
+  it("does not show when no branch remains", async () => {
     const el = await mountView(scoping("2026-032"));
 
     expect(el.querySelector(".branches-survivantes")).toBeNull();

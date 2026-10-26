@@ -4,14 +4,14 @@ import process from "node:process";
 import { describe, expect, it } from "vitest";
 
 /**
- * Les couches de `docs/pratiques.md` : le cœur et les vues ne parlent au système que par les ports, et ne choisissent jamais un adaptateur. Le test lit les imports des sources, comme `gouttiere.test.ts` en lit les styles : une dépendance à rebours ne casse rien à l'exécution, et ne se voit qu'au jour où l'on sépare ce qu'elle relie.
+ * The layers of `docs/practices.md`: the core and the views only talk to the system through the ports, and never choose an adapter. The test reads the sources' imports, as `gutter.test.ts` reads their styles: a backwards dependency breaks nothing at runtime, and only shows the day one separates what it connects.
  *
- * Les tests en sont exemptés : ils fournissent leurs doublures, et la plateforme du navigateur en est une.
+ * Tests are exempt: they provide their fakes, and the browser platform is one of them.
  */
 
 const ROOT = join(process.cwd(), "src");
 
-/** Ce qu'importe une source, tel qu'écrit : statique, réexporté ou dynamique. */
+/** What a source imports, as written: static, re-exported or dynamic. */
 export function listImports(source: string): string[] {
   const patterns = [
     /\b(?:import|export)\b[^;"'`]*?\bfrom\s*["']([^"']+)["']/g,
@@ -23,7 +23,7 @@ export function listImports(source: string): string[] {
   );
 }
 
-/** Le module visé, relatif à `src/` et sans extension ; un paquet garde son nom. */
+/** The targeted module, relative to `src/` and without extension; a package keeps its name. */
 export function resolve(file: string, target: string): string {
   if (!target.startsWith(".")) return target;
   return relative(ROOT, join(dirname(file), target)).replace(/\.(ts|vue)$/, "");
@@ -40,7 +40,7 @@ function listFiles(folder: string, withTests = false): string[] {
   });
 }
 
-/** Ce que le cœur, les vues et le kit ne doivent pas importer : une racine de composition, le démarrage et les adaptateurs. */
+/** What the core, the views and the kit must not import: a composition root, startup and the adapters. */
 const FORBIDDEN = [
   /^(main|startup|bureau\/main)$/,
   /^platform\/(web|bureau|authenticator-testing)/,
@@ -59,8 +59,8 @@ function violations(
   );
 }
 
-describe("les couches", () => {
-  it("lit les imports statiques, réexportés et dynamiques", () => {
+describe("the layers", () => {
+  it("reads static, re-exported and dynamic imports", () => {
     const source = [
       'import { a } from "./a";',
       'import type {\n  B,\n} from "../b";',
@@ -77,7 +77,7 @@ describe("les couches", () => {
     ]);
   });
 
-  it("résout un import relatif depuis src/", () => {
+  it("resolves a relative import from src/", () => {
     expect(resolve(join(ROOT, "core/ui/x.ts"), "../../startup")).toBe(
       "startup",
     );
@@ -87,7 +87,7 @@ describe("les couches", () => {
     expect(resolve(join(ROOT, "x.ts"), "vue")).toBe("vue");
   });
 
-  it("le cœur, les vues et le kit ne choisissent aucun adaptateur", () => {
+  it("the core, the views and the kit choose no adapter", () => {
     const files = [
       ...listFiles(join(ROOT, "core")),
       ...listFiles(join(ROOT, "features")),
@@ -99,14 +99,14 @@ describe("les couches", () => {
 });
 
 /**
- * L'application de bureau et ce qui se vend vivent dans un dépôt privé, qui consomme ce paquet par son champ `exports` (ADR-extensions-commerciales). Ce dépôt n'en porte aucune logique, pas même le nom : rien n'y importe le cœur natif, et aucun fichier — tests compris, hors celui-ci, qui doit bien les écrire — ne nomme le service de mise à jour, la licence du bureau ou ses causes.
+ * The desktop application and what is sold live in a private repo, which consumes this package through its `exports` field (ADR-extensions-commerciales). This repo carries none of its logic, not even its name: nothing here imports the native core, and no file — tests included, except this one, which has to write them — names the update service, the desktop licence or its causes.
  */
-describe("ce qui se vend", () => {
+describe("what is sold", () => {
   const SOURCES = listFiles(ROOT, true).filter(
     (f) => relative(ROOT, f) !== "layers.test.ts",
   );
 
-  it("n'est importé par aucun fichier", () => {
+  it("is imported by no file", () => {
     expect(
       violations(SOURCES, [/^bureau\//, /^@tauri-apps\//, /^@wdio\//]),
     ).toEqual([]);
@@ -115,7 +115,7 @@ describe("ce qui se vend", () => {
   const DESKTOP_NAMES =
     /Skaron|tauri|LicenceService|CoffreDeLicence|COFFRE_DE_LICENCE|Licence et mises à jour|licence du poste|sans-licence|licence-(refusee|invalide)/i;
 
-  it("n'est nommé par aucun fichier", () => {
+  it("is named by no file", () => {
     const naming = SOURCES.filter((f) =>
       DESKTOP_NAMES.test(readFileSync(f, "utf8")),
     ).map((f) => relative(process.cwd(), f));

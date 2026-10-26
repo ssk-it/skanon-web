@@ -13,16 +13,16 @@ import { RepoConfig } from "./repo-config";
 import { TokenService } from "../github/token.service";
 
 /**
- * L'écran « Ouvrir un projet » ne montrait que les dépôts déjà ouverts : les
- * référentiels des autres organisations étaient vérifiés sous le jeton de la
- * cible courante, qui ne les atteint pas, et rangés parmi les dépôts sans
- * référentiel. Voir RG-projets-connus.
+ * The « Ouvrir un projet » screen only showed repos already opened: the
+ * specifications of other organizations were checked under the token of the
+ * current target, which does not reach them, and filed among repos without
+ * a specification. See RG-projets-connus.
  */
-describe("dépôts proposés à l’ouverture", () => {
+describe("repos offered for opening", () => {
   const SSK_TOKEN = "ghp_ssk_aaaaaaaaaaaaaaaa";
   const WAYNE_TOKEN = "ghp_wayne_aaaaaaaaaaaaaa";
 
-  /** Ce que chaque jeton atteint, comme GitHub le dirait. */
+  /** What each token reaches, as GitHub would say. */
   const SCOPE: Record<string, readonly string[]> = {
     [SSK_TOKEN]: ["ssk-it/skift-cadrage", "ssk-it/skift"],
     [WAYNE_TOKEN]: ["Wayne-Corp/wayne-devis-cadrage"],
@@ -52,8 +52,8 @@ describe("dépôts proposés à l’ouverture", () => {
   });
 
   /**
-   * Répond à chaque appel en jouant GitHub : un dépôt hors de portée du jeton
-   * présenté est introuvable, comme la plateforme le dit d'un dépôt privé.
+   * Answers each call by playing GitHub: a repo out of reach of the presented
+   * token is not found, as the platform says of a private repo.
    */
   async function replayGithub(): Promise<void> {
     for (let round = 0; round < 50; round++) {
@@ -89,11 +89,11 @@ describe("dépôts proposés à l’ouverture", () => {
     }
   }
 
-  it("reconnaît les référentiels de chaque organisation, sous le jeton qui l’atteint", async () => {
+  it("recognises the specifications of each organization, under the token that reaches it", async () => {
     const tokens = inject(TokenService);
     tokens.setForScope("ssk-it", SSK_TOKEN);
     tokens.setForScope("wayne-corp", WAYNE_TOKEN);
-    // L'écran de choix est montré alors qu'un projet ssk-it était ouvert.
+    // The selection screen is shown while an ssk-it project was open.
     tokens.targetRepo({ owner: "ssk-it", repo: "skift-cadrage" });
 
     const known = inject(KnownReposService);
@@ -107,16 +107,16 @@ describe("dépôts proposés à l’ouverture", () => {
       .map((d) => `${d.repoRef.owner}/${d.repoRef.repo}`);
     expect(framedRepos.sort()).toEqual([...FRAMED_REPOS].sort());
     expect(known.error()).toBeNull();
-    // La cible partagée n'a pas été déplacée par la vérification.
+    // The shared target was not moved by the check.
     expect(tokens.currentTarget()).toEqual({
       owner: "ssk-it",
       repo: "skift-cadrage",
     });
   });
 
-  it("écrit un dépôt déjà ouvert comme GitHub le nomme", async () => {
-    // Saisi à la main en minuscules : la plateforme ne distingue pas la casse,
-    // mais deux graphies d'une organisation la couperaient en deux groupes.
+  it("writes an already opened repo as GitHub names it", async () => {
+    // Typed by hand in lower case: the platform does not distinguish case,
+    // but two spellings of an organization would split it into two groups.
     inject(RepoConfig).rememberOpened({
       owner: "wayne-corp",
       repo: "wayne-devis-cadrage",
@@ -138,13 +138,13 @@ describe("dépôts proposés à l’ouverture", () => {
   });
 });
 
-describe("regroupement des dépôts par organisation", () => {
+describe("grouping repos by organization", () => {
   const known = (name: string, framed: boolean, recent = false): KnownRepo => {
     const [owner, repo] = name.split("/");
     return { repoRef: { owner, repo }, framed, recent };
   };
 
-  it("range les organisations par nom, et dans chacune les référentiels d’abord", () => {
+  it("sorts organizations by name, and within each the specifications first", () => {
     const groups = groupReposByOrganization([
       known("ssk-it/skift", false),
       known("Wayne-Corp/wayne-devis-cadrage", true),
@@ -162,7 +162,7 @@ describe("regroupement des dépôts par organisation", () => {
     ]);
   });
 
-  it("ne coupe pas une organisation en deux selon la casse", () => {
+  it("does not split an organization in two depending on case", () => {
     const groups = groupReposByOrganization([
       known("Wayne-Corp/wayne-stock-cadrage", true),
       known("wayne-corp/wayne-chantier-cadrage", true),

@@ -1,40 +1,40 @@
 import type { RouteLocationRaw, RouteRecordRaw } from "vue-router";
 
-/** Ce qu'un lien d'ouverture désigne : une page de l'application, et son ancre. */
+/** What an opening link designates: a page of the application, and its anchor. */
 export interface DeepLink {
   segments: string[];
   fragment: string | null;
 }
 
 /**
- * Les schémas reconnus : `skanon:`, que l'application de bureau déclare au système, et `web+canon:`, celui de SSK Canon, pour qu'un lien écrit pour l'une s'ouvre dans l'autre. Le « + » s'accepte aussi lu comme une espace : c'est ce que devient un « + » non encodé dans une chaîne de requête, quand le lien est collé tel quel dans la barre d'adresse.
+ * The recognised schemes: `skanon:`, which the desktop application declares to the system, and `web+canon:`, SSK Canon's, so that a link written for one opens in the other. The « + » is also accepted read as a space: that is what an unencoded « + » becomes in a query string, when the link is pasted as is in the address bar.
  */
 const SCHEME = /^(web[+ ]canon|skanon):/i;
 
 /**
- * Lit un lien `web+canon:<organisation>/<depot>/<vue>` — RG-ouverture-par-protocole.
+ * Reads a `web+canon:<owner>/<repo>/<view>` link — RG-ouverture-par-protocole.
  *
- * Le lien porte le chemin de l'adresse https, sans l'hôte, et rien d'autre.
- * Retourne `null` pour tout ce qui ne désigne pas une page d'un projet : un
- * lien sans organisation ni dépôt, un hôte, un autre schéma, un segment `..`
- * qu'un navigateur résoudrait hors du chemin voulu. Le lien vient d'un outil
- * extérieur ; ce qui n'est pas reconnu mène à l'écran de choix, jamais à une
- * page devinée.
+ * The link carries the path of the https address, without the host, and nothing else.
+ * Returns `null` for anything that does not designate a project page: a
+ * link without owner or repo, a host, another scheme, a `..` segment
+ * a browser would resolve outside the intended path. The link comes from an outside
+ * tool; what is not recognised leads to the selection screen, never to a
+ * guessed page.
  */
 export function parseDeepLink(link: string | null): DeepLink | null {
   if (!link || !SCHEME.test(link)) return null;
   const rest = link.replace(SCHEME, "");
 
-  // Une autorité (`//hôte`, ou sa variante à contre-obliques que les
-  // navigateurs normalisent) ou un schéma imbriqué : le lien prétend mener
-  // ailleurs que chez l'application. On ne le suit pas, même vers un hôte qui
-  // serait le sien.
+  // An authority (`//host`, or its backslash variant that
+  // browsers normalise) or a nested scheme: the link claims to lead
+  // somewhere other than the application. It is not followed, even to a host that
+  // would be its own.
   if (/^[/\\]{2}/.test(rest) || /^[a-z][a-z0-9+.-]*:/i.test(rest)) return null;
 
   const hashIndex = rest.indexOf("#");
   const beforeAnchor = hashIndex < 0 ? rest : rest.slice(0, hashIndex);
   const anchor = hashIndex < 0 ? "" : rest.slice(hashIndex + 1);
-  // Aucune vue ne lit de paramètre de requête : il n'y a rien à transmettre.
+  // No view reads a query parameter: there is nothing to pass on.
   const path = beforeAnchor.split("?")[0];
 
   const segments: string[] = [];
@@ -51,8 +51,8 @@ export function parseDeepLink(link: string | null): DeepLink | null {
     segments.push(segment);
   }
 
-  // Le projet est obligatoire (RG-projet-dans-adresse) : sans organisation et
-  // dépôt, l'application ne devine pas lequel ouvrir (RG-choix-projet-prealable).
+  // The project is mandatory (RG-projet-dans-adresse): without owner and
+  // repo, the application does not guess which one to open (RG-choix-projet-prealable).
   if (segments.length < 2) return null;
 
   let fragment: string | null = null;
@@ -67,7 +67,7 @@ export function parseDeepLink(link: string | null): DeepLink | null {
 }
 
 /**
- * L'adresse d'une page désignée par un lien, ou l'écran de choix. La requête est vidée : le routeur la garderait sinon d'une redirection à l'autre, et aucune vue n'en lit.
+ * The address of a page designated by a link, or the selection screen. The query is emptied: the router would otherwise keep it from one redirect to the next, and no view reads it.
  */
 export function toLinkAddress(link: string | null): RouteLocationRaw {
   const designated = parseDeepLink(link);
@@ -80,9 +80,9 @@ export function toLinkAddress(link: string | null): RouteLocationRaw {
 }
 
 /**
- * L'adresse de réception des liens d'ouverture : celle où l'application de bureau mène chaque lien que le système lui remet (`main.ts`), et que la version web reçoit telle quelle.
+ * The reception address of opening links: the one where the desktop application leads each link the system hands it (`main.ts`), and which the web version receives as is.
  *
- * Une redirection, et non une page : le lien reçu devient l'adresse de la page, que le routage traite ensuite comme une adresse tapée. L'adresse de réception n'entre pas dans l'historique.
+ * A redirect, not a page: the received link becomes the page's address, which routing then treats as a typed address. The reception address does not enter the history.
  */
 export const deepLinkRoute: RouteRecordRaw = {
   path: "/ouvrir",

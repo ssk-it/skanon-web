@@ -5,7 +5,7 @@ import { ProjectIdentityService } from "../../core/repo/project-identity.service
 import { signal } from "../../core/signals";
 
 /**
- * Des identités inventées, pour les essais : des formes simples, qui ne reproduisent le logo d'aucun produit réel. SSK Canon s'en servait dans ses stories, que Skanon ne porte pas ; elles restent pour les tests qui montent un symbole.
+ * Invented identities, for tests: simple shapes that reproduce the logo of no real product. SSK Canon used them in its stories, which Skanon does not port; they remain for the tests that mount a symbol.
  */
 const svg = (body: string) =>
   `data:image/svg+xml;base64,${btoa(
@@ -25,11 +25,11 @@ export const FAKE_SYMBOLS = {
     clair: svg('<path d="M16 3 L29 28 H3 Z" fill="#15803d"/>'),
     dark: svg('<path d="M16 3 L29 28 H3 Z" fill="#86efac"/>'),
   },
-  /** Une version sans suffixe, qui convient aux deux fonds. */
+  /** A version without a suffix, suitable for both backgrounds. */
   losange: svg('<path d="M16 2 L30 16 L16 30 L2 16 Z" fill="#c2410c"/>'),
 } as const;
 
-/** Fournit un service d'identités qui répond sans réseau, d'après le nom du dépôt. */
+/** Provides an identity service that answers without network, based on the repo name. */
 export function provideFakeIdentities(
   byRepo: Record<string, string | Partial<Record<IdentityVariant, string>>>,
 ): void {

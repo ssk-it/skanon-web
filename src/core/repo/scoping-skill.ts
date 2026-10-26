@@ -1,13 +1,13 @@
 /**
- * Le skill de cadrage, distribué depuis le dépôt de l'automatisation.
+ * The scoping skill, distributed from the automation's repo.
  *
- * Il n'est pas embarqué ici : sa place est auprès du vérificateur qui fait
- * respecter le format, pour qu'une seule description de ce format existe. Deux
- * copies divergeraient dès la première correction.
+ * It is not embedded here: its place is next to the verifier that enforces
+ * the format, so that a single description of that format exists. Two copies
+ * would diverge at the first correction.
  */
 export const SKILL_REPO = "ssk-it/ssk-canon-action";
 
-/** Ce qui compose le skill, tel qu'il vit dans le dépôt. */
+/** What makes up the skill, as it lives in the repo. */
 export const SKILL_FILES: ReadonlyArray<{ path: string; source: string }> = [
   {
     path: "cadrage-canon/SKILL.md",
@@ -20,15 +20,15 @@ export const SKILL_FILES: ReadonlyArray<{ path: string; source: string }> = [
 ];
 
 /**
- * Commande d'installation, à coller dans un terminal.
+ * Installation command, to paste into a terminal.
  *
- * Deux fichiers dans une arborescence précise : les télécharger un à un
- * obligerait à recomposer les répertoires à la main, et une erreur de placement
- * rend le skill invisible sans rien dire.
+ * Two files in a precise tree: downloading them one by one would force one to
+ * recompose the directories by hand, and a misplacement makes the skill
+ * invisible without a word.
  */
 export function installCommand(): string {
-  // Coupée court : une ligne qui déborde de son cadre paraît tronquée, alors
-  // qu'elle ne fait que défiler.
+  // Kept short: a line that overflows its frame looks truncated, when it is
+  // merely scrolling.
   return [
     `git clone -q --depth 1 \\`,
     `  https://github.com/${SKILL_REPO} /tmp/canon \\`,
@@ -39,21 +39,21 @@ export function installCommand(): string {
 }
 
 /**
- * Configuration à écrire chez le développeur.
+ * Configuration to write on the developer's machine.
  *
- * Elle ne porte que ce qui est vrai de sa machine — où chaque référentiel est
- * cloné. Ce qui est vrai du projet, lui, est déclaré dans `ssk-canon.yml`, du
- * côté qui a autorité.
+ * It carries only what is true of their machine — where each specification is
+ * cloned. What is true of the project is declared in `ssk-canon.yml`, on the
+ * authoritative side.
  */
 export function sampleConfiguration(repoName: string): string {
   return `{\n  "projets": [\n    "~/chemin/vers/${repoName}"\n  ]\n}\n`;
 }
 
 /**
- * Le bloc à déclarer dans `ssk-canon.yml` pour que le skill se situe.
+ * The block to declare in `ssk-canon.yml` for the skill to find its bearings.
  *
- * Sans lui, un dépôt de code invoquant le skill ne se rattache à aucun projet :
- * c'est ce bloc, et lui seul, qui fait le lien du référentiel vers son code.
+ * Without it, a code repo invoking the skill attaches to no project: this
+ * block, and it alone, links the specification to its code.
  */
 export function sampleCodeRepos(
   repos: readonly { repo: string; role: string }[],

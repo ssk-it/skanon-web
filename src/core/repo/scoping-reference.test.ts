@@ -6,12 +6,12 @@ import {
 import type { Scoping } from "../model/model";
 
 /**
- * La résolution d'une référence à un cadrage — RG-reference-par-identifiant.
+ * Resolving a reference to a scoping — RG-reference-par-identifiant.
  *
- * Ce qui est en jeu n'est pas le confort mais la durée de vie du texte : citer
- * l'adresse d'une demande de fusion oblige à repasser la corriger après la
- * livraison, et cet oubli-là est silencieux — le lien continue de fonctionner,
- * mène à une demande close, et rien ne dit qu'une fiche existe.
+ * What is at stake is not convenience but the lifetime of the text: citing a
+ * pull request's address forces one to come back and correct it after
+ * delivery, and that omission is silent — the link keeps working, leads to a
+ * closed pull request, and nothing says that a page exists.
  */
 function scoping(id: string, provenance?: Scoping["provenance"]): Scoping {
   return { id, title: `Cadrage ${id}`, provenance } as unknown as Scoping;
@@ -19,8 +19,8 @@ function scoping(id: string, provenance?: Scoping["provenance"]): Scoping {
 
 const REPO = { owner: "org", repo: "projet" };
 
-describe("résolution d’une référence de cadrage", () => {
-  it("mène à la fiche quand le cadrage est livré", () => {
+describe("resolving a scoping reference", () => {
+  it("leads to the page when the scoping is delivered", () => {
     const target = resolveScopingReference(
       "2026-002",
       [scoping("2026-002")],
@@ -34,7 +34,7 @@ describe("résolution d’une référence de cadrage", () => {
     });
   });
 
-  it("mène à la demande de fusion tant que le cadrage ne l’est pas", () => {
+  it("leads to the pull request as long as the scoping is not", () => {
     const target = resolveScopingReference(
       "2026-002",
       [
@@ -55,10 +55,10 @@ describe("résolution d’une référence de cadrage", () => {
     });
   });
 
-  it("signale une référence que le dépôt ne porte pas", () => {
-    // Un identifiant inconnu n'est pas une erreur de saisie à corriger : le
-    // cadrage peut être en cours ailleurs, sur une branche que ce chargement
-    // n'a pas vue. Le dire vaut mieux que de fabriquer un lien mort.
+  it("reports a reference the repo does not carry", () => {
+    // An unknown identifier is not a typing error to correct: the scoping may
+    // be in progress elsewhere, on a branch this load did not see. Saying so is
+    // better than making up a dead link.
     const target = resolveScopingReference(
       "2026-999",
       [scoping("2026-002")],
@@ -70,30 +70,30 @@ describe("résolution d’une référence de cadrage", () => {
 });
 
 /**
- * Le préfixe de projet — RG-prefixe-projet.
+ * The project prefix — RG-prefixe-projet.
  *
- * Il s'ajoute à l'affichage et est accepté en entrée, sans rien changer à ce qui
- * est stocké : les identifiants déjà posés dans des issues ou des demandes de
- * fusion restent valides, et c'est tout l'intérêt.
+ * It is added on display and accepted on input, without changing anything in
+ * what is stored: identifiers already written in issues or pull requests stay
+ * valid, and that is the whole point.
  */
-describe("identifiant préfixé", () => {
-  it("accepte la forme sans préfixe", () => {
+describe("prefixed identifier", () => {
+  it("accepts the unprefixed form", () => {
     expect(extractScopingIdentifier("2026-002", "PRMCO")).toBe("2026-002");
   });
 
-  it("accepte la forme préfixée du projet", () => {
+  it("accepts the project's prefixed form", () => {
     expect(extractScopingIdentifier("PRMCO-2026-002", "PRMCO")).toBe(
       "2026-002",
     );
   });
 
-  it("refuse un préfixe qui n’est pas celui du projet", () => {
-    // Un identifiant numériquement valide ne suffit pas : préfixé d'un autre
-    // projet, il désigne un cadrage qui n'est pas ici.
+  it("refuses a prefix that is not the project's", () => {
+    // A numerically valid identifier is not enough: prefixed with another
+    // project's prefix, it designates a scoping that is not here.
     expect(extractScopingIdentifier("AUTRE-2026-002", "PRMCO")).toBeNull();
   });
 
-  it("n’accepte aucun préfixe quand le projet n’en déclare pas", () => {
+  it("accepts no prefix when the project declares none", () => {
     expect(extractScopingIdentifier("2026-002", null)).toBe("2026-002");
     expect(extractScopingIdentifier("PRMCO-2026-002", null)).toBeNull();
   });

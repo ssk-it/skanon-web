@@ -7,7 +7,7 @@ import {
   extractSubsections,
 } from "./frontmatter";
 
-/** Analyse le texte produit, en échouant clairement s'il est illisible. */
+/** Parses the produced text, failing clearly if it is unreadable. */
 function reread(text: string): {
   data: Record<string, unknown>;
   body: string;
@@ -20,11 +20,11 @@ function reread(text: string): {
 }
 
 /**
- * Ce que l'application écrit doit se relire à l'identique — par elle-même comme
- * par le vérificateur. Un écart ne se verrait qu'au rechargement, une fois le
- * fichier commité : le pire moment pour l'apprendre.
+ * What the application writes must read back identically — by itself as
+ * by the checker. A difference would only show on reload, once the
+ * file is committed: the worst moment to learn it.
  */
-describe("écriture d’une décision", () => {
+describe("writing a decision", () => {
   const decision = {
     title: "Où stocker les pièces jointes ?",
     status: "retenue" as const,
@@ -37,14 +37,14 @@ describe("écriture d’une décision", () => {
     decision: "Ce qui a tranché, en une phrase.",
   };
 
-  it("produit un frontmatter que la lecture accepte", () => {
+  it("produces a frontmatter that reading accepts", () => {
     const { data } = reread(serializeDecision("01-stockage", decision));
     expect(data["id"]).toBe("01-stockage");
     expect(data["statut"]).toBe("retenue");
     expect(data["option_retenue"]).toBe("stockage-objet");
   });
 
-  it("relit les options telles qu’elles ont été écrites", () => {
+  it("reads the options back as they were written", () => {
     const options = [
       ...extractSubsections(
         reread(serializeDecision("01-stockage", decision)).body,
@@ -57,7 +57,7 @@ describe("écriture d’une décision", () => {
     ]);
   });
 
-  it("marque l’option retenue dans son texte, pour qui lit le fichier seul", () => {
+  it("marks the chosen option in its text, for whoever reads the file alone", () => {
     const out = serializeDecision("01-stockage", decision);
     const options = [...extractSubsections(reread(out).body, "Options")];
     const chosen = options.find(([t]) => t === "stockage-objet")![1];
@@ -67,15 +67,15 @@ describe("écriture d’une décision", () => {
     );
   });
 
-  it("relit la description et ce qui a tranché", () => {
+  it("reads back the description and what settled it", () => {
     const { body } = reread(serializeDecision("01-stockage", decision));
     expect(extractSection(body, "Description")).toContain("question ouverte");
     expect(extractSection(body, "Décision")).toContain("a tranché");
   });
 
-  it("écrit null quand rien n’est encore tranché", () => {
-    // Une décision ouverte est le cas normal d'un cadrage en cours : elle ne
-    // doit pas être refusée, ni prétendre avoir une option retenue.
+  it("writes null when nothing is settled yet", () => {
+    // An open decision is the normal case of an in-progress scoping: it must
+    // not be rejected, nor claim to have a chosen option.
     const out = serializeDecision("01-x", {
       ...decision,
       status: "ouverte",
@@ -85,8 +85,8 @@ describe("écriture d’une décision", () => {
     expect(out).not.toContain("**Retenue.**");
   });
 
-  it("échappe un titre contenant deux-points", () => {
-    // La faute la plus fréquente du format : YAML lit le `:` comme séparateur.
+  it("escapes a title containing a colon", () => {
+    // The format's most frequent fault: YAML reads the `:` as a separator.
     const out = serializeDecision("01-x", {
       ...decision,
       title: "Stockage : où ?",
@@ -94,7 +94,7 @@ describe("écriture d’une décision", () => {
     expect(reread(out).data["titre"]).toBe("Stockage : où ?");
   });
 
-  it("omet les sections vides plutôt que d’écrire des titres creux", () => {
+  it("omits empty sections rather than writing hollow headings", () => {
     const out = serializeDecision("01-x", {
       ...decision,
       options: [],
@@ -104,7 +104,7 @@ describe("écriture d’une décision", () => {
     expect(out).not.toContain("## Décision");
   });
 
-  it("écarte une option sans identifiant", () => {
+  it("sets aside an option without an identifier", () => {
     const out = serializeDecision("01-x", {
       ...decision,
       options: [...decision.options, { id: "  ", body: "orpheline" }],

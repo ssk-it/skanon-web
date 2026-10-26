@@ -29,25 +29,25 @@ function scoping(
   };
 }
 
-/** Les dates d'un jeu d'essai, par identifiant. */
+/** The dates of a test fixture, by identifier. */
 function dates(m: Record<string, string | null | undefined>) {
   return (id: string) => m[id];
 }
 
-describe("trimestre d’une date", () => {
-  it("range janvier à mars dans le premier", () => {
+describe("quarter of a date", () => {
+  it("puts January to March in the first", () => {
     expect(quarterOf("2026-01-01T00:00:00Z")).toBe("2026-T1");
     expect(quarterOf("2026-03-31T23:00:00Z")).toBe("2026-T1");
   });
 
-  it("range octobre à décembre dans le quatrième", () => {
+  it("puts October to December in the fourth", () => {
     expect(quarterOf("2026-10-01T00:00:00Z")).toBe("2026-T4");
     expect(quarterOf("2026-12-31T00:00:00Z")).toBe("2026-T4");
   });
 });
 
-describe("groupes de la liste des cadrages", () => {
-  it("sort le travail en cours des trimestres", () => {
+describe("groups of the scopings list", () => {
+  it("takes work in progress out of the quarters", () => {
     const groups = groupScopings(
       [scoping("2026-005", "brouillon"), scoping("2026-004", "livree")],
       dates({ "2026-004": "2026-09-01T10:00:00Z" }),
@@ -56,7 +56,7 @@ describe("groupes de la liste des cadrages", () => {
     expect(groups[0].scopings.map((c) => c.id)).toEqual(["2026-005"]);
   });
 
-  it("réunit sous un même trimestre les cadrages livrés du même trimestre", () => {
+  it("gathers delivered scopings of the same quarter under one quarter", () => {
     const groups = groupScopings(
       [scoping("a", "livree"), scoping("b", "livree"), scoping("c", "livree")],
       dates({
@@ -69,9 +69,9 @@ describe("groupes de la liste des cadrages", () => {
     expect(groups[0].scopings.map((c) => c.id)).toEqual(["a", "b"]);
   });
 
-  // Les dates arrivent après la liste : un cadrage sans date encore connue doit
-  // rester visible plutôt que d'être escamoté le temps du chargement.
-  it("garde en fin de liste un cadrage dont la date manque", () => {
+  // Dates arrive after the list: a scoping with no known date yet must
+  // stay visible rather than be hidden while loading.
+  it("keeps a scoping whose date is missing at the end of the list", () => {
     const groups = groupScopings(
       [scoping("a", "livree"), scoping("b", "livree")],
       dates({ a: "2026-09-01T10:00:00Z" }),
@@ -80,7 +80,7 @@ describe("groupes de la liste des cadrages", () => {
     expect(groups[1].scopings.map((c) => c.id)).toEqual(["b"]);
   });
 
-  it("n’ouvre pas de groupe « en cours » quand tout est livré", () => {
+  it("does not open an « en cours » group when everything is delivered", () => {
     const groups = groupScopings(
       [scoping("a", "livree")],
       dates({ a: "2026-09-01T10:00:00Z" }),
@@ -88,8 +88,8 @@ describe("groupes de la liste des cadrages", () => {
     expect(groups.map((g) => g.key)).toEqual(["2026-T3"]);
   });
 
-  // Le premier trimestre est le seul dont l'ordinal ne suit pas la règle.
-  it("libelle le trimestre en clair, « 1ᵉʳ » compris", () => {
+  // The first quarter is the only one whose ordinal does not follow the rule.
+  it("labels the quarter in plain words, « 1ᵉʳ » included", () => {
     const groups = groupScopings(
       [scoping("a", "livree")],
       dates({ a: "2026-02-01T10:00:00Z" }),
@@ -98,10 +98,10 @@ describe("groupes de la liste des cadrages", () => {
   });
 });
 
-describe("livrés sans aucune date", () => {
-  // Sans date lue, un en-tête « Pas encore daté » sur toute la liste laissait
-  // croire à une catégorie de cadrages — RG-liste-cadrages-sobre.
-  it("les réunit sous « Livrés » quand aucun n’est daté", () => {
+describe("delivered without any date", () => {
+  // With no date read, a « Pas encore daté » header over the whole list suggested
+  // a category of scopings — RG-liste-cadrages-sobre.
+  it("gathers them under « Livrés » when none is dated", () => {
     const groups = groupScopings(
       [
         scoping("b", "brouillon"),
@@ -115,13 +115,13 @@ describe("livrés sans aucune date", () => {
     expect(groups[1].scopings.map((c) => c.id)).toEqual(["a", "c"]);
   });
 
-  it("dit que les dates arrivent tant qu’il en reste à lire", () => {
+  it("says the dates are coming while some remain to be read", () => {
     expect(
       deliveredDatesState([scoping("a", "livree")], dates({ a: undefined })),
     ).toBe("chargement");
   });
 
-  it("dit qu’elles sont indisponibles quand toutes les lectures ont échoué", () => {
+  it("says they are unavailable when all reads failed", () => {
     expect(
       deliveredDatesState(
         [scoping("a", "livree"), scoping("b", "livree")],
@@ -130,21 +130,21 @@ describe("livrés sans aucune date", () => {
     ).toBe("indisponibles");
   });
 
-  it("ne signale rien dès qu’une date est connue", () => {
+  it("flags nothing as soon as one date is known", () => {
     expect(
       deliveredDatesState(
         [scoping("a", "livree"), scoping("b", "livree")],
         dates({ a: "2026-09-01T10:00:00Z", b: null }),
       ),
     ).toBe("lues");
-    // un cadrage en cours n'a pas de date de livraison à attendre
+    // a scoping in progress has no delivery date to wait for
     expect(deliveredDatesState([scoping("a", "brouillon")], dates({}))).toBe(
       "lues",
     );
   });
 });
 
-describe("filtre de la liste des cadrages", () => {
+describe("filter of the scopings list", () => {
   const list = [
     scoping("2026-005", "brouillon", "Alléger la barre", ["referentiel"]),
     scoping("2026-004", "livree", "Rendre les diagrammes", [
@@ -157,7 +157,7 @@ describe("filtre de la liste des cadrages", () => {
   ];
   const ids = (l: readonly Scoping[]) => l.map((c) => c.id);
 
-  it("ne retire rien sans critère", () => {
+  it("removes nothing without a criterion", () => {
     expect(ids(filterScopings(list, "", new Set(), null))).toEqual([
       "2026-005",
       "2026-004",
@@ -165,7 +165,7 @@ describe("filtre de la liste des cadrages", () => {
     ]);
   });
 
-  it("cherche dans le titre, sans tenir compte de la casse ni des accents", () => {
+  it("searches the title, ignoring case and accents", () => {
     expect(ids(filterScopings(list, "PIECES", new Set(), null))).toEqual([
       "2026-003",
     ]);
@@ -174,7 +174,7 @@ describe("filtre de la liste des cadrages", () => {
     ]);
   });
 
-  it("cherche dans l’identifiant, préfixé ou non", () => {
+  it("searches the identifier, prefixed or not", () => {
     expect(ids(filterScopings(list, "004", new Set(), null))).toEqual([
       "2026-004",
     ]);
@@ -183,7 +183,7 @@ describe("filtre de la liste des cadrages", () => {
     ]);
   });
 
-  it("retient les cadrages d’un des domaines choisis, dans le même ordre", () => {
+  it("keeps the scopings of one of the chosen domains, in the same order", () => {
     expect(
       ids(filterScopings(list, "", new Set(["referentiel"]), null)),
     ).toEqual(["2026-005", "2026-004"]);
@@ -192,7 +192,7 @@ describe("filtre de la liste des cadrages", () => {
     ).toEqual(["2026-004", "2026-003"]);
   });
 
-  it("cumule le texte et les domaines", () => {
+  it("combines text and domains", () => {
     expect(
       ids(filterScopings(list, "barre", new Set(["persistance"]), null)),
     ).toEqual([]);

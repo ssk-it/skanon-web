@@ -56,9 +56,9 @@ async function mountView(
 }
 
 /**
- * Le réglage de la protection du jeton, et la description de chaque façon de le garder — RG-protection-du-jeton-par-projet, RG-garanties-annoncees.
+ * The token protection setting, and the description of each way of keeping it — RG-protection-du-jeton-par-projet, RG-garanties-annoncees.
  */
-describe("Réglages : la protection du jeton", () => {
+describe("Settings: token protection", () => {
   beforeEach(() => {
     provideHttpTesting();
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
@@ -70,7 +70,7 @@ describe("Réglages : la protection du jeton", () => {
   const choice = (view: Awaited<ReturnType<typeof mountView>>, value: string) =>
     section(view).find(`input[type=radio][value=${value}]`);
 
-  it("propose la passkey par défaut, sans l’exiger", async () => {
+  it("offers the passkey by default, without requiring it", async () => {
     const view = await mountView();
     expect((choice(view, "proposee").element as HTMLInputElement).checked).toBe(
       true,
@@ -80,31 +80,31 @@ describe("Réglages : la protection du jeton", () => {
     );
   });
 
-  it("montre l’exigence que le projet déclare", async () => {
+  it("shows the requirement the project declares", async () => {
     const view = await mountView("exigee");
     expect((choice(view, "exigee").element as HTMLInputElement).checked).toBe(
       true,
     );
   });
 
-  it("décrit chaque façon de garder le jeton, ce qu’elle protège et ce qu’elle laisse", async () => {
+  it("describes each way of keeping the token, what it protects and what it leaves exposed", async () => {
     const text = section(await mountView()).text();
     expect(text).toContain("En clair, dans le navigateur");
     expect(text).toContain("Sous passkey, dans le navigateur");
     expect(text).toContain("Dans le coffre du système");
     expect(text).toContain("Pour la session seulement");
-    // ce qui ne change pas, quelle que soit la forme
+    // what does not change, whatever the form
     expect(text).toContain("script");
     expect(text).toContain("révocation");
   });
 
-  it("dit que l’exigence est celle de l’application, non de GitHub", async () => {
+  it("says the requirement is the application's, not GitHub's", async () => {
     const text = section(await mountView()).text();
     expect(text).toContain("non de GitHub");
     expect(text).toContain("durée de vie");
   });
 
-  it("propose l’exigence par une demande de fusion", async () => {
+  it("offers the requirement through a pull request", async () => {
     const proposed = vi
       .spyOn(inject(SettingsService), "proposeSettings")
       .mockResolvedValue({
@@ -124,7 +124,7 @@ describe("Réglages : la protection du jeton", () => {
     );
   });
 
-  it("ne se montre pas sous une identité tierce, dont l’accès ne dure que la session", async () => {
+  it("does not show under a third-party identity, whose access lasts only the session", async () => {
     const view = await mountView("proposee", "identite_tierce");
     expect(section(view).exists()).toBe(false);
   });

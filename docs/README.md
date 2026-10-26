@@ -1,26 +1,28 @@
-# Documentation de Skanon
+# Skanon documentation
 
-## Ordre de lecture
+## Reading order
 
-1. [developpement.md](developpement.md) — l'arborescence, les commandes, les pièges d'outillage. À garder ouvert.
-2. [invariants.md](invariants.md) — `INV-1`…`INV-10`, les contraintes non négociables. À relire.
-3. [pratiques.md](pratiques.md) — la frontière avec le système, les niveaux de test, les erreurs, la mise en page, le cycle de livraison.
-4. [clean-code.md](clean-code.md) — comment s'écrit l'intérieur d'une unité, et ce que l'outillage fait respecter.
-5. [conventions.md](conventions.md) — nommage, langue, commentaires, commits.
+1. [development.md](development.md) — the source tree, the commands, the tooling pitfalls. Keep it open.
+2. [invariants.md](invariants.md) — `INV-1`…`INV-10`, the non-negotiable constraints. Reread them.
+3. [practices.md](practices.md) — the boundary with the system, the test levels, errors, page layout, the delivery cycle.
+4. [clean-code.md](clean-code.md) — how the inside of a unit is written, and what the tooling enforces.
+5. [conventions.md](conventions.md) — naming, language, comments, commits.
+6. [glossary.md](glossary.md) — each domain term, as the format writes it and as the code names it.
 
-## Par tâche
+## By task
 
-| Pour…                                     | Ouvrir                                                                |
-| ----------------------------------------- | --------------------------------------------------------------------- |
-| Ajouter une vue ou une route              | [developpement.md](developpement.md#ajouter-une-vue)                  |
-| Parler au système (secret, lien, fichier) | [pratiques.md](pratiques.md#la-frontière-avec-le-système)             |
-| Écrire un test                            | [pratiques.md](pratiques.md#les-tests)                                |
-| Lancer un test seul, ou en veille         | [developpement.md](developpement.md#les-gestes-courants)              |
-| Consommer ce dépôt comme un paquet        | [developpement.md](developpement.md#le-paquet)                        |
-| Ajouter un point d'extension              | [pratiques.md](pratiques.md#ce-qui-tient-au-livrable--les-extensions) |
+| To…                                     | Open                                                                    |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| Add a view or a route                   | [development.md](development.md#adding-a-view)                          |
+| Talk to the system (secret, link, file) | [practices.md](practices.md#the-boundary-with-the-system)               |
+| Write a test                            | [practices.md](practices.md#tests)                                      |
+| Run a single test, or in watch mode     | [development.md](development.md#everyday-tasks)                         |
+| Consume this repo as a package          | [development.md](development.md#the-package)                            |
+| Add an extension point                  | [practices.md](practices.md#what-belongs-to-the-deliverable-extensions) |
+| Name a domain concept                   | [glossary.md](glossary.md)                                              |
 
-## Ce qui n'est pas ici
+## What is not here
 
-- **Les décisions produit** : le référentiel de SSK Canon, [ssk-it/ssk-canon](https://github.com/ssk-it/ssk-canon), décrit dans son propre format. Le consulter par le skill `consulter-referentiel` avant toute évolution fonctionnelle. Skanon y est le produit : le cadrage livré [ssk-canon#2026-051](https://ssk-canon.s3-website.fr-par.scw.cloud/ssk-it/ssk-canon/cadrages/2026-051) en fait l'application qui remplace ssk-canon-pwa, sous le seul nom de Skanon (`ADR-application-de-bureau`).
-- **L'application de bureau** : son cœur natif, son adaptateur, ses extensions, sa publication et son déploiement vivent dans un dépôt privé, qui consomme ce dépôt comme un paquet épinglé (ADR-extensions-commerciales). Le déploiement de la version web s'y fait aussi, pour l'instant.
-- **La lecture du format** : la bibliothèque [`@ssk-it/canon-check`](https://github.com/ssk-it/ssk-canon-action), commune à l'application et à l'automatisation (`INV-7`).
+- **Product decisions**: the SSK Canon specification, [ssk-it/ssk-canon](https://github.com/ssk-it/ssk-canon), described in its own format. Consult it through the `consulter-referentiel` skill before any functional change. Skanon is the product there: the delivered scoping [ssk-canon#2026-051](https://ssk-canon.s3-website.fr-par.scw.cloud/ssk-it/ssk-canon/cadrages/2026-051) makes it the application that replaces ssk-canon-pwa, under the single name Skanon (`ADR-application-de-bureau`).
+- **The desktop application**: its native core, its adapter, its extensions, its publishing and its deployment live in a private repo, which consumes this repo as a pinned package (ADR-extensions-commerciales). Deployment of the web version happens there too, for now.
+- **Reading the format**: the [`@ssk-it/canon-check`](https://github.com/ssk-it/ssk-canon-action) library, shared by the application and the automation (`INV-7`).

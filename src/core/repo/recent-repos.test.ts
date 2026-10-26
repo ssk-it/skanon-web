@@ -3,16 +3,16 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RepoConfig, sameRepo, DEFAULT_REPO } from "./repo-config";
 
 /**
- * La liste des dépôts déjà ouverts vit dans le navigateur. Ces cas portent sur
- * ce qui doit rester vrai quand on passe d'un projet à l'autre, et sur ce que
- * le stockage peut rendre de tordu.
+ * The list of already opened repos lives in the browser. These cases cover
+ * what must stay true when moving from one project to another, and the
+ * twisted things storage can return.
  */
-describe("dépôts déjà ouverts", () => {
+describe("already opened repos", () => {
   let config: RepoConfig;
 
-  // Le banc d'essai ne fournit qu'un `localStorage` incomplet, sans `clear` ni
-  // `removeItem`. On en substitue un vrai : ce qui est éprouvé ici est la
-  // mémoire des dépôts, pas la capacité du navigateur à stocker.
+  // The test bench provides only an incomplete `localStorage`, without `clear`
+  // or `removeItem`. A real one is substituted: what is tested here is the
+  // memory of repos, not the browser's ability to store.
   let storage: Record<string, string>;
 
   beforeEach(() => {
@@ -30,16 +30,16 @@ describe("dépôts déjà ouverts", () => {
     config = inject(RepoConfig);
   });
 
-  it("ne retient rien tant qu’aucun dépôt n’a été ouvert", () => {
+  it("remembers nothing until a repo has been opened", () => {
     expect(config.recents()).toEqual([]);
   });
 
-  it("retient un dépôt effectivement ouvert", () => {
+  it("remembers a repo actually opened", () => {
     config.rememberOpened({ owner: "ssk-it", repo: "ssk-canon" });
     expect(config.recents()).toEqual([{ owner: "ssk-it", repo: "ssk-canon" }]);
   });
 
-  it("remonte un dépôt rouvert plutôt que de le dupliquer", () => {
+  it("moves a reopened repo up rather than duplicating it", () => {
     config.rememberOpened({ owner: "a", repo: "un" });
     config.rememberOpened({ owner: "b", repo: "deux" });
     config.rememberOpened({ owner: "a", repo: "un" });
@@ -47,35 +47,35 @@ describe("dépôts déjà ouverts", () => {
     expect(config.recents().map((d) => d.repo)).toEqual(["un", "deux"]);
   });
 
-  it("reconnaît le même dépôt quelle que soit la casse", () => {
-    // La plateforme ne distingue pas la casse : deux entrées pour un seul dépôt
-    // proposeraient deux fois la même chose.
+  it("recognises the same repo whatever the case", () => {
+    // The platform is case-insensitive: two entries for a single repo would
+    // offer the same thing twice.
     config.rememberOpened({ owner: "SSK-IT", repo: "ssk-canon" });
     config.rememberOpened({ owner: "ssk-it", repo: "SSK-Canon" });
     expect(config.recents().length).toBe(1);
   });
 
-  it("oublie un dépôt sans toucher aux autres", () => {
+  it("forgets a repo without touching the others", () => {
     config.rememberOpened({ owner: "a", repo: "un" });
     config.rememberOpened({ owner: "b", repo: "deux" });
     config.forget({ owner: "a", repo: "un" });
     expect(config.recents().map((d) => d.repo)).toEqual(["deux"]);
   });
 
-  it("borne la liste, les plus anciens sortant", () => {
+  it("bounds the list, the oldest dropping out", () => {
     for (let i = 0; i < 20; i++)
       config.rememberOpened({ owner: "o", repo: `d${i}` });
     expect(config.recents().length).toBe(12);
     expect(config.recents()[0].repo).toBe("d19");
   });
 
-  it("survit à un stockage corrompu, sans empêcher l’application de démarrer", () => {
+  it("survives corrupted storage, without preventing the application from starting", () => {
     storage["ssk-canon.depots-recents"] = "ceci n’est pas du JSON";
     resetInjection();
     expect(inject(RepoConfig).recents()).toEqual([]);
   });
 
-  it("écarte les entrées incomplètes qu’une ancienne version aurait laissées", () => {
+  it("leaves out incomplete entries an older version may have left", () => {
     storage["ssk-canon.depots-recents"] = JSON.stringify([
       { owner: "ssk-it" },
       { owner: "ssk-it", repo: "ssk-canon" },
@@ -86,13 +86,13 @@ describe("dépôts déjà ouverts", () => {
     ]);
   });
 
-  it("garde le dépôt par défaut quand rien n’est mémorisé", () => {
+  it("keeps the default repo when nothing is remembered", () => {
     expect(config.repoRef()).toEqual(DEFAULT_REPO);
   });
 });
 
-describe("identité d’un dépôt", () => {
-  it("ignore la casse des deux côtés", () => {
+describe("identity of a repo", () => {
+  it("ignores case on both sides", () => {
     expect(sameRepo({ owner: "A", repo: "B" }, { owner: "a", repo: "b" })).toBe(
       true,
     );

@@ -1,8 +1,8 @@
 <script lang="ts">
 /**
- * Première phrase de l'énoncé, débarrassée du Markdown le plus courant.
+ * First sentence of the statement, stripped of the most common Markdown.
  *
- * Les énoncés sont coupés vers 80 colonnes : le premier paragraphe se recolle avant d'y chercher la fin de phrase, un point suivi d'un blanc.
+ * Statements are wrapped at around 80 columns: the first paragraph is rejoined before looking for the end of the sentence, a period followed by whitespace.
  */
 export function buildExcerpt(statement: string): string {
   const paragraph =
@@ -121,7 +121,7 @@ h1 {
   font-weight: 400;
   letter-spacing: -0.015em;
 }
-/* RG-mesure-de-lecture : le titre et sa description partagent la mesure ; les listes qui suivent gardent leur largeur. */
+/* RG-mesure-de-lecture: the title and its description share the measure; the lists that follow keep their width. */
 .entete {
   margin-bottom: 36px;
   max-width: var(--pc-mesure);

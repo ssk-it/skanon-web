@@ -1,43 +1,43 @@
 /**
- * Une teinte par domaine, distincte pour chacun et stable dans le temps.
+ * One hue per domain, distinct for each and stable over time.
  *
- * Le référentiel ne déclare aucune couleur, et il ne doit pas avoir à le faire :
- * ce serait un réglage de plus à tenir, dans un fichier qui décrit le produit et
- * non son affichage.
+ * The specification declares no colour, and it must not have to:
+ * that would be one more setting to maintain, in a file that describes the product and
+ * not its display.
  *
- * La couleur porte ici de l'information : elle dit à quel domaine appartient ce
- * qu'on regarde, sur des écrans où fonctionnalités et règles se ressemblent
- * toutes. Elle ne remplace jamais le nom, qui reste écrit à côté.
+ * Colour carries information here: it says which domain what one is looking at
+ * belongs to, on screens where features and rules all look
+ * alike. It never replaces the name, which stays written next to it.
  *
- * **Pourquoi pas une empreinte du slug.** C'était la première version, et elle
- * était fausse : projeter une empreinte sur douze teintes rend les collisions
- * probables bien avant d'avoir douze domaines — 40 % dès quatre, par le paradoxe
- * des anniversaires. Le dépôt de référence en donnait aussitôt l'exemple, avec
- * « persistance » et « referentiel » de la même couleur. Une meilleure fonction
- * de hachage n'y aurait rien changé : le défaut est dans le modulo, pas dans le
- * hachage.
+ * **Why not a fingerprint of the slug.** That was the first version, and it
+ * was wrong: projecting a fingerprint onto twelve hues makes collisions
+ * likely well before having twelve domains — 40 % from four, by the birthday
+ * paradox. The reference repo immediately gave an example of it, with
+ * « persistance » and « referentiel » in the same colour. A better hash
+ * function would have changed nothing: the defect is in the modulo, not in the
+ * hash.
  *
- * Les teintes sont donc attribuées **par rang** : les domaines sont ordonnés par
- * identifiant, et l'espace des teintes est réparti entre eux. Deux domaines ont
- * ainsi toujours deux couleurs, et d'autant plus éloignées qu'ils sont peu
- * nombreux.
+ * Hues are therefore assigned **by rank**: domains are ordered by
+ * identifier, and the hue space is divided among them. Two domains thus
+ * always have two colours, and the further apart the fewer
+ * they are.
  */
 
 /**
- * Origine de la roue, en degrés.
+ * Origin of the wheel, in degrees.
  *
- * Un bleu, pour que le premier domaine d'un dépôt s'accorde au primaire du
- * thème plutôt que de jurer avec.
+ * A blue, so that a repo's first domain matches the theme's primary
+ * rather than clashing with it.
  */
 const HUE_ORIGIN = 235;
 
 /**
- * La bande écartée, en degrés : les jaunes verdâtres.
+ * The excluded band, in degrees: the greenish yellows.
  *
- * Vérifié à l'écran, non supposé : à la clarté du thème clair, un domaine tombé
- * sur 115° rendait un olive terne, nettement plus sale que ses voisins. Réduire
- * l'amplitude de la roue ne suffisait pas — cela ne fait que déplacer l'endroit
- * où elle tombe. La bande est donc franchement sautée.
+ * Checked on screen, not assumed: at the light theme's lightness, a domain that fell
+ * on 115° gave a dull olive, clearly dirtier than its neighbours. Reducing
+ * the wheel's amplitude was not enough — it only moves the place
+ * where it falls. The band is therefore skipped outright.
  */
 const EXCLUDED_START = 95;
 const EXCLUDED_END = 155;
@@ -45,26 +45,26 @@ const EXCLUDED_WIDTH = EXCLUDED_END - EXCLUDED_START;
 const USABLE = 360 - EXCLUDED_WIDTH;
 
 /**
- * Teinte d'un domaine à un rang donné, parmi `total` domaines.
+ * Hue of a domain at a given rank, among `total` domains.
  *
- * La répartition se fait sur la roue amputée de la bande exclue, puis la teinte
- * est replacée : ainsi les couleurs restent également espacées, et aucune ne
- * tombe dans la zone illisible.
+ * The distribution is done on the wheel minus the excluded band, then the hue
+ * is put back in place: so the colours stay evenly spaced, and none
+ * falls in the unreadable zone.
  */
 export function hueAtRank(rank: number, total: number): number {
   if (total <= 0) return HUE_ORIGIN;
   const step = USABLE / Math.max(total, 1);
-  // Position sur la roue utile, comptée depuis l'origine.
+  // Position on the usable wheel, counted from the origin.
   const raw = (HUE_ORIGIN - EXCLUDED_END + rank * step + USABLE) % USABLE;
   return Math.round((EXCLUDED_END + raw) % 360);
 }
 
 /**
- * Le rang de chaque domaine, par identifiant croissant.
+ * The rank of each domain, by ascending identifier.
  *
- * L'ordre alphabétique des slugs plutôt que celui du chargement : ce dernier
- * dépend de l'arborescence renvoyée par la plateforme, et une couleur qui
- * changerait au gré d'un ajout de fichier ne serait plus un repère.
+ * The alphabetical order of slugs rather than the loading order: the latter
+ * depends on the tree returned by the platform, and a colour that
+ * changed whenever a file was added would no longer be a landmark.
  */
 export function domainRanks(
   ids: readonly string[],
@@ -73,26 +73,26 @@ export function domainRanks(
   return new Map(sorted.map((id, i) => [id, i]));
 }
 
-/** La teinte d'un domaine, en degrés, parmi l'ensemble des domaines du dépôt. */
+/** A domain's hue, in degrees, among all the repo's domains. */
 export function domainHue(id: string, all: readonly string[]): number {
   const ranks = domainRanks(all);
   const rank = ranks.get(id);
-  // Un domaine inconnu de la liste — un rattachement qui pointe vers un fichier
-  // absent — garde une couleur neutre plutôt que d'en emprunter une autre.
+  // A domain unknown to the list — an attachment pointing to a missing
+  // file — keeps a neutral colour rather than borrowing another one.
   if (rank === undefined) return HUE_ORIGIN;
   return hueAtRank(rank, ranks.size);
 }
 
 /**
- * Les variables CSS portant la couleur d'un domaine.
+ * The CSS variables carrying a domain's colour.
  *
- * Rendues en `oklch`, dont la clarté est perceptuelle : à clarté égale, toutes
- * les teintes pèsent le même poids visuel. En `hsl`, un jaune et un bleu de même
- * « luminosité » n'ont pas du tout le même contraste, et il aurait fallu
- * corriger chaque teinte à la main.
+ * Rendered in `oklch`, whose lightness is perceptual: at equal lightness, all
+ * hues carry the same visual weight. In `hsl`, a yellow and a blue of the same
+ * "lightness" do not have the same contrast at all, and each hue would have
+ * had to be corrected by hand.
  *
- * Les valeurs sont posées en style inline : les teintes ne sont pas connues à la
- * compilation, elles dépendent des domaines du dépôt ouvert.
+ * The values are set as inline style: the hues are not known at
+ * compile time, they depend on the open repo's domains.
  */
 export function domainStyle(
   id: string,

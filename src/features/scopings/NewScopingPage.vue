@@ -14,9 +14,9 @@ import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
 
 /**
- * Ouverture d'un cadrage.
+ * Opening a scoping.
  *
- * Le formulaire ne demande que ce qu'un cadrage doit porter dès sa création : un titre, ce qu'il vise, et le parcours attendu. Les décisions, les impacts et les énoncés se rédigent ensuite, au fil de la relecture — les exiger d'emblée confondrait l'ouverture d'un sujet avec sa conclusion.
+ * The form asks only for what a scoping must carry from its creation: a title, what it aims at, and the expected journey. Decisions, impacts and statements are written afterwards, as the review goes — requiring them up front would confuse opening a subject with concluding it.
  */
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
@@ -36,9 +36,9 @@ const error = ref<string | null>(null);
 const knownDomains = computed(() => store.domains().map((d) => d.id));
 
 /**
- * Ce qui manque encore, nommé plutôt que signalé par un bouton inerte.
+ * What is still missing, named rather than signalled by an inert button.
  *
- * Un bouton désactivé sans explication laisse le rédacteur chercher lequel des quatre champs le bloque.
+ * A disabled button with no explanation leaves the author searching for which of the four fields blocks it.
  */
 const missing = computed(() => {
   const absent = [
@@ -67,7 +67,7 @@ async function create(): Promise<void> {
       journey: journey.value,
     });
 
-    // Le cadrage vit sur sa branche, invisible du référentiel chargé : on renvoie vers la demande de fusion, qui est l'endroit où il se relit et se commente jusqu'à sa livraison. Par l'ouvreur de la plateforme : dans l'application de bureau, `window.open` ne mène nulle part.
+    // The scoping lives on its branch, invisible from the loaded specification: we send the user to the pull request, which is where it is reviewed and commented on until its delivery. Through the platform's opener: in the desktop application, `window.open` leads nowhere.
     void opener.open(cree.url);
     await router.push(links.path("cadrages"));
   } catch (e) {

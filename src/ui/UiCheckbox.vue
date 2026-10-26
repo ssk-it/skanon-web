@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * Une case à cocher : `mat-checkbox`.
+ * A checkbox: `mat-checkbox`.
  *
  * ```vue
- * <UiCaseACocher v-model="parApi">Charger les contenus par l’API</UiCaseACocher>
+ * <UiCheckbox v-model="viaApi">Charger les contenus par l’API</UiCheckbox>
  * ```
  *
- * Une vraie case `<input type="checkbox">`, rendue invisible sous le dessin de Material 3 : le clavier, le libellé cliquable et les lecteurs d'écran restent ceux du navigateur.
+ * A real `<input type="checkbox">`, made invisible under the Material 3 drawing: the keyboard, the clickable label and screen readers remain the browser's.
  */
 const checked = defineModel<boolean>({ default: false });
 

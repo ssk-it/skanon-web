@@ -12,9 +12,9 @@ import {
 } from "../model/model";
 
 /**
- * La comparaison répond à « qu'a fait ce trimestre ? », pas « qu'existe-t-il ? ».
- * Une règle inchangée ne doit donc produire aucune entrée : lister l'immobile
- * noierait ce qui a bougé, et c'est ce qui a bougé qu'on est venu chercher.
+ * The comparison answers "what did this quarter do?", not "what exists?".
+ * An unchanged rule must therefore produce no entry: listing what stayed still
+ * would drown what moved, and what moved is what one came looking for.
  */
 function rule(
   id: string,
@@ -41,10 +41,10 @@ function scoping(id: string, status: ScopingStatus): Scoping {
 }
 
 /**
- * Réglages qu'un projet obtient sans rien déclarer.
+ * Settings a project gets without declaring anything.
  *
- * Nommés une fois : ces tests portent sur la comparaison, non sur les réglages,
- * et chaque champ ajouté à `ReglagesProjet` les cassait un à un.
+ * Named once: these tests are about the comparison, not about settings,
+ * and each field added to `ProjectSettings` broke them one by one.
  */
 const MINIMAL_SETTINGS = {
   access: "jeton_personnel",
@@ -67,24 +67,24 @@ function specification(rules: Rule[], scopings: Scoping[] = []): Specification {
   };
 }
 
-describe("comparaison de deux états du référentiel", () => {
-  it("ignore une règle dont l’énoncé n’a pas bougé", () => {
+describe("comparison of two states of the specification", () => {
+  it("ignores a rule whose statement has not moved", () => {
     const before = specification([rule("RG-a", "texte")]);
     const after = specification([rule("RG-a", "texte")]);
 
     expect(compareRules(before, after)).toEqual([]);
   });
 
-  it("ne retient pas une différence d’espaces en fin de texte", () => {
-    // le format ajoute une ligne vide finale à l'écriture : la propagation
-    // produirait sinon une modification à chaque exécution
+  it("does not keep a difference in trailing whitespace", () => {
+    // the format adds a final blank line on write: propagation
+    // would otherwise produce a modification on each run
     const before = specification([rule("RG-a", "texte")]);
     const after = specification([rule("RG-a", "texte\n")]);
 
     expect(compareRules(before, after)).toEqual([]);
   });
 
-  it("signale une règle apparue", () => {
+  it("flags a rule that appeared", () => {
     const before = specification([]);
     const after = specification([rule("RG-a", "texte")]);
 
@@ -93,7 +93,7 @@ describe("comparaison de deux états du référentiel", () => {
     expect(gap.before).toBeNull();
   });
 
-  it("signale une règle dont l’énoncé a changé", () => {
+  it("flags a rule whose statement changed", () => {
     const before = specification([rule("RG-a", "ancien")]);
     const after = specification([rule("RG-a", "nouveau")]);
 
@@ -103,16 +103,16 @@ describe("comparaison de deux états du référentiel", () => {
     expect(gap.after?.statement).toBe("nouveau");
   });
 
-  it("préfère l’abrogation à la modification quand les deux surviennent", () => {
-    // une abrogation réécrit presque toujours l'énoncé pour dire pourquoi :
-    // rapporter « modifiée » masquerait le changement de plus grande portée
+  it("prefers repeal over modification when both occur", () => {
+    // a repeal almost always rewrites the statement to say why:
+    // reporting « modifiée » would mask the change with the widest reach
     const before = specification([rule("RG-a", "ancien")]);
     const after = specification([rule("RG-a", "ne s’applique plus", "abroge")]);
 
     expect(compareRules(before, after)[0].evolution).toBe("abrogee");
   });
 
-  it("signale une règle disparue, bien que ce soit une anomalie", () => {
+  it("flags a disappeared rule, although it is an anomaly", () => {
     const before = specification([rule("RG-a", "texte")]);
     const after = specification([]);
 
@@ -121,7 +121,7 @@ describe("comparaison de deux états du référentiel", () => {
     expect(gap.after).toBeNull();
   });
 
-  it("trie les écarts par identifiant, indépendamment de leur nature", () => {
+  it("sorts the differences by identifier, regardless of their kind", () => {
     const before = specification([rule("RG-z", "ancien")]);
     const after = specification([
       rule("RG-a", "neuf"),
@@ -135,29 +135,29 @@ describe("comparaison de deux états du référentiel", () => {
   });
 });
 
-describe("cadrages livrés entre deux bornes", () => {
-  it("retient un cadrage passé à livré", () => {
+describe("scopings delivered between two bounds", () => {
+  it("keeps a scoping that moved to delivered", () => {
     const before = specification([], [scoping("2026-001", "en_relecture")]);
     const after = specification([], [scoping("2026-001", "livree")]);
 
     expect(listScopingsDeliveredBetween(before, after)).toEqual(["2026-001"]);
   });
 
-  it("ignore un cadrage déjà livré à la borne de départ", () => {
+  it("ignores a scoping already delivered at the start bound", () => {
     const before = specification([], [scoping("2026-001", "livree")]);
     const after = specification([], [scoping("2026-001", "livree")]);
 
     expect(listScopingsDeliveredBetween(before, after)).toEqual([]);
   });
 
-  it("retient un cadrage apparu et livré dans l’intervalle", () => {
+  it("keeps a scoping that appeared and was delivered within the interval", () => {
     const before = specification([], []);
     const after = specification([], [scoping("2026-002", "livree")]);
 
     expect(listScopingsDeliveredBetween(before, after)).toEqual(["2026-002"]);
   });
 
-  it("ignore un cadrage apparu mais non livré", () => {
+  it("ignores a scoping that appeared but was not delivered", () => {
     const before = specification([], []);
     const after = specification([], [scoping("2026-002", "brouillon")]);
 

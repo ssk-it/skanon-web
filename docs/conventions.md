@@ -1,40 +1,48 @@
 # Conventions
 
-## La règle en une phrase
+## The rule in one sentence
 
-**Le vocabulaire métier reste en français, partout ; la mécanique reste en anglais.** Un terme du domaine — cadrage, référentiel, règle, fonctionnalité, domaine, impact, décision, statut, jeton, coffre — ne se traduit jamais, pas même dans un nom de variable : le client parle de « cadrages », et le code aussi. Tout ce qui n'appartient pas au domaine — verbes, structures, types techniques, plateforme — s'écrit en anglais, comme le reste de l'écosystème.
+**Code, identifiers, comments, documentation and commit messages are in English, domain vocabulary included, following [glossary.md](glossary.md).** A domain term — scoping, specification, rule, feature, domain, impact, decision, status, token, vault — takes the English name the glossary gives it, and only that one: a `scoping` is never also a `framing` or a `proposal`, so that a search for one word finds every use. The glossary keeps, next to each English term, the French term the format and the interface write, so that a word read on screen or in a file leads to its code.
 
-C'est la convention de SSK Canon, reprise telle quelle : le cœur porté garde ses noms, et une recherche dans l'un retrouve l'autre.
+## What stays in French
 
-## Méthodes et fonctions
+What the code does not own, and the names it shares with it.
 
-`verbeAnglais` + `TermeMétierFrançais`, en camelCase : `loadReferentiel()`, `findRegleById(id)`, `saveJetons(jetons)`. Un verbe sans complément métier reste anglais : `retry()`, `open(url)`.
+- **What the user reads**: interface texts, in templates, until internationalisation. They are the product's text, addressed to French-speaking authors; translating them is a product decision, which will come with an i18n mechanism, not a by-product of renaming.
+- **What the SSK Canon format reads or writes**: YAML keys (`cree_par`, `option_retenue`, `depots_code`), status and operation values (`"brouillon"`, `"livree"`, `"cree"`, `"abroge"`), folder names (`cadrages/`, `identite/`), and routes that mirror the addresses of the published site (`…/cadrages/2026-001`). The format is shared with `@ssk-it/canon-check`, the automation and every existing project repo, and its addresses are cited in issues and scopings: renaming on our side alone would make the application unable to read existing repos, and break links already written (`INV-1`, `INV-7`).
+- **Slot names and union-type values shared with the format** — the values of `ScopingStatus`, `ImpactOperation`, `HelpSection`, `VaultWrite`, the `"bureau"` / `"web"` target. They are the format's values, or are compared with them; a later pass may translate those that do not leave the code, with a mapping at the edge.
 
-Verbes retenus : `load` (lire depuis GitHub, le stockage ou le coffre), `parse` / `serialize`, `build` (assembler en mémoire), `find` (rend `null` si absent), `get` (lève si absent), `list` (rend un tableau), `save` / `commit` (écrire), `delete`, `upload`, `apply`, `validate` (rend des erreurs), `assert` (lève), `format`, `is` / `has`, `to` (conversion), `create` (fabriquer un objet neuf), `listen`.
+The persisted formats on the user's machine also keep their names ([practices.md](practices.md#the-boundary-with-the-system)): renaming them would lose what is already stored.
 
-## Types et champs
+## Methods and functions
 
-- Types métier : le terme français en PascalCase, sans accent — `Cadrage`, `Regle`, `CoffreDeJetons`. Types techniques : anglais — `HttpClient`, `HttpErrorResponse`.
-- Champs : ceux du frontmatter qu'ils décrivent, en camelCase là où le YAML est en snake_case (`cree_par` → `creePar`).
-- **Pas d'accents ni de cédilles dans les identifiants**. Les accents sont pour le contenu, les libellés et les commentaires.
+`englishVerb` + `DomainTerm`, in camelCase: `loadSpecification()`, `findRule(id)`, `saveTokens(tokens)`. A verb without a domain complement stays on its own: `retry()`, `open(url)`.
 
-## Fichiers
+Chosen verbs: `load` (read from GitHub, storage or the vault), `parse` / `serialize`, `build` (assemble in memory), `find` (returns `null` if absent), `get` (throws if absent), `list` (returns an array), `save` / `commit` (write), `delete`, `upload`, `apply`, `validate` (returns errors), `assert` (throws), `format`, `is` / `has`, `to` (conversion), `create` (make a new object), `listen`.
 
-- Composants Vue : PascalCase, suffixe du rôle — `CadragePage.vue`, `StatutChip.vue`.
-- Le reste : kebab-case — `github-client.ts`, `referentiel.store.ts`. Un test à côté de ce qu'il éprouve : `referentiel.store.test.ts`.
+## Types and fields
+
+- Domain types: the glossary term in PascalCase — `Scoping`, `Rule`, `TokenVault`. Technical types: as the platform names them — `HttpClient`, `HttpErrorResponse`.
+- Fields: those of the frontmatter they describe, under their glossary name, in camelCase (`cree_par` → `createdBy`). The mapping between the YAML key and the field is made where the file is read and written, never elsewhere.
+- **No accents or cedillas in identifiers.** Accents are for content and labels.
+
+## Files
+
+- Vue components: PascalCase, with a role suffix — `ScopingPage.vue`, `StatusChip.vue`.
+- Everything else: kebab-case — `github-client.ts`, `specification.store.ts`. A test sits next to what it exercises: `known-repos.test.ts` beside `known-repos.service.ts`.
 
 ## Interface
 
-Tout ce que l'utilisateur lit est en français, accents compris, dans les gabarits — jamais en dur dans la logique d'un service.
+Everything the user reads is in French, accents included, in templates — never hard-coded in a service's logic.
 
-## Commentaires
+## Comments
 
-En français. Ils disent le **pourquoi** — la contrainte, l'invariant, l'option écartée —, jamais le quoi. Un commentaire qui paraphrase la ligne suivante se supprime. Ils citent l'invariant (`INV-7`) ou la règle de gestion (`RG-dernier-etat-connu`) plutôt que de la reformuler.
+In English. They state the **why** — the constraint, the invariant, the rejected option —, never the what. A comment that paraphrases the next line is deleted. They cite the invariant (`INV-7`) or the business rule (`RG-dernier-etat-connu`) rather than rephrasing it.
 
 ## Commits
 
-Impératif présent, en anglais, préfixe de portée quand il aide : `core:`, `ui:`, `web:`, `ci:`, `docs:`. Le corps dit pourquoi, à 72 colonnes.
+Present imperative, in English, with a scope prefix when it helps: `core:`, `ui:`, `web:`, `ci:`, `docs:`. The body says why, at 72 columns.
 
 ## Documentation
 
-Les fichiers Markdown ne coupent pas leurs lignes : un paragraphe tient sur une ligne. `proseWrap: "preserve"` dans `.prettierrc.json`.
+In English. Markdown files do not wrap their lines: a paragraph fits on one line. `proseWrap: "preserve"` in `.prettierrc.json`.

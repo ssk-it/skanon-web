@@ -7,9 +7,9 @@ import process from "node:process";
 import { pwa } from "./tools/pwa/pwa";
 
 /**
- * Le commit construit, que la barre du bas affiche comme version du site. Celui de GitHub Actions d'abord, qui désigne ce qu'on a demandé de déployer ; sinon celui de la copie de travail. Une construction hors d'un dépôt n'a pas de version à dire, et ne doit pas échouer pour autant.
+ * The built commit, which the bottom bar shows as the site's version. GitHub Actions' one first, which designates what was asked to be deployed; otherwise the working copy's. A build outside a repo has no version to tell, and must not fail for all that.
  */
-function commitConstruit(): string {
+function builtCommit(): string {
   const sha = process.env.GITHUB_SHA;
   if (sha) return sha.slice(0, 7);
   try {
@@ -23,25 +23,25 @@ function commitConstruit(): string {
 }
 
 /**
- * La version web statique (`pnpm build:web`, dans `dist-web/`), servie par n'importe quel hébergement de fichiers, depuis sa racine de composition `src/main.ts`. L'application de bureau, qui vit dans un dépôt privé, construit ce même code depuis sa propre racine, avec sa propre configuration.
+ * The static web version (`pnpm build:web`, in `dist-web/`), served by any file hosting, from its composition root `src/main.ts`. The desktop application, which lives in a private repo, builds this same code from its own root, with its own configuration.
  */
 export default defineConfig({
   plugins: [vue(), pwa()],
   define: {
-    "import.meta.env.VITE_CIBLE": JSON.stringify("web"),
-    "import.meta.env.VITE_VERSION": JSON.stringify(commitConstruit()),
+    "import.meta.env.VITE_TARGET": JSON.stringify("web"),
+    "import.meta.env.VITE_VERSION": JSON.stringify(builtCommit()),
   },
 
   server: {
     port: 1430,
     strictPort: true,
-    // Sous le magasin global de pnpm, `node_modules` mène hors du dépôt : sans cela, le serveur refuse d'y servir une police (403), qui manque sans erreur visible.
+    // Under pnpm's global store, `node_modules` leads outside the repo: without this, the server refuses to serve a font from there (403), which goes missing with no visible error.
     fs: { allow: [searchForWorkspaceRoot(process.cwd()), "../.."] },
   },
 
   build: {
     outDir: "dist-web",
-    // Les petites images intégrées en `data:` seraient refusées par une politique de sécurité du contenu `default-src 'self'`, comme celle de l'application de bureau.
+    // Small images inlined as `data:` would be refused by a `default-src 'self'` content security policy, like the desktop application's.
     assetsInlineLimit: 0,
     target: "es2022",
   },
@@ -56,12 +56,12 @@ export default defineConfig({
           include: ["src/**/*.test.ts"],
           exclude: ["src/**/*.browser.test.ts"],
           setupFiles: ["src/test-setup.ts"],
-          // Le premier test d'un fichier paie l'import à froid de ce qu'il monte — une page, ses routes, parfois Mermaid —, et la suite tourne en parallèle : sous cette charge, ce premier import dépassait les 5 s par défaut (constaté une fois sur dix). Un test lent pour une autre raison reste borné.
+          // The first test of a file pays for the cold import of what it mounts — a page, its routes, sometimes Mermaid —, and the suite runs in parallel: under that load, this first import exceeded the default 5 s (observed one time in ten). A test slow for another reason stays bounded.
           testTimeout: 15_000,
         },
       },
       /**
-       * Ce que jsdom ne met pas en page — disposition, défilement, polices —, dans le moteur le plus proche de WKWebView, sans fenêtre : WebKit de Playwright, sans tête.
+       * What jsdom does not lay out — layout, scrolling, fonts —, in the engine closest to WKWebView, without a window: Playwright's WebKit, headless.
        */
       {
         extends: true,

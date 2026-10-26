@@ -6,11 +6,11 @@ import {
 } from "@ssk-it/canon-check/identite";
 
 /**
- * Les noms de l'identité d'un projet sont des règles du format : ils viennent
- * de la bibliothèque que la vérification applique aussi (RG-parseur-partage).
- * Les tenir ici à part ferait diverger les deux listes, et un fichier que la
- * vérification accepte ne s'afficherait pas. Ne reste propre à l'application
- * que le choix du fichier à montrer selon le fond (RG-identite-affichee).
+ * The names of a project's identity are rules of the format: they come
+ * from the library the check also applies (RG-parseur-partage).
+ * Keeping them here separately would make the two lists diverge, and a file the
+ * check accepts would not display. All that remains specific to the application
+ * is the choice of the file to show depending on the background (RG-identite-affichee).
  */
 export {
   FORMATS_IDENTITE,
@@ -25,12 +25,12 @@ export type IdentityVariant = (typeof VARIANTES_IDENTITE)[number];
 export type IdentityFormat = (typeof FORMATS_IDENTITE)[number];
 
 /**
- * Les fichiers qui peuvent porter le symbole sur un fond, du meilleur au
- * moins bon.
+ * The files that can carry the symbol on a background, from best to
+ * worst.
  *
- * La variante de l'autre fond n'y figure pas : un symbole clair sur fond
- * sombre peut disparaître, et l'avatar de l'organisation vaut mieux qu'une
- * identité illisible (RG-identite-affichee).
+ * The other background's variant is not among them: a light symbol on a dark
+ * background can disappear, and the organization's avatar is better than an
+ * unreadable identity (RG-identite-affichee).
  */
 export function listSymbolCandidates(variant: IdentityVariant): string[] {
   return [`symbole-${variant}`, "symbole"].flatMap((base) =>
@@ -39,10 +39,10 @@ export function listSymbolCandidates(variant: IdentityVariant): string[] {
 }
 
 /**
- * Un fichier de `identite/`, chemin relatif au répertoire, tel que
- * l'arborescence de la plateforme le donne — avec son empreinte, que la
- * vérification n'a pas à connaître. Distinct du `FichierIdentite` de la
- * bibliothèque (`chemin`, `taille`), qui décrit ce qu'elle contrôle.
+ * A file of `identite/`, path relative to the directory, as the
+ * platform's tree gives it — with its fingerprint, which the
+ * check does not need to know. Distinct from the library's `FichierIdentite`
+ * (`chemin`, `taille`), which describes what it checks.
  */
 export interface IdentityFile {
   readonly path: string;
@@ -51,11 +51,11 @@ export interface IdentityFile {
 }
 
 /**
- * Le fichier à montrer comme symbole sur ce fond, parmi ceux que le
- * répertoire contient.
+ * The file to show as the symbol on this background, among those the
+ * directory contains.
  *
- * Un fichier au-delà de la borne est écarté : la vérification le refuse, et
- * le télécharger ferait payer à l'accueil le poids qu'elle existe pour éviter.
+ * A file beyond the limit is set aside: the check refuses it, and
+ * downloading it would make the home page pay the weight the limit exists to avoid.
  */
 export function chooseSymbol<F extends IdentityFile>(
   files: readonly F[],
@@ -75,10 +75,10 @@ const TYPES: Record<IdentityFormat, string> = {
 };
 
 /**
- * Le type d'image d'un fichier, d'après son nom.
+ * The image type of a file, from its name.
  *
- * Le canal non décompté sert tout en `text/plain` : sans un type déclaré,
- * l'image ne s'afficherait pas.
+ * The uncounted channel serves everything as `text/plain`: without a declared type,
+ * the image would not display.
  */
 export function formatImageType(path: string): string | null {
   const name = lireNomIdentite(path);

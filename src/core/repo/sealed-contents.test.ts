@@ -5,7 +5,7 @@ import type { Cipher } from "../../platform/ports";
 import { ContentCache, KnownState, INDEXEDDB_FACTORY } from "./content-cache";
 
 /**
- * Un chiffreur simulé, réversible sous sa seule clé : il suffit à éprouver que le cache ne range que des scellés, et qu'un scellé ne s'ouvre que sous la clé qui l'a fait. Le vrai chiffrement est éprouvé avec le coffre (`web-scellement.test.ts`).
+ * A simulated cipher, reversible under its own key only: it is enough to test that the cache stores only sealed items, and that a sealed item opens only under the key that made it. The real encryption is tested with the vault (`web-sealing.test.ts`).
  */
 function cipher(key: string): Cipher {
   return {
@@ -17,7 +17,7 @@ function cipher(key: string): Cipher {
   };
 }
 
-/** Tout ce que le stockage du navigateur garde, d'un bloc, comme le lirait un programme qui ouvre le profil. */
+/** Everything the browser's storage keeps, in one block, as a program opening the profile would read it. */
 async function raw(factory: IDBFactory): Promise<string> {
   const db = await new Promise<IDBDatabase>((end) => {
     const d = factory.open("ssk-canon.cache");
@@ -38,9 +38,9 @@ async function raw(factory: IDBFactory): Promise<string> {
 }
 
 /**
- * RG-contenus-prives-au-repos : les contenus d'un dépôt privé sont gardés sous la même forme que le jeton qui les ouvre. Scellé, le jeton ; scellés, les contenus.
+ * RG-contenus-prives-au-repos: a private repo's contents are kept in the same form as the token that opens them. Sealed, the token; sealed, the contents.
  */
-describe("les contenus privés sous la clé de la passkey", () => {
+describe("private contents under the passkey's key", () => {
   const PRIVATE = { owner: "org", repo: "prive" };
   const PUBLIC = { owner: "org", repo: "public" };
   let factory: IDBFactory;
@@ -66,7 +66,7 @@ describe("les contenus privés sous la clé de la passkey", () => {
     factory = new IDBFactory();
   });
 
-  it("ne range d’un dépôt privé que des scellés", async () => {
+  it("stores only sealed items from a private repo", async () => {
     const cache = newVisit();
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
@@ -79,7 +79,7 @@ describe("les contenus privés sous la clé de la passkey", () => {
     expect(stored).not.toContain("RG-secrete");
   });
 
-  it("les rouvre à la visite suivante, sous la même clé", async () => {
+  it("reopens them on the next visit, under the same key", async () => {
     const cache = newVisit();
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
@@ -94,7 +94,7 @@ describe("les contenus privés sous la clé de la passkey", () => {
     expect(await next.loadState(PRIVATE, "HEAD")).toMatchObject(state());
   });
 
-  it("ne les rend pas tant que les jetons sont verrouillés", async () => {
+  it("does not return them while tokens are locked", async () => {
     const cache = newVisit();
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
@@ -107,8 +107,8 @@ describe("les contenus privés sous la clé de la passkey", () => {
     expect(await next.loadContent(PRIVATE, "a1")).toBeNull();
   });
 
-  it("ne range rien d’un dépôt privé tant que les jetons sont verrouillés", async () => {
-    // ni en clair, ce qui défairait la protection, ni scellé, faute de clé
+  it("stores nothing from a private repo while tokens are locked", async () => {
+    // neither in clear, which would undo the protection, nor sealed, for lack of a key
     const cache = newVisit();
     cache.lock();
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
@@ -119,7 +119,7 @@ describe("les contenus privés sous la clé de la passkey", () => {
     expect(await cache.loadContent(PRIVATE, "a1")).toBe("énoncé confidentiel");
   });
 
-  it("ne rend pas un scellé qu’une autre clé a fait", async () => {
+  it("does not return a sealed item another key made", async () => {
     const cache = newVisit();
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
@@ -131,8 +131,8 @@ describe("les contenus privés sous la clé de la passkey", () => {
     expect(await next.loadContent(PRIVATE, "a1")).toBeNull();
   });
 
-  it("garde en clair ce qu’il lit d’un dépôt public", async () => {
-    // rien à protéger : le canal public le sert à quiconque
+  it("keeps in clear what it reads from a public repo", async () => {
+    // nothing to protect: the public channel serves it to anyone
     const cache = newVisit();
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PUBLIC, "b2", "énoncé public", {
@@ -143,7 +143,7 @@ describe("les contenus privés sous la clé de la passkey", () => {
     expect(await newVisit().loadContent(PUBLIC, "b2")).toBe("énoncé public");
   });
 
-  it("efface les scellés d’un dépôt privé avec les autres contenus privés", async () => {
+  it("erases a private repo's sealed items with the other private contents", async () => {
     const cache = newVisit();
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
@@ -156,7 +156,7 @@ describe("les contenus privés sous la clé de la passkey", () => {
     expect(await next.loadContent(PRIVATE, "a1")).toBeNull();
   });
 
-  it("revient au clair quand la clé lui est retirée", async () => {
+  it("goes back to clear when the key is withdrawn from it", async () => {
     const cache = newVisit();
     cache.encryptWith(cipher("k1"));
     cache.encryptWith(null);

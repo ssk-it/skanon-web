@@ -3,18 +3,18 @@ import { computed, ref, useAttrs, useId } from "vue";
 import UiFieldFrame from "./UiFieldFrame.vue";
 
 /**
- * Un champ de saisie : `mat-form-field appearance="outline"` et son `matInput`, ensemble.
+ * A text field: `mat-form-field appearance="outline"` and its `matInput`, together.
  *
  * ```vue
- * <UiChamp v-model="titre" libelle="Titre" indice="Ce que ce cadrage change, en une ligne." />
- * <UiChamp v-model="objectif" libelle="Objectif" multiligne :rows="5" />
- * <UiChamp v-model="saisie" libelle="Jeton" type="password" :erreur="erreur" @keyup.enter="valider()" />
+ * <UiTextField v-model="title" label="Titre" hint="Ce que ce cadrage change, en une ligne." />
+ * <UiTextField v-model="goal" label="Objectif" multiline :rows="5" />
+ * <UiTextField v-model="input" label="Jeton" type="password" :error="error" @keyup.enter="validate()" />
  * ```
  *
- * - Le libellé flotte quand le champ a le focus ou une valeur, comme chez Material ; `libelle-fixe` le tient flottant d'office. Le `placeholder` ne se montre que libellé flottant.
- * - `erreur` (un texte) met le champ en erreur et remplace l'indication ; l'emplacement `#indice` remplace l'indication simple quand elle doit porter un style à elle.
- * - `class` et `style` vont au cadre ; tout autre attribut et tout écouteur (`@keyup.enter`, `@blur`, `aria-*`, `name`, `autocomplete`, `spellcheck`, `data-focus-initial`…) vont à l'`<input>` ou au `<textarea>`.
- * - Largeur : 212 px par défaut, comme `mat-form-field` ; une vue qui le veut pleine largeur lui donne `width: 100%`.
+ * - The label floats when the field has focus or a value, as in Material; `fixed-label` keeps it floating by default. The `placeholder` only shows with the label floating.
+ * - `error` (a text) puts the field in error and replaces the hint; the `#indice` slot replaces the plain hint when it must carry its own style.
+ * - `class` and `style` go to the frame; any other attribute and any listener (`@keyup.enter`, `@blur`, `aria-*`, `name`, `autocomplete`, `spellcheck`, `data-focus-initial`…) go to the `<input>` or the `<textarea>`.
+ * - Width: 212 px by default, like `mat-form-field`; a view that wants it full width gives it `width: 100%`.
  */
 defineOptions({ inheritAttrs: false });
 
@@ -67,9 +67,9 @@ function activate(): void {
 }
 
 defineExpose({
-  /** Donne le focus à la saisie. */
+  /** Gives focus to the input. */
   focus: activate,
-  /** L'élément de saisie, pour qui doit s'y accrocher — `UiAutocompletion`. */
+  /** The input element, for whoever must hook onto it — `UiAutocomplete`. */
   element: control,
 });
 </script>
@@ -117,7 +117,7 @@ defineExpose({
       @focus="focus = true"
       @blur="focus = false"
     />
-    <!-- Ce qui accompagne la saisie dans le cadre : le panneau de UiAutocompletion. -->
+    <!-- What accompanies the input in the frame: the panel of UiAutocomplete. -->
     <slot />
     <template v-if="$slots.indice" #indice><slot name="indice" /></template>
   </UiFieldFrame>

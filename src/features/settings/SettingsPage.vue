@@ -25,17 +25,17 @@ import CodeBlock from "../shared/CodeBlock.vue";
 import ViewState from "../shared/ViewState.vue";
 
 /**
- * Réglages du projet.
+ * Project settings.
  *
- * Ils vivent dans le dépôt, non dans le navigateur : ils valent pour tous ceux qui travaillent sur le projet. Les modifier suit donc le même chemin que n'importe quel changement — une branche, une demande de fusion — plutôt que de prendre effet sans que personne l'ait relu.
+ * They live in the repo, not in the browser: they hold for everyone working on the project. Changing them therefore follows the same path as any other change — a branch, a pull request — rather than taking effect without anyone having reviewed it.
  */
 
 const MODES: AccessMode[] = ["jeton_personnel", "identite_tierce", "relais"];
 
 /**
- * Modes que l'application sait honorer aujourd'hui.
+ * Modes the application can honour today.
  *
- * Les autres sont montrés avec leurs garanties, mais ne se choisissent pas : un projet qui en déclarerait un croirait appliquer un réglage sans effet. La gamme se voit, son avancement aussi.
+ * The others are shown with their guarantees, but cannot be chosen: a project declaring one would believe it applies a setting with no effect. The range is visible, and so is its progress.
  */
 const IMPLEMENTED_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>([
   "jeton_personnel",
@@ -50,21 +50,21 @@ const modes = MODES;
 const modeLabel = (m: AccessMode) => ACCESS_MODE_LABEL[m];
 const guarantees = (m: AccessMode) => GUARANTEES[m];
 const implemented = (m: AccessMode) => IMPLEMENTED_MODES.has(m);
-/** Les valeurs du modèle sont techniques : ce que lit l'utilisateur ne l'est pas. */
+/** The model's values are technical: what the user reads is not. */
 const scopeLabel = (m: AccessMode) =>
   GUARANTEES[m].scope === "chemin" ? "chemin" : "dépôt";
 
 const access = ref<AccessMode>("jeton_personnel");
-/** Ce que le projet demande du jeton personnel dans la version web (RG-protection-du-jeton-par-projet). */
+/** What the project requires of the personal token in the web version (RG-protection-du-jeton-par-projet). */
 const tokenProtection = ref<TokenProtection>("proposee");
 const issuer = ref("");
 const client = ref("");
 const exchange = ref("");
 
 /**
- * Vrai si le mode demande des paramètres qui manquent.
+ * True if the mode requires parameters that are missing.
  *
- * Proposer des réglages incomplets écrirait un mode que personne ne pourrait employer : le refus vaut mieux que la découverte à la première connexion.
+ * Offering incomplete settings would write a mode no one could use: refusal is better than discovery at the first sign-in.
  */
 const incompleteIdentity = computed(
   () =>
@@ -76,24 +76,24 @@ const sending = ref(false);
 const error = ref<string | null>(null);
 const proposed = ref<{ pullRequest: number; url: string } | null>(null);
 
-/** Ce qui est chargé, pour savoir si la saisie s'en écarte. */
+/** What is loaded, to know whether the input departs from it. */
 const initial = ref("");
 
 const modified = computed(() => fingerprint() !== initial.value);
 
-/** Les dépôts de code, tels qu'on les édite. */
+/** The code repos, as they are edited. */
 const codeRepos = ref<readonly CodeRepo[]>([]);
 const repoHelp = ref(false);
 
-/** Ce que le réglage écrira, montré dans l'infobulle. */
+/** What the setting will write, shown in the tooltip. */
 const codeReposPreview = computed(() =>
   sampleCodeRepos(codeRepos.value.filter((d) => d.repo.trim())),
 );
 
 /**
- * Signale un nom mal formé sans l'empêcher de le saisir.
+ * Flags a malformed name without preventing it from being typed.
  *
- * Bloquer la frappe interdirait de composer le nom caractère par caractère ; la vérification finale, elle, écarte ce qui n'est pas de la forme attendue.
+ * Blocking keystrokes would forbid composing the name character by character; the final check, for its part, rules out what is not of the expected form.
  */
 function isMalformedRepo(repo: string): boolean {
   const v = repo.trim();
@@ -115,20 +115,20 @@ function removeCodeRepo(i: number): void {
 }
 
 const skillCommand = installCommand();
-// Calculés, non figés : le référentiel se charge après la construction du composant, et une valeur prise trop tôt afficherait l'exemple générique à un projet qui déclare déjà ses dépôts.
+// Computed, not frozen: the specification loads after the component is built, and a value taken too early would show the generic example to a project that already declares its repos.
 const configSkill = computed(() => sampleConfiguration(store.repoRef().repo));
 
-/** Ce qui vient d'être copié, pour le dire en retour. */
+/** What has just been copied, to acknowledge it. */
 const copied = ref<string | null>(null);
 
 async function copy(text: string, what: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
     copied.value = what;
-    // Le retour s'efface : laissé affiché, il ferait croire à un état plutôt qu'à un accusé de réception.
+    // The feedback fades: left displayed, it would suggest a state rather than an acknowledgement.
     setTimeout(() => (copied.value = null), 2000);
   } catch {
-    // Le presse-papiers peut être refusé — hors contexte sécurisé, ou par l'utilisateur. Le texte reste sélectionnable à la main.
+    // The clipboard may be refused — outside a secure context, or by the user. The text remains selectable by hand.
   }
 }
 
@@ -136,9 +136,9 @@ const installation = ref(false);
 const automationError = ref<string | null>(null);
 
 /**
- * Installe les workflows manquants.
+ * Installs the missing workflows.
  *
- * Directement, sans demande de fusion : ce sont des fichiers d'outillage, non du référentiel, et une automatisation qui attend une relecture ne protège rien pendant qu'elle attend.
+ * Directly, without a pull request: these are tooling files, not the specification, and an automation waiting for a review protects nothing while it waits.
  */
 async function installAutomation(): Promise<void> {
   if (installation.value) return;
@@ -156,7 +156,7 @@ async function installAutomation(): Promise<void> {
   }
 }
 
-// La question ne se pose qu'une fois le dépôt chargé, et elle coûte un appel : la poser ici plutôt qu'à chaque affichage de la page.
+// The question only arises once the repo is loaded, and it costs a call: ask it here rather than on every display of the page.
 watchEffect(() => {
   if (store.state() === "pret" && automation.installed() === null) {
     void automation.check();
@@ -172,7 +172,7 @@ watchEffect(() => {
   client.value = r.identity?.client ?? "";
   exchange.value = r.identity?.exchange ?? "";
   codeRepos.value = [...store.specification().project.codeRepos];
-  // capturé après application, pour que « modifié » compare bien à l'état chargé
+  // captured after applying, so that « modifié » compares against the loaded state
   queueMicrotask(() => (initial.value = fingerprint()));
 });
 
@@ -190,10 +190,10 @@ async function proposeSettings(): Promise<void> {
   try {
     const p = await settings.proposeSettings({
       access: access.value,
-      // Seul le jeton personnel se garde sur le poste : un autre mode retire l'exigence, devenue sans objet.
+      // Only the personal token is kept on the machine: another mode removes the requirement, which no longer applies.
       tokenProtection:
         access.value === "jeton_personnel" ? tokenProtection.value : "proposee",
-      // Les entrées vides sont écartées : une ligne ajoutée puis laissée telle quelle ne décrit aucun dépôt.
+      // Empty entries are dropped: a line added then left as is describes no repo.
       codeRepos: codeRepos.value
         .filter((d) => d.repo.trim())
         .map((d) => ({ repo: d.repo.trim(), role: d.role.trim() })),
@@ -218,7 +218,7 @@ async function proposeSettings(): Promise<void> {
   }
 }
 
-/** Représentation stable de la saisie, pour détecter un écart. */
+/** Stable representation of the input, to detect a difference. */
 function fingerprint(): string {
   const d = codeRepos.value.map((x) => `${x.repo}~${x.role}`).join(",");
   return `${access.value}#${tokenProtection.value}#${issuer.value}#${client.value}#${exchange.value}#${d}`;
@@ -281,7 +281,7 @@ function fingerprint(): string {
           </label>
         </div>
 
-        <!-- RG-protection-du-jeton-par-projet, RG-garanties-annoncees : chaque façon de garder le jeton dit ce qu'elle protège et ce qu'elle laisse, et l'exigence ne se fait pas passer pour celle de GitHub. -->
+        <!-- RG-protection-du-jeton-par-projet, RG-garanties-annoncees: each way of keeping the token says what it protects and what it leaves exposed, and the requirement does not pass itself off as GitHub's. -->
         <div v-if="access === 'jeton_personnel'" class="protection-du-jeton">
           <h3 class="sous-section">Protection du jeton dans la version web</h3>
           <p class="explication">
@@ -613,7 +613,7 @@ h1 {
     height: 17px;
   }
 }
-/* Le contenu reste sélectionnable : c'est du texte qu'on recopie, non un message qu'on lit et qu'on ferme. */
+/* The content stays selectable: it is text to copy, not a message to read and dismiss. */
 .infobulle {
   margin: 2px 0 14px;
   padding: 11px 13px;
@@ -690,7 +690,7 @@ h1 {
   &:hover {
     background: var(--mat-sys-surface-container);
   }
-  /* Ce qui n'est pas choisissable ne doit pas en avoir l'air : le curseur et l'opacité le disent avant que le clic ne l'apprenne. */
+  /* What cannot be chosen must not look like it can: the cursor and the opacity say so before the click finds out. */
   &.indisponible {
     cursor: default;
     opacity: 0.62;

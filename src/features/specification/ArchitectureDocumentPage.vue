@@ -15,9 +15,9 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 /**
- * Un document d'architecture, et ce qui s'y rattache.
+ * An architecture document, and what is attached to it.
  *
- * Les deux relations présentées ici se calculent : un flux dit les composants qu'il relie, un composant apprend quels flux le touchent sans qu'aucune liste ne soit tenue sur lui. C'est la propriété qui distingue ces documents d'un wiki, où la même information aurait à être maintenue des deux côtés.
+ * The two relations presented here are computed: a flow states the components it connects, a component learns which flows touch it without any list being kept on it. That is the property that distinguishes these documents from a wiki, where the same information would have to be maintained on both sides.
  */
 const route = useRoute();
 const store = inject(SpecificationStore);
@@ -105,7 +105,7 @@ function label(kind: string): string {
 </template>
 
 <style scoped>
-/* RG-mesure-de-lecture : la fiche entière est un texte à lire. */
+/* RG-mesure-de-lecture: the whole page is a text to be read. */
 .page-document-architecture {
   display: block;
   max-width: var(--pc-mesure);

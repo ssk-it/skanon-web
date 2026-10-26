@@ -3,11 +3,11 @@ import "@fontsource/roboto/400.css";
 import "@fontsource/material-symbols-outlined/400.css";
 
 /**
- * Les polices sont embarquées, non demandées à un service : la politique de sécurité du contenu de l'application de bureau refuse tout autre hôte, et l'application doit s'afficher hors ligne. Un fichier de police que le serveur refuse — le magasin global de pnpm mène hors du dépôt (docs/developpement.md) — ne lève aucune erreur : les icônes s'affichent alors en toutes lettres. Seul un vrai moteur le voit.
+ * Fonts are embedded, not requested from a service: the desktop application's content security policy refuses any other host, and the application must display offline. A font file the server refuses — pnpm's global store leads outside the repo (docs/development.md) — throws no error: the icons are then displayed spelled out. Only a real engine sees it.
  */
-describe("polices embarquées", () => {
+describe("embedded fonts", () => {
   it.each([["Roboto"], ["Material Symbols Outlined"]])(
-    "charge %s",
+    "loads %s",
     async (family) => {
       const loaded = await document.fonts.load(`24px "${family}"`, "a");
       expect(loaded.length).toBeGreaterThan(0);

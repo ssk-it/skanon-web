@@ -9,23 +9,23 @@ import UiIcon from "../../ui/UiIcon.vue";
 import OrganizationAvatar from "./OrganizationAvatar.vue";
 
 /**
- * Le symbole d'un projet, là où l'application le désigne.
+ * A project's symbol, wherever the application designates it.
  *
- * Il prend la variante du thème réellement appliqué, non celui du système : quand le rédacteur force un thème, le symbole le suit. Sans symbole pour ce fond, le repli — l'avatar de l'organisation, ou l'icône de dossier sur l'accueil — occupe la même place, pour que rien ne se décale. Voir RG-identite-affichee.
+ * It takes the variant of the theme actually applied, not the system's: when the author forces a theme, the symbol follows. With no symbol for this background, the fallback — the organisation's avatar, or the folder icon on the home page — takes the same place, so that nothing shifts. See RG-identite-affichee.
  *
- * Les couleurs du symbole sont les siennes : l'application ne les choisit ni ne les teinte (RG-couleur-porteuse). Il est décoratif pour qui ne le voit pas, le nom du projet étant toujours écrit à côté.
+ * The symbol's colours are its own: the application neither chooses nor tints them (RG-couleur-porteuse). It is decorative for those who do not see it, the project name always being written next to it.
  *
- * L'élément racine est `span.symbole-projet` : c'est lui qu'une vue vise pour placer le symbole, comme elle visait `pc-symbole-projet`.
+ * The root element is `span.symbole-projet`: it is what a view targets to place the symbol, as it targeted `pc-symbole-projet`.
  */
 const props = withDefaults(
   defineProps<{
     repoRef: RepoRef;
-    /** Côté de la case, en pixels d'affichage. */
+    /** Side of the box, in display pixels. */
     size?: number;
-    /** Ce qui se montre sans symbole : l'avatar, une icône de Material, ou rien. */
+    /** What shows without a symbol: the avatar, a Material icon, or nothing. */
     fallback?: "avatar" | "folder" | "folder_open" | "aucun";
     /**
-     * Le fond sur lequel le symbole se pose, quand il ne suit pas le thème — la marque de la barre, sombre dans les deux. La variante se choisit d'après le fond : c'est ainsi que l'identité les nomme.
+     * The background the symbol sits on, when it does not follow the theme — the bar's brand, dark in both. The variant is chosen from the background: that is how the identity names them.
      */
     background?: IdentityVariant | null;
   }>(),
@@ -41,7 +41,7 @@ const read = computed(() =>
   identities.findSymbol(props.repoRef, variant.value),
 );
 
-// L'échec appartient à une image, pas au composant : un symbole remplacé dans le dépôt doit avoir sa chance plutôt que garder le repli du précédent.
+// Failure belongs to an image, not to the component: a symbol replaced in the repo must get its chance rather than keep the previous one's fallback.
 const failed = ref(false);
 watch(read, () => (failed.value = false));
 
@@ -49,7 +49,7 @@ const source = computed(() => (failed.value ? null : read.value));
 const empty = computed(() => !source.value && props.fallback === "aucun");
 
 watchEffect(() => {
-  // Lue pour être suivie : un retour à l'accueil ou un accès retiré redemande l'identité.
+  // Read so as to be tracked: a return to the home page or a withdrawn access asks for the identity again.
   identities.generation();
   void identities.request(props.repoRef, variant.value);
 });
@@ -91,11 +91,11 @@ watchEffect(() => {
   width: var(--taille-symbole);
   height: var(--taille-symbole);
 }
-/* Sans repli, la place n'est pas réservée : elle n'existait pas avant le symbole, et rien ne s'y décale. */
+/* Without a fallback, the space is not reserved: it did not exist before the symbol, and nothing shifts into it. */
 .symbole-projet.vide {
   display: none;
 }
-/* Un symbole n'est pas toujours carré : il tient dans la case sans être rogné ni déformé. */
+/* A symbol is not always square: it fits in the box without being cropped or distorted. */
 .symbole {
   width: 100%;
   height: 100%;

@@ -4,17 +4,17 @@ import { inject } from "../core/injection";
 import { DialogService, type OpenDialog } from "./dialog.service";
 
 /**
- * L'hôte des dialogues, monté une fois dans `App.vue` : il affiche ceux que `DialogService` tient ouverts, par-dessus la page.
+ * The dialog host, mounted once in `App.vue`: it shows those `DialogService` keeps open, over the page.
  *
- * Ce que faisait la superposition du CDK pour `MatDialog` :
- * - un fond qui assombrit la page et ferme le dialogue au clic, sans réponse ;
- * - Échap qui ferme le dernier ouvert, sans réponse ;
- * - le focus posé dans le dialogue à l'ouverture, piégé dedans tant qu'il est ouvert — Tab boucle sur ses éléments —, rendu ensuite à l'élément qui l'avait ;
- * - le défilement de la page bloqué derrière.
+ * What the CDK overlay did for `MatDialog`:
+ * - a backdrop that darkens the page and closes the dialog on click, with no answer;
+ * - Escape, which closes the last one opened, with no answer;
+ * - focus placed in the dialog on opening, trapped inside while it is open — Tab cycles through its elements —, then given back to the element that had it;
+ * - page scrolling blocked behind it.
  */
 const dialogs = inject(DialogService);
 
-/** L'élément qui avait le focus avant chaque dialogue, pour le lui rendre. */
+/** The element that had focus before each dialog, to give it back. */
 const previousOnes = new Map<number, HTMLElement | null>();
 const panels = new Map<number, HTMLElement>();
 
@@ -74,7 +74,7 @@ function onKey(d: OpenDialog, e: KeyboardEvent): void {
 }
 
 /**
- * Le défilement de la page est bloqué tant qu'un dialogue est ouvert, sans que sa barre disparaisse : la page ne se décale pas sous le fond — la stratégie de blocage du CDK.
+ * Page scrolling is blocked while a dialog is open, without its scrollbar disappearing: the page does not shift under the backdrop — the CDK's block strategy.
  */
 let scrollLocked: { x: number; y: number } | null = null;
 
@@ -178,7 +178,7 @@ onBeforeUnmount(unlockScroll);
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Le panneau : la surface de `mat-dialog-container` en Material 3. Il défile de lui-même quand son contenu dépasse la fenêtre — d'où la gouttière stable (docs/pratiques.md, « La mise en page »). */
+/* The panel: the surface of `mat-dialog-container` in Material 3. It scrolls by itself when its content exceeds the window — hence the stable gutter (docs/practices.md, "Page layout"). */
 .ui-dialog-panneau {
   position: relative;
   display: flex;
@@ -200,7 +200,7 @@ onBeforeUnmount(unlockScroll);
   }
 }
 
-/* Le blocage du défilement de la page : la barre reste, la page ne bouge pas. */
+/* Blocking page scrolling: the scrollbar stays, the page does not move. */
 .ui-defilement-bloque {
   position: fixed;
   width: 100%;

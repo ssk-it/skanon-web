@@ -8,20 +8,20 @@ import {
   Specification,
 } from "../model/model";
 
-/** Ce que le vérificateur lit d'un cadrage : le cadrage saisi, ou un cadrage du référentiel. */
+/** What the verifier reads of a scoping: the scoping being entered, or a scoping from the specification. */
 type ScopingEntry = Pick<Scoping, "id" | "domains" | "statements"> & {
   readonly impacts: ScopingInput["impacts"];
 };
 
-/** Ce que la vérification rapporte d'un cadrage en cours de rédaction. */
+/** What verification reports of a scoping being authored. */
 export interface Verdict {
-  /** Ce qui empêcherait la livraison. */
+  /** What would prevent delivery. */
   readonly errors: readonly string[];
-  /** Ce qui mérite l'attention sans bloquer. */
+  /** What deserves attention without blocking. */
   readonly warnings: readonly string[];
 }
 
-/** Un cadrage tel que saisi, pas encore écrit. */
+/** A scoping as entered, not written yet. */
 export interface ScopingInput {
   readonly id: string;
   readonly title: string;
@@ -35,39 +35,39 @@ export interface ScopingInput {
 }
 
 /**
- * Vérification d'intégrité pendant la rédaction.
+ * Integrity verification during authoring.
  *
- * Les règles sont celles de `@ssk-it/canon-check`, le même module que l'Action
- * exécute avant chaque livraison. Il ne dépend d'aucun système de fichiers :
- * l'Action lui donne un référentiel lu sur disque, l'application lui donne celui
- * qu'elle a chargé. Une seule implémentation, deux moments.
+ * The rules are those of `@ssk-it/canon-check`, the same module the Action
+ * runs before each delivery. It depends on no file system: the Action gives
+ * it a specification read from disk, the application gives it the one it has
+ * loaded. A single implementation, two moments.
  *
- * **Ce qui reste moins fiable ici qu'en intégration continue.** L'application
- * connaît le référentiel de la branche principale, augmenté du seul cadrage en
- * cours. Un cadrage voisin, ouvert sur une autre branche, lui échappe — les
- * contrôles portant sur les index dérivés ou les règles abrogées peuvent donc
- * conclure moins que la vérification finale.
+ * **What remains less reliable here than in continuous integration.** The
+ * application knows the main branch's specification, augmented with only the
+ * scoping in progress. A neighbouring scoping, open on another branch,
+ * escapes it — checks on derived indexes or repealed rules may therefore
+ * conclude less than the final verification.
  *
- * Le désaccord va toujours dans le même sens : l'application signale moins,
- * jamais plus. Ce qu'elle affirme est vrai ; ce qu'elle tait peut encore
- * apparaître à la livraison, où la vérification reste l'autorité.
+ * The disagreement always goes the same way: the application reports less,
+ * never more. What it asserts is true; what it leaves unsaid may still
+ * appear at delivery, where verification remains the authority.
  */
 export class VerificationService {
   private readonly store = inject(SpecificationStore);
 
   /**
-   * Vérifie le référentiel tel qu'il serait avec ce cadrage.
+   * Verifies the specification as it would be with this scoping.
    *
-   * Le cadrage saisi remplace sa version enregistrée : c'est bien l'effet de ce
-   * qu'on est en train d'écrire qu'on veut mesurer, pas celui de ce qui est
-   * déjà dans le dépôt.
+   * The scoping being entered replaces its saved version: it is indeed the
+   * effect of what is being written that we want to measure, not that of what
+   * is already in the repo.
    */
   checkScoping(input: ScopingInput, context?: Specification): Verdict {
-    // Le contexte de la branche éditée, quand il est connu : un cadrage crée
-    // souvent le domaine ou les règles qu'il déclare, et ceux-ci n'existent pas
-    // encore sur la branche principale. Les ignorer signalerait comme inconnu
-    // ce que le cadrage apporte lui-même — un défaut qui n'en est pas un, et
-    // que la vérification à la livraison ne relève pas.
+    // The context of the edited branch, when it is known: a scoping often
+    // creates the domain or the rules it declares, and these do not exist yet
+    // on the main branch. Ignoring them would report as unknown what the
+    // scoping itself brings — a defect that is not one, and that verification
+    // at delivery does not raise.
     const ref = context ?? this.store.specification();
 
     const scopings = new Map<string, ScopingEntry>(ref.scopings);
@@ -78,9 +78,9 @@ export class VerificationService {
       statements: input.statements,
     });
 
-    // `ignorerIndexDerives` : `cree_par` et `modifie_par` sont écrits par la
-    // propagation, après la livraison. Les exiger corrects pendant la rédaction
-    // signalerait comme faute ce que le cadrage n'a pas encore produit.
+    // `ignorerIndexDerives`: `cree_par` and `modifie_par` are written by
+    // propagation, after delivery. Requiring them correct during authoring
+    // would report as a fault what the scoping has not produced yet.
     const { errors, warnings } = checkRepo(
       {
         domains: ref.domains,
@@ -92,9 +92,9 @@ export class VerificationService {
           ...derivedIndexes(r),
           fonctionnalites: r.features,
         })),
-        // Sans elles, le vérificateur tiendrait toute cible d'architecture pour
-        // inconnue : il cherche chaque impact dans la collection que sa nature
-        // désigne, et une collection absente se lit comme vide.
+        // Without them, the verifier would hold every architecture target as
+        // unknown: it looks for each impact in the collection its kind designates,
+        // and an absent collection reads as empty.
         decisions: mapValues(ref.decisions, derivedIndexes),
         architecture: mapValues(ref.architecture, derivedIndexes),
         cadrages: mapValues(scopings, toCheckedScoping),
@@ -119,7 +119,7 @@ export class VerificationService {
 }
 
 /*
- * Le vérificateur lit les entités sous les noms du format SSK Canon — `domaines`, `statut`, `enonces`, et la clé de chaque impact qui en dit la nature (`regle`, `adr`, `architecture`) —, le modèle les nomme en anglais. La correspondance se fait ici, à un seul endroit : une propriété manquante n'y serait signalée par aucune compilation, seulement par un contrôle qui ne contrôle plus rien.
+ * The verifier reads entities under the SSK Canon format's names — `domaines`, `statut`, `enonces`, and each impact's key that states its kind (`regle`, `adr`, `architecture`) —, the model names them in English. The mapping is done here, in a single place: a missing property would be reported by no compilation, only by a check that no longer checks anything.
  */
 
 function mapValues<T, U>(
@@ -143,7 +143,7 @@ function derivedIndexes(entry: {
   };
 }
 
-/** Un cadrage ne déclare pas son statut : le vérificateur refuserait d'en lire un. */
+/** A scoping does not declare its status: the verifier would refuse to read one. */
 function toCheckedScoping(scoping: ScopingEntry) {
   return {
     id: scoping.id,

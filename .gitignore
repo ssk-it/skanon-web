@@ -23,6 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Les captures que Vitest laisse quand un test du navigateur échoue.
+# The screenshots Vitest leaves when a browser test fails.
 .vitest
 dist-web

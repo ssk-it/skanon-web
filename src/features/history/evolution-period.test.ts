@@ -11,16 +11,16 @@ import EvolutionPage from "./EvolutionPage.vue";
 import { LastVisit, periodStart } from "./periods";
 
 /**
- * L'Évolution à l'ouverture — RG-periode-par-defaut.
+ * Evolution on opening — RG-periode-par-defaut.
  *
- * Ce qui est éprouvé ici, c'est qu'elle répond d'emblée à la question qu'on lui pose — qu'est-ce qui a changé depuis la dernière fois ? — et qu'elle dit laquelle des périodes elle a retenue.
+ * What is tested here is that it answers right away the question put to it — what has changed since last time? — and that it says which of the periods it chose.
  */
 
 const NOW = new Date("2026-10-06T12:00:00Z");
 const DAY = 86_400_000;
 
-describe("Les périodes toutes faites", () => {
-  it("remontent du nombre de jours annoncé", () => {
+describe("The ready-made periods", () => {
+  it("go back the announced number of days", () => {
     expect(periodStart("7-jours", NOW, null)?.toISOString()).toBe(
       new Date(NOW.getTime() - 7 * DAY).toISOString(),
     );
@@ -32,7 +32,7 @@ describe("Les périodes toutes faites", () => {
     );
   });
 
-  it("partent de la dernière visite quand elle est connue", () => {
+  it("start from the last visit when it is known", () => {
     const visit = new Date("2026-09-10T08:00:00Z");
     expect(periodStart("visite", NOW, visit)).toEqual(visit);
     expect(periodStart("visite", NOW, null)).toBeNull();
@@ -40,7 +40,7 @@ describe("Les périodes toutes faites", () => {
 });
 
 /**
- * Un stockage complet, substitué à celui du banc d'essai. Ce qui est éprouvé ici est la mémoire des visites, non la capacité du navigateur à stocker.
+ * A complete storage, substituted for the test bench's. What is tested here is the memory of visits, not the browser's ability to store.
  */
 function substituteStorage(name: "localStorage" | "sessionStorage"): void {
   let values: Record<string, string> = {};
@@ -55,7 +55,7 @@ function substituteStorage(name: "localStorage" | "sessionStorage"): void {
   });
 }
 
-describe("La dernière visite", () => {
+describe("The last visit", () => {
   const repoRef = { owner: "org", repo: "depot" };
 
   beforeEach(() => {
@@ -63,7 +63,7 @@ describe("La dernière visite", () => {
     substituteStorage("sessionStorage");
   });
 
-  it("n’existe pas à la première visite, et s’enregistre", () => {
+  it("does not exist on the first visit, and is recorded", () => {
     const v = new LastVisit();
 
     expect(v.visit(repoRef, NOW)).toBeNull();
@@ -72,7 +72,7 @@ describe("La dernière visite", () => {
     );
   });
 
-  it("rend la visite précédente, figée pour la session", () => {
+  it("returns the previous visit, frozen for the session", () => {
     localStorage.setItem(
       "pc-evolution-visite:org/depot",
       "2026-09-10T08:00:00.000Z",
@@ -82,14 +82,14 @@ describe("La dernière visite", () => {
     expect(v.visit(repoRef, NOW)?.toISOString()).toBe(
       "2026-09-10T08:00:00.000Z",
     );
-    // un rechargement dans la même session ne ramène pas la période à une minute
+    // a reload in the same session does not bring the period down to one minute
     const later = new Date(NOW.getTime() + 60_000);
     expect(v.visit(repoRef, later)?.toISOString()).toBe(
       "2026-09-10T08:00:00.000Z",
     );
   });
 
-  it("appartient au projet", () => {
+  it("belongs to the project", () => {
     localStorage.setItem(
       "pc-evolution-visite:org/autre",
       "2026-09-10T08:00:00.000Z",
@@ -99,7 +99,7 @@ describe("La dernière visite", () => {
   });
 });
 
-describe("L’Évolution à l’ouverture", () => {
+describe("Evolution on opening", () => {
   let calls: Array<{ departure: Date; arrival: Date }>;
   let visit: Date | null;
 
@@ -115,7 +115,7 @@ describe("L’Évolution à l’ouverture", () => {
     provide(LastVisit, { visit: () => visit });
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
     const router = createAppRouter(createMemoryHistory());
-    // La racine, non la route de la vue : son garde chargerait le référentiel, que le banc de SSK Canon ne montait pas (`provideRouter([])`).
+    // The root, not the view's route: its guard would load the specification, which SSK Canon's bench did not mount (`provideRouter([])`).
     await router.push("/");
     await router.isReady();
     return mount(EvolutionPage, { global: { plugins: [router] } });
@@ -135,7 +135,7 @@ describe("L’Évolution à l’ouverture", () => {
     visit = null;
   });
 
-  it("compare d’emblée les trente derniers jours à la première visite, et le dit", async () => {
+  it("compares the last thirty days right away on the first visit, and says so", async () => {
     const el = await stable(await mountView());
 
     expect(calls.length).toBe(1);
@@ -148,7 +148,7 @@ describe("L’Évolution à l’ouverture", () => {
     );
   });
 
-  it("compare depuis la dernière visite quand elle est connue", async () => {
+  it("compares since the last visit when it is known", async () => {
     visit = new Date(Date.now() - 12 * DAY);
     const el = await stable(await mountView());
 
@@ -162,7 +162,7 @@ describe("L’Évolution à l’ouverture", () => {
     );
   });
 
-  it("ne propose pas la dernière visite quand il n’y en a pas", async () => {
+  it("does not offer the last visit when there is none", async () => {
     const el = await stable(await mountView());
 
     const labels = [...el.querySelectorAll(".periodes button")].map((b) =>
@@ -176,7 +176,7 @@ describe("L’Évolution à l’ouverture", () => {
     ]);
   });
 
-  it("change de période d’un geste", async () => {
+  it("switches period in one gesture", async () => {
     const f = await mountView();
     const el = await stable(f);
 
@@ -189,7 +189,7 @@ describe("L’Évolution à l’ouverture", () => {
     expect(daysBefore(calls[1].departure)).toBe(7);
   });
 
-  it("ne montre les dates libres que sur demande", async () => {
+  it("shows free dates only on request", async () => {
     const f = await mountView();
     const el = await stable(f);
     expect(el.querySelector("form.bornes")).toBeNull();
@@ -200,7 +200,7 @@ describe("L’Évolution à l’ouverture", () => {
     await stable(f);
 
     expect(el.querySelector("form.bornes")).not.toBeNull();
-    // choisir ses dates ne relance rien tant qu'on n'a pas comparé
+    // choosing dates triggers nothing until one has compared
     expect(calls.length).toBe(1);
   });
 });

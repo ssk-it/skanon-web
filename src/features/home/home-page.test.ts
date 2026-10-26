@@ -15,16 +15,16 @@ import { DialogService } from "../../ui/dialog.service";
 import HomePage from "./HomePage.vue";
 
 /**
- * Une fois tous les référentiels reconnus, la liste en compte plusieurs dizaines, de plusieurs organisations : sans regroupement, on y cherche le sien ligne à ligne.
+ * Once every specification is recognised, the list holds several dozen, from several organisations: without grouping, one searches for one's own line by line.
  */
-describe("écran « Ouvrir un projet »", () => {
+describe("« Ouvrir un projet » screen", () => {
   const known = (name: string, framed: boolean, recent = false): KnownRepo => {
     const [owner, repo] = name.split("/");
     return { repoRef: { owner, repo }, framed, recent };
   };
 
   const SYMBOL = "data:image/svg+xml;base64,c3ltYm9sZQ==";
-  /** Les dépôts dont l'identité a été demandée, et ceux qui en ont une. */
+  /** The repos whose identity was requested, and those that have one. */
   let requests: string[];
   let withSymbol: string[];
   let rereads: number;
@@ -69,7 +69,7 @@ describe("écran « Ouvrir un projet »", () => {
   const texts = (root: Element, selector: string) =>
     [...root.querySelectorAll(selector)].map((e) => e.textContent?.trim());
 
-  it("présente les référentiels groupés par organisation", async () => {
+  it("shows specifications grouped by organisation", async () => {
     const page = await mountView([
       known("ssk-it/skift-cadrage", true, true),
       known("Wayne-Corp/wayne-devis-cadrage", true),
@@ -85,7 +85,7 @@ describe("écran « Ouvrir un projet »", () => {
     ]);
   });
 
-  it("montre l’avatar de chaque organisation à côté de son nom", async () => {
+  it("shows each organisation's avatar next to its name", async () => {
     const page = await mountView([
       known("ssk-it/skift-cadrage", true),
       known("Wayne-Corp/wayne-devis-cadrage", true),
@@ -100,7 +100,7 @@ describe("écran « Ouvrir un projet »", () => {
   });
 
   /** RG-identite-affichee, RG-lecture-identite. */
-  it("montre le symbole d’un projet à la place du dossier, et le dossier sans symbole", async () => {
+  it("shows a project's symbol in place of the folder, and the folder without a symbol", async () => {
     withSymbol = ["skift-cadrage"];
     const page = await mountView([
       known("ssk-it/skift-cadrage", true),
@@ -118,7 +118,7 @@ describe("écran « Ouvrir un projet »", () => {
     ).toBe("folder");
   });
 
-  it("redemande les identités à chaque retour, sans en lire pour les dépôts sans référentiel", async () => {
+  it("asks for identities again on each return, without reading any for repos without a specification", async () => {
     withSymbol = [];
     await mountView([
       known("ssk-it/skift-cadrage", true),
@@ -126,11 +126,11 @@ describe("écran « Ouvrir un projet »", () => {
     ]);
 
     expect(rereads).toBe(1);
-    // L'identité vit dans le référentiel : un dépôt qui n'en porte pas n'a rien à montrer, et le lire coûterait un appel par dépôt de code.
+    // The identity lives in the specification: a repo that carries none has nothing to show, and reading it would cost one call per code repo.
     expect(requests).toEqual(["ssk-it/skift-cadrage"]);
   });
 
-  it("groupe aussi les dépôts sans référentiel, toujours repliés", async () => {
+  it("also groups repos without a specification, always collapsed", async () => {
     const page = await mountView([
       known("ssk-it/skift-cadrage", true),
       known("ssk-it/skift", false),
@@ -143,8 +143,8 @@ describe("écran « Ouvrir un projet »", () => {
     expect(texts(others, ".organisation h2")).toEqual(["Globex", "ssk-it"]);
   });
 
-  /** RG-connexion-optionnelle, RG-modes-acces : l'aide se propose sans se poser en préalable. */
-  it("propose la connexion, facultative, avec la façon de créer un jeton, tant qu’aucun accès n’est en place", async () => {
+  /** RG-connexion-optionnelle, RG-modes-acces: the help offers itself without posing as a prerequisite. */
+  it("offers sign-in, optional, with how to create a token, as long as no access is in place", async () => {
     const page = await mountView([known("ssk-it/skift-cadrage", true, true)]);
 
     const signInBlock = page.querySelector(".connexion")!;
@@ -162,8 +162,8 @@ describe("écran « Ouvrir un projet »", () => {
     ).not.toBeNull();
   });
 
-  /** RG-acces-par-portee : un jeton d'une autre organisation que le dernier projet ouvert reste un accès en place. */
-  it("ne la propose plus dès qu’un jeton est enregistré, quelle qu’en soit la portée", async () => {
+  /** RG-acces-par-portee: a token for another organisation than the last opened project remains an access in place. */
+  it("no longer offers it once a token is saved, whatever its scope", async () => {
     inject(TokenService).setForScope(
       "wayne-corp",
       "ghp_abcdefghijklmnopqrst1234",
@@ -173,7 +173,7 @@ describe("écran « Ouvrir un projet »", () => {
     expect(page.querySelector(".connexion")).toBeNull();
   });
 
-  it("ouvre la connexion, assez large pour l’aide, depuis l’accueil", async () => {
+  it("opens sign-in, wide enough for the help, from the home page", async () => {
     const page = await mountView([]);
 
     (page.querySelector(".connexion .ui-bouton") as HTMLElement).click();

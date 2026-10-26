@@ -2,26 +2,26 @@ import { inject } from "../injection";
 import { GithubClient, RepoRef } from "../github/github-client";
 import { SpecificationStore } from "./specification.store";
 
-/** Ce qu'il faut savoir du projet pour amorcer son dépôt. */
+/** What must be known about the project to bootstrap its repo. */
 export interface NewProject {
   readonly name: string;
   readonly description: string;
 }
 
 /**
- * Configuration d'un projet neuf.
+ * Configuration of a new project.
  *
- * Les natures de lien sont écrites plutôt qu'omises : un projet qui voudra les
- * restreindre ou les étendre les trouve sous les yeux, alors qu'un fichier
- * silencieux laisserait croire qu'elles ne se règlent pas.
+ * Link kinds are written rather than omitted: a project that wants to
+ * restrict or extend them finds them in front of it, whereas a silent
+ * file would suggest they cannot be configured.
  *
- * Ni statuts ni opérations : le statut se déduit du dépôt (RG-statuts-cadrage)
- * et les opérations d'impact sont fixes. Les écrire ferait passer pour réglable
- * ce que plus rien ne lit.
+ * Neither statuses nor operations: the status is derived from the repo (RG-statuts-cadrage)
+ * and impact operations are fixed. Writing them would pass off as configurable
+ * what nothing reads any more.
  */
 function configuration(project: NewProject): string {
-  // Une description absente le reste : la remplacer par une phrase composée
-  // ferait passer pour une intention ce qui n'est qu'un gabarit.
+  // A missing description stays missing: replacing it with a composed sentence
+  // would pass off as an intention what is only a template.
   const description = project.description.trim()
     ? `  description: >\n    ${project.description.trim().split("\n").join("\n    ")}\n`
     : "  # description : ce que fait ce produit, en une phrase.\n";
@@ -42,11 +42,11 @@ tags_liens:
 }
 
 /**
- * Ce que chaque répertoire attend, dit dans le répertoire lui-même.
+ * What each directory expects, stated in the directory itself.
  *
- * Git ne versionne pas un répertoire vide : il lui faut un fichier. Autant qu'il
- * serve — celui qui ouvre le dépôt sur la plateforme y lit ce qu'on y dépose,
- * plutôt qu'un fichier vide dont il se demande à quoi il sert.
+ * Git does not version an empty directory: it needs a file. It might as well
+ * be useful — whoever opens the repo on the platform reads there what goes in it,
+ * rather than an empty file they wonder the purpose of.
  */
 const DIRECTORIES: ReadonlyArray<{ path: string; content: string }> = [
   {
@@ -118,23 +118,23 @@ livrés.
 }
 
 /**
- * Amorçage d'un dépôt vide.
+ * Bootstrapping an empty repo.
  *
- * Un dépôt créé sur la plateforme n'a rien — pas même une branche, sa branche
- * par défaut étant annoncée sans exister. L'application sait le dire ; savoir y
- * remédier évite au projet de composer à la main une arborescence dont il ne
- * connaît pas encore les conventions.
+ * A repo created on the platform has nothing — not even a branch, its default
+ * branch being announced without existing. The application can say so; being able
+ * to remedy it spares the project from composing by hand a tree whose
+ * conventions it does not know yet.
  */
 export class BootstrapService {
   private readonly github = inject(GithubClient);
   private readonly store = inject(SpecificationStore);
 
   /**
-   * Dépose la structure d'un dépôt cadré, directement sur la branche par défaut.
+   * Drops the structure of a framing repo, directly on the default branch.
    *
-   * Sans demande de fusion, contrairement à toute autre écriture : il n'y a rien
-   * à relire dans un dépôt vide, et une branche ne peut de toute façon pas
-   * diverger de ce qui n'existe pas.
+   * Without a pull request, unlike any other write: there is nothing
+   * to review in an empty repo, and a branch cannot diverge anyway
+   * from what does not exist.
    */
   async bootstrapProject(project: NewProject): Promise<void> {
     const repoRef: RepoRef = this.store.repoRef();
@@ -146,9 +146,9 @@ export class BootstrapService {
       ...DIRECTORIES,
     ];
 
-    // Un fichier après l'autre : la première écriture crée la branche, et les
-    // suivantes s'y ajoutent. Les grouper en un seul enregistrement demanderait
-    // de composer un arbre Git, pour un gain nul à cette échelle.
+    // One file after another: the first write creates the branch, and the
+    // next ones add to it. Grouping them in a single commit would require
+    // composing a Git tree, for no gain at this scale.
     for (const f of files) {
       await this.github.commitFile(
         repoRef,

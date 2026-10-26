@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { computed, effect, linkedSignal, signal, untracked } from "./signals";
 
-describe("signaux", () => {
-  it("se lisent par appel et se modifient par set et update", () => {
+describe("signals", () => {
+  it("are read by call and modified by set and update", () => {
     const count = signal(1);
     count.set(2);
     count.update((n) => n + 1);
     expect(count()).toBe(3);
   });
 
-  it("recalculent un dérivé quand sa source change", () => {
+  it("recompute a derived value when its source changes", () => {
     const count = signal(2);
     const double = computed(() => count() * 2);
     expect(double()).toBe(4);
@@ -17,7 +17,7 @@ describe("signaux", () => {
     expect(double()).toBe(10);
   });
 
-  it("relancent un effet sur ce qu'il lit, non sur ce qu'il lit sans s'abonner", () => {
+  it("rerun an effect on what it reads, not on what it reads without subscribing", () => {
     const tracked = signal(0);
     const ignore = signal(0);
     const seen: number[] = [];
@@ -31,7 +31,7 @@ describe("signaux", () => {
     expect(seen).toEqual([0, 11]);
   });
 
-  it("gardent une valeur posée à la main jusqu'au prochain changement de la source", () => {
+  it("keep a hand-set value until the next change of the source", () => {
     const source = signal("brouillon");
     const status = linkedSignal(() => source());
     status.set("en_relecture");
@@ -40,7 +40,7 @@ describe("signaux", () => {
     expect(status()).toBe("livree");
   });
 
-  it("passent la valeur précédente au calcul d'un signal lié", () => {
+  it("pass the previous value to a linked signal's computation", () => {
     const source = signal(1);
     const linked = linkedSignal<number, string>({
       source: () => source(),

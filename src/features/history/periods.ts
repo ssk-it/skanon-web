@@ -1,9 +1,9 @@
 import type { RepoRef } from "../../core/github/github-client";
 
 /**
- * Les périodes que l'Évolution propose d'un geste — RG-periode-par-defaut.
+ * The periods Evolution offers in one gesture — RG-periode-par-defaut.
  *
- * `libre` laisse choisir les deux dates ; les autres se calculent depuis maintenant.
+ * `libre` lets the user choose both dates; the others are computed from now.
  */
 export type Period = "7-jours" | "visite" | "30-jours" | "3-mois" | "libre";
 
@@ -16,7 +16,7 @@ const LOOKBACK_DAYS: Partial<Record<Period, number>> = {
 };
 
 /**
- * Le début d'une période, ou `null` quand elle ne se calcule pas : dates libres, ou dernière visite inconnue.
+ * The start of a period, or `null` when it cannot be computed: free dates, or unknown last visit.
  */
 export function periodStart(
   period: Period,
@@ -29,13 +29,13 @@ export function periodStart(
 }
 
 /**
- * La date de la visite précédente, par projet, sur ce poste.
+ * The date of the previous visit, per project, on this machine.
  *
- * Elle est propre au lecteur : la tenir dans le dépôt ferait d'une habitude personnelle un fait partagé (2026-044, décision 04). Elle se perd avec le poste, ce qui ne coûte qu'une période de trente jours, non une erreur.
+ * It belongs to the reader: keeping it in the repo would turn a personal habit into a shared fact (2026-044, decision 04). It is lost with the machine, which costs only a thirty-day period, not an error.
  *
- * **Figée pour la session.** Enregistrer la visite courante à chaque ouverture ramènerait la période à une minute au premier rechargement. La visite précédente est donc lue une fois, retenue pour la session, et c'est seulement alors que la visite courante la remplace pour la fois suivante.
+ * **Frozen for the session.** Recording the current visit at each opening would bring the period down to one minute on the first reload. The previous visit is therefore read once, kept for the session, and only then does the current visit replace it for the next time.
  *
- * Le stockage du navigateur peut manquer ou refuser : la vue retombe alors sur trente jours, sans rien perdre d'autre.
+ * The browser's storage may be missing or refuse: the view then falls back to thirty days, without losing anything else.
  */
 export class LastVisit {
   visit(repoRef: RepoRef, now: Date = new Date()): Date | null {

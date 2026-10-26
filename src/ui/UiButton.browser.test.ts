@@ -6,9 +6,9 @@ import UiButton from "./UiButton.vue";
 import UiIcon from "./UiIcon.vue";
 
 /**
- * Le calque d'état d'un bouton d'icône est un disque centré sur le bouton : l'icône doit l'être aussi, à sa taille de `mat-icon`. Décalée, elle sort du disque au survol — un défaut que seule la mise en page révèle, et que jsdom ne calcule pas.
+ * The state layer of an icon button is a disc centred on the button: the icon must be too, at its `mat-icon` size. Off-centre, it goes outside the disc on hover — a defect only layout reveals, and that jsdom does not compute.
  */
-describe("bouton d'icône", () => {
+describe("icon button", () => {
   const mounted: { unmount(): void }[] = [];
   afterEach(() => mounted.splice(0).forEach((m) => m.unmount()));
 
@@ -27,13 +27,13 @@ describe("bouton d'icône", () => {
     };
   }
 
-  it("garde l'icône à 24 px", () => {
+  it("keeps the icon at 24 px", () => {
     const { icon } = boxes();
     expect(icon.width).toBe(24);
     expect(icon.height).toBe(24);
   });
 
-  it("centre l'icône sur le calque d'état", () => {
+  it("centres the icon on the state layer", () => {
     const { button, icon } = boxes();
     expect(icon.left + icon.width / 2).toBeCloseTo(
       button.left + button.width / 2,

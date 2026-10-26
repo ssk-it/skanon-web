@@ -5,14 +5,14 @@ import {
   pauseTracking,
   resetTracking,
   shallowRef,
-  // `pauseTracking` et `resetTracking`, dont `untracked` a besoin, ne sont pas réexportés par `vue`.
+  // `pauseTracking` and `resetTracking`, which `untracked` needs, are not re-exported by `vue`.
   // eslint-disable-next-line vue/prefer-import-from-vue
 } from "@vue/reactivity";
 
 /**
- * Des signaux lisibles par appel — `etat()`, `etat.set(…)` — sur la réactivité de Vue.
+ * Signals readable by call — `state()`, `state.set(…)` — on Vue's reactivity.
  *
- * Le cœur hérité de SSK Canon est écrit dans cette forme, et la garder rend son portage mécanique : une ligne qui lisait un signal le lit toujours, et un gabarit Vue qui appelle `store.etat()` s'abonne comme il le ferait à une `ref`. La mécanique est celle de Vue — mêmes dépendances, même ordonnancement —, seule la façon de lire change.
+ * The core inherited from SSK Canon is written in this form, and keeping it makes its port mechanical: a line that read a signal still reads it, and a Vue template that calls `store.state()` subscribes as it would to a `ref`. The mechanics are Vue's — same dependencies, same scheduling —, only the way of reading changes.
  */
 export interface Signal<T> {
   (): T;
@@ -42,7 +42,7 @@ export function computed<T>(fn: () => T): Signal<T> {
   return () => ref.value;
 }
 
-/** Lire sans s'abonner : dans un effet, ce qui est lu ici ne le relance pas. */
+/** Read without subscribing: in an effect, what is read here does not rerun it. */
 export function untracked<T>(fn: () => T): T {
   pauseTracking();
   try {
@@ -57,9 +57,9 @@ export interface EffectRef {
 }
 
 /**
- * Un effet relancé à chaque changement de ce qu'il lit. Synchrone, contrairement à celui d'Angular qui attend la détection de changements : les effets du cœur ne font qu'écrire un signal ou un stockage, et l'ordre de leurs écritures n'a jamais dépendu de ce délai.
+ * An effect rerun on each change of what it reads. Synchronous, unlike Angular's which waits for change detection: the core's effects only write a signal or a storage, and the order of their writes has never depended on that delay.
  *
- * Créé dans le `setup` d'un composant, l'effet s'arrête avec lui ; ailleurs, il vit jusqu'à `destroy`.
+ * Created in a component's `setup`, the effect stops with it; elsewhere, it lives until `destroy`.
  */
 export function effect(fn: () => void): EffectRef {
   const scope = effectScope();
@@ -68,7 +68,7 @@ export function effect(fn: () => void): EffectRef {
 }
 
 /**
- * Un signal modifiable qui se réaligne sur sa source quand elle change — un brouillon initialisé depuis ce que le dépôt dit, que l'utilisateur modifie ensuite.
+ * A writable signal that realigns with its source when it changes — a draft initialised from what the repo says, which the user then modifies.
  */
 export function linkedSignal<S, T = S>(
   options:
@@ -86,7 +86,7 @@ export function linkedSignal<S, T = S>(
         }
       : options;
   let previous: { source: S; value: T } | undefined;
-  // Chaque recalcul rend un objet neuf : une valeur posée à la main ne vaut que pour l'objet qu'elle a vu, et tombe d'elle-même quand la source change.
+  // Each recomputation returns a fresh object: a hand-set value only holds for the object it saw, and falls away by itself when the source changes.
   const derived = vueComputed(() => {
     const s = source();
     const value = untracked(() => computation(s, previous));

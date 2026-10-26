@@ -62,14 +62,14 @@ describe("UiMenu", () => {
     deleteItem.mockReset();
   });
 
-  it("reste fermé tant qu’on ne clique pas sur le déclencheur", () => {
+  it("stays closed until the trigger is clicked", () => {
     const m = mountView(ACTIONS);
     expect(m.panel()).toBeNull();
     expect(m.trigger().getAttribute("aria-expanded")).toBe("false");
     expect(m.trigger().getAttribute("aria-haspopup")).toBe("menu");
   });
 
-  it("ouvre la liste des actions au clic, et y pose le focus", async () => {
+  it("opens the action list on click, and puts focus in it", async () => {
     const m = mountView(ACTIONS);
     m.trigger().click();
     await flushPromises();
@@ -83,7 +83,7 @@ describe("UiMenu", () => {
     expect(document.activeElement).toBe(m.entries()[0]);
   });
 
-  it("referme puis exécute l’action choisie", async () => {
+  it("closes then runs the chosen action", async () => {
     const m = mountView(ACTIONS);
     m.trigger().click();
     await flushPromises();
@@ -96,7 +96,7 @@ describe("UiMenu", () => {
     expect(m.panel()).toBeNull();
   });
 
-  it("se ferme au clic dehors, sans rien exécuter", async () => {
+  it("closes on an outside click, without running anything", async () => {
     const m = mountView(ACTIONS);
     m.trigger().click();
     await flushPromises();
@@ -111,7 +111,7 @@ describe("UiMenu", () => {
     expect(deleteItem).not.toHaveBeenCalled();
   });
 
-  it("ne se ferme pas à un appui dans le panneau", async () => {
+  it("does not close on a press in the panel", async () => {
     const m = mountView(ACTIONS);
     m.trigger().click();
     await flushPromises();
@@ -122,7 +122,7 @@ describe("UiMenu", () => {
     expect(m.panel()).not.toBeNull();
   });
 
-  it("se ferme à Échap, et rend le focus au déclencheur", async () => {
+  it("closes on Escape, and gives focus back to the trigger", async () => {
     const m = mountView(ACTIONS);
     m.trigger().click();
     await flushPromises();
@@ -134,7 +134,7 @@ describe("UiMenu", () => {
     expect(document.activeElement).toBe(m.trigger());
   });
 
-  it("se referme au second clic sur le déclencheur", async () => {
+  it("closes on a second click on the trigger", async () => {
     const m = mountView(ACTIONS);
     m.trigger().click();
     await flushPromises();
@@ -144,7 +144,7 @@ describe("UiMenu", () => {
     expect(m.panel()).toBeNull();
   });
 
-  it("parcourt les entrées aux flèches, en boucle", async () => {
+  it("goes through the entries with the arrow keys, wrapping around", async () => {
     const m = mountView(ACTIONS);
     m.trigger().click();
     await flushPromises();
@@ -157,7 +157,7 @@ describe("UiMenu", () => {
     expect(document.activeElement).toBe(m.entries()[1]);
   });
 
-  it("ne propose pas une action désactivée", async () => {
+  it("does not offer a disabled action", async () => {
     const m = mountView([
       { label: "Modifier", action: edit },
       { label: "Supprimer", action: deleteItem, disabled: true },

@@ -25,15 +25,15 @@ import {
 import { VerificationService } from "./verification.service";
 
 /**
- * Les natures qu'un impact peut viser, dans l'ordre où on les cherche.
+ * The kinds an impact can target, in the order they are looked for.
  *
- * Le même ordre que dans le chargeur et dans le vérificateur partagé : un
- * désaccord se paierait par un impact compris différemment selon le chemin
- * emprunté pour le lire.
+ * The same order as in the loader and in the shared checker: a
+ * disagreement would cost an impact understood differently depending on the
+ * path taken to read it.
  */
 const TARGET_KINDS = ["regle", "adr", "architecture"] as const;
 
-/** Ce qu'il faut fournir pour ouvrir un cadrage. */
+/** What must be provided to open a scoping. */
 export interface NewScoping {
   readonly title: string;
   readonly domains: readonly string[];
@@ -41,63 +41,63 @@ export interface NewScoping {
   readonly journey: string;
 }
 
-/** Un impact et l'énoncé qui l'accompagne, tels que saisis. */
+/** An impact and the statement that comes with it, as entered. */
 export interface ImpactInput {
-  /** L'identifiant visé, quelle que soit sa nature. */
+  /** The targeted identifier, whatever its kind. */
   readonly target: string;
   /**
-   * La nature visée, qui décide du champ écrit dans le fichier.
+   * The targeted kind, which decides the field written to the file.
    *
-   * Absente sur un impact rédigé avant que l'impact puisse viser autre chose
-   * qu'une règle : le repli est donc `regle`, seule valeur qu'il pouvait avoir.
+   * Absent on an impact written before an impact could target anything other
+   * than a rule: the fallback is therefore `regle`, the only value it could have.
    */
   readonly kind?: TargetKind;
   readonly operation: ImpactOperation;
-  /** Obligatoire pour `cree` et `modifie` — sans lui la propagation n'écrit rien. */
+  /** Required for `cree` and `modifie` — without it propagation writes nothing. */
   readonly statement: string;
 }
 
-/** L'état complet d'un cadrage en cours de rédaction. */
+/** The complete state of a scoping being authored. */
 export interface EditableScoping extends NewScoping {
   readonly impacts: readonly ImpactInput[];
   /**
-   * Les liens externes portés par le cadrage.
+   * The external links carried by the scoping.
    *
-   * Facultatif à l'appel, mais l'omettre les efface : la sérialisation
-   * reconstruit tout le frontmatter, et ce qu'on ne lui donne pas disparaît.
-   * Tout appelant qui réécrit un cadrage existant doit donc les relire d'abord.
+   * Optional at the call, but omitting them erases them: serialization
+   * rebuilds the whole frontmatter, and whatever it is not given disappears.
+   * Any caller that rewrites an existing scoping must therefore re-read them first.
    */
   readonly links?: readonly ExternalLink[];
   /**
-   * Les sections que l'éditeur ne connaît pas, telles qu'elles étaient.
+   * The sections the editor does not know, as they were.
    *
-   * Un cadrage peut porter ce que son auteur juge utile — des questions
-   * ouvertes, un état de l'art, une note. Reconstruire le fichier à partir des
-   * seules sections connues les effacerait sans le dire : la pire faute pour un
-   * outil dont la raison d'être est de conserver ce qui a été écrit.
+   * A scoping can carry whatever its author finds useful — open questions, a
+   * state of the art, a note. Rebuilding the file from the known sections
+   * alone would erase them without saying so: the worst fault for a tool
+   * whose reason for being is to keep what was written.
    */
   readonly unknownSections?: string;
 }
 
-/** Où vit un cadrage, et ce qu'il faut pour y réécrire. */
+/** Where a scoping lives, and what it takes to rewrite there. */
 export interface ScopingSource {
   readonly branch: string;
   readonly path: string;
-  /** SHA du fichier, exigé par l'API pour remplacer un contenu existant. */
+  /** SHA of the file, required by the API to replace an existing content. */
   readonly sha: string;
 }
 
 /**
- * Ce cadrage vit-il sur sa propre branche, plutôt que dans le référentiel ?
+ * Does this scoping live on its own branch, rather than in the specification?
  *
- * Se reconnaît à ce que la branche n'est pas la principale, et jamais à son nom
- * — voir RG-branche-par-cadrage. Un test sur le préfixe « cadrage/ » a rendu les
- * transitions invisibles sur la totalité des branches réelles, toutes nommées
- * « cadrage-<id> » : le nommage est le premier endroit où deux conventions
- * divergent, celle de l'application et celle du rédacteur.
+ * Recognised by the branch not being the default one, and never by its name
+ * — see RG-branche-par-cadrage. A test on the « cadrage/ » prefix made
+ * transitions invisible on every real branch, all named
+ * « cadrage-<id> »: naming is the first place where two conventions
+ * diverge, the application's and the author's.
  *
- * Faute de connaître la branche principale, on répond non : proposer une
- * transition qu'on ne peut pas situer vaut moins que n'en proposer aucune.
+ * Without knowing the default branch, the answer is no: offering a
+ * transition that cannot be placed is worth less than offering none.
  */
 export function isOnItsBranch(
   branch: string | undefined,
@@ -107,11 +107,11 @@ export function isOnItsBranch(
 }
 
 /**
- * Statuts vers lesquels un cadrage peut basculer — RG-bascule-de-statut.
+ * Statuses a scoping can toggle to — RG-bascule-de-statut.
  *
- * Un cadrage qui n'est pas sur sa propre branche ne bouge pas : son statut
- * décrit alors ce qui est déjà dans le référentiel, et le changer sans passer
- * par une demande de fusion contournerait la vérification.
+ * A scoping that is not on its own branch does not move: its status then
+ * describes what is already in the specification, and changing it without going
+ * through a pull request would bypass the check.
  */
 export function listToggles(
   from: ScopingStatus,
@@ -128,15 +128,15 @@ export interface CreatedScoping {
 }
 
 /**
- * Prochain identifiant disponible, au format `<année>-<séquence sur 3>`.
+ * Next available identifier, in the `<year>-<3-digit sequence>` format.
  *
- * La séquence repart de la plus haute déjà employée dans l'année, sans jamais
- * combler un trou : un identifiant abandonné reste brûlé. Le réutiliser ferait
- * pointer d'anciennes références vers un cadrage sans rapport, alors que la
- * stabilité des identifiants est ce sur quoi repose tout le reste.
+ * The sequence resumes from the highest already used in the year, never
+ * filling a gap: an abandoned identifier stays burnt. Reusing it would make
+ * old references point to an unrelated scoping, whereas the stability of
+ * identifiers is what everything else rests on.
  *
- * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
- * l'éprouver ne doit pas demander de construire un service.
+ * A free function rather than a method: it depends on no injection, and
+ * exercising it should not require building a service.
  */
 export function nextScopingId(
   existing: Iterable<string>,
@@ -151,46 +151,46 @@ export function nextScopingId(
   return `${prefix}-${String(max + 1).padStart(3, "0")}`;
 }
 
-/** Échappe une valeur de frontmatter si YAML pourrait la mal lire. */
+/** Escapes a frontmatter value if YAML could misread it. */
 function yamlValue(text: string): string {
   const own = text.trim().replace(/\s+/g, " ");
-  // Un « : » suivi d'une espace se lit comme un séparateur, et une apostrophe
-  // ouvrante en tête ferait de même. Les titres en contiennent presque toujours.
+  // A « : » followed by a space reads as a separator, and a leading opening
+  // quote would do the same. Titles almost always contain some.
   const risky = /:\s|^[-?[\]{}#&*!|>'"%@`]/.test(own) || own.includes(" #");
   return risky ? `'${own.replace(/'/g, "''")}'` : own;
 }
 
 /**
- * Sérialise un cadrage neuf au format du référentiel.
+ * Serializes a new scoping in the specification format.
  *
- * Le fichier produit doit passer la vérification d'intégrité, faute de quoi la
- * pull request serait bloquée dès son ouverture. Un cadrage sans impact est
- * valide : les impacts se déclarent au fil de la rédaction, pas à la création.
+ * The produced file must pass the integrity check, otherwise the pull
+ * request would be blocked as soon as it opens. A scoping without impacts is
+ * valid: impacts are declared as authoring goes, not at creation.
  */
 export function serializeNewScoping(id: string, c: NewScoping): string {
   return serializeScoping(id, { ...c, impacts: [], links: [] });
 }
 
 /**
- * Sérialise un cadrage complet au format du référentiel.
+ * Serializes a complete scoping in the specification format.
  *
- * La section `## Énoncés` n'apparaît que si un impact l'exige. Une section vide
- * passerait la vérification mais suggérerait au lecteur qu'il manque quelque
- * chose, là où il n'y a simplement rien à énoncer.
+ * The `## Énoncés` section only appears if an impact requires it. An empty
+ * section would pass the check but would suggest to the reader that something
+ * is missing, where there is simply nothing to state.
  *
- * Un impact `abroge` peut porter un énoncé — pour dire pourquoi la règle ne
- * s'applique plus — sans y être tenu ; `touche` n'en porte jamais, puisqu'il ne
- * produit aucune écriture.
+ * An `abroge` impact may carry a statement — to say why the rule no longer
+ * applies — without being bound to; `touche` never carries one, since it
+ * produces no write.
  */
-/** Une décision en cours d'écriture. */
+/** A decision being written. */
 export interface EditableDecision {
   readonly title: string;
   readonly status: DecisionStatus;
   readonly description: string;
   readonly options: readonly EditableOption[];
-  /** L'identifiant de l'option retenue, ou `null` tant que rien n'est tranché. */
+  /** The identifier of the chosen option, or `null` while nothing is settled. */
   readonly chosenOption: string | null;
-  /** Ce qui a tranché, en une phrase — la valeur d'une décision relue plus tard. */
+  /** What settled it, in one sentence — the value of a decision re-read later. */
   readonly decision: string;
 }
 
@@ -200,20 +200,20 @@ export interface EditableOption {
 }
 
 /**
- * Une décision, dans le format que la lecture attend.
+ * A decision, in the format reading expects.
  *
- * Symétrique de `parseDecision` : l'option retenue est nommée dans le
- * frontmatter, et les options sont des titres de niveau 3 sous « Options ».
- * Écrire autrement produirait un fichier que l'application ne saurait pas
- * relire — le défaut le plus coûteux, puisqu'il ne se voit qu'au rechargement.
+ * Symmetric of `parseDecision`: the chosen option is named in the
+ * frontmatter, and options are level-3 headings under « Options ».
+ * Writing otherwise would produce a file the application could not
+ * re-read — the costliest defect, since it only shows on reload.
  */
 export function serializeDecision(id: string, d: EditableDecision): string {
   const options = d.options
     .filter((o) => o.id.trim())
     .flatMap((o) => {
-      // La marque ouvre le premier paragraphe plutôt que d'occuper une ligne à
-      // elle : c'est ainsi qu'on l'écrit à la main, et réécrire autrement ferait
-      // apparaître un écart dans l'historique sans que rien n'ait changé.
+      // The mark opens the first paragraph rather than taking a line of its
+      // own: that is how it is written by hand, and rewriting it otherwise would
+      // make a difference appear in history without anything having changed.
       const body = o.body.trim();
       const chosen = o.id.trim() === d.chosenOption;
       return [
@@ -242,19 +242,19 @@ export function serializeDecision(id: string, d: EditableDecision): string {
 }
 
 /**
- * Un lien externe, sur une ligne de frontmatter.
+ * An external link, on one frontmatter line.
  *
- * En flux plutôt qu'en bloc indenté : c'est la forme qu'ont les liens écrits à
- * la main dans le référentiel, et en produire une autre ferait apparaître une
- * réécriture dans l'historique là où rien n'a changé. Le nom passe par
- * `valeurYaml` — un titre porte presque toujours de quoi tromper le lecteur
- * YAML, à commencer par le « : ».
+ * Flow style rather than an indented block: it is the form links written by
+ * hand in the specification have, and producing another would make a
+ * rewrite appear in history where nothing changed. The name goes through
+ * `yamlValue` — a title almost always carries something to mislead the YAML
+ * reader, starting with the « : ».
  */
 /**
- * Ajoute un lien à une liste.
+ * Adds a link to a list.
  *
- * Une même ressource ne se référence pas deux fois : le lien saisi remplace
- * celui qui portait déjà cette adresse, plutôt que de s'ajouter à côté.
+ * The same resource is not referenced twice: the entered link replaces
+ * the one that already carried that address, rather than being added next to it.
  */
 export function withLink(
   links: readonly ExternalLink[],
@@ -264,13 +264,13 @@ export function withLink(
 }
 
 /**
- * Remplace le lien d'adresse `url` par celui saisi.
+ * Replaces the link at address `url` with the entered one.
  *
- * L'ancienne adresse dit lequel remplacer : c'est elle qui identifie le lien
- * dans le frontmatter, et corriger une adresse sans nommer la précédente
- * produirait un doublon là où l'on voulait une correction. Le lien garde son
- * rang — le voir sauter en fin de rangée pour un nom retouché ferait douter de
- * ce qui a été écrit.
+ * The old address says which one to replace: it is what identifies the link
+ * in the frontmatter, and correcting an address without naming the previous one
+ * would produce a duplicate where a correction was wanted. The link keeps its
+ * rank — seeing it jump to the end of the row for a retouched name would cast
+ * doubt on what was written.
  */
 export function withLinkModified(
   links: readonly ExternalLink[],
@@ -278,17 +278,17 @@ export function withLinkModified(
   link: ExternalLink,
 ): ExternalLink[] {
   const rank = links.findIndex((l) => l.url === url);
-  // Le lien a disparu entre l'affichage et l'écriture — livré, ou repris
-  // ailleurs. L'ajouter vaut mieux que de perdre la saisie sans rien dire.
+  // The link disappeared between display and write — delivered, or taken up
+  // elsewhere. Adding it is better than silently losing the input.
   if (rank < 0) return withLink(links, link);
-  // La nouvelle adresse peut être celle d'un autre lien de la liste : la garder
-  // deux fois romprait l'unicité que l'ajout maintient déjà.
+  // The new address may be that of another link in the list: keeping it
+  // twice would break the uniqueness that adding already maintains.
   return links
     .map((l, k) => (k === rank ? link : l))
     .filter((l, k) => k === rank || l.url !== link.url);
 }
 
-/** Retire de la liste le lien portant cette adresse. */
+/** Removes from the list the link carrying this address. */
 export function withoutLink(
   links: readonly ExternalLink[],
   url: string,
@@ -299,10 +299,10 @@ export function withoutLink(
 function serializeLink(l: ExternalLink): string {
   const fields = [`tag: ${yamlValue(l.tag)}`];
   if (l.name.trim()) fields.push(`nom: ${yamlValue(l.name)}`);
-  // L'adresse est toujours entre apostrophes, comme dans le référentiel écrit à
-  // la main : `valeurYaml` la laisserait nue — le « : » d'un schéma n'est pas
-  // suivi d'une espace — et réécrire un cadrage existant l'aurait dénudée, ce
-  // qui ferait apparaître en relecture un lien que personne n'a touché.
+  // The address is always in single quotes, as in the specification written by
+  // hand: `yamlValue` would leave it bare — the « : » of a scheme is not
+  // followed by a space — and rewriting an existing scoping would have stripped it,
+  // which would make a link nobody touched show up in review.
   fields.push(`url: '${l.url.trim().replace(/'/g, "''")}'`);
   return `  - { ${fields.join(", ")} }`;
 }
@@ -332,9 +332,9 @@ export function serializeScoping(id: string, c: EditableScoping): string {
       "---",
       `id: ${id}`,
       `titre: ${yamlValue(c.title)}`,
-      // Pas de `statut:` : le vérificateur de l'Action le refuse, le statut se
-      // déduisant de l'état du dépôt. L'écrire produisait un fichier rejeté en
-      // intégration continue, donc une demande de fusion en échec.
+      // No `statut:`: the Action's checker rejects it, the status being
+      // derived from the repo state. Writing it produced a file rejected in
+      // continuous integration, hence a failing pull request.
       `domaines: ${domains}`,
       links.length
         ? `liens:\n${links.map(serializeLink).join("\n")}`
@@ -351,24 +351,24 @@ export function serializeScoping(id: string, c: EditableScoping): string {
       c.journey.trim(),
       "",
       ...(sections.length ? ["## Énoncés", "", ...sections] : []),
-      // Rendues telles quelles, à la fin : les replacer où elles étaient
-      // demanderait de mémoriser leur ordre, alors que les préserver suffit à ne
-      // rien perdre.
+      // Rendered as is, at the end: putting them back where they were
+      // would require remembering their order, whereas preserving them is enough to
+      // lose nothing.
       ...(c.unknownSections?.trim() ? [c.unknownSections.trim(), ""] : []),
     ]
       .join("\n")
-      // Une seule ligne vide finale : sans cela le fichier en gagne une à chaque
-      // enregistrement, et l'écart finit par se voir dans l'historique.
+      // A single final blank line: without that the file gains one at each
+      // save, and the difference ends up showing in history.
       .replace(/\n+$/, "\n")
   );
 }
 
 /**
- * Création d'un cadrage dans le dépôt.
+ * Creating a scoping in the repo.
  *
- * Le parcours suit ce que la plateforme fournit, sans rien réinventer : une
- * branche par cadrage, un commit, une pull request. Le statut se lit sur
- * cette pull request : en brouillon, le cadrage l'est (RG-statuts-cadrage).
+ * The flow follows what the platform provides, reinventing nothing: one
+ * branch per scoping, one commit, one pull request. The status is read from
+ * that pull request: if it is a draft, so is the scoping (RG-statuts-cadrage).
  */
 export class AuthoringService {
   private readonly github = inject(GithubClient);
@@ -376,12 +376,12 @@ export class AuthoringService {
   private readonly loader = inject(RepoLoader);
   private readonly verification = inject(VerificationService);
 
-  /** Identifiants des règles du référentiel, pour valider les impacts. */
+  /** Identifiers of the specification's rules, to validate impacts. */
   knownRules(): ReadonlySet<string> {
     return new Set(this.store.rules().map((r) => r.id));
   }
 
-  /** Identifiant que prendrait un cadrage créé maintenant. */
+  /** Identifier a scoping created now would take. */
   nextId(): string {
     return nextScopingId(
       this.store.scopings().map((c: Scoping) => c.id),
@@ -390,12 +390,12 @@ export class AuthoringService {
   }
 
   /**
-   * Crée la branche, y commite le cadrage, et ouvre la pull request.
+   * Creates the branch, commits the scoping to it, and opens the pull request.
    *
-   * Les trois étapes ne sont pas atomiques : GitHub n'offre aucune transaction.
-   * L'ordre est choisi pour que chaque échec laisse un état rattrapable — une
-   * branche sans commit s'ignore, un commit sans pull request se retrouve par
-   * son nom de branche. L'inverse produirait une pull request vide.
+   * The three steps are not atomic: GitHub offers no transaction.
+   * The order is chosen so that each failure leaves a recoverable state — a
+   * branch without a commit is ignored, a commit without a pull request is found
+   * by its branch name. The reverse would produce an empty pull request.
    */
   async createScoping(next: NewScoping): Promise<CreatedScoping> {
     const repoRef: RepoRef = this.store.repoRef();
@@ -414,8 +414,8 @@ export class AuthoringService {
       `Cadrage ${id} : ${next.title}`,
     );
 
-    // Le cadrage naît en brouillon, et c'est sa demande qui le porte : une
-    // demande prête à relire annoncerait un cadrage qui n'est pas commencé
+    // The scoping is born a draft, and its pull request is what carries that: a
+    // pull request ready for review would announce a scoping that has not started
     // (RG-bascule-de-statut).
     const inDraft = true;
 
@@ -444,12 +444,12 @@ export class AuthoringService {
   }
 
   /**
-   * La branche qui porte un cadrage non livré, s'il en existe une.
+   * The branch carrying an undelivered scoping, if there is one.
    *
-   * Les branches des demandes de fusion ouvertes d'abord, puis les branches de
-   * cadrage qui n'en ont pas encore — un cadrage commencé, qui n'a pas eu sa
-   * première relecture (RG-cadrages-en-cours-visibles). Retient la première
-   * qui contient ce cadrage : c'est lui qui rattache la branche, non son nom.
+   * Branches of open pull requests first, then scoping branches that do not
+   * have one yet — a scoping started, that has not had its first review
+   * (RG-cadrages-en-cours-visibles). Keeps the first one that contains this
+   * scoping: it is the scoping that ties the branch, not its name.
    */
   private async findScopingBranch(
     repoRef: RepoRef,
@@ -469,8 +469,8 @@ export class AuthoringService {
   }
 
   /**
-   * Dit si une branche porte un fichier. Seul un « introuvable » vaut absence :
-   * un dépôt qui ne répond pas ne dit rien de ce qu'il contient.
+   * Says whether a branch carries a file. Only a "not found" counts as absence:
+   * a repo that does not answer says nothing about what it contains.
    */
   private async carries(
     repoRef: RepoRef,
@@ -487,13 +487,13 @@ export class AuthoringService {
   }
 
   /**
-   * Charge un cadrage en cours pour édition, depuis sa branche.
+   * Loads an in-progress scoping for editing, from its branch.
    *
-   * Un cadrage que la branche principale porte est livré, et ne se modifie
-   * plus (RG-cadrage-livre-immuable) : il n'est pas chargé, même si une
-   * branche le porte encore. L'écrire sur la principale contournerait la
-   * vérification ; l'écrire sur une branche survivante produirait une demande
-   * qu'elle refuserait.
+   * A scoping the default branch carries is delivered, and is no longer
+   * modified (RG-cadrage-livre-immuable): it is not loaded, even if a
+   * branch still carries it. Writing it on the default branch would bypass the
+   * check; writing it on a stale branch would produce a pull request
+   * the check would reject.
    */
   async loadForEditing(id: string): Promise<{
     source: ScopingSource;
@@ -511,8 +511,8 @@ export class AuthoringService {
           "changer passe par un nouveau cadrage.",
       );
     }
-    // La branche se trouve par le cadrage qu'elle porte, non par son nom : un
-    // cadrage rédigé à la main suit une autre convention.
+    // The branch is found by the scoping it carries, not by its name: a
+    // scoping written by hand follows another convention.
     const branch = await this.findScopingBranch(repoRef, id);
     if (!branch) {
       throw new Error(
@@ -527,10 +527,10 @@ export class AuthoringService {
       branch,
     );
 
-    // Le référentiel de la branche sert à vérifier ce qu'on y écrit : un
-    // cadrage crée souvent le domaine et les règles qu'il déclare, absents de
-    // la branche principale. Sans ce contexte, la vérification les dirait
-    // inconnus, alors que celle de la livraison les accepte.
+    // The branch's specification is used to check what is written there: a
+    // scoping often creates the domain and the rules it declares, absent from
+    // the default branch. Without that context, the check would call them
+    // unknown, whereas the delivery check accepts them.
     let context: Specification | null = null;
     try {
       context = await this.loader.loadSpecification({
@@ -538,8 +538,8 @@ export class AuthoringService {
         ref: branch,
       });
     } catch {
-      // Sans lui, la vérification se rabat sur la branche principale : moins
-      // juste, mais mieux que de ne pas pouvoir éditer.
+      // Without it, the check falls back on the default branch: less
+      // accurate, but better than not being able to edit.
     }
 
     return {
@@ -550,7 +550,7 @@ export class AuthoringService {
     };
   }
 
-  /** Voir `listBascules`. */
+  /** See `listToggles`. */
   possibleTransitions(
     from: ScopingStatus,
     onItsBranch: boolean,
@@ -559,17 +559,17 @@ export class AuthoringService {
   }
 
   /**
-   * Fait passer un cadrage à un autre statut.
+   * Moves a scoping to another status.
    *
-   * **Le statut n'est plus écrit dans le fichier** : il se déduit de l'état du
-   * dépôt, et le vérificateur refuse un `statut:` déclaré. Changer de statut,
-   * c'est donc agir sur la demande de fusion — la seule chose qui le porte.
+   * **The status is no longer written in the file**: it is derived from the
+   * repo state, and the checker rejects a declared `statut:`. Changing status
+   * therefore means acting on the pull request — the only thing that carries it.
    *
-   * Ce qui s'obtient par là : « brouillon » convertit la demande en brouillon,
-   * « en_relecture » la déclare prête. « validee » ne s'atteint pas d'ici — une
-   * validation est une approbation donnée par un relecteur sur la plateforme, et
-   * se l'accorder à soi-même la viderait de son sens. « livree » résulte de la
-   * fusion, comme auparavant.
+   * What can be obtained that way: « brouillon » converts the pull request to a
+   * draft, « en_relecture » marks it ready. « validee » cannot be reached from
+   * here — an approval is given by a reviewer on the platform, and granting it to
+   * oneself would empty it of its meaning. « livree » results from the
+   * merge, as before.
    */
   async changeStatus(
     id: string,
@@ -598,10 +598,10 @@ export class AuthoringService {
     }
 
     try {
-      // La bascule est demandée sans comparer à l'état lu : celui-ci peut être
-      // en retard d'une transition, la plateforme ne rendant pas une mutation
-      // visible instantanément. La demander à l'identique est sans effet, la
-      // comparer sur une lecture périmée ne l'est pas.
+      // The toggle is requested without comparing to the read state: that one may be
+      // one transition behind, the platform not making a mutation visible
+      // instantly. Requesting it identically has no effect; comparing
+      // on a stale read does.
       await this.github.toggleDraftPullRequest(
         repoRef,
         pr.number,
@@ -609,26 +609,26 @@ export class AuthoringService {
       );
       return { status: to, toggleFailed: false };
     } catch {
-      // Rien n'a changé : le statut vivant sur la demande, un échec ici n'est
-      // pas rattrapable en écrivant ailleurs. On le dit plutôt que de laisser
-      // croire à un changement.
+      // Nothing changed: the status living on the pull request, a failure here
+      // cannot be recovered by writing elsewhere. Say so rather than letting
+      // anyone believe in a change.
       return { status: to, toggleFailed: true };
     }
   }
 
   /**
-   * Réécrit un cadrage sur sa branche.
+   * Rewrites a scoping on its branch.
    *
-   * Les impacts sont contrôlés avant d'écrire : un cadrage commité puis refusé
-   * par la vérification laisse au rédacteur une demande de fusion en échec, alors
-   * que la cause était connue au moment de la saisie.
+   * Impacts are checked before writing: a scoping committed then rejected
+   * by the check leaves the author with a failing pull request, whereas
+   * the cause was known at input time.
    */
   /**
-   * Charge les décisions d'un cadrage depuis la branche où il vit.
+   * Loads the decisions of a scoping from the branch where it lives.
    *
-   * Depuis l'arborescence de cette branche : une décision créée en même temps
-   * que le cadrage n'existe nulle part ailleurs, et la chercher sur la branche
-   * principale rendrait une liste vide sans le dire.
+   * From that branch's tree: a decision created at the same time
+   * as the scoping exists nowhere else, and looking for it on the default
+   * branch would return an empty list without saying so.
    */
   async loadDecisions(
     id: string,
@@ -670,9 +670,9 @@ export class AuthoringService {
             options: [...extractSubsections(parse.body, "Options")].map(
               ([id, body]) => ({
                 id,
-                // La marque « Retenue » est dérivée du frontmatter : la garder
-                // dans le texte la ferait réécrire en double au prochain
-                // enregistrement.
+                // The « Retenue » mark is derived from the frontmatter: keeping it
+                // in the text would have it rewritten twice at the next
+                // save.
                 body: body.replace(/^\*\*Retenue\.\*\*\s*/, "").trim(),
               }),
             ),
@@ -688,7 +688,7 @@ export class AuthoringService {
       .sort((a, b) => a.file.localeCompare(b.file));
   }
 
-  /** Écrit une décision sur la branche du cadrage. */
+  /** Writes a decision on the scoping's branch. */
   async saveDecision(
     scopingId: string,
     idDecision: string,
@@ -709,11 +709,11 @@ export class AuthoringService {
   }
 
   /**
-   * Retire une décision du dépôt.
+   * Removes a decision from the repo.
    *
-   * Le SHA est relu juste avant : une décision retirée de l'écran il y a
-   * plusieurs minutes a pu changer entre-temps, et la plateforme refuserait la
-   * suppression — ce qui vaut mieux que de l'imposer.
+   * The SHA is re-read just before: a decision removed from the screen
+   * several minutes ago may have changed in the meantime, and the platform would
+   * refuse the deletion — which is better than forcing it.
    */
   async deleteDecision(branch: string, path: string): Promise<void> {
     const repoRef = this.store.repoRef();
@@ -727,31 +727,31 @@ export class AuthoringService {
     );
   }
 
-  /** Ajoute un lien externe à un cadrage, sans passer par l'éditeur. */
+  /** Adds an external link to a scoping, without going through the editor. */
   async addLink(id: string, link: ExternalLink): Promise<void> {
     await this.rewriteLinks(id, (links) => withLink(links, link));
   }
 
-  /** Corrige un lien déjà attaché, l'adresse comprise. */
+  /** Corrects an already attached link, address included. */
   async editLink(id: string, url: string, link: ExternalLink): Promise<void> {
     await this.rewriteLinks(id, (links) => withLinkModified(links, url, link));
   }
 
-  /** Détache un lien du cadrage. La ressource, elle, n'est pas touchée. */
+  /** Detaches a link from the scoping. The resource itself is not touched. */
   async deleteLink(id: string, url: string): Promise<void> {
     await this.rewriteLinks(id, (links) => withoutLink(links, url));
   }
 
   /**
-   * Réécrit la liste des liens d'un cadrage, sans passer par l'éditeur.
+   * Rewrites a scoping's list of links, without going through the editor.
    *
-   * Le cadrage est relu juste avant d'être réécrit plutôt que reconstruit
-   * depuis le référentiel en mémoire : celui-ci vient de la branche principale,
-   * et un cadrage en cours vit sur la sienne. Le réécrire depuis la mémoire
-   * ramènerait la version livrée par-dessus le travail en cours.
+   * The scoping is re-read just before being rewritten rather than rebuilt
+   * from the in-memory specification: that one comes from the default branch,
+   * and an in-progress scoping lives on its own. Rewriting it from memory
+   * would bring the delivered version back over the work in progress.
    *
-   * La relecture porte aussi les sections que l'application ne présente pas —
-   * une note, un état de l'art — que la sérialisation effacerait sans elles.
+   * The re-read also carries the sections the application does not present —
+   * a note, a state of the art — that serialization would erase without them.
    */
   private async rewriteLinks(
     id: string,
@@ -765,9 +765,9 @@ export class AuthoringService {
 
     const data = parse.data as Record<string, unknown>;
     const statements = extractStatements(parse.body);
-    // La cible se lit du champ employé, comme au chargement du référentiel : un
-    // cadrage rédigé avant ce changement ne porte que `regle`, et reste donc
-    // relisible sans que rien ne soit réécrit.
+    // The target is read from the field used, as when loading the specification: a
+    // scoping written before this change only carries `regle`, and so stays
+    // readable without anything being rewritten.
     const impacts = ((data["impacts"] as Array<Record<string, unknown>>) ?? [])
       .filter((i) => !!i && typeof i === "object")
       .map((i) => {
@@ -813,9 +813,9 @@ export class AuthoringService {
     scoping: EditableScoping,
     context?: Specification,
   ): Promise<ScopingSource> {
-    // Les règles sont celles du vérificateur partagé, que l'Action exécute avant
-    // chaque livraison : ce qui est refusé ici est exactement ce qui bloquerait
-    // là-bas, sans qu'aucune règle n'existe en double.
+    // The rules are those of the shared checker, which the Action runs before
+    // each delivery: what is rejected here is exactly what would block
+    // there, without any rule existing twice.
     const { errors } = this.verification.checkScoping(
       {
         id,
@@ -832,10 +832,10 @@ export class AuthoringService {
             .map((i) => [i.target.trim(), i.statement.trim()]),
         ),
       },
-      // Le même contexte qu'à la saisie : sans lui, l'enregistrement refuse un
-      // domaine ou une règle que le cadrage crée sur sa branche, alors que la
-      // vérification de la livraison les accepte. Refuser d'écrire est pire que
-      // de le signaler — le travail reste bloqué.
+      // The same context as on input: without it, saving rejects a
+      // domain or a rule the scoping creates on its branch, whereas the
+      // delivery check accepts them. Refusing to write is worse than
+      // flagging it — the work stays blocked.
       context,
     );
     if (errors.length) throw new Error(errors.join(" "));
@@ -849,9 +849,9 @@ export class AuthoringService {
       source.sha,
     );
 
-    // La source rendue porte le nouveau SHA : l'appelant peut réécrire aussitôt,
-    // sans relire — et sans risquer de lire une version que la référence de
-    // branche n'a pas encore rattrapée.
+    // The returned source carries the new SHA: the caller can rewrite right away,
+    // without re-reading — and without risking reading a version the branch
+    // reference has not yet caught up with.
     return { ...source, sha: file };
   }
 }

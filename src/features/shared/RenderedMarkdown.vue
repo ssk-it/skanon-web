@@ -7,13 +7,13 @@ import { extractDiagrams, themeMermaid } from "./diagram";
 import { renderMarkdownSync } from "./markdown";
 
 /**
- * Affiche du Markdown, en dessinant les diagrammes qu'il contient.
+ * Displays Markdown, drawing the diagrams it contains.
  *
- * Un composant plutôt qu'une fonction : le rendu d'un diagramme est asynchrone — le moteur n'est chargé qu'à la demande — et une fonction rend une valeur, elle n'attend pas.
+ * A component rather than a function: rendering a diagram is asynchronous — the engine is only loaded on demand — and a function returns a value, it does not wait.
  *
- * Le moteur n'est importé que si la page en contient un. Une page sans diagramme ne paie donc rien de plus qu'avant, ce que l'import dynamique est seul à garantir : un import ordinaire le mettrait dans le paquet principal, chargé partout.
+ * The engine is only imported if the page contains one. A page without a diagram therefore pays nothing more than before, which only the dynamic import guarantees: an ordinary import would put it in the main bundle, loaded everywhere.
  *
- * L'élément racine est `div.markdown-rendu`, l'hôte `pc-markdown` de SSK Canon.
+ * The root element is `div.markdown-rendu`, SSK Canon's `pc-markdown` host.
  */
 const props = defineProps<{ text?: string | null }>();
 
@@ -21,7 +21,7 @@ const theme = inject(ThemeService);
 const host = ref<HTMLElement | null>(null);
 
 onMounted(() => {
-  // Le thème est suivi ici, non lu dans `rendre` : une bascule redessine les diagrammes. Un thème lu au moment du rendu seul laisserait les schémas déjà affichés dans l'ancien.
+  // The theme is tracked here, not read inside `render`: a toggle redraws the diagrams. A theme read only at render time would leave the diagrams already displayed in the old one.
   watch(
     [() => props.text, () => theme.effective()],
     ([value, effective]) => void render(value ?? "", effective),
@@ -43,7 +43,7 @@ async function render(
   const html = renderMarkdownSync(text);
   const diagrams = extractDiagrams(html);
 
-  // Rien à dessiner : on s'arrête avant de charger quoi que ce soit.
+  // Nothing to draw: stop before loading anything.
   if (!diagrams.length) {
     element.innerHTML = html;
     return;
@@ -57,7 +57,7 @@ async function render(
     if (!target) continue;
     try {
       const { svg } = await mermaid.render(`mermaid-${d.id}`, d.source);
-      // Le moteur produit du balisage à partir d'un texte que l'application ne contrôle pas : il passe par le même assainissement que le reste.
+      // The engine produces markup from a text the application does not control: it goes through the same sanitising as the rest.
       target.innerHTML = DOMPurify.sanitize(svg, {
         USE_PROFILES: { svg: true, svgFilters: true },
       });
@@ -71,9 +71,9 @@ async function render(
 
 <script lang="ts">
 /**
- * Le moteur, chargé une fois et partagé.
+ * The engine, loaded once and shared.
  *
- * Deux diagrammes sur une même page, ou deux pages successives, ne doivent pas déclencher deux chargements : le module est mis en cache par le navigateur, mais l'initialisation ne l'est pas.
+ * Two diagrams on the same page, or two successive pages, must not trigger two loads: the module is cached by the browser, but the initialisation is not.
  */
 let engine: Promise<typeof import("mermaid").default> | null = null;
 let appliedTheme: "clair" | "sombre" | null = null;
@@ -82,18 +82,18 @@ async function loadEngine(effective: "clair" | "sombre") {
   engine ??= import("mermaid").then((m) => m.default);
   const mermaid = await engine;
 
-  // `initialize` est global au moteur : le rappeler au changement de thème est ce qui fait suivre les diagrammes, et le rappeler sans changement réinitialiserait inutilement un état partagé.
+  // `initialize` is global to the engine: calling it again on a theme change is what makes the diagrams follow, and calling it again without a change would needlessly reset a shared state.
   if (appliedTheme !== effective) {
     mermaid.initialize({
       startOnLoad: false,
-      // `loose` autoriserait les clics et le HTML dans les libellés, sur un texte venu d'un dépôt. `strict` est le seul mode compatible avec le fait que ce contenu n'est pas contrôlé.
+      // `loose` would allow clicks and HTML in labels, on a text coming from a repo. `strict` is the only mode compatible with this content not being controlled.
       securityLevel: "strict",
       theme: themeMermaid(effective),
-      // Les libellés sont dessinés en SVG, non en HTML dans un `foreignObject`.
+      // Labels are drawn in SVG, not as HTML inside a `foreignObject`.
       //
-      // DOMPurify retire `foreignObject` — c'est du HTML injecté au milieu d'un SVG, et sa suppression est délibérée. Les diagrammes s'affichaient donc complets et muets : des formes sans texte, ce qu'on prend pour le schéma voulu plutôt que pour un défaut.
+      // DOMPurify removes `foreignObject` — it is HTML injected in the middle of an SVG, and its removal is deliberate. Diagrams therefore displayed complete and mute: shapes without text, which one takes for the intended diagram rather than for a defect.
       //
-      // Affaiblir l'assainissement serait la mauvaise réponse : le texte vient d'un dépôt que l'application ne contrôle pas. `htmlLabels` se règle globalement autant que par type : le rendu récent du moteur ne lit pas toujours l'option propre au diagramme.
+      // Weakening the sanitising would be the wrong answer: the text comes from a repo the application does not control. `htmlLabels` is set globally as well as per type: the engine's recent renderer does not always read the diagram-specific option.
       htmlLabels: false,
       flowchart: { htmlLabels: false },
       class: { htmlLabels: false },
@@ -104,11 +104,11 @@ async function loadEngine(effective: "clair" | "sombre") {
 }
 
 /**
- * Rend un diagramme agrandissable.
+ * Makes a diagram enlargeable.
  *
- * Le moteur contraint le SVG à sa largeur « naturelle » — quelques centaines de pixels pour un flux de quelques nœuds —, ce qui le rend illisible dès qu'il porte du texte. L'agrandissement le montre à la taille de l'écran.
+ * The engine constrains the SVG to its « natural » width — a few hundred pixels for a flow of a few nodes —, which makes it unreadable as soon as it carries text. Enlarging shows it at screen size.
  *
- * Un survol et un rôle de bouton plutôt qu'une icône : la cible du clic est le diagramme entier, et rien n'indiquerait mieux qu'il est cliquable qu'un curseur qui change dessus.
+ * A hover and a button role rather than an icon: the click target is the whole diagram, and nothing would signal better that it is clickable than a cursor that changes over it.
  */
 function makeEnlargeable(target: HTMLElement): void {
   target.classList.add("pc-diagramme-cliquable");
@@ -119,7 +119,7 @@ function makeEnlargeable(target: HTMLElement): void {
   const open = () => enlarge(target.innerHTML);
   target.addEventListener("click", open);
   target.addEventListener("keydown", (e) => {
-    // Au clavier, ce qu'on attend d'un élément annoncé comme un bouton.
+    // With the keyboard, what one expects of an element announced as a button.
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       open();
@@ -128,9 +128,9 @@ function makeEnlargeable(target: HTMLElement): void {
 }
 
 /**
- * Ouvre un diagramme en grand, par-dessus la page.
+ * Opens a diagram large, over the page.
  *
- * Le contenu est celui déjà assaini et affiché : le réassainir ne changerait rien, le régénérer ferait dépendre l'agrandissement d'un second rendu qui pourrait différer.
+ * The content is the one already sanitised and displayed: sanitising it again would change nothing, regenerating it would make enlarging depend on a second render that could differ.
  */
 function enlarge(sanitizedSvg: string): void {
   const background = document.createElement("div");
@@ -145,7 +145,7 @@ function enlarge(sanitizedSvg: string): void {
     if (e.key === "Escape") close();
   };
 
-  // Le fond referme, le contenu non : cliquer sur le diagramme agrandi pour le regarder de plus près ne doit pas le faire disparaître.
+  // The backdrop closes, the content does not: clicking the enlarged diagram to look at it more closely must not make it disappear.
   background.addEventListener("click", (e) => {
     if (e.target === background) close();
   });
@@ -155,9 +155,9 @@ function enlarge(sanitizedSvg: string): void {
 }
 
 /**
- * Ce qu'un diagramme fautif laisse voir — RG-diagrammes-rendus.
+ * What a faulty diagram leaves visible — RG-diagrammes-rendus.
  *
- * À l'endroit où il devait paraître, et sans emporter la page : un schéma illustre un propos, il ne le porte pas.
+ * At the place where it was to appear, and without taking the page down with it: a diagram illustrates a point, it does not carry it.
  */
 function errorMessage(e: unknown): string {
   const cause = e instanceof Error ? e.message : String(e);
@@ -174,7 +174,7 @@ function errorMessage(e: unknown): string {
 </template>
 
 <style>
-/* Global : le HTML est posé par `innerHTML`, hors de portée des styles d'un composant. */
+/* Global: the HTML is set through `innerHTML`, out of reach of a component's styles. */
 .markdown-rendu {
   display: block;
 }

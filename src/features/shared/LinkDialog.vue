@@ -10,14 +10,14 @@ import UiTextField from "../../ui/UiTextField.vue";
 import UiDialog from "../../ui/UiDialog.vue";
 
 /**
- * Saisie d'un lien externe attaché à un cadrage.
+ * Input of an external link attached to a scoping.
  *
- * L'adresse et le nom, plus la nature du lien : le nom seul ne dirait pas de quoi il s'agit, et la nature seule laisserait deux issues d'un même cadrage indiscernables. Les natures viennent du projet, non d'une liste en dur — voir `tags_liens` dans le fichier de configuration — et la saisie en accepte de nouvelles : aucune liste déclarée d'avance ne couvre les ressources que tous les projets référencent, et rien dans le format ne suppose la liste fermée. Celles déjà employées dans le dépôt sont proposées avec elle.
+ * The address and the name, plus the link's kind: the name alone would not say what it is about, and the kind alone would leave two issues of the same scoping indistinguishable. Kinds come from the project, not from a hard-coded list — see `tags_liens` in the configuration file — and the input accepts new ones: no list declared in advance covers the resources every project references, and nothing in the format assumes a closed list. Those already used in the repo are offered along with it.
  *
- * Le même écran sert à corriger un lien existant, dont il reçoit alors les valeurs en `data` : une adresse se retape mal, et deux écrans pour une seule saisie les feraient diverger dès la première évolution — la validation de l'adresse la première.
+ * The same screen serves to correct an existing link, whose values it then receives in `data`: an address is easily mistyped, and two screens for a single input would make them diverge from the first change on — the address validation first.
  */
 const props = defineProps<{
-  /** Le lien à corriger, absent quand l'écran sert à en ajouter un. */
+  /** The link to correct, absent when the screen serves to add one. */
   data?: ExternalLink | null;
 }>();
 
@@ -31,7 +31,7 @@ const modification = !!initial;
 const url = ref(initial?.url ?? "");
 const name = ref(initial?.name ?? "");
 
-/** Celles du projet, plus celles que ses cadrages emploient déjà. */
+/** The project's own, plus those its scopings already use. */
 const tags = computed(() => store.linkTags());
 
 function tagLabel(tag: string): string {
@@ -39,16 +39,16 @@ function tagLabel(tag: string): string {
 }
 
 /**
- * Ce que le champ montre : le libellé, non la clé.
+ * What the field shows: the label, not the key.
  *
- * Choisir « Carte Trello » dans la liste pour voir « carte_trello » s'inscrire donnerait à croire que la saisie a été corrigée. La forme écrite dans le frontmatter se retrouve par normalisation, qui rend justement la clé d'origine pour tout libellé connu.
+ * Choosing « Carte Trello » from the list only to see « carte_trello » written in would suggest the input had been corrected. The form written in the frontmatter is recovered by normalisation, which precisely gives back the original key for any known label.
  */
 const tag = ref(tagLabel(initial?.tag || tags.value[0] || "document"));
 
 /**
- * Les natures proposées, filtrées par ce qui est tapé.
+ * The offered kinds, filtered by what is typed.
  *
- * Le filtre porte sur la nature normalisée et sur son libellé : on cherche « Carte Trello » comme on l'a lue sur la fiche, pas comme elle s'écrit dans le frontmatter. La liste entière reste offerte tant que le champ vaut une nature connue — sinon la sélection d'une proposition masquerait toutes les autres, et changer d'avis demanderait de tout effacer.
+ * The filter applies to the normalised kind and to its label: one searches for « Carte Trello » as read on the page, not as written in the frontmatter. The whole list stays on offer as long as the field holds a known kind — otherwise selecting one suggestion would hide all the others, and changing one's mind would require erasing everything.
  */
 const proposedTags = computed(() => {
   const all = tags.value;
@@ -64,9 +64,9 @@ const proposedTags = computed(() => {
 });
 
 /**
- * La nature telle qu'elle sera écrite dans le frontmatter.
+ * The kind as it will be written in the frontmatter.
  *
- * Accents pliés, séparateurs unifiés en soulignés, casse abaissée : la nature est une clé, et « Ticket Jira » saisi ici ne doit pas fonder une seconde nature à côté du « ticket_jira » déjà employé ailleurs. C'est aussi ce qui ramène le libellé montré dans le champ à la clé qu'il désigne — « Carte Trello » redonne « carte_trello ».
+ * Accents folded, separators unified into underscores, case lowered: the kind is a key, and « Ticket Jira » typed here must not found a second kind next to the « ticket_jira » already used elsewhere. It is also what brings the label shown in the field back to the key it designates — « Carte Trello » gives back « carte_trello ».
  */
 const normalizedTag = computed(() => normalizeTag(tag.value));
 
@@ -78,9 +78,9 @@ const tagError = computed(() => {
 });
 
 /**
- * Une adresse absolue en http(s), et rien d'autre.
+ * An absolute http(s) address, and nothing else.
  *
- * Un chemin relatif ou un `javascript:` n'a aucun sens ici : le premier ne résoudrait pas depuis le dépôt, le second ferait du frontmatter un vecteur d'exécution pour quiconque ouvre la fiche.
+ * A relative path or a `javascript:` makes no sense here: the former would not resolve from the repo, the latter would turn the frontmatter into an execution vector for anyone opening the page.
  */
 const urlError = computed(() => {
   const raw = url.value.trim();
@@ -96,9 +96,9 @@ const urlError = computed(() => {
 });
 
 /**
- * Le nom n'est pas exigé.
+ * The name is not required.
  *
- * Les liens écrits avant que le champ existe n'en portent pas, et la fiche les nomme par leur nature : l'imposer ici rendrait ces liens-là impossibles à corriger sans leur inventer un libellé au passage.
+ * Links written before the field existed carry none, and the page names them by their kind: requiring it here would make those links impossible to correct without inventing a label for them along the way.
  */
 const valid = computed(
   () => !!url.value.trim() && !urlError.value && !!normalizedTag.value,
@@ -119,7 +119,7 @@ function validate(): void {
     class="lien-dialog"
     :title="modification ? 'Modifier le lien' : 'Ajouter un lien'"
   >
-    <!-- L'indication porte l'erreur sans mettre le champ en erreur : c'est ainsi que SSK Canon l'affichait, par une classe sur son mat-hint. -->
+    <!-- The hint carries the error without putting the field in error: that is how SSK Canon displayed it, through a class on its mat-hint. -->
     <UiTextField
       v-model="url"
       class="champ"
@@ -177,7 +177,7 @@ function validate(): void {
 .erreur {
   color: var(--mat-sys-error);
 }
-/* SSK Canon y posait aussi `padding-top: 8px`, que la règle de Material « titre + contenu » annulait par sa spécificité : le contenu commence donc au ras du titre, et l'écart n'est pas repris ici. */
+/* SSK Canon also set `padding-top: 8px` here, which Material's « title + content » rule cancelled through its specificity: the content therefore starts flush with the title, and the gap is not reproduced here. */
 .lien-dialog :deep(.ui-dialogue__contenu) {
   display: flex;
   flex-direction: column;

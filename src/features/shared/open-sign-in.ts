@@ -2,9 +2,9 @@ import { inject } from "../../core/injection";
 import { DialogService } from "../../ui/dialog.service";
 
 /**
- * Ouvre la connexion à GitHub, depuis la barre comme depuis l'accueil. Résout `true` quand l'accès a changé.
+ * Opens sign-in to GitHub, from the bar as from the home page. Resolves `true` when access has changed.
  *
- * Le dialogue est chargé à l'ouverture, non au démarrage : il porte la saisie du jeton, un poids que tout le monde paierait pour un bouton qu'on ne clique pas toujours. Il est plus large que les 560 px par défaut : l'aide à la création du jeton y tient un tableau des permissions, qu'un panneau étroit tasse.
+ * The dialog is loaded on opening, not at startup: it carries the token input, a weight everyone would pay for a button not always clicked. It is wider than the default 560 px: the token creation help holds a table of permissions there, which a narrow panel squeezes.
  */
 export async function openSignIn(): Promise<boolean> {
   const { default: TokenDialog } = await import("./TokenDialog.vue");

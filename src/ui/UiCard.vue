@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * Une carte de Material 3 : `mat-card`, dans ses deux apparences.
+ * A Material 3 card: `mat-card`, in its two appearances.
  *
  * ```vue
- * <UiCarte>…</UiCarte>
- * <UiCarte apparence="outlined">…</UiCarte>
+ * <UiCard>…</UiCard>
+ * <UiCard appearance="outlined">…</UiCard>
  * ```
  *
- * SSK Canon importe `MatCardModule` dans l'écran du référentiel sans y poser de `mat-card` : la carte est là pour qu'un portage qui en trouverait une n'ait pas à réinventer ses couleurs.
+ * SSK Canon imports `MatCardModule` in the specification screen without placing any `mat-card` there: the card is here so that a port that finds one does not have to reinvent its colours.
  */
 withDefaults(defineProps<{ appearance?: "elevated" | "outlined" }>(), {
   appearance: "elevated",

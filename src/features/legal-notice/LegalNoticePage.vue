@@ -6,9 +6,9 @@ import ExternalLink from "../../ui/ExternalLink.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 
 /**
- * Les mentions légales de l'éditeur, reprises de https://www.ssk-it.fr/mentions-legales/ : un changement de l'une se reporte dans l'autre.
+ * The publisher's legal notice, taken from https://www.ssk-it.fr/mentions-legales/: a change to one is carried over to the other.
  *
- * Comme l'aide, elles ne disent que ce qui vaut pour le livrable où l'on se trouve (2026-054, décision 03) : son hébergeur, ce qu'il présente à l'éditeur et sa licence viennent de son extension (ADR-extensions-commerciales). Ce qui touche aux données reste d'accord avec la page « Fonctionnement », qui le détaille (RG-aide-fidele).
+ * Like the help, it says only what holds for the deliverable one is on (2026-054, decision 03): its host, what it presents of the publisher and its licence come from its extension (ADR-extensions-commerciales). What concerns data stays consistent with the « Fonctionnement » page, which details it (RG-aide-fidele).
  */
 const legalNotice = inject(COMPOSITION).legalNotice;
 </script>
@@ -32,7 +32,7 @@ const legalNotice = inject(COMPOSITION).legalNotice;
           43330 Saint-Ferréol-d’Auroure, France
         </dd>
         <dt>Contact</dt>
-        <!-- Le domaine est ajouté par la feuille de style, comme sur ssk-it.fr : l'adresse entière n'est écrite ni dans la page ni dans le paquet. -->
+        <!-- The domain is added by the stylesheet, as on ssk-it.fr: the full address is written neither in the page nor in the bundle. -->
         <dd class="courriel">skanon</dd>
         <dt>SIRET</dt>
         <dd>511 992 406 00047</dd>
@@ -147,7 +147,7 @@ dd {
   content: "@ssk-it.fr";
 }
 
-/* Sur un téléphone, l'intitulé passe au-dessus de sa valeur : deux colonnes y tronqueraient l'adresse. */
+/* On a phone, the label moves above its value: two columns would truncate the address there. */
 @media (max-width: 599px) {
   dl {
     grid-template-columns: 1fr;

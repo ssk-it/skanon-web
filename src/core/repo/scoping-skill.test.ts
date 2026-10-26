@@ -2,18 +2,18 @@ import { describe, expect, it } from "vitest";
 import { sampleCodeRepos, installCommand } from "./scoping-skill";
 
 /**
- * L'exemple affiché dans les réglages doit refléter le projet ouvert : un
- * projet qui déclare déjà ses dépôts n'a pas à lire un exemple générique, qu'il
- * recopierait par-dessus sa propre déclaration.
+ * The example displayed in the settings must reflect the open project: a
+ * project that already declares its repos has no business reading a generic
+ * example, which it would copy over its own declaration.
  */
-describe("exemple de dépôts de code", () => {
-  it("propose un modèle générique quand le projet n’en déclare aucun", () => {
+describe("example of code repos", () => {
+  it("offers a generic template when the project declares none", () => {
     const out = sampleCodeRepos([]);
     expect(out).toContain("organisation/depot-front");
     expect(out.startsWith("depots_code:")).toBe(true);
   });
 
-  it("reprend les dépôts déclarés par le projet", () => {
+  it("takes up the repos declared by the project", () => {
     const out = sampleCodeRepos([
       { repo: "Wayne-Corp/wayne-front", role: "Application web" },
       { repo: "Wayne-Corp/wayne-back", role: "API" },
@@ -25,15 +25,15 @@ describe("exemple de dépôts de code", () => {
     expect(out).not.toContain("organisation/depot-front");
   });
 
-  it("omet le rôle quand il n’est pas renseigné", () => {
+  it("omits the role when it is not filled in", () => {
     expect(
       sampleCodeRepos([{ repo: "ssk-it/ssk-canon-pwa", role: "" }]),
     ).toContain("{ repo: ssk-it/ssk-canon-pwa }");
   });
 
-  it("installe le skill depuis le dépôt de l’automatisation", () => {
-    // Il n'est pas embarqué dans l'application : une deuxième copie du format
-    // divergerait de la première dès la première correction.
+  it("installs the skill from the automation's repo", () => {
+    // It is not embedded in the application: a second copy of the format would
+    // diverge from the first at the first correction.
     expect(installCommand()).toContain("ssk-it/ssk-canon-action");
     expect(installCommand()).toContain("~/.claude/skills/");
   });

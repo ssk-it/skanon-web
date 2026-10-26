@@ -9,7 +9,7 @@ import { createWebPlatform } from "./platform/web";
 import { createAppRouter } from "./router";
 
 /**
- * Une page hors projet — l'aide, les mentions —, telle qu'un livrable la montre : sa cible, ses extensions. Pour les tests des extensions, qui éprouvent leurs apports dans la page qui les rend.
+ * A page outside any project — help, the legal notice —, as a deliverable shows it: its target, its extensions. For the extensions' tests, which exercise their contributions in the page that renders them.
  */
 export async function mountPage(
   address: string,
@@ -27,7 +27,7 @@ export async function mountPage(
   return view;
 }
 
-/** Le texte de cette page. */
+/** This page's text. */
 export async function pageText(
   address: string,
   target: "web" | "bureau",

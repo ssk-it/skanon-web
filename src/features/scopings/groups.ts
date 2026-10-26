@@ -2,10 +2,10 @@ import type { Scoping } from "../../core/model/model";
 import { displayIdentifier } from "../../core/repo/scoping-reference";
 
 /**
- * Un bloc de la liste : les cadrages en cours, ou un trimestre de livraison.
+ * A block of the list: the scopings in progress, or a delivery quarter.
  *
- * `cle` sert au `track` du template et doit donc rester stable tant que le
- * groupe existe ; `libelle` est ce qui s'affiche.
+ * `key` serves the template's `track` and must therefore stay stable as long as
+ * the group exists; `label` is what is displayed.
  */
 export interface ScopingGroup {
   readonly key: string;
@@ -14,12 +14,12 @@ export interface ScopingGroup {
 }
 
 /**
- * Le trimestre d'une date ISO, sous la forme `2026-T3`.
+ * The quarter of an ISO date, in the form `2026-T3`.
  *
- * Lu en UTC, comme Git la produit. En heure locale, un cadrage livré le 31 mars
- * au soir bascule au trimestre suivant pour un lecteur à l'est de Greenwich et
- * pas pour les autres : le même dépôt se découperait différemment selon le
- * fuseau de qui le regarde.
+ * Read in UTC, as Git produces it. In local time, a scoping delivered on the
+ * evening of 31 March moves to the next quarter for a reader east of Greenwich
+ * and not for the others: the same repo would be divided differently depending
+ * on the time zone of whoever looks at it.
  */
 export function quarterOf(iso: string): string {
   const d = new Date(iso);
@@ -28,24 +28,24 @@ export function quarterOf(iso: string): string {
 
 function quarterLabel(key: string): string {
   const [year, t] = key.split("-T");
-  // « 1ᵉʳ » et non « 1ᵉ » : le premier est le seul à ne pas suivre la règle.
+  // « 1ᵉʳ » and not « 1ᵉ »: the first is the only one not following the rule.
   return `${t}${t === "1" ? "ᵉʳ" : "ᵉ"} trimestre ${year}`;
 }
 
 /**
- * Découpe la liste en blocs : le travail en cours d'abord, puis les cadrages
- * livrés par trimestre, du plus récent au plus ancien.
+ * Cuts the list into blocks: work in progress first, then the scopings
+ * delivered by quarter, from most recent to oldest.
  *
- * **Pourquoi les en cours échappent aux trimestres.** La liste est ordonnée par
- * statut avant de l'être par date. Découper cet ordre par trimestre ferait
- * revenir le même trimestre à plusieurs endroits — les brouillons récents en
- * tête, puis les livrés qui redescendent dans le temps. Les en cours forment
- * donc un bloc à part, et le découpage chronologique ne s'applique qu'en
- * dessous, là où l'ordre est effectivement décroissant.
+ * **Why the in-progress ones escape the quarters.** The list is ordered by
+ * status before being ordered by date. Cutting that order by quarter would bring
+ * the same quarter back in several places — recent drafts at the top, then the
+ * delivered ones going back in time. The in-progress ones therefore form a
+ * separate block, and the chronological division applies only below, where the
+ * order is actually descending.
  *
- * Les dates arrivent après la liste, un appel Git par cadrage. Un cadrage dont
- * la date manque encore rejoint un groupe « sans date » en fin de liste plutôt
- * que de disparaître : mieux vaut le montrer mal placé que pas du tout.
+ * Dates arrive after the list, one Git call per scoping. A scoping whose date
+ * is still missing joins a « sans date » group at the end of the list rather
+ * than disappearing: better to show it misplaced than not at all.
  */
 export function groupScopings(
   scopings: readonly Scoping[],
@@ -59,8 +59,8 @@ export function groupScopings(
     groups.push({ key: "en-cours", label: "En cours", scopings: inProgress });
   }
 
-  // Un Map conserve l'ordre d'insertion : les livrés arrivant déjà du plus
-  // récent au plus ancien, les trimestres se suivent sans avoir à les retrier.
+  // A Map keeps insertion order: since delivered ones already arrive from most
+  // recent to oldest, the quarters follow one another without re-sorting.
   const byQuarter = new Map<string, Scoping[]>();
   const undated: Scoping[] = [];
   for (const c of delivered) {
@@ -75,10 +75,10 @@ export function groupScopings(
     else byQuarter.set(key, [c]);
   }
 
-  // Aucun livré daté : découper n'aurait aucun sens, et un en-tête « Pas encore
-  // daté » coiffant toute la liste passerait pour une catégorie de cadrages —
-  // RG-liste-cadrages-sobre. Le pourquoi se dit une fois, à part : voir
-  // `etatDatesLivres`.
+  // No dated delivered one: cutting would make no sense, and a « Pas encore
+  // daté » header topping the whole list would pass for a category of scopings —
+  // RG-liste-cadrages-sobre. The why is said once, separately: see
+  // `deliveredDatesState`.
   if (!byQuarter.size) {
     if (undated.length)
       groups.push({ key: "livres", label: "Livrés", scopings: undated });
@@ -89,10 +89,10 @@ export function groupScopings(
     groups.push({ key, label: quarterLabel(key), scopings: members });
   }
   if (undated.length) {
-    // « Pas encore daté » et non « Date inconnue » : le cas courant n'est pas
-    // une anomalie mais un cadrage qui vit encore sur sa branche, sans date de
-    // livraison sur la principale. Le second cas, une date qui tarde à
-    // arriver, se résout de lui-même au chargement suivant.
+    // « Pas encore daté » and not « Date inconnue »: the common case is not
+    // an anomaly but a scoping still living on its branch, with no delivery
+    // date on the main one. The second case, a date slow to
+    // arrive, resolves itself on the next load.
     groups.push({
       key: "sans-date",
       label: "Pas encore daté",
@@ -103,11 +103,11 @@ export function groupScopings(
 }
 
 /**
- * Où en sont les dates des cadrages livrés.
+ * Where the dates of delivered scopings stand.
  *
- * `chargement` tant qu'il en reste à lire ; `indisponibles` quand aucune n'a pu
- * l'être — la liste le dit alors une fois, avec sa cause ; `lues` dès qu'une
- * date est connue, ou quand rien n'est livré.
+ * `chargement` while some remain to be read; `indisponibles` when none could
+ * be — the list then says so once, with its cause; `lues` as soon as one date
+ * is known, or when nothing is delivered.
  */
 export function deliveredDatesState(
   scopings: readonly Scoping[],
@@ -120,7 +120,7 @@ export function deliveredDatesState(
   return dates.some((d) => d === undefined) ? "chargement" : "indisponibles";
 }
 
-/** Minuscules, sans accents : « Pièces » se trouve en tapant « pieces ». */
+/** Lowercase, without accents: « Pièces » is found by typing « pieces ». */
 function normalize(text: string): string {
   return text
     .normalize("NFD")
@@ -129,13 +129,13 @@ function normalize(text: string): string {
 }
 
 /**
- * Les cadrages qui répondent au filtre, dans l'ordre reçu —
+ * The scopings that match the filter, in the order received —
  * RG-liste-cadrages-filtrable.
  *
- * Le texte porte sur l'identifiant, tel qu'il est stocké et tel qu'il s'affiche,
- * et sur le titre. Les domaines s'additionnent : un cadrage en retient un parmi
- * ceux choisis. Filtrer avant de grouper garde l'ordre du cycle de vie et la
- * séparation des cadrages en cours.
+ * The text applies to the identifier, as stored and as displayed, and to the
+ * title. Domains add up: a scoping is kept if it has one among those chosen.
+ * Filtering before grouping keeps the life-cycle order and the separation of
+ * scopings in progress.
  */
 export function filterScopings(
   scopings: readonly Scoping[],

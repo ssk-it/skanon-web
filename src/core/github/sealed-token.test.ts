@@ -11,20 +11,20 @@ import { TokenService } from "./token.service";
 const TOKEN = "github_pat_11AAAAAAA0secretdurouge";
 const OTHER = "ghp_autrejetondelorganisationacme";
 
-/** Tout ce que le navigateur garde pour l'origine, d'un bloc. */
+/** Everything the browser keeps for the origin, in one block. */
 function storage(): string {
   return Object.keys(localStorage)
     .map((k) => `${k}=${localStorage.getItem(k)}`)
     .join("\n");
 }
 
-/** La version web, dont la passkey est simulée. */
+/** The web version, whose passkey is simulated. */
 function onTheWeb(auth: FakeAuthenticator): void {
   const vault = new BrowserSealedVault(auth);
   provide(PLATFORM, { ...createWebPlatform(), vault, sealing: vault });
 }
 
-/** Un nouvel onglet : un service neuf sur le même stockage. */
+/** A new tab: a fresh service on the same storage. */
 async function reopen(auth: FakeAuthenticator): Promise<TokenService> {
   const { resetInjection } = await import("../injection");
   resetInjection();
@@ -35,9 +35,9 @@ async function reopen(auth: FakeAuthenticator): Promise<TokenService> {
 }
 
 /**
- * Le jeton de la version web derrière une passkey (RG-secret-conserve-localement, RG-protection-du-jeton-par-projet).
+ * The web version's token behind a passkey (RG-secret-conserve-localement, RG-protection-du-jeton-par-projet).
  */
-describe("le jeton gardé sous passkey", () => {
+describe("the token kept under a passkey", () => {
   let auth: FakeAuthenticator;
   let service: TokenService;
 
@@ -49,12 +49,12 @@ describe("le jeton gardé sous passkey", () => {
     await service.initialize();
   });
 
-  it("dit le jeton gardé en clair tant que rien n’est protégé", () => {
+  it("says the token is kept in plain text as long as nothing is protected", () => {
     service.set(TOKEN);
     expect(service.form()).toBe("en-clair");
   });
 
-  it("protège les jetons en place, et n’en laisse que le chiffré", async () => {
+  it("protects the tokens in place, and leaves only the ciphertext", async () => {
     service.set(TOKEN);
     service.setForScope("acme", OTHER);
     await flushPromises();
@@ -64,7 +64,7 @@ describe("le jeton gardé sous passkey", () => {
     expect(storage()).not.toContain(OTHER);
   });
 
-  it("se rouvre verrouillé, sans jeton, puis par la passkey", async () => {
+  it("reopens locked, without a token, then through the passkey", async () => {
     service.set(TOKEN);
     await flushPromises();
     await service.protect();
@@ -79,7 +79,7 @@ describe("le jeton gardé sous passkey", () => {
     expect(tab.value()).toBe(TOKEN);
   });
 
-  it("reste verrouillé quand le déverrouillage est annulé, et le dit", async () => {
+  it("stays locked when unlocking is cancelled, and says so", async () => {
     service.set(TOKEN);
     await flushPromises();
     await service.protect();
@@ -90,7 +90,7 @@ describe("le jeton gardé sous passkey", () => {
     expect(tab.passkeyFailure()).toBe("annule");
   });
 
-  it("s’ouvre dès l’ouverture de l’onglet, sans attendre de clic", async () => {
+  it("opens as soon as the tab opens, without waiting for a click", async () => {
     service.set(TOKEN);
     await flushPromises();
     await service.protect();
@@ -99,7 +99,7 @@ describe("le jeton gardé sous passkey", () => {
     expect(tab.value()).toBe(TOKEN);
   });
 
-  it("ne dit rien d’un refus à l’ouverture de l’onglet : le navigateur a pu exiger un clic", async () => {
+  it("says nothing of a refusal when the tab opens: the browser may have required a click", async () => {
     service.set(TOKEN);
     await flushPromises();
     await service.protect();
@@ -110,7 +110,7 @@ describe("le jeton gardé sous passkey", () => {
     expect(tab.passkeyFailure()).toBeNull();
   });
 
-  it("garde scellé un jeton saisi une fois ouvert", async () => {
+  it("keeps sealed a token entered once opened", async () => {
     service.set(TOKEN);
     await flushPromises();
     await service.protect();
@@ -123,7 +123,7 @@ describe("le jeton gardé sous passkey", () => {
     expect(tab.value()).toBe(OTHER);
   });
 
-  it("protège un jeton à sa saisie sans jamais l’écrire en clair", async () => {
+  it("protects a token on entry without ever writing it in plain text", async () => {
     const writes: string[] = [];
     const write = localStorage.setItem.bind(localStorage);
     vi.spyOn(localStorage, "setItem").mockImplementation((k, v) => {
@@ -136,7 +136,7 @@ describe("le jeton gardé sous passkey", () => {
     vi.restoreAllMocks();
   });
 
-  it("garde en clair, et le dit, un jeton dont la protection est annulée sur un projet qui la propose", async () => {
+  it("keeps in plain text, and says so, a token whose protection is cancelled on a project that offers it", async () => {
     auth.cancel = true;
     expect(await service.setProtected("", TOKEN)).toBe("annule");
     await flushPromises();
@@ -145,7 +145,7 @@ describe("le jeton gardé sous passkey", () => {
     expect(storage()).toContain(TOKEN);
   });
 
-  it("efface le scellé avec les jetons", async () => {
+  it("erases the sealed store with the tokens", async () => {
     service.set(TOKEN);
     await flushPromises();
     await service.protect();
@@ -157,7 +157,7 @@ describe("le jeton gardé sous passkey", () => {
   });
 });
 
-describe("le projet qui exige la passkey", () => {
+describe("the project that requires the passkey", () => {
   let auth: FakeAuthenticator;
   let service: TokenService;
 
@@ -169,7 +169,7 @@ describe("le projet qui exige la passkey", () => {
     await service.initialize();
   });
 
-  it("retire du navigateur le jeton gardé en clair, sans l’ôter à l’onglet", async () => {
+  it("removes from the browser the token kept in plain text, without taking it from the tab", async () => {
     service.set(TOKEN);
     await flushPromises();
     service.requireProtection("exigee");
@@ -179,7 +179,7 @@ describe("le projet qui exige la passkey", () => {
     expect(service.form()).toBe("session");
   });
 
-  it("n’écrit jamais en clair un jeton saisi ensuite", async () => {
+  it("never writes in plain text a token entered afterwards", async () => {
     service.requireProtection("exigee");
     service.set(OTHER);
     await flushPromises();
@@ -187,7 +187,7 @@ describe("le projet qui exige la passkey", () => {
     expect(service.value()).toBe(OTHER);
   });
 
-  it("ne garde que pour l’onglet un jeton dont la protection est annulée", async () => {
+  it("keeps only for the tab a token whose protection is cancelled", async () => {
     service.requireProtection("exigee");
     auth.cancel = true;
     expect(await service.setProtected("", TOKEN)).toBe("annule");
@@ -197,7 +197,7 @@ describe("le projet qui exige la passkey", () => {
     expect(service.form()).toBe("session");
   });
 
-  it("garde le jeton protégé une fois la passkey créée", async () => {
+  it("keeps the token protected once the passkey is created", async () => {
     service.set(TOKEN);
     service.requireProtection("exigee");
     expect(await service.protect()).toBe("scelle");
@@ -206,8 +206,8 @@ describe("le projet qui exige la passkey", () => {
     expect(tab.locked()).toBe(true);
   });
 
-  it("suit le plus exigeant des projets ouverts dans l’onglet", async () => {
-    // un jeton peut en ouvrir plusieurs : on ne garde pas en clair, pour l'un, ce que l'autre a demandé de protéger
+  it("follows the most demanding of the projects open in the tab", async () => {
+    // a token may open several: we do not keep in plain text, for one, what the other asked to protect
     service.requireProtection("exigee");
     service.requireProtection("proposee");
     service.set(TOKEN);
@@ -216,7 +216,7 @@ describe("le projet qui exige la passkey", () => {
     expect(service.form()).toBe("session");
   });
 
-  it("n’exige rien de plus sur le bureau, dont le coffre du système suffit", async () => {
+  it("requires nothing more on the desktop, whose system vault is enough", async () => {
     const { resetInjection } = await import("../injection");
     resetInjection();
     const vault = {
@@ -239,8 +239,8 @@ describe("le projet qui exige la passkey", () => {
   });
 });
 
-describe("les contenus privés suivent le jeton", () => {
-  it("chiffre le cache une fois les jetons ouverts, et ne le chiffre plus quand ils sont oubliés", async () => {
+describe("private contents follow the token", () => {
+  it("encrypts the cache once the tokens are opened, and stops encrypting it when they are forgotten", async () => {
     localStorage.clear();
     const auth = new FakeAuthenticator();
     onTheWeb(auth);
@@ -253,7 +253,7 @@ describe("les contenus privés suivent le jeton", () => {
     await flushPromises();
 
     await service.protect();
-    // ce que le cache gardait en clair ne survit pas au scellement
+    // what the cache kept in plain text does not survive sealing
     expect(clearPrivate).toHaveBeenCalled();
     expect(encryptWith).toHaveBeenLastCalledWith(expect.anything());
 
@@ -261,7 +261,7 @@ describe("les contenus privés suivent le jeton", () => {
     expect(encryptWith).toHaveBeenLastCalledWith(null);
   });
 
-  it("tient le cache fermé tant que les jetons sont verrouillés", async () => {
+  it("keeps the cache closed as long as the tokens are locked", async () => {
     localStorage.clear();
     const auth = new FakeAuthenticator();
     onTheWeb(auth);

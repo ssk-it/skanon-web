@@ -2,25 +2,25 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 export interface TocEntry {
-  /** Ancre, sans dièse. */
+  /** Anchor, without the hash. */
   readonly id: string;
   readonly label: string;
-  /** 0 pour une section, 1 pour un élément à l'intérieur. */
+  /** 0 for a section, 1 for an element inside it. */
   readonly level: 0 | 1;
-  /** Pastille courte affichée à droite : opération d'impact, statut… */
+  /** Short badge displayed on the right: impact operation, status… */
   readonly badge?: string;
 }
 
 /**
- * Sommaire latéral qui suit le défilement.
+ * Side table of contents that follows scrolling.
  *
- * La section active est déterminée par IntersectionObserver plutôt que par un calcul de position à chaque événement de défilement : le navigateur fait le travail hors du fil principal, et la liste reste fluide sur une fiche longue.
+ * The active section is determined by IntersectionObserver rather than by a position calculation on every scroll event: the browser does the work off the main thread, and the list stays smooth on a long page.
  *
  * ```vue
- * <SommaireLateral :entrees="entrees" titre="Sur cette page" />
+ * <SideToc :entries="entries" title="Sur cette page" />
  * ```
  *
- * L’élément racine est `div.sommaire`, l’hôte `pc-sommaire` de SSK Canon. Le composant s’appelait `Sommaire` : un nom d’un seul mot, que la règle `vue/multi-word-component-names` refuse.
+ * The root element is `div.sommaire`, SSK Canon's `pc-sommaire` host. The component was called `Sommaire`: a single-word name, which the `vue/multi-word-component-names` rule rejects.
  */
 const props = withDefaults(
   defineProps<{ entries: readonly TocEntry[]; title?: string }>(),
@@ -30,9 +30,9 @@ const props = withDefaults(
 const active = ref("");
 let observer: IntersectionObserver | null = null;
 
-// les ancres n'existent qu'une fois la fiche rendue
+// anchors only exist once the page is rendered
 onMounted(() => void nextTick(observeSections));
-// et la liste change quand on passe d'un cadrage à un autre
+// and the list changes when moving from one scoping to another
 watch(
   () => props.entries,
   () => queueMicrotask(observeSections),
@@ -56,14 +56,14 @@ function observeSections(): void {
         if (e.isIntersecting) visibleOnes.add(e.target.id);
         else visibleOnes.delete(e.target.id);
       }
-      // Un enfant visible l'emporte sur sa section : quand on lit une décision précise, marquer « Décisions » n'apprend rien, alors que le titre de la décision situe la lecture. À défaut, la section.
+      // A visible child wins over its section: when reading a specific decision, highlighting « Décisions » teaches nothing, whereas the decision's title locates the reading. Failing that, the section.
       const list = props.entries;
       const child = list.find((e) => e.level === 1 && visibleOnes.has(e.id));
       const first = child ?? list.find((e) => visibleOnes.has(e.id));
       if (first) active.value = first.id;
     },
     {
-      // Bande de lecture : sous la barre collante, et s'arrêtant au premier tiers de l'écran. Un élément devient actif quand il atteint le haut de la zone lue, pas quand il affleure le bas.
+      // Reading band: below the sticky bar, and stopping at the first third of the screen. An element becomes active when it reaches the top of the read area, not when it peeks in at the bottom.
       rootMargin: "-88px 0px -66% 0px",
       threshold: 0,
     },
@@ -72,7 +72,7 @@ function observeSections(): void {
   observer = next;
 }
 
-/** Défilement doux sans polluer l'historique de navigation. */
+/** Smooth scrolling without polluting the navigation history. */
 function scrollToEntry(event: Event, id: string): void {
   const target = document.getElementById(id);
   if (!target) return;
@@ -84,7 +84,7 @@ function scrollToEntry(event: Event, id: string): void {
     block: "start",
   });
   active.value = id;
-  // rend la cible focalisable pour les lecteurs d'écran, sans contour visible
+  // makes the target focusable for screen readers, without a visible outline
   target.setAttribute("tabindex", "-1");
   target.focus({ preventScroll: true });
 }
@@ -111,11 +111,11 @@ function scrollToEntry(event: Event, id: string): void {
 </template>
 
 <style scoped>
-/* Le collant vit sur la racine : un élément sticky imbriqué dans un parent non collant reste attaché à ce dernier et défile avec lui. C'est ce qui faisait disparaître le sommaire en bas de page. */
+/* The sticky lives on the root: a sticky element nested in a non-sticky parent stays attached to the latter and scrolls with it. That is what made the table of contents disappear at the bottom of the page. */
 .sommaire {
   display: block;
   position: sticky;
-  /* sous la barre d'application, elle-même collante */
+  /* below the application bar, itself sticky */
   top: 84px;
   max-height: calc(100vh - 108px);
   overflow-y: auto;

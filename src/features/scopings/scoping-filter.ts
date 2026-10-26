@@ -11,18 +11,18 @@ interface FilterState {
 const NONE: ReadonlySet<string> = new Set();
 
 /**
- * Le filtre de la liste des cadrages, tenu hors de la page —
+ * The scopings list filter, held outside the page —
  * RG-liste-cadrages-filtrable.
  *
- * La page est détruite dès qu'on ouvre une fiche : le filtre qu'elle tiendrait
- * se perdrait au retour, et il faudrait refaire, à chaque cadrage consulté, le
- * geste qui menait à lui. Tenu ici, il survit à la navigation dans
- * l'application, par le lien de retour comme par le navigateur.
+ * The page is destroyed as soon as a scoping page is opened: the filter it held
+ * would be lost on return, and the gesture that led to each consulted scoping
+ * would have to be redone. Held here, it survives navigation within the
+ * application, through the back link as through the browser.
  *
- * Il appartient au projet où il a été posé : les domaines d'un projet n'existent
- * pas dans un autre, et y appliquer le filtre viderait la liste sans raison
- * visible. Il ne survit pas à un rechargement, ce qui n'est pas un manque : il
- * sert à parcourir, non à être retrouvé.
+ * It belongs to the project where it was set: one project's domains do not
+ * exist in another, and applying the filter there would empty the list for no
+ * visible reason. It does not survive a reload, which is not a shortcoming: it
+ * serves to browse, not to be found again.
  */
 export class ScopingFilter {
   private readonly config = inject(RepoConfig);

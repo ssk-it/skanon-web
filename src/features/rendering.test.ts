@@ -17,9 +17,9 @@ import SpecificationPage from "./specification/SpecificationPage.vue";
 import RulePage from "./specification/RulePage.vue";
 
 /**
- * Monte les écrans avec un référentiel réaliste et inspecte le DOM produit.
+ * Mounts the screens with a realistic specification and inspects the DOM produced.
  *
- * Ce qui est vérifié ici est ce qu'un coup d'œil au navigateur montrerait : que les données arrivent à l'écran, et que les deux cas subtils du modèle — la divergence d'énoncé et l'abrogation — sont visibles et expliqués.
+ * What is checked here is what a glance at the browser would show: that the data reach the screen, and that the model's two subtle cases — statement divergence and repeal — are visible and explained.
  */
 const TREE = {
   sha: "racine",
@@ -115,9 +115,9 @@ async function loadTestSpecification(): Promise<void> {
 
   http.expectOne((r) => r.url.includes("/git/trees/")).flush(TREE);
 
-  // Les requêtes de contenu partent après résolution de l'arborescence, à travers plusieurs micro-tâches et une file à concurrence bornée : on répond à ce qui est en vol jusqu'à épuisement plutôt que de supposer un timing.
+  // Content requests go out after the tree is resolved, across several microtasks and a bounded-concurrency queue: we answer whatever is in flight until exhausted rather than assume a timing.
   const remaining = new Set(Object.keys(FILES));
-  // Un tour de la boucle d'événements à chaque fois, non une micro-tâche : sous la charge de toute la suite, une étape de la lecture peut attendre plus que les micro-tâches d'un tour.
+  // One turn of the event loop each time, not a microtask: under the load of the whole suite, a step of the read can wait longer than one turn's microtasks.
   for (let round = 0; round < 50 && remaining.size; round++) {
     await new Promise((r) => setTimeout(r, 0));
     for (const path of [...remaining]) {
@@ -132,7 +132,7 @@ async function loadTestSpecification(): Promise<void> {
   await p;
 }
 
-/** Monte `page` à l'adresse `chemin` du dépôt de test, le référentiel déjà chargé. */
+/** Mounts `page` at the test repo's address `path`, with the specification already loaded. */
 async function mountView(page: Component, path: string): Promise<HTMLElement> {
   const router = createAppRouter(createMemoryHistory());
   await router.push(`/test/test/${path}`);
@@ -142,55 +142,55 @@ async function mountView(page: Component, path: string): Promise<HTMLElement> {
   return view.element.parentElement ?? (view.element as HTMLElement);
 }
 
-// Mermaid pèse plusieurs mégaoctets, et `MarkdownRendu` le charge à la demande : sous la charge de toute la suite, ce premier chargement dépassait à lui seul le délai d'un test (constaté une fois sur six). Le charger avant, avec son propre délai, laisse aux tests le seul comportement à éprouver.
+// Mermaid weighs several megabytes, and `RenderedMarkdown` loads it on demand: under the load of the whole suite, that first load alone exceeded a test's timeout (observed once in six). Loading it beforehand, with its own timeout, leaves the tests only the behaviour to test.
 beforeAll(async () => {
   await import("mermaid");
 }, 60_000);
 
-describe("rendu des écrans", () => {
+describe("screen rendering", () => {
   beforeEach(() => {
     http = provideHttpTesting();
   });
 
-  it("la page référentiel liste les domaines avec leur compte", async () => {
+  it("the specification page lists the domains with their count", async () => {
     await loadTestSpecification();
     const el = await mountView(SpecificationPage, "referentiel");
 
     const text = el.textContent ?? "";
     expect(text).toContain("Facturation");
     expect(text).toContain("1 fonctionnalités");
-    // le compte n'inclut pas la règle abrogée
+    // the count does not include the repealed rule
     expect(text).toContain("1 règles actives");
   });
 
-  it("la fiche domaine liste les cadrages qui s’y rattachent", async () => {
+  it("the domain page lists the scopings attached to it", async () => {
     await loadTestSpecification();
     const el = await mountView(DomainPage, "referentiel/domaine/facturation");
 
-    // Le rattachement est celui que le cadrage déclare : il peut ne toucher aucune règle du domaine — n'en décrire que l'architecture — et devoir s'y lire tout de même.
+    // The attachment is the one the scoping declares: it may touch no rule of the domain — describe only its architecture — and still have to be read there.
     const link = el.querySelector('a[href$="/cadrages/2026-001"]');
     expect(link).not.toBeNull();
     expect(link?.textContent).toContain("Relance automatique");
     expect(link?.querySelector(".statut-chip")).not.toBeNull();
   });
 
-  it("la fiche domaine dessine le diagramme au lieu d’en montrer la source", async () => {
+  it("the domain page draws the diagram instead of showing its source", async () => {
     await loadTestSpecification();
     const el = await mountView(DomainPage, "referentiel/domaine/facturation");
     await new Promise((r) => setTimeout(r, 300));
     await flushPromises();
 
-    // La prose qui entoure le schéma se lit toujours.
+    // The prose around the diagram is always readable.
     expect(el.textContent).toContain("Émission et suivi des factures.");
-    // Le bloc a quitté la forme où le rendu Markdown le laisse : c'est exactement ce que la page montrait, et qu'on prenait pour le contenu.
+    // The block has left the form in which Markdown rendering leaves it: that is exactly what the page showed, and what was taken for the content.
     expect(el.querySelector("code.language-mermaid")).toBeNull();
-    // Il occupe son emplacement — dessiné, ou signalé en échec, le moteur mesurant le texte par `getBBox` que l'environnement de test n'a pas.
+    // It takes up its slot — drawn, or flagged as failed, since the engine measures text with `getBBox`, which the test environment lacks.
     expect(
       el.querySelector(".pc-diagramme, .pc-diagramme-erreur"),
     ).not.toBeNull();
   });
 
-  it("la fiche règle remonte au cadrage responsable", async () => {
+  it("the rule page goes back to the responsible scoping", async () => {
     await loadTestSpecification();
     const el = await mountView(RulePage, "referentiel/regle/RG-limite");
 
@@ -201,7 +201,7 @@ describe("rendu des écrans", () => {
     expect(el.querySelector(".operation-chip")?.textContent).toContain("crée");
   });
 
-  it("la fiche règle signale une règle abrogée", async () => {
+  it("the rule page flags a repealed rule", async () => {
     await loadTestSpecification();
     const el = await mountView(RulePage, "referentiel/regle/RG-obsolete");
 
@@ -209,7 +209,7 @@ describe("rendu des écrans", () => {
     expect(el.textContent).toContain("ne s’applique plus");
   });
 
-  it("la fiche cadrage rend objectif, liens et impacts", async () => {
+  it("the scoping page renders goal, links and impacts", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingPage, "cadrages/2026-001");
 
@@ -222,23 +222,23 @@ describe("rendu des écrans", () => {
     expect(el.querySelectorAll(".impact").length).toBe(2);
   });
 
-  it("la fiche cadrage rassemble sous « Divers » ce que le gabarit ignore", async () => {
+  it("the scoping page gathers under « Divers » what the template ignores", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingPage, "cadrages/2026-001");
 
     const block = el.querySelector("#divers");
     expect(block).not.toBeNull();
-    // le titre d'origine, seul à dire de quoi la section parle
+    // the original title, the only thing that says what the section is about
     expect(block?.querySelector("h3")?.textContent?.trim()).toBe(
       "Ce que la mesure a montré",
     );
     expect(block?.textContent).toContain("partent le week-end");
-    // et sa sous-section, qui n'a pas d'autre endroit où se lire
+    // and its subsection, which has nowhere else to be read
     expect(block?.textContent).toContain("Une observation, hors périmètre");
     expect(block?.textContent).toContain("ne sont pas conservés");
   });
 
-  it("le sommaire nomme chaque section rassemblée sous « Divers »", async () => {
+  it("the table of contents names each section gathered under « Divers »", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingPage, "cadrages/2026-001");
 
@@ -250,11 +250,11 @@ describe("rendu des écrans", () => {
     );
   });
 
-  it("la fiche cadrage signale un énoncé divergent de l’énoncé courant", async () => {
+  it("the scoping page flags a statement that diverges from the current statement", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingPage, "cadrages/2026-001");
 
-    // le cadrage dit « trois », la règle dit « quatorze » : l'écart doit être expliqué, sinon le lecteur y voit une incohérence
+    // the scoping says « trois », the rule says « quatorze »: the gap must be explained, otherwise the reader sees an inconsistency
     const divergence = el.querySelector(".i-divergence");
     expect(divergence).not.toBeNull();
     expect(divergence?.textContent).toContain(
@@ -263,21 +263,21 @@ describe("rendu des écrans", () => {
     expect(el.textContent).toContain("trois");
   });
 
-  it("le sommaire liste les sections, les décisions et les impacts", async () => {
+  it("the table of contents lists the sections, the decisions and the impacts", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingPage, "cadrages/2026-001");
 
     const links = el.querySelectorAll(".sommaire a");
     const labels = [...links].map((a) => a.textContent?.trim() ?? "");
 
-    // les sections présentes, et chaque impact nommément — c'est ce qu'on cherche en revenant sur une fiche
+    // the sections present, and each impact by name — that is what one looks for when coming back to a page
     expect(labels.some((l) => l.startsWith("Objectif"))).toBe(true);
     expect(labels.some((l) => l.includes("Impacts"))).toBe(true);
     expect(labels.some((l) => l.includes("RG-limite"))).toBe(true);
     expect(labels.some((l) => l.includes("RG-obsolete"))).toBe(true);
   });
 
-  it("le sommaire marque l’opération de chaque impact", async () => {
+  it("the table of contents marks the operation of each impact", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingPage, "cadrages/2026-001");
 
@@ -287,7 +287,7 @@ describe("rendu des écrans", () => {
     expect(line?.querySelector(".marque")?.textContent?.trim()).toBe("abroge");
   });
 
-  it("les ancres du sommaire correspondent à des éléments de la fiche", async () => {
+  it("the table of contents anchors match elements of the page", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingPage, "cadrages/2026-001");
 
@@ -295,25 +295,25 @@ describe("rendu des écrans", () => {
       (a.getAttribute("href") ?? "").replace("#", ""),
     );
     expect(anchors.length).toBeGreaterThan(0);
-    // un sommaire dont les liens ne mènent nulle part est pire qu'aucun sommaire
+    // a table of contents whose links lead nowhere is worse than none
     const ids = new Set([...el.querySelectorAll("[id]")].map((n) => n.id));
     for (const anchor of anchors) {
       expect(ids.has(anchor)).toBe(true);
     }
   });
 
-  it("la liste des cadrages suit le cycle de vie puis l’identifiant", async () => {
+  it("the scopings list follows the life cycle then the identifier", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingsPage, "cadrages");
 
     const ids = [...el.querySelectorAll(".ligne .cid")].map(
       (n) => n.textContent?.trim() ?? "",
     );
-    // le jeu de test n'a qu'un cadrage, mais l'ordre doit être déterministe
+    // the test fixture has only one scoping, but the order must be deterministic
     expect(ids).toEqual(["2026-001"]);
   });
 
-  it("la liste n’affiche pas « 0 impact » pour un cadrage sans impact", async () => {
+  it("the list does not show « 0 impact » for a scoping without impacts", async () => {
     await loadTestSpecification();
     const el = await mountView(ScopingsPage, "cadrages");
 

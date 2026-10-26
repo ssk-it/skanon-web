@@ -3,10 +3,10 @@ import { signal } from "../signals";
 import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { SpecificationStore } from "./specification.store";
 
-/** Ce qui signe un dépôt outillé, quel que soit le nom donné aux fichiers. */
+/** What marks an equipped repo, whatever name the files are given. */
 const ACTION = "ssk-it/ssk-canon-action";
 
-/** Où vivent les workflows, et ce que chacun apporte. */
+/** Where the workflows live, and what each one brings. */
 const WORKFLOWS: ReadonlyArray<{ path: string; content: string }> = [
   {
     path: ".github/workflows/verification-depot-cadre.yml",
@@ -86,11 +86,11 @@ jobs:
 ];
 
 /**
- * Droit d'écrire sous `.github/workflows/`, que la plateforme traite à part.
+ * Permission to write under `.github/workflows/`, which the platform treats apart.
  *
- * Un accès qui écrit partout ailleurs peut être refusé ici seul : c'est une
- * permission distincte, parce qu'un workflow s'exécute avec les droits du dépôt.
- * Le refus doit donc nommer cette cause, sous peine d'être lu comme une panne.
+ * An access that writes everywhere else can be refused here alone: it is a
+ * distinct permission, because a workflow runs with the repo's rights.
+ * The refusal must therefore name that cause, or it will be read as an outage.
  */
 export class AutomationRefused extends Error {
   constructor() {
@@ -104,34 +104,34 @@ export class AutomationRefused extends Error {
 }
 
 /**
- * Installation de l'automatisation dans un dépôt cadré.
+ * Installing automation in a framing repo.
  *
- * Sans elle, rien n'empêche de livrer un cadrage incohérent, et les règles ne
- * sont jamais mises à jour : le référentiel cesse d'être la projection des
- * cadrages livrés, ce dont dépend tout le reste. C'est deux fichiers à copier —
- * assez peu pour qu'on le remette à plus tard, assez conséquent pour que
- * l'oubli se paie.
+ * Without it, nothing prevents delivering an inconsistent scoping, and rules are
+ * never updated: the specification stops being the projection of the
+ * delivered scopings, which everything else depends on. It is two files to copy —
+ * few enough to be put off, consequential enough for
+ * forgetting it to cost.
  */
 export class AutomationService {
   private readonly github = inject(GithubClient);
   private readonly store = inject(SpecificationStore);
 
   /**
-   * Dit si le dépôt porte déjà les deux workflows.
+   * Says whether the repo already carries both workflows.
    *
-   * `null` tant que la question n'a pas été posée : l'absence d'automatisation
-   * et l'ignorance ne se présentent pas de la même façon à l'écran.
+   * `null` until the question has been asked: missing automation
+   * and not knowing are not presented the same way on screen.
    */
   readonly installed = signal<boolean | null>(null);
 
   /**
-   * Regarde si l'automatisation est en place.
+   * Checks whether automation is in place.
    *
-   * Sur l'appel à l'action, non sur le nom des fichiers : un dépôt outillé avant
-   * que l'application ne sache le faire les a nommés autrement, et chercher les
-   * noms que nous déposons lui proposerait d'installer ce qu'il a déjà — puis
-   * de le doubler. C'est ce qu'a fait la première version, sur notre propre
-   * dépôt de référence.
+   * By the call to the action, not by file names: a repo equipped before
+   * the application could do it named them otherwise, and looking for the
+   * names we drop would offer to install what it already has — then
+   * to duplicate it. That is what the first version did, on our own
+   * reference repo.
    */
   async check(): Promise<void> {
     try {
@@ -148,18 +148,18 @@ export class AutomationService {
       );
       this.installed.set(contents.some((c) => c.includes(ACTION)));
     } catch {
-      // Ne rien affirmer si la question n'a pas pu être posée : proposer
-      // d'installer ce qui est peut-être déjà là serait pire que se taire.
+      // Assert nothing if the question could not be asked: offering
+      // to install what may already be there would be worse than keeping quiet.
       this.installed.set(null);
     }
   }
 
   /**
-   * Dépose les workflows sur la branche principale.
+   * Drops the workflows on the default branch.
    *
-   * Directement, comme l'amorçage : une automatisation qui attend une relecture
-   * ne protège rien pendant qu'elle attend, et c'est justement la période où le
-   * dépôt est le plus exposé.
+   * Directly, like bootstrapping: an automation waiting for a review
+   * protects nothing while it waits, and that is precisely the period when the
+   * repo is most exposed.
    */
   async install(): Promise<void> {
     const repoRef: RepoRef = this.store.repoRef();
@@ -175,9 +175,9 @@ export class AutomationService {
           `Installe l'automatisation : ${w.path.split("/").pop()}`,
         );
       } catch (e) {
-        // La plateforme refuse par un 403 dépourvu de motif lisible. Le
-        // traduire ici évite de le présenter comme une panne, alors que c'est
-        // un droit manquant que le rédacteur peut lui-même s'accorder.
+        // The platform refuses with a 403 lacking a readable reason. Translating
+        // it here avoids presenting it as an outage, whereas it is
+        // a missing permission the author can grant themselves.
         if (e instanceof GithubError && e.status === 403) {
           throw new AutomationRefused();
         }

@@ -1,8 +1,8 @@
 <script lang="ts">
-/** Ce que la barre transmet à l'ouverture. */
+/** What the bar passes on opening. */
 export interface PaletteData {
   /**
-   * Vrai quand le lecteur regarde le référentiel à une autre date que maintenant. La recherche porte sur l'état courant (2026-042, décision 02) : sans le dire, un lecteur qui remonte le temps prendrait le présent pour ce qu'il regardait.
+   * True when the reader looks at the specification at another date than now. The search covers the current state (2026-042, decision 02): without saying so, a reader going back in time would take the present for what they were looking at.
    */
   readonly onPastState: boolean;
 }
@@ -31,7 +31,7 @@ const GROUP_LABEL: Record<ResultKind, string> = {
 };
 
 /**
- * Au-delà, la palette cesse d'aider à choisir : elle invite à préciser plutôt que de dérouler une liste qu'on ne lira pas.
+ * Beyond this, the palette stops helping to choose: it invites narrowing down rather than unrolling a list no one will read.
  */
 const MAX_PER_GROUP = 6;
 
@@ -44,11 +44,11 @@ interface Group {
 }
 
 /**
- * Chercher dans le référentiel depuis n'importe quelle vue — RG-recherche-a-portee-de-clavier.
+ * Search the specification from any view — RG-recherche-a-portee-de-clavier.
  *
- * Une palette, non une vue : une recherche sert à aller ailleurs, et l'adresse qui compte est celle de l'élément trouvé, qui existe déjà. Échap rend la vue quittée intacte.
+ * A palette, not a view: a search serves to go elsewhere, and the address that matters is that of the found element, which already exists. Escape leaves the departed view intact.
  *
- * L'élément racine est `div.palette-recherche`, l'hôte `pc-palette-recherche` de SSK Canon. `App.vue` l'ouvre par `DialogService` avec ces `data`, et attend `fermer`.
+ * The root element is `div.palette-recherche`, SSK Canon's `pc-palette-recherche` host. `App.vue` opens it through `DialogService` with this `data`, and waits for `close`.
  */
 const props = defineProps<{ data: PaletteData }>();
 const emit = defineEmits<{ close: [] }>();
@@ -61,16 +61,16 @@ const query = ref("");
 const activeIndex = ref(0);
 
 /**
- * L'index suit le référentiel : il se reconstruit quand celui-ci change — après une écriture, ou quand les branches finissent d'arriver.
+ * The index follows the specification: it is rebuilt when the latter changes — after a write, or when the branches finish arriving.
  */
 const index = computed(() => buildSearchIndex(store.specification()));
 
 const results = computed(() => findResults(index.value, query.value));
 
 /**
- * Le référentiel par nature, puis les cadrages en cours.
+ * The specification by kind, then the scopings in progress.
  *
- * Les cadrages en cours forment un groupe à part et le dernier : ils arrivent après les autres, et s'ajouter en fin de liste ne déplace pas ce que le lecteur était en train de parcourir.
+ * Scopings in progress form a separate group, and the last one: they arrive after the others, and appending at the end of the list does not move what the reader was going through.
  */
 const groups = computed<readonly Group[]>(() => {
   const { specification, inProgress } = results.value;
@@ -85,7 +85,7 @@ const groups = computed<readonly Group[]>(() => {
     };
   }).filter((g) => g.results.length);
 
-  // Le groupe se montre aussi vide tant que les branches arrivent : c'est là qu'il dit qu'elles arrivent.
+  // The group shows even when empty while branches are arriving: that is where it says they are arriving.
   if (inProgress.length || store.loadingBranches()) {
     list.push({
       key: "en-cours",
@@ -98,7 +98,7 @@ const groups = computed<readonly Group[]>(() => {
   return list;
 });
 
-/** Les résultats affichés, dans l'ordre où les flèches les parcourent. */
+/** The displayed results, in the order the arrow keys go through them. */
 const displayed = computed(() => groups.value.flatMap((g) => g.results));
 
 const noResult = computed(() => displayed.value.length === 0);
@@ -111,7 +111,7 @@ function indexOf(r: SearchResult): number {
   return displayed.value.indexOf(r);
 }
 
-/** L'adresse d'un résultat, à son ancre s'il en a une. */
+/** A result's address, at its anchor if it has one. */
 function target(r: SearchResult): RouteLocationRaw {
   return {
     path: links.path(...r.link),
@@ -395,7 +395,7 @@ kbd {
 .pied kbd {
   margin-right: 2px;
 }
-/* Sur un écran tactile, ni Échap ni les flèches n'existent. */
+/* On a touch screen, neither Escape nor the arrow keys exist. */
 @media (pointer: coarse) {
   .pied,
   .echap {

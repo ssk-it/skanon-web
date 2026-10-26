@@ -8,29 +8,29 @@ import RenderedMarkdown from "./RenderedMarkdown.vue";
 const TEXT = "Un texte.\n\n```mermaid\nflowchart LR\n  A --> B\n```";
 
 /**
- * Le comportement du composant autour du rendu.
+ * The component's behaviour around the rendering.
  *
- * Le dessin lui-même n'est pas éprouvé ici : le moteur mesure le texte par `getBBox`, que l'environnement de test n'implémente pas. Ce qui est éprouvé est ce qui l'entoure — que le reste de la page survive, et qu'un diagramme fautif se signale là où il devait paraître.
+ * The drawing itself is not tested here: the engine measures text through `getBBox`, which the test environment does not implement. What is tested is what surrounds it — that the rest of the page survives, and that a faulty diagram reports itself where it was to appear.
  */
-// Mermaid pèse plusieurs mégaoctets, et `MarkdownRendu` le charge à la demande : sous la charge de toute la suite, ce premier chargement dépassait à lui seul le délai d'un test (constaté une fois sur six). Le charger avant, avec son propre délai, laisse aux tests le seul comportement à éprouver.
+// Mermaid weighs several megabytes, and `RenderedMarkdown` loads it on demand: under the load of the whole suite, this first load alone exceeded a test's timeout (observed once in six). Loading it beforehand, with its own timeout, leaves the tests only the behaviour to test.
 beforeAll(async () => {
   await import("mermaid");
 }, 60_000);
 
-describe("composant de rendu", () => {
-  it("laisse la page lisible quand un diagramme ne peut pas être dessiné", async () => {
+describe("rendering component", () => {
+  it("leaves the page readable when a diagram cannot be drawn", async () => {
     const view = mount(RenderedMarkdown, { props: { text: TEXT } });
     await flushPromises();
     await new Promise((r) => setTimeout(r, 300));
 
     const html = view.html();
-    // Le propos demeure : un schéma illustre, il ne porte pas.
+    // The point remains: a diagram illustrates, it does not carry.
     expect(html).toContain("Un texte.");
-    // Et l'échec se dit, plutôt que de laisser un vide qu'on prendrait pour un cadrage qui n'aurait rien écrit à cet endroit.
+    // And the failure says so, rather than leaving a gap one would take for a scoping that wrote nothing at that place.
     expect(html).toContain("pc-diagramme-erreur");
   });
 
-  it("suit le thème effectif de l’application", async () => {
+  it("follows the application's effective theme", async () => {
     const theme = inject(ThemeService);
     const view = mount(RenderedMarkdown, { props: { text: TEXT } });
 
@@ -38,7 +38,7 @@ describe("composant de rendu", () => {
     await nextTick();
     await new Promise((r) => setTimeout(r, 200));
 
-    // Le thème est lu dans l'effet de rendu : une bascule le relance. Sans cela, les diagrammes déjà affichés resteraient dans l'ancien thème.
+    // The theme is read in the rendering effect: a toggle reruns it. Without that, the diagrams already displayed would stay in the old theme.
     expect(theme.effective()).toBe("sombre");
     expect(view.html()).toContain("Un texte.");
   });

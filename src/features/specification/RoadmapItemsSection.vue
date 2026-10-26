@@ -14,11 +14,11 @@ import ExternalLink from "../../ui/ExternalLink.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 
 /**
- * Ce qui est envisagé pour un domaine ou une fonctionnalité — RG-pistes-a-part.
+ * What is envisaged for a domain or a feature — RG-pistes-a-part.
  *
- * Repliée par défaut, en bas de la vue, à part de ce que le référentiel
- * contient : une piste n'est pas l'effectif, et ne doit pas se lire comme tel.
- * Elle ne prend aucune couleur de statut ni d'opération (RG-couleur-porteuse).
+ * Collapsed by default, at the bottom of the view, apart from what the specification
+ * contains: a roadmap item is not what is in effect, and must not read as such.
+ * It takes no status or operation colour (RG-couleur-porteuse).
  */
 const props = defineProps<{
   collection: "domains" | "features";
@@ -124,7 +124,7 @@ onMounted(() => void service.load(store.repoRef()));
 .pistes {
   margin-top: 36px;
 }
-/* Un titre de section qui se déplie : même typographie que les autres titres de la vue, pour qu'il ne passe pas pour un bouton d'action. */
+/* A section title that expands: same typography as the view's other titles, so that it does not pass for an action button. */
 .bascule {
   display: inline-flex;
   align-items: center;
@@ -155,7 +155,7 @@ onMounted(() => void service.load(store.repoRef()));
 .contenu {
   margin-top: 12px;
 }
-/* Le libellé qui tient la frontière avec l'effectif : toujours là, au-dessus des pistes, jamais repliable à part. */
+/* The label that holds the boundary with what is in effect: always there, above the roadmap items, never collapsible on its own. */
 .avertissement {
   margin: 0 0 16px;
   font-size: 13.5px;
@@ -172,7 +172,7 @@ onMounted(() => void service.load(store.repoRef()));
   text-transform: uppercase;
   color: var(--mat-sys-on-surface-variant);
 }
-/* Bordure en tirets : la liste se distingue d'un coup d'œil de celles, pleines, qui portent l'effectif. */
+/* Dashed border: the list stands out at a glance from the solid ones that carry what is in effect. */
 .liste {
   list-style: none;
   margin: 0;

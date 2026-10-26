@@ -4,15 +4,15 @@ import { createAppRouter } from "../../router";
 import { parseDeepLink } from "./deep-link";
 
 /**
- * L'ouverture par protocole — RG-ouverture-par-protocole.
+ * Opening through a protocol — RG-ouverture-par-protocole.
  *
- * Le navigateur confie à l'application le lien `web+canon:` entier, dans le
- * paramètre `lien` de l'adresse de réception. Ce lien vient d'un outil
- * extérieur : il ne doit pouvoir conduire que vers les pages de l'application,
- * et jamais deviner un projet qu'il ne porte pas.
+ * The browser hands the application the whole `web+canon:` link, in the
+ * `lien` parameter of the reception address. This link comes from an outside
+ * tool: it must only be able to lead to the application's pages,
+ * and never guess a project it does not carry.
  */
-describe("analyse d’un lien web+canon", () => {
-  it("lit le chemin de l’adresse https, sans l’hôte", () => {
+describe("parsing a web+canon link", () => {
+  it("reads the path of the https address, without the host", () => {
     expect(
       parseDeepLink("web+canon:ssk-it/ssk-canon/cadrages/2026-047"),
     ).toEqual({
@@ -21,7 +21,7 @@ describe("analyse d’un lien web+canon", () => {
     });
   });
 
-  it("ouvre toute vue d’un projet, pas seulement les cadrages", () => {
+  it("opens any view of a project, not only scopings", () => {
     expect(
       parseDeepLink(
         "web+canon:ssk-it/ssk-canon/referentiel/regle/RG-prefixe-projet",
@@ -38,28 +38,28 @@ describe("analyse d’un lien web+canon", () => {
     });
   });
 
-  it("laisse au routage l’identifiant préfixé par le projet", () => {
-    // La résolution du préfixe vit dans la page du cadrage, comme pour une
-    // adresse tapée : le lien n'a pas à la refaire.
+  it("leaves the project-prefixed identifier to routing", () => {
+    // Prefix resolution lives in the scoping page, as for a
+    // typed address: the link does not have to redo it.
     expect(
       parseDeepLink("web+canon:org/prime/cadrages/PRMCO-2026-012")?.segments,
     ).toEqual(["org", "prime", "cadrages", "PRMCO-2026-012"]);
   });
 
-  it("accepte un projet seul, que le routage mène au référentiel", () => {
+  it("accepts a project alone, which routing leads to the specification", () => {
     expect(parseDeepLink("web+canon:ssk-it/ssk-canon")?.segments).toEqual([
       "ssk-it",
       "ssk-canon",
     ]);
   });
 
-  it("tolère les barres obliques de tête et de fin", () => {
+  it("tolerates leading and trailing slashes", () => {
     expect(
       parseDeepLink("web+canon:/ssk-it/ssk-canon/cadrages/")?.segments,
     ).toEqual(["ssk-it", "ssk-canon", "cadrages"]);
   });
 
-  it("garde l’ancre, qui mène à une décision dans son cadrage", () => {
+  it("keeps the anchor, which leads to a decision in its scoping", () => {
     expect(
       parseDeepLink(
         "web+canon:ssk-it/ssk-canon/cadrages/2026-047#02-ce-que-le-lien-designe",
@@ -70,29 +70,29 @@ describe("analyse d’un lien web+canon", () => {
     });
   });
 
-  it("décode les segments que l’adresse https encodait", () => {
+  it("decodes the segments the https address encoded", () => {
     expect(
       parseDeepLink("web+canon:ssk-it/ssk-canon/cadrages/2026%2D047")?.segments,
     ).toEqual(["ssk-it", "ssk-canon", "cadrages", "2026-047"]);
   });
 
-  it("reconnaît le schéma quel que soit sa casse", () => {
+  it("recognises the scheme whatever its case", () => {
     expect(parseDeepLink("WEB+Canon:ssk-it/ssk-canon")?.segments).toEqual([
       "ssk-it",
       "ssk-canon",
     ]);
   });
 
-  it("reconnaît le « + » du schéma lu comme une espace", () => {
-    // Dans une chaîne de requête, un « + » non encodé se lit comme une espace :
-    // un lien collé tel quel dans la barre d'adresse arrive ainsi.
+  it("recognises the scheme's « + » read as a space", () => {
+    // In a query string, an unencoded « + » reads as a space:
+    // a link pasted as is in the address bar arrives that way.
     expect(parseDeepLink("web canon:ssk-it/ssk-canon")?.segments).toEqual([
       "ssk-it",
       "ssk-canon",
     ]);
   });
 
-  describe("mène à l’écran de choix", () => {
+  describe("leads to the selection screen", () => {
     it.each([
       ["un paramètre absent", null],
       ["un paramètre vide", ""],
@@ -124,7 +124,7 @@ describe("analyse d’un lien web+canon", () => {
   });
 });
 
-describe("adresse de réception /ouvrir", () => {
+describe("reception address /ouvrir", () => {
   let router: Router;
 
   async function open(address: string): Promise<string> {
@@ -133,8 +133,8 @@ describe("adresse de réception /ouvrir", () => {
     return router.currentRoute.value.fullPath;
   }
 
-  it("ouvre la page désignée par le lien que le système a encodé", async () => {
-    // Le lien entier arrive encodé comme un composant d'adresse : « + », « : » et « / » en %2B, %3A, %2F.
+  it("opens the page designated by the link the system encoded", async () => {
+    // The whole link arrives encoded as an address component: « + », « : » and « / » as %2B, %3A, %2F.
     expect(
       await open(
         "/ouvrir?lien=web%2Bcanon%3Assk-it%2Fssk-canon%2Fcadrages%2F2026-047",
@@ -142,13 +142,13 @@ describe("adresse de réception /ouvrir", () => {
     ).toBe("/ssk-it/ssk-canon/cadrages/2026-047");
   });
 
-  it("ouvre aussi un lien skanon:", async () => {
+  it("also opens a skanon: link", async () => {
     expect(
       await open("/ouvrir?lien=skanon%3Assk-it%2Fssk-canon%2Fcadrages"),
     ).toBe("/ssk-it/ssk-canon/cadrages");
   });
 
-  it("porte l’ancre jusqu’à la page", async () => {
+  it("carries the anchor through to the page", async () => {
     expect(
       await open(
         "/ouvrir?lien=web%2Bcanon%3Assk-it%2Fssk-canon%2Fcadrages%2F2026-047%2302-ce-que-le-lien-designe",
@@ -156,11 +156,11 @@ describe("adresse de réception /ouvrir", () => {
     ).toBe("/ssk-it/ssk-canon/cadrages/2026-047#02-ce-que-le-lien-designe");
   });
 
-  it("ramène au choix du projet un lien qui n’en porte pas", async () => {
+  it("brings a link that carries no project back to project selection", async () => {
     expect(await open("/ouvrir?lien=web%2Bcanon%3A2026-047")).toBe("/");
   });
 
-  it("ne suit pas un hôte porté par le lien", async () => {
+  it("does not follow a host carried by the link", async () => {
     expect(
       await open(
         "/ouvrir?lien=web%2Bcanon%3Ahttps%3A%2F%2Fevil.example%2Fa%2Fb",
@@ -168,7 +168,7 @@ describe("adresse de réception /ouvrir", () => {
     ).toBe("/");
   });
 
-  it("ne laisse pas l’adresse de réception dans l’historique", async () => {
+  it("does not leave the reception address in the history", async () => {
     await open("/ssk-it/ssk-canon/referentiel");
     await router.push(
       "/ouvrir?lien=web%2Bcanon%3Assk-it%2Fssk-canon%2Fcadrages",

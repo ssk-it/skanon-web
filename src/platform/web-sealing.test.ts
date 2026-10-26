@@ -15,14 +15,14 @@ const TOKENS: StoredTokens = {
   byScope: [["acme", OTHER]],
 };
 
-/** Tout ce que le navigateur garde pour l'origine, d'un bloc. */
+/** Everything the browser keeps for the origin, in one block. */
 function storage(): string {
   return Object.keys(localStorage)
     .map((k) => `${k}=${localStorage.getItem(k)}`)
     .join("\n");
 }
 
-describe("le coffre du navigateur scellé par une passkey", () => {
+describe("the browser vault sealed by a passkey", () => {
   let auth: FakeAuthenticator;
 
   beforeEach(() => {
@@ -30,25 +30,25 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     auth = new FakeAuthenticator();
   });
 
-  it("garde les jetons en clair tant que rien n’est scellé", async () => {
+  it("keeps the tokens in plain text as long as nothing is sealed", async () => {
     const vault = new BrowserSealedVault(auth);
     expect(vault.state).toBe("aucun");
     expect(await vault.saveTokens(TOKENS)).toBe("faite");
     expect(await new BrowserSealedVault(auth).loadTokens()).toEqual(TOKENS);
   });
 
-  it("ne laisse dans le navigateur que le chiffré, une fois scellé", async () => {
+  it("leaves only the ciphertext in the browser, once sealed", async () => {
     const vault = new BrowserSealedVault(auth);
     await vault.saveTokens(TOKENS);
     expect(await vault.sealTokens(TOKENS)).toBe("scelle");
     expect(vault.state).toBe("ouvert");
-    // ni le jeton, ni sa fin, ni l'autre jeton : RG-secret-conserve-localement
+    // neither the token, nor its end, nor the other token: RG-secret-conserve-localement
     expect(storage()).not.toContain(TOKEN);
     expect(storage()).not.toContain(TOKEN.slice(-8));
     expect(storage()).not.toContain(OTHER);
   });
 
-  it("se retrouve verrouillé au chargement suivant, et s’ouvre par la passkey", async () => {
+  it("is locked again at the next load, and opens through the passkey", async () => {
     await new BrowserSealedVault(auth).sealTokens(TOKENS);
 
     const reloaded = new BrowserSealedVault(auth);
@@ -63,7 +63,7 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(reloaded.state).toBe("ouvert");
   });
 
-  it("rescelle ce qu’on y écrit une fois ouvert", async () => {
+  it("reseals what is written to it once opened", async () => {
     const vault = new BrowserSealedVault(auth);
     await vault.sealTokens(TOKENS);
     const following = { general: OTHER, byScope: [] };
@@ -78,8 +78,8 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     });
   });
 
-  it("refuse d’écrire tant qu’il est verrouillé, sans toucher au scellé", async () => {
-    // écrire en clair à côté du scellé défairait la protection ; l'écraser perdrait les jetons scellés
+  it("refuses to write while locked, without touching the sealed store", async () => {
+    // writing in plain text next to the sealed store would undo the protection; overwriting it would lose the sealed tokens
     await new BrowserSealedVault(auth).sealTokens(TOKENS);
     const before = storage();
     const reloaded = new BrowserSealedVault(auth);
@@ -90,7 +90,7 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(storage()).toBe(before);
   });
 
-  it("reste verrouillé quand le déverrouillage est annulé", async () => {
+  it("stays locked when unlocking is cancelled", async () => {
     await new BrowserSealedVault(auth).sealTokens(TOKENS);
     const reloaded = new BrowserSealedVault(auth);
     await reloaded.loadTokens();
@@ -99,7 +99,7 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(reloaded.state).toBe("verrouille");
   });
 
-  it("dit illisible un scellé que la clé rendue n’ouvre pas", async () => {
+  it("reports unreadable a sealed store the returned key does not open", async () => {
     await new BrowserSealedVault(auth).sealTokens(TOKENS);
     const reloaded = new BrowserSealedVault(auth);
     await reloaded.loadTokens();
@@ -108,7 +108,7 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(reloaded.state).toBe("verrouille");
   });
 
-  it("ne change rien quand l’appareil ne rend pas de clé", async () => {
+  it("changes nothing when the device returns no key", async () => {
     const vault = new BrowserSealedVault(auth);
     await vault.saveTokens(TOKENS);
     auth.prfAtCreation = "absente";
@@ -117,7 +117,7 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(await new BrowserSealedVault(auth).loadTokens()).toEqual(TOKENS);
   });
 
-  it("ne change rien quand la création est annulée", async () => {
+  it("changes nothing when creation is cancelled", async () => {
     const vault = new BrowserSealedVault(auth);
     await vault.saveTokens(TOKENS);
     auth.cancel = true;
@@ -126,7 +126,7 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(storage()).toContain(TOKEN);
   });
 
-  it("demande la clé après coup au navigateur qui ne la rend pas à la création", async () => {
+  it("asks for the key afterwards from the browser that does not return it at creation", async () => {
     auth.prfAtCreation = "differee";
     const vault = new BrowserSealedVault(auth);
     expect(await vault.sealTokens(TOKENS)).toBe("scelle");
@@ -139,8 +139,8 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     });
   });
 
-  it("efface le scellé comme le clair, et reprend la même passkey ensuite", async () => {
-    // une passkey par scellement encombrerait le trousseau de l'utilisateur
+  it("erases the sealed store like the plain one, and reuses the same passkey afterwards", async () => {
+    // one passkey per sealing would clutter the user's keychain
     const vault = new BrowserSealedVault(auth);
     await vault.sealTokens(TOKENS);
     expect(await vault.deleteTokens()).toBe("faite");
@@ -155,7 +155,7 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(auth.creations).toBe(1);
   });
 
-  it("crée une passkey neuve quand l’ancienne a disparu du trousseau", async () => {
+  it("creates a fresh passkey when the old one has disappeared from the keychain", async () => {
     const vault = new BrowserSealedVault(auth);
     await vault.sealTokens(TOKENS);
     await vault.deleteTokens();
@@ -164,17 +164,17 @@ describe("le coffre du navigateur scellé par une passkey", () => {
     expect(auth.creations).toBe(2);
   });
 
-  it("ne dit le scellement possible que si le navigateur le permet", async () => {
+  it("reports sealing possible only if the browser allows it", async () => {
     expect(await new BrowserSealedVault(auth).isPossible()).toBe(true);
     auth.possible = false;
     expect(await new BrowserSealedVault(auth).isPossible()).toBe(false);
   });
 });
 
-describe("le chiffreur des contenus privés", () => {
+describe("the private contents cipher", () => {
   beforeEach(() => localStorage.clear());
 
-  it("n’existe que tant que les jetons sont ouverts", async () => {
+  it("only exists as long as the tokens are open", async () => {
     const auth = new FakeAuthenticator();
     const vault = new BrowserSealedVault(auth);
     expect(vault.findCipher()).toBeNull();
@@ -186,7 +186,7 @@ describe("le chiffreur des contenus privés", () => {
     expect(reloaded.findCipher()).toBeNull();
   });
 
-  it("rouvre ce qu’il a scellé, d’un chargement à l’autre", async () => {
+  it("reopens what it sealed, from one load to the next", async () => {
     const auth = new FakeAuthenticator();
     const vault = new BrowserSealedVault(auth);
     await vault.sealTokens(TOKENS);
@@ -199,7 +199,7 @@ describe("le chiffreur des contenus privés", () => {
     expect(await reloaded.findCipher()!.open(sealed)).toBe("règle privée");
   });
 
-  it("rend null pour un scellé qu’il n’ouvre pas", async () => {
+  it("returns null for a sealed text it does not open", async () => {
     const vault = new BrowserSealedVault(new FakeAuthenticator());
     await vault.sealTokens(TOKENS);
     const cipher = vault.findCipher()!;
@@ -213,10 +213,10 @@ describe("le chiffreur des contenus privés", () => {
 });
 
 /**
- * Le texte qu'on scelle est un format stocké sur le poste : ses champs gardent les noms qu'il avait quand ils ont été écrits, quel que soit le nom des champs dans le code. Sinon, un rédacteur perdrait ses jetons scellés à la mise à jour.
+ * The text being sealed is a format stored on the machine: its fields keep the names they had when they were written, whatever the field names in the code. Otherwise, an author would lose their sealed tokens on update.
  */
-describe("le texte des jetons scellés", () => {
-  it("relit ce que la version précédente a scellé", () => {
+describe("the sealed tokens text", () => {
+  it("rereads what the previous version sealed", () => {
     expect(
       readSealedText(
         JSON.stringify({ general: TOKEN, parPortee: [["acme", OTHER]] }),
@@ -224,14 +224,14 @@ describe("le texte des jetons scellés", () => {
     ).toEqual(TOKENS);
   });
 
-  it("écrit sous les mêmes noms qu'il relit", () => {
+  it("writes under the same names it rereads", () => {
     expect(JSON.parse(writeSealedText(TOKENS))).toEqual({
       general: TOKEN,
       parPortee: [["acme", OTHER]],
     });
   });
 
-  it("rend null sur un texte illisible", () => {
+  it("returns null on an unreadable text", () => {
     expect(readSealedText("{")).toBeNull();
   });
 });

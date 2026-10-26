@@ -1,4 +1,4 @@
-# Les scripts d'installation que pnpm laisse s'exécuter. Il les bloque par défaut, et c'est voulu : un script d'installation exécute du code à chaque installation.
+# The install scripts pnpm lets run. It blocks them by default, and that is intended: an install script runs code on every install.
 allowBuilds:
-  # Vérifie à l'installation que son binaire correspond à la machine.
+  # Checks at install time that its binary matches the machine.
   esbuild: true

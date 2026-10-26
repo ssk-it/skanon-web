@@ -5,31 +5,31 @@ import { IdentityFile, IdentityVariant } from "./identity-names";
 import type { Cipher } from "../../platform/ports";
 
 /**
- * Ce qu'on sait d'une branche lue : son arborescence, et quand on l'a lue.
+ * What is known of a read branch: its tree, and when it was read.
  *
- * C'est ce qui permet deux choses que les contenus seuls ne donnent pas :
- * redemander l'arborescence de façon conditionnelle, et afficher le dernier état
- * lu quand le dépôt ne répond plus (RG-dernier-etat-connu).
+ * That is what allows two things contents alone do not give:
+ * requesting the tree again conditionally, and showing the last state
+ * read when the repo no longer answers (RG-dernier-etat-connu).
  */
 export interface KnownState {
-  /** Le commit que l'arborescence avait résolu. */
+  /** The commit the tree had resolved. */
   readonly commit: string;
-  /** L'étiquette rendue avec l'arborescence, pour la redemander sous condition. */
+  /** The tag returned with the tree, to request it again conditionally. */
   readonly etag: string | null;
-  /** Instant de la lecture, au format ISO. */
+  /** Time of the read, in ISO format. */
   readonly readAt: string;
   readonly entries: readonly TreeEntry[];
   readonly truncated: boolean;
-  /** Lu par l'API faute d'être servi par le canal public : un dépôt privé. */
+  /** Read through the API for lack of being served by the public channel: a private repo. */
   readonly private: boolean;
 }
 
 /**
- * Le stockage du navigateur où vivent les contenus, s'il en a un.
+ * The browser storage where contents live, if it has one.
  *
- * Fourni par injection pour que les tests en donnent un neuf à chaque cas, et
- * qu'un navigateur qui n'en a pas — ou le refuse — retombe sur la mémoire de
- * l'onglet plutôt que d'échouer.
+ * Provided by injection so that tests give a fresh one to each case, and
+ * so that a browser that has none — or refuses it — falls back on the tab's
+ * memory rather than failing.
  */
 export const INDEXEDDB_FACTORY = new InjectionToken<IDBFactory | null>(
   "FABRIQUE_INDEXEDDB",
@@ -55,33 +55,33 @@ interface StoredState extends KnownState {
   readonly ref: string;
 }
 
-/** Un symbole lu, prêt à montrer. */
+/** A read symbol, ready to show. */
 export interface KnownSymbol {
-  /** Le fichier de `identite/` qui le porte. */
+  /** The `identite/` file that carries it. */
   readonly path: string;
-  /** Son empreinte, quand l'API l'a donnée : ce qui évite de le relire. */
+  /** Its fingerprint, when the API gave it: what avoids reading it again. */
   readonly sha: string | null;
-  /** L'image, en adresse `data:` — voir `IdentitesService`. */
+  /** The image, as a `data:` address — see `ProjectIdentityService`. */
   readonly source: string;
 }
 
 /**
- * Ce qu'on sait de l'identité d'un projet, et de quoi la redemander.
+ * What is known of a project's identity, and what to request it again with.
  *
- * Lue hors de toute arborescence — l'accueil n'en charge aucune —, elle ne se
- * range pas sous une empreinte de contenu : elle se redemande sous condition,
- * et se remplace en entier. Voir RG-lecture-identite.
+ * Read outside any tree — the home page loads none —, it is not
+ * stored under a content fingerprint: it is requested again conditionally,
+ * and replaced as a whole. See RG-lecture-identite.
  */
 export interface KnownProjectIdentity {
-  /** Lue sous un accès, ou par le canal non décompté. */
+  /** Read under an access, or through the uncounted channel. */
   readonly channel: "api" | "raw";
-  /** L'étiquette de la racine du dépôt, pour la redemander sous condition. */
+  /** The tag of the repo root, to request it again conditionally. */
   readonly etag: string | null;
-  /** L'empreinte du répertoire `identite/`, `null` s'il n'existe pas. */
+  /** The fingerprint of the `identite/` directory, `null` if it does not exist. */
   readonly directory: string | null;
-  /** Ce que le répertoire contient, quand l'API l'a dit. */
+  /** What the directory contains, when the API said so. */
   readonly files: readonly IdentityFile[] | null;
-  /** Le symbole de chaque fond déjà demandé ; `null` quand il n'y en a pas. */
+  /** The symbol of each background already requested; `null` when there is none. */
   readonly symbols: Partial<Record<IdentityVariant, KnownSymbol | null>>;
   readonly private: boolean;
 }
@@ -91,7 +91,7 @@ interface StoredProjectIdentity extends KnownProjectIdentity {
 }
 
 /**
- * Une entrée privée rangée sous la clé de la passkey. Ce qui la désigne reste lisible — le dépôt, l'empreinte ou la branche —, parce que l'élagage et les effacements trient sur eux ; le reste n'est que le scellé.
+ * A private entry stored under the passkey's key. What designates it stays readable — the repo, the fingerprint or the branch —, because pruning and erasures sort on them; the rest is only the seal.
  */
 interface SealedEntry {
   readonly private: true;
@@ -99,7 +99,7 @@ interface SealedEntry {
 }
 
 /**
- * Comment le poste garde ce qu'il a lu d'un dépôt privé : sous la même forme que le jeton qui l'a ouvert (RG-contenus-prives-au-repos). En clair ; ou, le jeton scellé par une passkey, sous la clé qu'elle rend — et rien tant qu'elle n'est pas ouverte.
+ * How the machine keeps what it read from a private repo: in the same form as the token that opened it (RG-contenus-prives-au-repos). In clear; or, the token sealed by a passkey, under the key it returns — and nothing while it is not open.
  */
 type Protection =
   | { readonly mode: "clair" }
@@ -109,20 +109,20 @@ type Protection =
 const PLAIN: Protection = { mode: "clair" };
 
 /**
- * Les contenus déjà lus, rangés sous l'empreinte que l'arborescence leur donne.
+ * Contents already read, stored under the fingerprint the tree gives them.
  *
- * Une empreinte désigne un contenu et un seul : ce qui est rangé sous elle ne
- * peut pas être périmé. La fraîcheur ne se joue donc pas ici mais dans
- * l'arborescence, relue à chaque chargement, qui dit quelles empreintes sont en
- * vigueur. Voir RG-contenus-par-empreinte.
+ * A fingerprint designates one content and only one: what is stored under it
+ * cannot be stale. Freshness is therefore not decided here but in
+ * the tree, re-read at each load, which says which fingerprints are
+ * current. See RG-contenus-par-empreinte.
  *
- * Deux niveaux : la mémoire de l'onglet, toujours, et le stockage du navigateur
- * quand l'appelant le permet. Ce qui n'est pas persisté — un dépôt privé lu sous
- * un accès temporaire — vit et meurt avec l'onglet, comme l'accès lui-même
+ * Two levels: the tab's memory, always, and the browser storage
+ * when the caller allows it. What is not persisted — a private repo read under
+ * a temporary access — lives and dies with the tab, like the access itself
  * (RG-contenus-prives-au-repos).
  *
- * Le cache est une copie dérivée, jamais une source : tout échec du stockage est
- * avalé, et ne coûte qu'un téléchargement de plus.
+ * The cache is a derived copy, never a source: any storage failure is
+ * swallowed, and costs only one more download.
  */
 export class ContentCache {
   private readonly factory = inject(INDEXEDDB_FACTORY);
@@ -134,21 +134,21 @@ export class ContentCache {
 
   private protection: Protection = PLAIN;
 
-  /** Range désormais ce qu'il lit d'un dépôt privé sous cette clé ; en clair, sans clé. */
+  /** From now on stores what it reads from a private repo under this key; in clear, without a key. */
   encryptWith(cipher: Cipher | null): void {
     this.protection = cipher ? { mode: "chiffre", cipher } : PLAIN;
   }
 
-  /** Les jetons sont scellés et fermés : ce qui est lu d'un dépôt privé ne vit que dans l'onglet, et les scellés ne se rendent pas. */
+  /** Tokens are sealed and closed: what is read from a private repo only lives in the tab, and seals are not given back. */
   lock(): void {
     this.protection = { mode: "verrouille" };
   }
 
   /**
-   * Augmente à chaque effacement achevé.
+   * Increases at each completed erasure.
    *
-   * Ce qu'un écran montre d'un dépôt privé doit disparaître avec l'accès, et
-   * non au prochain chargement : c'est le signal que les vues suivent.
+   * What a screen shows of a private repo must disappear with the access, and
+   * not at the next load: this is the signal views follow.
    */
   readonly erasures = signal(0);
 
@@ -237,7 +237,7 @@ export class ContentCache {
       await this.writeProtected(IDENTITIES, entry, { repoRef: entry.repoRef });
   }
 
-  /** Oublie l'identité d'un dépôt — refusée, ou disparue. */
+  /** Forgets a repo's identity — refused, or gone. */
   async clearIdentity(repoRef: RepoRef): Promise<void> {
     const key = repoKey(repoRef);
     this.identities.delete(key);
@@ -246,11 +246,11 @@ export class ContentCache {
   }
 
   /**
-   * Retire d'un dépôt ce qu'aucune arborescence lue ne cite plus.
+   * Removes from a repo what no read tree cites any more.
    *
-   * `empreintes` réunit celles de la branche principale et des branches de
-   * cadrage ; `refs` les branches encore ouvertes. Le cache suit ainsi le
-   * référentiel, non son historique.
+   * `fingerprints` gathers those of the default branch and of the scoping
+   * branches; `refs` the branches still open. The cache thus follows the
+   * specification, not its history.
    */
   async pruneRepo(
     repoRef: RepoRef,
@@ -270,7 +270,7 @@ export class ContentCache {
     );
   }
 
-  /** Efface tout ce qu'on détient d'un dépôt. */
+  /** Erases everything held about a repo. */
   async clearRepo(repoRef: RepoRef): Promise<void> {
     const key = repoKey(repoRef);
     this.forgetInMemory(
@@ -287,9 +287,9 @@ export class ContentCache {
   }
 
   /**
-   * Efface les contenus privés des dépôts qu'un accès retiré couvrait.
+   * Erases the private contents of the repos a removed access covered.
    *
-   * Sans portée, tous : c'est le cas de la déconnexion.
+   * Without a scope, all of them: that is the sign-out case.
    */
   async clearPrivate(
     covers: (repoRef: string) => boolean = () => true,
@@ -327,9 +327,9 @@ export class ContentCache {
       if (identity(i)) this.identities.delete(key);
   }
 
-  // --- protection des contenus privés ---
+  // --- protection of private contents ---
 
-  /** Écrit une entrée telle que la protection le veut : elle-même, son scellé, ou rien. */
+  /** Writes an entry as the protection wants it: itself, its seal, or nothing. */
   private async writeProtected(
     store: string,
     entry: { readonly private: boolean },
@@ -345,7 +345,7 @@ export class ContentCache {
     await this.write(store, { ...designation, ...sealedEntry });
   }
 
-  /** Une entrée lue du stockage, rendue en clair ; `null` pour un scellé qu'aucune clé ouverte n'ouvre. */
+  /** An entry read from storage, returned in clear; `null` for a seal no open key opens. */
   private async unseal<T>(stored: unknown): Promise<T | null> {
     if (!stored) return null;
     const sealed = (stored as Partial<SealedEntry>).sealed;
@@ -360,13 +360,13 @@ export class ContentCache {
     }
   }
 
-  // --- stockage du navigateur ---
+  // --- browser storage ---
 
   private open(): Promise<IDBDatabase | null> {
     this.base ??= new Promise((resolve) => {
       if (!this.factory) return resolve(null);
       try {
-        // Version 3 : les champs des enregistrements ont pris leurs noms anglais (`repoRef`, `content`, `private`…). Ceux d'une version antérieure ne se relisent plus : un cache se reconstruit, ses magasins repartent vides.
+        // Version 3: record fields took their English names (`repoRef`, `content`, `private`…). Those of an earlier version can no longer be read back: a cache can be rebuilt, its stores start empty.
         const request = this.factory.open(DATABASE_NAME, 3);
         request.onupgradeneeded = () => {
           const db = request.result;
@@ -377,8 +377,8 @@ export class ContentCache {
           db.createObjectStore(IDENTITIES, { keyPath: "repoRef" });
         };
         request.onsuccess = () => resolve(request.result);
-        // Stockage refusé, quota dépassé, navigation privée stricte : l'onglet
-        // garde sa mémoire, et le chargement suivant relira simplement tout.
+        // Storage refused, quota exceeded, strict private browsing: the tab
+        // keeps its memory, and the next load will simply read everything again.
         request.onerror = () => resolve(null);
         request.onblocked = () => resolve(null);
       } catch {
@@ -415,7 +415,7 @@ export class ContentCache {
         tx.onabort = () => resolve();
       });
     } catch {
-      // stockage plein ou refusé : la mémoire de l'onglet suffit
+      // storage full or refused: the tab's memory is enough
     }
   }
 
@@ -431,7 +431,7 @@ export class ContentCache {
         tx.onabort = () => resolve();
       });
     } catch {
-      // un effacement manqué se rattrape au suivant
+      // a missed erasure is made up for by the next one
     }
   }
 
@@ -453,7 +453,7 @@ export class ContentCache {
         tx.onabort = () => resolve();
       });
     } catch {
-      // un effacement manqué se rattrape au suivant
+      // a missed erasure is made up for by the next one
     }
   }
 }
@@ -471,7 +471,7 @@ function walk<T>(
   };
 }
 
-/** `organisation/depot`, en minuscules : la forme des portées de jetons. */
+/** `owner/repo`, in lower case: the form of token scopes. */
 function repoKey(repoRef: RepoRef): string {
   return `${repoRef.owner.toLowerCase()}/${repoRef.repo.toLowerCase()}`;
 }

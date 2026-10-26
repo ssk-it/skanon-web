@@ -3,7 +3,7 @@ import { createWebPlatform } from "./platform/web";
 import { webExtension } from "./web/extension";
 
 /**
- * La racine de composition de la version web : les adaptateurs du navigateur, et ce que ce livrable apporte (ADR-extensions-commerciales).
+ * The web version's composition root: the browser adapters, and what this deliverable contributes (ADR-extensions-commerciales).
  */
 void start({
   platform: createWebPlatform(),
