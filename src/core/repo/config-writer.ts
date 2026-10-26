@@ -65,7 +65,7 @@ export function replaceBlock(
   if (begin === -1) {
     // Added at the end of the document, preceded by its comment: with no marker for where
     // to insert it, the end is the only place that disturbs nothing.
-    const end = source.replace(/\s*$/, "");
+    const end = source.trimEnd();
     return `${end}\n\n${comment}\n${block}\n`;
   }
 

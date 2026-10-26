@@ -24,31 +24,41 @@ export class ServiceWorkerAnnouncer implements VersionAnnouncer {
   readonly active: boolean;
   /** The ready version is served by reloading the page, not by a relaunch. */
   readonly relaunches = false;
-  private readonly registration: Promise<ServiceWorkerRegistration> | null;
   private readonly listeners = new Set<(a: VersionAnnouncement) => void>();
   private readonly made = new Set<VersionAnnouncement>();
 
-  constructor(
-    private readonly container: ServiceWorkerContainer | undefined,
-    private readonly script = SCRIPT_SERVICE_WORKER,
-  ) {
-    this.active = !!container;
-    if (!container) {
-      this.registration = null;
-      return;
-    }
-    container.addEventListener("message", (e: MessageEvent) => {
-      if ((e.data as { type?: unknown } | null)?.type === VERSION_LOST_MESSAGE)
-        this.announce("perdue");
-    });
-    this.registration = afterLoad().then(() =>
+  /** Registers the service worker, once the page has loaded, and listens to what it announces. */
+  static register(
+    container: ServiceWorkerContainer | undefined,
+    script = SCRIPT_SERVICE_WORKER,
+  ): ServiceWorkerAnnouncer {
+    if (!container) return new ServiceWorkerAnnouncer(undefined, script, null);
+    const registration = afterLoad().then(() =>
       container.register(script, { scope: "/", updateViaCache: "none" }),
     );
-    this.registration.then(
-      (r) => this.track(r),
+    const announcer = new ServiceWorkerAnnouncer(
+      container,
+      script,
+      registration,
+    );
+    container.addEventListener("message", (e: MessageEvent) => {
+      if ((e.data as { type?: unknown } | null)?.type === VERSION_LOST_MESSAGE)
+        announcer.announce("perdue");
+    });
+    registration.then(
+      (r) => announcer.track(r),
       // Registration refused — private browsing, blocked storage: the application works without it, and without offline mode.
       () => {},
     );
+    return announcer;
+  }
+
+  private constructor(
+    private readonly container: ServiceWorkerContainer | undefined,
+    private readonly script: string,
+    private readonly registration: Promise<ServiceWorkerRegistration> | null,
+  ) {
+    this.active = !!container;
   }
 
   listen(onAnnouncement: (a: VersionAnnouncement) => void): () => void {
@@ -146,7 +156,7 @@ export function createWebPlatform(): Platform {
     },
     // The web version receives its links through the address itself (`/lien?…`): nothing to listen to.
     links: { async listen() {} },
-    version: new ServiceWorkerAnnouncer(serviceWorkerAvailable()),
+    version: ServiceWorkerAnnouncer.register(serviceWorkerAvailable()),
     // The site is redeployed on every merge, without a number: the built commit designates it (`vite.config.ts`).
     loadVersion: async () => import.meta.env.VITE_VERSION,
   };
