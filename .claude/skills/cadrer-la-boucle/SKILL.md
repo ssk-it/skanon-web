@@ -1,88 +1,87 @@
 ---
 name: cadrer-la-boucle
-description: À la fin d'une boucle de travail sur Skanon — un lot de décisions prises, une phase terminée, un choix technique tranché — demander à l'utilisateur si cette boucle doit être reportée dans le dépôt de cadrage ssk-it/ssk-canon. Se déclenche quand du travail vient d'aboutir et que des décisions ont été prises, pas au milieu d'une tâche.
+description: At the end of a work loop on Skanon — a batch of decisions taken, a phase completed, a technical choice settled — ask the user whether this loop should be recorded in the scoping repo ssk-it/ssk-canon. Triggers when work has just completed and decisions were taken, not in the middle of a task.
 ---
 
-# Cadrer la boucle qui vient de se terminer
+# Scope the loop that has just ended
 
-Skanon est un outil de cadrage : `ssk-it/ssk-canon` est son propre
-référentiel, décrit dans son propre format. Chaque décision structurante prise
-pendant le développement doit y être consignée comme un cadrage — sinon l'outil
-ne tient pas la promesse qu'il fait à ses utilisateurs.
+Skanon is a scoping tool: `ssk-it/ssk-canon` is its own specification,
+described in its own format. Every structuring decision taken during
+development must be recorded there as a scoping — otherwise the tool does not
+keep the promise it makes to its users.
 
-C'est facile à oublier : le travail est fait, les tests passent, on passe à la
-suite. Cette skill existe pour que la question soit posée.
+It is easy to forget: the work is done, the tests pass, we move on. This skill
+exists so that the question gets asked.
 
-## Quand se déclencher
+## When to trigger
 
-À la **fin d'une boucle de travail**, c'est-à-dire quand :
+At the **end of a work loop**, that is, when:
 
-- une phase de la feuille de route est terminée ;
-- un choix technique a été tranché, surtout s'il repose sur une mesure ou un
-  fait vérifié ;
-- une hypothèse s'est révélée fausse et a changé la conception ;
-- une option a été explicitement écartée avec un motif.
+- a phase of the roadmap is completed;
+- a technical choice has been settled, especially if it rests on a measurement
+  or a verified fact;
+- an assumption turned out to be wrong and changed the design;
+- an option was explicitly rejected, with a reason.
 
-**Ne pas se déclencher** au milieu d'une tâche, ni pour une correction de bug
-sans conséquence sur le comportement attendu, ni pour un travail de pure forme.
+**Do not trigger** in the middle of a task, nor for a bug fix with no
+consequence on the expected behaviour, nor for pure form work.
 
-## Ce qu'il faut faire
+## What to do
 
-1. **Récapituler les décisions** prises pendant la boucle, en une ligne chacune.
-   Distinguer ce qui relève d'une décision — un choix entre options, avec un
-   motif — de ce qui relève de l'exécution.
+1. **Summarise the decisions** taken during the loop, one line each.
+   Distinguish what is a decision — a choice between options, with a
+   reason — from what is execution.
 
-2. **Demander à l'utilisateur** si cette boucle doit être reportée dans
-   `ssk-it/ssk-canon`, en proposant une forme concrète :
-   - un **nouveau cadrage** si la boucle a produit un ensemble cohérent de
-     décisions ;
-   - des **décisions ajoutées à un cadrage existant** si elles complètent un
-     sujet déjà ouvert ;
-   - des **règles modifiées** si le comportement attendu a changé ;
-   - **rien**, si la boucle n'a produit que de l'exécution.
+2. **Ask the user** whether this loop should be recorded in
+   `ssk-it/ssk-canon`, proposing a concrete form:
+   - a **new scoping** if the loop produced a coherent set of decisions;
+   - **decisions added to an existing scoping** if they complete a topic
+     already open;
+   - **modified rules** if the expected behaviour has changed;
+   - **nothing**, if the loop produced only execution.
 
-   Poser la question, ne pas décider seul : c'est l'utilisateur qui sait si un
-   choix mérite d'être consigné pour la durée.
+   Ask the question, do not decide alone: the user is the one who knows
+   whether a choice deserves to be recorded for the long run.
 
-   Pour proposer la bonne forme, appliquer d'abord le skill
-   `consulter-referentiel`, en lui passant le récapitulatif : un cadrage encore
-   en cours ou une règle existante sur le même sujet appelle un complément ou
-   une modification, pas un nouveau cadrage qui les doublerait.
+   To propose the right form, first apply the `consulter-referentiel` skill,
+   passing it the summary: a scoping still in progress or an existing rule on
+   the same topic calls for a complement or a modification, not a new scoping
+   that would duplicate them.
 
-3. **Si la réponse est oui**, invoquer la skill `cadrage-canon`, qui écrit
-   dans `ssk-it/ssk-canon` en préparant une copie liée — ne jamais écrire à la
-   main dans un clone. Le format qu'elle applique :
-   - identifiant `<année>-<séquence sur 3 chiffres>`, jamais réutilisé ;
-   - objectif, parcours utilisateur, impacts déclarés ;
-   - une section `## Énoncés` portant le texte de chaque règle créée ou
-     modifiée, sous un titre de niveau 3 nommant la règle ;
-   - les décisions dans `decisions/`, avec **les options écartées et leur
-     motif** — c'est ce qui a le plus de valeur six mois plus tard ;
-   - le statut correspondant à l'état réel du travail.
+3. **If the answer is yes**, invoke the `cadrage-canon` skill, which writes to
+   `ssk-it/ssk-canon` by preparing a linked worktree — never write by hand in
+   a clone. The format it applies:
+   - identifier `<year>-<3-digit sequence>`, never reused;
+   - goal, user journey, declared impacts;
+   - an `## Énoncés` section carrying the text of each rule created or
+     modified, under a level-3 heading naming the rule;
+   - the decisions in `decisions/`, with **the rejected options and their
+     reason** — that is what has the most value six months later;
+   - the status matching the actual state of the work.
 
-4. **Vérifier l'intégrité** avant de conclure, depuis la copie liée que
-   `cadrage-canon` a préparée :
+4. **Check integrity** before concluding, from the linked worktree that
+   `cadrage-canon` prepared:
 
    ```bash
-   node actions/src/check.mjs <copie-liee>
+   node actions/src/check.mjs <linked-worktree>
    ```
 
-5. **Reporter aussi dans `docs/decisions.md`** si la décision touche
-   l'architecture du produit lui-même. Les deux ne font pas doublon :
-   `docs/` s'adresse à un développeur qui reprend le code, `ssk-it/ssk-canon`
-   décrit le comportement du produit.
+5. **Also record it in this repo's `docs/`** if the decision touches the
+   architecture of the product itself. The two are not duplicates: `docs/`
+   is addressed to a developer taking over the code, `ssk-it/ssk-canon`
+   describes the product's behaviour.
 
-   `example-repo/` n'est pas une cible : c'est un jeu de test, pas le
-   référentiel de Skanon.
+   `example-repo/` is not a target: it is a test fixture, not Skanon's
+   specification.
 
-## Les pièges du format
+## Format pitfalls
 
-- Un impact `cree` ou `modifie` **doit** avoir son énoncé, sinon la
-  vérification échoue.
-- Un cadrage porte l'énoncé **au moment de sa livraison**, pas l'état courant :
-  ne pas réécrire les énoncés des cadrages anciens.
-- Les champs `cree_par` et `modifie_par` sont dérivés des impacts des cadrages
-  livrés. La vérification les recalcule : les renseigner à la main de façon
-  incohérente fait échouer le contrôle.
-- Une règle créée par un cadrage non livré n'existe pas encore dans `rules/` —
-  c'est normal et toléré.
+- A `cree` or `modifie` impact **must** have its statement, otherwise the
+  verification fails.
+- A scoping carries the statement **as of its delivery**, not the current
+  state: do not rewrite the statements of old scopings.
+- The `cree_par` and `modifie_par` fields are derived from the impacts of
+  delivered scopings. The verification recomputes them: filling them in by
+  hand inconsistently makes the check fail.
+- A rule created by an undelivered scoping does not exist yet in `rules/` —
+  that is normal and tolerated.

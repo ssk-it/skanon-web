@@ -1,9 +1,9 @@
 /**
- * L'injection du cœur : une instance par service, créée à la première demande.
+ * The core's injection: one instance per service, created on first request.
  *
- * Les services hérités de SSK Canon se demandent leurs dépendances par `inject(Service)` dans leurs champs. Les garder ainsi rend le portage mécanique, et ce conteneur d'une soixantaine de lignes suffit à ce qu'ils en attendent : des singletons, une substitution pour les tests, et des jetons pour ce qui n'est pas une classe.
+ * The services inherited from SSK Canon request their dependencies through `inject(Service)` in their fields. Keeping them so makes the port mechanical, and this container of some sixty lines is enough for what they expect of it: singletons, a substitution for tests, and tokens for what is not a class.
  *
- * Les composants Vue demandent un service par la même fonction : le conteneur est global à l'application, comme l'était l'injecteur racine.
+ * Vue components request a service through the same function: the container is global to the application, as the root injector was.
  */
 
 export class InjectionToken<T> {
@@ -18,67 +18,67 @@ export class InjectionToken<T> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Classe<T> = new (...args: any[]) => T;
-export type Jeton<T> = Classe<T> | InjectionToken<T>;
+type ClassType<T> = new (...args: any[]) => T;
+export type ProviderToken<T> = ClassType<T> | InjectionToken<T>;
 
-const instances = new Map<Jeton<unknown>, unknown>();
-const enCreation = new Set<Jeton<unknown>>();
+const instances = new Map<ProviderToken<unknown>, unknown>();
+const underConstruction = new Set<ProviderToken<unknown>>();
 
-export function inject<T>(jeton: Jeton<T>): T;
+export function inject<T>(token: ProviderToken<T>): T;
 export function inject<T>(
-  jeton: Jeton<T>,
+  token: ProviderToken<T>,
   options: { optional: true },
 ): T | null;
 export function inject<T>(
-  jeton: Jeton<T>,
+  token: ProviderToken<T>,
   options?: { optional: true },
 ): T | null {
-  if (instances.has(jeton)) return instances.get(jeton) as T;
-  if (jeton instanceof InjectionToken) {
-    if (!jeton.options) {
+  if (instances.has(token)) return instances.get(token) as T;
+  if (token instanceof InjectionToken) {
+    if (!token.options) {
       if (options?.optional) return null;
-      throw new Error(`Aucune valeur fournie pour ${jeton}`);
+      throw new Error(`Aucune valeur fournie pour ${token}`);
     }
-    return creer(jeton, jeton.options.factory);
+    return create(token, token.options.factory);
   }
-  return creer(jeton, () => new jeton());
+  return create(token, () => new token());
 }
 
-function creer<T>(jeton: Jeton<T>, fabrique: () => T): T {
-  if (enCreation.has(jeton)) {
+function create<T>(token: ProviderToken<T>, factory: () => T): T {
+  if (underConstruction.has(token)) {
     throw new Error(
-      `Dépendance circulaire sur ${String(jeton instanceof InjectionToken ? jeton : jeton.name)}`,
+      `Dépendance circulaire sur ${String(token instanceof InjectionToken ? token : token.name)}`,
     );
   }
-  enCreation.add(jeton);
+  underConstruction.add(token);
   try {
-    const instance = fabrique();
-    instances.set(jeton, instance);
+    const instance = factory();
+    instances.set(token, instance);
     return instance;
   } finally {
-    enCreation.delete(jeton);
+    underConstruction.delete(token);
   }
 }
 
 /**
- * Fournit la valeur d'un jeton : un adaptateur dans la racine de composition, une doublure dans un test. Comme le `useValue` d'Angular, la doublure n'est pas vérifiée contre le type : un test n'en écrit que ce que le service éprouvé appelle.
+ * Provides a token's value: an adapter in the composition root, a fake in a test. Like Angular's `useValue`, the fake is not checked against the type: a test only writes what the service under test calls.
  */
-export function provide<T>(jeton: Jeton<T>, valeur: T | object): void {
-  instances.set(jeton, valeur);
+export function provide<T>(token: ProviderToken<T>, value: T | object): void {
+  instances.set(token, value);
 }
 
-const finsDeVie: Array<() => void> = [];
+const teardowns: Array<() => void> = [];
 
 /**
- * Ce qu'un service doit défaire quand le conteneur l'oublie — écouteurs, minuteries —, comme `DestroyRef.onDestroy` : sans cela, le service d'un test continuerait d'écouter dans le suivant.
+ * What a service must undo when the container forgets it — listeners, timers —, like `DestroyRef.onDestroy`: without it, a test's service would keep listening in the next one.
  */
-export function onDestroy(fin: () => void): void {
-  finsDeVie.push(fin);
+export function onDestroy(end: () => void): void {
+  teardowns.push(end);
 }
 
-/** Oublie toutes les instances : chaque test repart d'un conteneur vide. */
+/** Forgets all instances: each test starts again from an empty container. */
 export function resetInjection(): void {
-  for (const fin of finsDeVie.splice(0)) fin();
+  for (const end of teardowns.splice(0)) end();
   instances.clear();
-  enCreation.clear();
+  underConstruction.clear();
 }

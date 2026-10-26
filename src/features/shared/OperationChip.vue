@@ -1,20 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import {
-  LIBELLE_OPERATION,
-  type OperationImpact,
-} from "../../core/model/model";
+import { OPERATION_LABEL, type ImpactOperation } from "../../core/model/model";
 
 /**
- * L'opération d'un impact. `touche` se distingue visuellement des trois autres : c'est la seule qui n'écrit rien, et cette différence compte à la relecture.
+ * An impact's operation. `touche` is visually distinct from the other three: it is the only one that writes nothing, and that difference matters during review.
  */
-const props = defineProps<{ operation: OperationImpact }>();
+const props = defineProps<{ operation: ImpactOperation }>();
 
-const libelle = computed(() => LIBELLE_OPERATION[props.operation]);
+const label = computed(() => OPERATION_LABEL[props.operation]);
 </script>
 
 <template>
-  <span class="operation-chip op" :class="'o-' + operation">{{ libelle }}</span>
+  <span class="operation-chip op" :class="'o-' + operation">{{ label }}</span>
 </template>
 
 <style scoped>

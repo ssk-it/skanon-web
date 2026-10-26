@@ -1,44 +1,44 @@
 <script setup lang="ts">
-import UiBouton from "../../ui/UiBouton.vue";
-import UiDialogue from "../../ui/UiDialogue.vue";
+import UiButton from "../../ui/UiButton.vue";
+import UiDialog from "../../ui/UiDialog.vue";
 
-/** Ce que l'écran demande, et sous quel libellé il l'engage. */
-export interface DemandeConfirmation {
-  readonly titre: string;
+/** What the screen asks, and under which label it commits. */
+export interface ConfirmationRequest {
+  readonly title: string;
   readonly message: string;
-  /** Le libellé du bouton qui engage — un verbe, pas « OK ». */
+  /** The label of the committing button — a verb, not « OK ». */
   readonly action: string;
 }
 
 /**
- * Confirme une écriture que l'application ne sait pas défaire.
+ * Confirms a write the application cannot undo.
  *
- * Ce qui est commité dans le dépôt ne se reprend pas depuis ici : Git en garde l'histoire, mais la retrouver demande de passer par GitHub. Le bouton nomme l'acte plutôt que de dire « OK » — c'est le libellé, non le texte au-dessus, que l'on lit avant de cliquer.
+ * What is committed in the repo cannot be taken back from here: Git keeps its history, but retrieving it means going through GitHub. The button names the act rather than saying « OK » — it is the label, not the text above, that one reads before clicking.
  *
  * ```ts
- * const confirme = await inject(DialogService).open<boolean>(ConfirmationDialog, {
+ * const confirmed = await inject(DialogService).open<boolean>(ConfirmationDialog, {
  *   focus: "dialogue",
- *   data: { titre: "Supprimer ce lien ?", message: "…", action: "Supprimer" },
+ *   data: { title: "Supprimer ce lien ?", message: "…", action: "Supprimer" },
  * });
  * ```
  */
-defineProps<{ data: DemandeConfirmation }>();
+defineProps<{ data: ConfirmationRequest }>();
 
-const emit = defineEmits<{ fermer: [confirme?: boolean] }>();
+const emit = defineEmits<{ close: [confirme?: boolean] }>();
 </script>
 
 <template>
-  <UiDialogue class="confirmation-dialog" :titre="data.titre">
+  <UiDialog class="confirmation-dialog" :title="data.title">
     <p class="message">{{ data.message }}</p>
     <template #actions>
-      <UiBouton data-focus-initial @click="emit('fermer', false)"
-        >Annuler</UiBouton
+      <UiButton data-focus-initial @click="emit('close', false)"
+        >Annuler</UiButton
       >
-      <UiBouton variante="filled" @click="emit('fermer', true)">{{
+      <UiButton variant="filled" @click="emit('close', true)">{{
         data.action
-      }}</UiBouton>
+      }}</UiButton>
     </template>
-  </UiDialogue>
+  </UiDialog>
 </template>
 
 <style scoped>

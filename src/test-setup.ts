@@ -1,18 +1,18 @@
 import { afterEach } from "vitest";
 import { resetInjection } from "./core/injection";
 
-// Chaque test repart d'un conteneur vide, comme le faisait `TestBed.resetTestingModule`.
+// Each test starts again from an empty container, as `TestBed.resetTestingModule` did.
 afterEach(() => {
   resetInjection();
-  // Un test peut avoir remplacé le stockage par un stockage qui refuse tout : le refus est son objet, non une erreur du nettoyage.
-  for (const stockage of [globalThis.localStorage, globalThis.sessionStorage]) {
+  // A test may have replaced storage with one that refuses everything: the refusal is its subject, not a cleanup error.
+  for (const storage of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
-      stockage.clear();
+      storage.clear();
     } catch {
-      /* stockage factice d'un test */
+      /* a test's fake storage */
     }
   }
 });
 
-// jsdom ne met rien en page et n'implémente pas `scrollTo`, que le défilement du routeur appelle à chaque navigation (`src/routeur.ts`) : sans cette doublure, chaque test de page routée l'écrit sur la console.
+// jsdom lays nothing out and does not implement `scrollTo`, which the router's scrolling calls on every navigation (`src/router.ts`): without this fake, every routed page test writes it to the console.
 window.scrollTo = () => {};

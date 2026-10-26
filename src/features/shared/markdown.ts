@@ -2,14 +2,14 @@ import DOMPurify from "dompurify";
 import { marked } from "marked";
 
 /**
- * Rend du Markdown en HTML assaini — le `markdown.pipe` de SSK Canon, devenu une fonction.
+ * Renders Markdown into sanitised HTML — SSK Canon's `markdown.pipe`, turned into a function.
  *
- * L'assainissement n'est pas optionnel : le contenu provient d'un dépôt tiers que l'application ne contrôle pas. Le résultat se pose par `v-html` ; il n'y est posé qu'après passage par DOMPurify.
+ * Sanitising is not optional: the content comes from a third-party repo the application does not control. The result is set through `v-html`; it is only set there after going through DOMPurify.
  *
- * Partagé avec le composant qui dessine les diagrammes : deux rendus pour un même contenu finiraient par différer, et un diagramme s'afficherait autrement selon le chemin emprunté.
+ * Shared with the component that draws diagrams: two renderings of the same content would end up differing, and a diagram would display differently depending on the path taken.
  */
-export function rendreMarkdown(valeur: string): string {
-  const html = marked.parse(valeur, { async: false, gfm: true, breaks: false });
+export function renderMarkdownSync(value: string): string {
+  const html = marked.parse(value, { async: false, gfm: true, breaks: false });
   return DOMPurify.sanitize(html, {
     ADD_ATTR: ["target", "rel"],
     FORBID_TAGS: ["style", "form", "input"],
@@ -17,9 +17,9 @@ export function rendreMarkdown(valeur: string): string {
 }
 
 /**
- * Ce qu'un gabarit affiche : rien pour un texte vide ou absent, le HTML assaini sinon. `<div class="md" v-html="renderMarkdown(r.enonce)" />` remplace `[innerHTML]="r.enonce | markdown"`.
+ * What a template displays: nothing for an empty or absent text, the sanitised HTML otherwise. `<div class="md" v-html="renderMarkdown(r.statement)" />` replaces `[innerHTML]="r.enonce | markdown"`.
  */
-export function renderMarkdown(valeur: string | null | undefined): string {
-  if (!valeur?.trim()) return "";
-  return rendreMarkdown(valeur);
+export function renderMarkdown(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  return renderMarkdownSync(value);
 }

@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** La cible du build : la version web statique (`vite.config.ts`), ou l'application de bureau, que son dépôt construit depuis ce même code. */
-  readonly VITE_CIBLE: "bureau" | "web";
-  /** Le commit construit, en sept caractères, ou `développement` hors d'un dépôt (`vite.config.ts`). Seule la version web l'affiche. */
+  /** The build target: the static web version (`vite.config.ts`), or the desktop application, which its repo builds from this same code. */
+  readonly VITE_TARGET: "bureau" | "web";
+  /** The built commit, in seven characters, or `développement` outside a repo (`vite.config.ts`). Only the web version shows it. */
   readonly VITE_VERSION: string;
 }

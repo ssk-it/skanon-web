@@ -1,58 +1,58 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PLATEFORME } from "../../plateforme/jeton";
-import type { AnnonceVersion, CauseSansVersion } from "../../plateforme/ports";
-import { createPlateformeWeb } from "../../plateforme/web";
+import { PLATFORM } from "../../platform/platform-token";
+import type { VersionAnnouncement, NoVersionCause } from "../../platform/ports";
+import { createWebPlatform } from "../../platform/web";
 import { inject, provide, resetInjection } from "../injection";
 import {
-  INTERVALLE_VERIFICATION,
-  RECHARGER_PAGE,
+  CHECK_INTERVAL,
+  RELOAD_PAGE,
   VersionService,
-  estUrlDeSaisie,
+  isInputUrl,
 } from "./version.service";
 
 /**
- * Un annonceur simulé, à la place du service worker : ce qu'il annonce, et les deux appels qu'on lui fait. Le vrai ne tourne pas sous jsdom, et ne tournerait de toute façon qu'avec une version déployée à côté.
+ * A simulated announcer, in place of the service worker: what it announces, and the two calls made to it. The real one does not run under jsdom, and would only run anyway with a version deployed next to it.
  */
-class FauxAnnonceur {
-  actif = true;
-  relance = false;
-  private readonly ecouteurs = new Set<(a: AnnonceVersion) => void>();
-  private readonly ecouteursDeCause = new Set<
-    (c: CauseSansVersion | null) => void
+class FakeAnnouncer {
+  active = true;
+  relaunches = false;
+  private readonly listeners = new Set<(a: VersionAnnouncement) => void>();
+  private readonly causeListeners = new Set<
+    (c: NoVersionCause | null) => void
   >();
   readonly check = vi.fn<() => Promise<void>>(() => Promise.resolve());
   readonly activate = vi.fn<() => Promise<void>>(() => Promise.resolve());
 
-  listen(surAnnonce: (a: AnnonceVersion) => void): () => void {
-    this.ecouteurs.add(surAnnonce);
-    return () => this.ecouteurs.delete(surAnnonce);
+  listen(onAnnouncement: (a: VersionAnnouncement) => void): () => void {
+    this.listeners.add(onAnnouncement);
+    return () => this.listeners.delete(onAnnouncement);
   }
 
-  listenCause(surCause: (c: CauseSansVersion | null) => void): () => void {
-    this.ecouteursDeCause.add(surCause);
-    return () => this.ecouteursDeCause.delete(surCause);
+  listenCause(onCause: (c: NoVersionCause | null) => void): () => void {
+    this.causeListeners.add(onCause);
+    return () => this.causeListeners.delete(onCause);
   }
 
-  annoncer(annonce: AnnonceVersion): void {
-    for (const e of this.ecouteurs) e(annonce);
+  announce(announcement: VersionAnnouncement): void {
+    for (const e of this.listeners) e(announcement);
   }
 
-  direCause(cause: CauseSansVersion | null): void {
-    for (const e of this.ecouteursDeCause) e(cause);
+  sayCause(cause: NoVersionCause | null): void {
+    for (const e of this.causeListeners) e(cause);
   }
 }
 
 describe("VersionService", () => {
-  let sw: FauxAnnonceur;
-  let recharger: ReturnType<typeof vi.fn>;
+  let sw: FakeAnnouncer;
+  let reload: ReturnType<typeof vi.fn>;
 
-  function creer(): VersionService {
-    provide(PLATEFORME, { ...createPlateformeWeb(), version: sw });
-    provide(RECHARGER_PAGE, recharger);
+  function create(): VersionService {
+    provide(PLATFORM, { ...createWebPlatform(), version: sw });
+    provide(RELOAD_PAGE, reload);
     return inject(VersionService);
   }
 
-  function revenirAuPremierPlan(): void {
+  function returnToForeground(): void {
     Object.defineProperty(document, "visibilityState", {
       value: "visible",
       configurable: true,
@@ -61,97 +61,97 @@ describe("VersionService", () => {
   }
 
   beforeEach(() => {
-    sw = new FauxAnnonceur();
-    recharger = vi.fn();
+    sw = new FakeAnnouncer();
+    reload = vi.fn();
   });
 
   afterEach(() => {
     resetInjection();
     vi.useRealTimers();
-    // la propriété définie par revenirAuPremierPlan masquait celle de jsdom
+    // the property defined by returnToForeground hid jsdom's
     delete (document as { visibilityState?: unknown }).visibilityState;
   });
 
-  it("reste sur la version courante tant que rien n’est annoncé", () => {
-    expect(creer().etat()).toBe("courante");
+  it("stays on the current version as long as nothing is announced", () => {
+    expect(create().state()).toBe("courante");
   });
 
-  it("se dit prête quand une nouvelle version est téléchargée", () => {
-    const service = creer();
-    sw.annoncer("prete");
-    expect(service.etat()).toBe("prete");
+  it("reports ready when a new version is downloaded", () => {
+    const service = create();
+    sw.announce("prete");
+    expect(service.state()).toBe("prete");
   });
 
-  it("ignore les étapes qui précèdent la version prête", () => {
-    // Le service worker de Skanon n'annonce que la version installée, prête à servir : une version détectée, encore en téléchargement, ne franchit pas le port. Rien n'est annoncé tant qu'elle n'est pas prête.
-    const service = creer();
-    expect(service.etat()).toBe("courante");
+  it("ignores the steps that precede the ready version", () => {
+    // Skanon's service worker only announces the installed version, ready to serve: a detected version, still downloading, does not cross the port. Nothing is announced as long as it is not ready.
+    const service = create();
+    expect(service.state()).toBe("courante");
   });
 
-  it("ne recharge jamais d’elle-même — RG-nouvelle-version-proposee", () => {
-    creer();
-    sw.annoncer("prete");
-    expect(recharger).not.toHaveBeenCalled();
+  it("never reloads by itself — RG-nouvelle-version-proposee", () => {
+    create();
+    sw.announce("prete");
+    expect(reload).not.toHaveBeenCalled();
     expect(sw.activate).not.toHaveBeenCalled();
   });
 
-  it("active la nouvelle version puis recharge, sur demande", async () => {
-    const service = creer();
-    sw.annoncer("prete");
+  it("activates the new version then reloads, on request", async () => {
+    const service = create();
+    sw.announce("prete");
 
     await service.reloadVersion();
 
     expect(sw.activate).toHaveBeenCalledOnce();
-    expect(recharger).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
     expect(sw.activate.mock.invocationCallOrder[0]).toBeLessThan(
-      recharger.mock.invocationCallOrder[0]!,
+      reload.mock.invocationCallOrder[0]!,
     );
   });
 
-  it("recharge même si l’activation échoue", async () => {
-    // le rechargement suffit à servir la version prête : un échec de l'activation ne doit pas laisser le bouton sans effet
+  it("reloads even if activation fails", async () => {
+    // reloading is enough to serve the ready version: a failed activation must not leave the button without effect
     sw.activate.mockRejectedValue(new Error("échec"));
-    const service = creer();
-    sw.annoncer("prete");
+    const service = create();
+    sw.announce("prete");
 
     await service.reloadVersion();
 
-    expect(recharger).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
   });
 
-  it("se dit perdue quand le service worker ne peut plus servir la version", () => {
-    const service = creer();
-    sw.annoncer("perdue");
-    expect(service.etat()).toBe("perdue");
+  it("reports lost when the service worker can no longer serve the version", () => {
+    const service = create();
+    sw.announce("perdue");
+    expect(service.state()).toBe("perdue");
   });
 
-  it("reste perdue si une nouvelle version devient prête ensuite", () => {
-    // le défaut le plus grave garde la parole : c'est lui qu'il faut expliquer
-    const service = creer();
-    sw.annoncer("perdue");
-    sw.annoncer("prete");
-    expect(service.etat()).toBe("perdue");
+  it("stays lost if a new version becomes ready afterwards", () => {
+    // the most serious defect keeps the floor: it is the one that needs explaining
+    const service = create();
+    sw.announce("perdue");
+    sw.announce("prete");
+    expect(service.state()).toBe("perdue");
   });
 
-  it("ne recharge pas d’elle-même une version perdue — RG-version-perdue-signalee", async () => {
-    const service = creer();
-    sw.annoncer("perdue");
-    expect(recharger).not.toHaveBeenCalled();
+  it("does not reload a lost version by itself — RG-version-perdue-signalee", async () => {
+    const service = create();
+    sw.announce("perdue");
+    expect(reload).not.toHaveBeenCalled();
 
     await service.reloadVersion();
-    // rien à activer : seule la version publiée peut encore être servie
+    // nothing to activate: only the published version can still be served
     expect(sw.activate).not.toHaveBeenCalled();
-    expect(recharger).toHaveBeenCalledOnce();
+    expect(reload).toHaveBeenCalledOnce();
   });
 
-  it("vérifie au retour au premier plan", () => {
-    creer();
-    revenirAuPremierPlan();
+  it("checks on return to the foreground", () => {
+    create();
+    returnToForeground();
     expect(sw.check).toHaveBeenCalledOnce();
   });
 
-  it("ne vérifie pas quand la fenêtre passe à l’arrière-plan", () => {
-    creer();
+  it("does not check when the window goes to the background", () => {
+    create();
     Object.defineProperty(document, "visibilityState", {
       value: "hidden",
       configurable: true,
@@ -160,108 +160,108 @@ describe("VersionService", () => {
     expect(sw.check).not.toHaveBeenCalled();
   });
 
-  it("vérifie toutes les heures", () => {
+  it("checks every hour", () => {
     vi.useFakeTimers();
-    creer();
+    create();
 
-    vi.advanceTimersByTime(INTERVALLE_VERIFICATION - 1);
+    vi.advanceTimersByTime(CHECK_INTERVAL - 1);
     expect(sw.check).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(1);
     expect(sw.check).toHaveBeenCalledOnce();
 
-    vi.advanceTimersByTime(INTERVALLE_VERIFICATION);
+    vi.advanceTimersByTime(CHECK_INTERVAL);
     expect(sw.check).toHaveBeenCalledTimes(2);
   });
 
-  it("se tait quand une vérification échoue hors ligne", async () => {
+  it("stays silent when a check fails offline", async () => {
     sw.check.mockRejectedValue(new Error("Failed to fetch"));
-    const service = creer();
+    const service = create();
 
     await expect(service.checkVersion()).resolves.toBeUndefined();
-    expect(service.etat()).toBe("courante");
+    expect(service.state()).toBe("courante");
   });
 
-  it("cesse de vérifier une fois détruit", () => {
+  it("stops checking once destroyed", () => {
     vi.useFakeTimers();
-    creer();
+    create();
     resetInjection();
 
-    revenirAuPremierPlan();
-    vi.advanceTimersByTime(INTERVALLE_VERIFICATION);
+    returnToForeground();
+    vi.advanceTimersByTime(CHECK_INTERVAL);
     expect(sw.check).not.toHaveBeenCalled();
   });
 
-  it("ne fait rien quand le service worker est désactivé", () => {
-    // le cas du serveur de développement, où la version web n'inscrit pas de service worker
-    sw.actif = false;
+  it("does nothing when the service worker is disabled", () => {
+    // the development server's case, where the web version registers no service worker
+    sw.active = false;
     vi.useFakeTimers();
-    const service = creer();
+    const service = create();
 
-    revenirAuPremierPlan();
-    vi.advanceTimersByTime(INTERVALLE_VERIFICATION);
+    returnToForeground();
+    vi.advanceTimersByTime(CHECK_INTERVAL);
     expect(sw.check).not.toHaveBeenCalled();
-    expect(service.etat()).toBe("courante");
+    expect(service.state()).toBe("courante");
   });
 
-  describe("sur le bureau", () => {
+  describe("on the desktop", () => {
     beforeEach(() => {
-      sw.relance = true;
+      sw.relaunches = true;
     });
 
-    it("relance par l’annonceur, sans recharger la page", async () => {
-      const service = creer();
-      sw.annoncer("prete");
+    it("relaunches through the announcer, without reloading the page", async () => {
+      const service = create();
+      sw.announce("prete");
 
       await service.reloadVersion();
 
       expect(sw.activate).toHaveBeenCalledOnce();
-      // la relance remplace la fenêtre : recharger la page avant n'aurait servi que l'ancienne version
-      expect(recharger).not.toHaveBeenCalled();
+      // the relaunch replaces the window: reloading the page first would only have served the old version
+      expect(reload).not.toHaveBeenCalled();
     });
 
-    it("dit que l’installation a échoué, et garde la version prête", async () => {
+    it("says the installation failed, and keeps the version ready", async () => {
       sw.activate.mockRejectedValue("installation-echouee");
-      const service = creer();
-      sw.annoncer("prete");
+      const service = create();
+      sw.announce("prete");
 
       await service.reloadVersion();
 
       expect(service.cause()).toBe("installation-echouee");
-      expect(service.etat()).toBe("prete");
-      expect(recharger).not.toHaveBeenCalled();
+      expect(service.state()).toBe("prete");
+      expect(reload).not.toHaveBeenCalled();
     });
 
-    it("dit pourquoi aucune version n’est annoncée — RG-nouvelle-version-proposee", () => {
-      const service = creer();
+    it("says why no version is announced — RG-nouvelle-version-proposee", () => {
+      const service = create();
       expect(service.cause()).toBeNull();
 
-      // une cause que seul le livrable connaît : le service la relaie sans la lire
-      const cause = "une-cause-du-livrable" as CauseSansVersion;
-      sw.direCause(cause);
+      // a cause only the deliverable knows: the service relays it without reading it
+      const cause = "une-cause-du-livrable" as NoVersionCause;
+      sw.sayCause(cause);
       expect(service.cause()).toBe(cause);
-      expect(service.etat()).toBe("courante");
+      expect(service.state()).toBe("courante");
 
-      sw.direCause(null);
+      sw.sayCause(null);
       expect(service.cause()).toBeNull();
     });
   });
 
-  it("se passe d’un service worker absent", () => {
-    // jsdom n'a pas de service worker : la plateforme web par défaut n'a rien à annoncer
-    provide(RECHARGER_PAGE, recharger);
-    expect(inject(VersionService).etat()).toBe("courante");
+  it("does without an absent service worker", () => {
+    // jsdom has no service worker: the default web platform has nothing to announce
+    provide(RELOAD_PAGE, reload);
+    expect(inject(VersionService).state()).toBe("courante");
   });
 });
 
-describe("estUrlDeSaisie", () => {
+describe("isInputUrl", () => {
   it.each([
     "/ssk-it/ssk-canon/cadrages/nouveau",
     "/ssk-it/ssk-canon/cadrages/2026-049/editer",
     "/ssk-it/ssk-canon/cadrages/2026-049/editer?onglet=decisions",
     "/ssk-it/ssk-canon/reglages",
-  ])("reconnaît une page de saisie : %s", (url) => {
-    expect(estUrlDeSaisie(url)).toBe(true);
+  ])("recognises an input page: %s", (url) => {
+    expect(isInputUrl(url)).toBe(true);
   });
 
   it.each([
@@ -270,9 +270,9 @@ describe("estUrlDeSaisie", () => {
     "/ssk-it/ssk-canon/cadrages",
     "/ssk-it/ssk-canon/cadrages/2026-049",
     "/ssk-it/ssk-canon/cadrages/2026-049#01-recharger-ou-proposer",
-    // un dépôt nommé comme une vue ne fait pas d'une page de lecture une saisie
+    // a repo named like a view does not make a reading page an input page
     "/ssk-it/reglages/referentiel",
-  ])("ne confond pas une page de lecture : %s", (url) => {
-    expect(estUrlDeSaisie(url)).toBe(false);
+  ])("does not mistake a reading page: %s", (url) => {
+    expect(isInputUrl(url)).toBe(false);
   });
 });

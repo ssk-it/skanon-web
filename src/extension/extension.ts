@@ -1,87 +1,87 @@
 /**
- * Ce qu'un livrable ajoute à l'interface commune, et que le code commun ne doit pas connaître : ce qui tient au livrable — qui l'héberge, d'où viennent ses versions, sous quelle licence elles s'obtiennent, ce qu'il vend. Ce qui tient au système passe par les ports (ADR-extensions-commerciales).
+ * What a deliverable adds to the shared interface, and that the shared code must not know: what belongs to the deliverable — who hosts it, where its versions come from, under what licence they are obtained, what it sells. What belongs to the system goes through the ports (ADR-extensions-commerciales).
  *
- * Chaque point d'extension nomme un endroit de l'interface, jamais une fonctionnalité. Un point naît avec la première extension qui l'emploie, et un test l'éprouve par une extension factice.
+ * Each extension point names a place in the interface, never a feature. A point is born with the first extension that uses it, and a test exercises it through a fake extension.
  *
- * Une extension est créée par la racine de composition de son livrable, qui lui passe ce dont elle a besoin : elle ne demande rien à l'interface commune qui ne soit exporté.
+ * An extension is created by its deliverable's composition root, which passes it what it needs: it asks nothing of the shared interface that is not exported.
  */
 export interface Extension {
-  /** Unique parmi les extensions d'un livrable. */
+  /** Unique among a deliverable's extensions. */
   readonly id: string;
-  readonly coquille?: ApportsDeCoquille;
-  readonly pages?: ApportsDePages;
+  readonly shell?: ShellContributions;
+  readonly pages?: PageContributions;
 }
 
-/** Ce que porte tout apport à un point qui en reçoit plusieurs. */
+/** What every contribution carries to a point that receives several. */
 export interface Contribution {
-  /** Unique parmi les apports du même point. */
+  /** Unique among the contributions to the same point. */
   readonly id: string;
-  /** Rang parmi les apports du même point, du plus petit au plus grand ; 0 par défaut. À rang égal, l'ordre de composition. */
-  readonly rang?: number;
-  /** Faux : l'apport ne s'affiche pas. Toujours vrai par défaut. L'extension le calcule elle-même, droits compris : l'interface commune ne sait pas pourquoi. */
+  /** Rank among the contributions to the same point, from smallest to largest; 0 by default. At equal rank, composition order. */
+  readonly rank?: number;
+  /** False: the contribution is not shown. Always true by default. The extension computes it itself, permissions included: the shared interface does not know why. */
   readonly visible?: () => boolean;
 }
 
-export interface ApportsDeCoquille {
-  /** Des boutons de la barre du haut, avant celui de la connexion. */
-  readonly actionsDeBarre?: readonly ActionDeBarre[];
-  /** Des bandeaux d'état, sous ceux de la coquille, dans son style : l'extension en donne le texte, la coquille la forme. */
-  readonly bandeaux?: readonly Bandeau[];
+export interface ShellContributions {
+  /** Buttons of the top bar, before the sign-in one. */
+  readonly toolbarActions?: readonly ToolbarAction[];
+  /** Status banners, below the shell's, in its style: the extension gives their text, the shell their form. */
+  readonly banners?: readonly Banner[];
 }
 
-export interface ActionDeBarre extends Contribution {
-  /** Le nom de l'icône, qui dit l'état courant plutôt que l'action à venir. */
-  readonly icone: () => string;
-  /** Le nom accessible ; stable, puisque les tests et la suite native le visent. */
-  readonly libelle: string;
-  readonly titre: () => string;
-  /** Vrai : le bouton est mis en avant, comme celui d'un quota bas. */
-  readonly alerte?: () => boolean;
-  readonly activer: () => void;
+export interface ToolbarAction extends Contribution {
+  /** The icon's name, which shows the current state rather than the action to come. */
+  readonly icon: () => string;
+  /** The accessible name; stable, since tests and the native suite target it. */
+  readonly label: string;
+  readonly title: () => string;
+  /** True: the button is highlighted, like that of a low quota. */
+  readonly alert?: () => boolean;
+  readonly activate: () => void;
 }
 
-export interface Bandeau extends Contribution {
-  readonly icone: string;
-  /** Ce que dit le bandeau ; il ne s'affiche que visible et non vide. */
-  readonly texte: () => string;
+export interface Banner extends Contribution {
+  readonly icon: string;
+  /** What the banner says; it is only shown when visible and not empty. */
+  readonly text: () => string;
 }
 
-/** Les sections de la page « Fonctionnement » où un livrable dit ce qui lui est propre (RG-aide-fidele). */
-export type SectionAide = "jetons" | "cache" | "communications";
+/** The sections of the « Fonctionnement » page where a deliverable says what is specific to it (RG-aide-fidele). */
+export type HelpSection = "jetons" | "cache" | "communications";
 
-export interface ApportsDePages {
-  /** Des phrases de la page « Fonctionnement », par section, à l'endroit que la page réserve au livrable. */
-  readonly aide?: Partial<Readonly<Record<SectionAide, readonly string[]>>>;
-  readonly mentions?: MentionsDuLivrable;
+export interface PageContributions {
+  /** Phrases of the « Fonctionnement » page, by section, at the place the page reserves for the deliverable. */
+  readonly help?: Partial<Readonly<Record<HelpSection, readonly string[]>>>;
+  readonly legalNotice?: DeliverableNotice;
 }
 
-/** Ce que les mentions légales disent du livrable courant (RG-mentions-legales). */
-export interface MentionsDuLivrable {
-  /** Le paragraphe « Hébergeur » : celui qui sert ce livrable, ou l'absence d'hébergeur. Un seul par livrable. */
-  readonly hebergeur?: string;
-  /** Ajouté au paragraphe « Données personnelles ». */
-  readonly donnees?: readonly string[];
-  /** Ajouté à « Propriété intellectuelle » : la licence de ce que le livrable apporte. */
-  readonly propriete?: readonly PhraseDeMention[];
+/** What the legal notice says about the current deliverable (RG-mentions-legales). */
+export interface DeliverableNotice {
+  /** The « Hébergeur » paragraph: the one that serves this deliverable, or the absence of a host. Only one per deliverable. */
+  readonly host?: string;
+  /** Added to the « Données personnelles » paragraph. */
+  readonly data?: readonly string[];
+  /** Added to « Propriété intellectuelle »: the licence of what the deliverable contributes. */
+  readonly ownership?: readonly NoticePhrase[];
 }
 
-/** Une phrase des mentions : du texte, ou du texte autour d'un lien hors de l'application — vers des sources, un texte de licence. */
-export type PhraseDeMention =
+/** A phrase of the notice: text, or text around a link outside the application — to sources, a licence text. */
+export type NoticePhrase =
   | string
   | {
-      readonly avant: string;
-      readonly lien: { readonly libelle: string; readonly href: string };
-      readonly apres?: string;
+      readonly before: string;
+      readonly link: { readonly label: string; readonly href: string };
+      readonly after?: string;
     };
 
-/** Les apports de toutes les extensions d'un livrable, rassemblés point par point. */
+/** The contributions of all of a deliverable's extensions, gathered point by point. */
 export interface Composition {
-  readonly actionsDeBarre: readonly ActionDeBarre[];
-  readonly bandeaux: readonly Bandeau[];
-  readonly aide: Readonly<Record<SectionAide, readonly string[]>>;
-  readonly mentions: {
-    readonly hebergeur: string | null;
-    readonly donnees: readonly string[];
-    readonly propriete: readonly PhraseDeMention[];
+  readonly toolbarActions: readonly ToolbarAction[];
+  readonly banners: readonly Banner[];
+  readonly help: Readonly<Record<HelpSection, readonly string[]>>;
+  readonly legalNotice: {
+    readonly host: string | null;
+    readonly data: readonly string[];
+    readonly ownership: readonly NoticePhrase[];
   };
 }

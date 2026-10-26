@@ -3,12 +3,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
 import { inject } from "../core/injection";
 import { DialogService } from "./dialog.service";
-import UiDialogHote from "./UiDialogHote.vue";
+import UiDialogHost from "./UiDialogHost.vue";
 
-/** Un dialogue d'essai : un champ, deux boutons, et ce qu'il a reçu. */
-const Essai = defineComponent({
+/** A test dialog: a field, two buttons, and what it received. */
+const Sample = defineComponent({
   props: { data: { type: Object, default: null } },
-  emits: ["fermer"],
+  emits: ["close"],
   setup(props, { emit }) {
     return () =>
       h("div", { class: "essai" }, [
@@ -18,34 +18,34 @@ const Essai = defineComponent({
           "button",
           {
             class: "non",
-            // Le focus initial se demande par les données : c'est tout ce qu'un dialogue reçoit.
+            // Initial focus is requested through the data: that is all a dialog receives.
             "data-focus-initial": props.data?.["focusInitial"] ? "" : undefined,
-            onClick: () => emit("fermer", false),
+            onClick: () => emit("close", false),
           },
           "Non",
         ),
         h(
           "button",
-          { class: "oui", onClick: () => emit("fermer", true) },
+          { class: "oui", onClick: () => emit("close", true) },
           "Oui",
         ),
       ]);
   },
 });
 
-let hote: VueWrapper | null = null;
+let host: VueWrapper | null = null;
 
-function monter(): DialogService {
-  hote = mount(UiDialogHote, { attachTo: document.body });
+function mountView(): DialogService {
+  host = mount(UiDialogHost, { attachTo: document.body });
   return inject(DialogService);
 }
 
-function panneau(): HTMLElement | null {
+function panel(): HTMLElement | null {
   return document.querySelector<HTMLElement>(".ui-dialog-panneau");
 }
 
-function touche(cible: Element, key: string, shiftKey = false): void {
-  cible.dispatchEvent(
+function pressKey(target: Element, key: string, shiftKey = false): void {
+  target.dispatchEvent(
     new KeyboardEvent("keydown", {
       key,
       shiftKey,
@@ -56,143 +56,142 @@ function touche(cible: Element, key: string, shiftKey = false): void {
 }
 
 afterEach(() => {
-  hote?.unmount();
-  hote = null;
+  host?.unmount();
+  host = null;
   document.body.innerHTML = "";
 });
 
 describe("DialogService", () => {
-  it("monte le composant avec ses données, et rend le résultat qu’il émet", async () => {
-    const dialogues = monter();
-    const resultat = dialogues.open<boolean>(Essai, {
+  it("mounts the component with its data, and returns the result it emits", async () => {
+    const dialogs = mountView();
+    const result = dialogs.open<boolean>(Sample, {
       data: { message: "Bonjour" },
     });
     await flushPromises();
 
-    expect(panneau()?.querySelector(".recu")?.textContent).toBe("Bonjour");
-    panneau()!.querySelector<HTMLButtonElement>(".oui")!.click();
+    expect(panel()?.querySelector(".recu")?.textContent).toBe("Bonjour");
+    panel()!.querySelector<HTMLButtonElement>(".oui")!.click();
 
-    expect(await resultat).toBe(true);
+    expect(await result).toBe(true);
     await nextTick();
-    expect(panneau()).toBeNull();
+    expect(panel()).toBeNull();
   });
 
-  it("ferme sans réponse à Échap", async () => {
-    const dialogues = monter();
-    const resultat = dialogues.open(Essai);
+  it("closes without an answer on Escape", async () => {
+    const dialogs = mountView();
+    const result = dialogs.open(Sample);
     await flushPromises();
 
-    touche(panneau()!.querySelector(".premier")!, "Escape");
+    pressKey(panel()!.querySelector(".premier")!, "Escape");
 
-    expect(await resultat).toBeUndefined();
+    expect(await result).toBeUndefined();
     await nextTick();
-    expect(panneau()).toBeNull();
+    expect(panel()).toBeNull();
   });
 
-  it("ferme sans réponse au clic sur le fond", async () => {
-    const dialogues = monter();
-    const resultat = dialogues.open(Essai);
+  it("closes without an answer on a click on the backdrop", async () => {
+    const dialogs = mountView();
+    const result = dialogs.open(Sample);
     await flushPromises();
 
     document.querySelector<HTMLElement>(".ui-dialog-fond")!.click();
 
-    expect(await resultat).toBeUndefined();
+    expect(await result).toBeUndefined();
   });
 
-  it("ne ferme pas au clic dans le panneau", async () => {
-    const dialogues = monter();
-    void dialogues.open(Essai);
+  it("does not close on a click in the panel", async () => {
+    const dialogs = mountView();
+    void dialogs.open(Sample);
     await flushPromises();
 
-    panneau()!.querySelector<HTMLElement>(".recu")!.click();
+    panel()!.querySelector<HTMLElement>(".recu")!.click();
     await nextTick();
 
-    expect(panneau()).not.toBeNull();
+    expect(panel()).not.toBeNull();
   });
 
-  it("donne le focus au premier élément focalisable, ou au panneau sur demande", async () => {
-    const dialogues = monter();
-    void dialogues.open(Essai);
+  it("gives focus to the first focusable element, or to the panel on request", async () => {
+    const dialogs = mountView();
+    void dialogs.open(Sample);
     await flushPromises();
     expect(document.activeElement?.className).toBe("premier");
 
-    dialogues.closeAll();
+    dialogs.closeAll();
     await flushPromises();
-    void dialogues.open(Essai, { focus: "dialogue" });
+    void dialogs.open(Sample, { focus: "dialogue" });
     await flushPromises();
-    expect(document.activeElement).toBe(panneau());
+    expect(document.activeElement).toBe(panel());
   });
 
-  it("préfère l’élément marqué pour le focus initial", async () => {
-    const dialogues = monter();
-    void dialogues.open(Essai, { data: { focusInitial: true } });
+  it("prefers the element marked for initial focus", async () => {
+    const dialogs = mountView();
+    void dialogs.open(Sample, { data: { focusInitial: true } });
     await flushPromises();
 
     expect(document.activeElement?.className).toBe("non");
   });
 
-  it("piège le focus : Tab boucle du dernier élément au premier, et l’inverse", async () => {
-    const dialogues = monter();
-    void dialogues.open(Essai);
+  it("traps focus: Tab cycles from the last element to the first, and back", async () => {
+    const dialogs = mountView();
+    void dialogs.open(Sample);
     await flushPromises();
 
-    const oui = panneau()!.querySelector<HTMLButtonElement>(".oui")!;
-    oui.focus();
-    touche(oui, "Tab");
+    const yes = panel()!.querySelector<HTMLButtonElement>(".oui")!;
+    yes.focus();
+    pressKey(yes, "Tab");
     expect(document.activeElement?.className).toBe("premier");
 
-    touche(document.activeElement!, "Tab", true);
-    expect(document.activeElement).toBe(oui);
+    pressKey(document.activeElement!, "Tab", true);
+    expect(document.activeElement).toBe(yes);
   });
 
-  it("rend le focus à l’élément qui l’avait avant l’ouverture", async () => {
-    const dialogues = monter();
-    const declencheur = document.createElement("button");
-    document.body.appendChild(declencheur);
-    declencheur.focus();
+  it("gives focus back to the element that had it before opening", async () => {
+    const dialogs = mountView();
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
 
-    const resultat = dialogues.open(Essai);
+    const result = dialogs.open(Sample);
     await flushPromises();
-    expect(document.activeElement).not.toBe(declencheur);
+    expect(document.activeElement).not.toBe(trigger);
 
-    touche(panneau()!, "Escape");
-    await resultat;
+    pressKey(panel()!, "Escape");
+    await result;
     await flushPromises();
-    expect(document.activeElement).toBe(declencheur);
+    expect(document.activeElement).toBe(trigger);
   });
 
-  it("n’écoute Échap que dans le dernier dialogue ouvert", async () => {
-    const dialogues = monter();
-    const premier = dialogues.open(Essai, { data: { message: "1" } });
-    const second = dialogues.open(Essai, { data: { message: "2" } });
+  it("listens to Escape only in the last dialog opened", async () => {
+    const dialogs = mountView();
+    const first = dialogs.open(Sample, { data: { message: "1" } });
+    const second = dialogs.open(Sample, { data: { message: "2" } });
     await flushPromises();
 
-    const panneaux =
-      document.querySelectorAll<HTMLElement>(".ui-dialog-panneau");
-    expect(panneaux).toHaveLength(2);
-    touche(panneaux[1]!, "Escape");
+    const panels = document.querySelectorAll<HTMLElement>(".ui-dialog-panneau");
+    expect(panels).toHaveLength(2);
+    pressKey(panels[1]!, "Escape");
 
     expect(await second).toBeUndefined();
     await nextTick();
-    expect(dialogues.ouverts()).toHaveLength(1);
+    expect(dialogs.openDialogs()).toHaveLength(1);
     expect(document.querySelector(".recu")?.textContent).toBe("1");
 
-    dialogues.closeAll();
-    expect(await premier).toBeUndefined();
+    dialogs.closeAll();
+    expect(await first).toBeUndefined();
   });
 
-  it("pose la largeur, la position et le nom demandés", async () => {
-    const dialogues = monter();
-    void dialogues.open(Essai, {
-      largeur: "640px",
-      largeurMax: "calc(100vw - 32px)",
-      haut: "12vh",
-      classe: "palette-recherche",
-      libelle: "Rechercher dans le référentiel",
+  it("sets the requested width, position and name", async () => {
+    const dialogs = mountView();
+    void dialogs.open(Sample, {
+      width: "640px",
+      maxWidth: "calc(100vw - 32px)",
+      top: "12vh",
+      className: "palette-recherche",
+      label: "Rechercher dans le référentiel",
     });
     await flushPromises();
 
-    const p = panneau()!;
+    const p = panel()!;
     expect(p.style.width).toBe("640px");
     expect(p.style.maxWidth).toBe("calc(100vw - 32px)");
     expect(p.style.marginTop).toBe("12vh");
@@ -202,15 +201,15 @@ describe("DialogService", () => {
     expect(p.getAttribute("aria-modal")).toBe("true");
   });
 
-  it("ignore une seconde fermeture : la promesse ne se résout qu’une fois", async () => {
-    const dialogues = monter();
-    const resultat = dialogues.open<boolean>(Essai);
+  it("ignores a second close: the promise resolves only once", async () => {
+    const dialogs = mountView();
+    const result = dialogs.open<boolean>(Sample);
     await flushPromises();
 
-    const [ouvert] = dialogues.ouverts();
-    ouvert!.fermer(true);
-    ouvert!.fermer(false);
+    const [opened] = dialogs.openDialogs();
+    opened!.close(true);
+    opened!.close(false);
 
-    expect(await resultat).toBe(true);
+    expect(await result).toBe(true);
   });
 });

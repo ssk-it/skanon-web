@@ -1,118 +1,124 @@
 import { describe, expect, it } from "vitest";
-import { parseModeAcces, parseIdentite } from "./repo-loader";
-import { estSurSaBranche } from "./redaction.service";
+import { parseAccessMode, parseIdentity } from "./repo-loader";
+import { isOnItsBranch } from "./authoring.service";
 
-describe("mode d’accès déclaré par le projet", () => {
-  it("retient le jeton personnel quand rien n’est déclaré", () => {
-    // c'est le seul mode qui ne demande rien à héberger : un projet qui ne
-    // règle rien doit fonctionner
-    const { acces, anomalie } = parseModeAcces(undefined);
-    expect(acces).toBe("jeton_personnel");
-    expect(anomalie).toBeNull();
+describe("access mode declared by the project", () => {
+  it("keeps the personal token when nothing is declared", () => {
+    // it is the only mode that requires hosting nothing: a project that sets
+    // nothing must work
+    const { access, anomaly } = parseAccessMode(undefined);
+    expect(access).toBe("jeton_personnel");
+    expect(anomaly).toBeNull();
   });
 
-  it("lit un mode connu", () => {
-    expect(parseModeAcces("relais").acces).toBe("relais");
-    expect(parseModeAcces("identite_tierce").acces).toBe("identite_tierce");
+  it("reads a known mode", () => {
+    expect(parseAccessMode("relais").access).toBe("relais");
+    expect(parseAccessMode("identite_tierce").access).toBe("identite_tierce");
   });
 
-  it("signale un mode inconnu plutôt que de le subir", () => {
-    // le taire laisserait croire au projet qu'il applique un réglage qu'il
-    // n'applique pas
-    const { acces, anomalie } = parseModeAcces("oauth");
-    expect(acces).toBe("jeton_personnel");
-    expect(anomalie).toContain("oauth");
+  it("reports an unknown mode rather than putting up with it", () => {
+    // keeping quiet would let the project believe it applies a setting it
+    // does not apply
+    const { access, anomaly } = parseAccessMode("oauth");
+    expect(access).toBe("jeton_personnel");
+    expect(anomaly).toContain("oauth");
   });
 
-  it("nomme les modes attendus dans l’anomalie", () => {
-    expect(parseModeAcces("inventé").anomalie).toContain("jeton_personnel");
+  it("names the expected modes in the anomaly", () => {
+    expect(parseAccessMode("inventé").anomaly).toContain("jeton_personnel");
   });
 });
 
-describe("paramètres de l’identité tierce", () => {
-  const COMPLET = {
+describe("third-party identity parameters", () => {
+  // The `identite` block as the configuration file writes it, in French, and what the read makes of it.
+  const BLOCK = {
     emetteur: "http://localhost:8088/realms/ssk-canon",
     client: "ssk-canon-pwa",
     echange: "http://localhost:8790",
   };
+  const COMPLETE = {
+    issuer: BLOCK.emetteur,
+    client: BLOCK.client,
+    exchange: BLOCK.echange,
+  };
 
-  it("rend null quand rien n’est déclaré", () => {
-    const { identite, anomalies } = parseIdentite(undefined);
-    expect(identite).toBeNull();
+  it("returns null when nothing is declared", () => {
+    const { identity, anomalies } = parseIdentity(undefined);
+    expect(identity).toBeNull();
     expect(anomalies).toEqual([]);
   });
 
-  it("lit un bloc complet", () => {
-    expect(parseIdentite(COMPLET).identite).toEqual(COMPLET);
+  it("reads a complete block", () => {
+    expect(parseIdentity(BLOCK).identity).toEqual(COMPLETE);
   });
 
-  it("retire une barre finale, qui doublerait les séparateurs", () => {
-    const { identite } = parseIdentite({
-      ...COMPLET,
-      emetteur: COMPLET.emetteur + "/",
+  it("removes a trailing slash, which would double the separators", () => {
+    const { identity } = parseIdentity({
+      ...BLOCK,
+      emetteur: BLOCK.emetteur + "/",
     });
-    expect(identite?.emetteur).toBe(COMPLET.emetteur);
+    expect(identity?.issuer).toBe(COMPLETE.issuer);
   });
 
-  it("rend null sur un bloc incomplet, plutôt qu’un objet à trous", () => {
-    // la connexion échouerait de toute façon ; échouer au chargement laisse au
-    // moins le référentiel lisible et l'anomalie visible
-    const { identite, anomalies } = parseIdentite({
-      emetteur: COMPLET.emetteur,
+  it("returns null on an incomplete block, rather than an object with holes", () => {
+    // sign-in would fail anyway; failing at load at least leaves the
+    // specification readable and the anomaly visible
+    const { identity, anomalies } = parseIdentity({
+      emetteur: BLOCK.emetteur,
     });
-    expect(identite).toBeNull();
+    expect(identity).toBeNull();
     expect(anomalies.length).toBe(2);
   });
 
-  it("nomme le champ manquant", () => {
-    const { anomalies } = parseIdentite({ ...COMPLET, client: "" });
+  it("names the missing field", () => {
+    const { anomalies } = parseIdentity({ ...BLOCK, client: "" });
     expect(anomalies.some((a) => a.includes("identite.client"))).toBe(true);
   });
 
-  it("refuse une adresse mal formée", () => {
-    // elle se découvrirait sinon au moment de la connexion, loin de sa cause
-    const { identite, anomalies } = parseIdentite({
-      ...COMPLET,
+  it("refuses a malformed address", () => {
+    // it would otherwise be discovered at sign-in time, far from its cause
+    const { identity, anomalies } = parseIdentity({
+      ...BLOCK,
       emetteur: "keycloak",
     });
-    expect(identite).toBeNull();
+    expect(identity).toBeNull();
     expect(anomalies.some((a) => a.includes("adresse valide"))).toBe(true);
   });
 
-  it("n’exige pas que le client soit une adresse", () => {
-    expect(parseIdentite(COMPLET).anomalies).toEqual([]);
+  it("does not require the client to be an address", () => {
+    expect(parseIdentity(BLOCK).anomalies).toEqual([]);
   });
 });
 
 /**
- * Le cadrage se reconnaît à sa branche, jamais au nom de celle-ci.
+ * A scoping is recognised by its branch, never by the branch's name.
  *
- * Ces cas viennent d'un défaut constaté : les transitions de statut étaient
- * invisibles sur tous les cadrages réels. Le test portait sur le préfixe
- * « cadrage/ » que l'application emploie à la création, alors que les branches
- * existantes suivent toutes « cadrage-<id> » — voir RG-branche-par-cadrage.
+ * These cases come from an observed defect: status transitions were invisible
+ * on every real scoping. The test relied on the « cadrage/ » prefix the
+ * application uses at creation, whereas existing branches all follow
+ * « cadrage-<id> » — see RG-branche-par-cadrage.
  */
-describe("reconnaître la branche d’un cadrage", () => {
-  it("reconnaît une branche nommée « cadrage-<id> »", () => {
-    expect(estSurSaBranche("cadrage-2026-002", "main")).toBe(true);
+describe("recognising a scoping's branch", () => {
+  it("recognises a branch named « cadrage-<id> »", () => {
+    expect(isOnItsBranch("cadrage-2026-002", "main")).toBe(true);
   });
 
-  it("reconnaît une branche nommée « cadrage/<id> »", () => {
-    expect(estSurSaBranche("cadrage/2026-002", "main")).toBe(true);
+  it("recognises a branch named « cadrage/<id> »", () => {
+    expect(isOnItsBranch("cadrage/2026-002", "main")).toBe(true);
   });
 
-  it("reconnaît une branche nommée tout autrement", () => {
-    expect(estSurSaBranche("brouillon-de-sebastien", "main")).toBe(true);
+  it("recognises a branch named quite otherwise", () => {
+    expect(isOnItsBranch("brouillon-de-sebastien", "main")).toBe(true);
   });
 
-  it("refuse la branche principale, quel que soit son nom", () => {
-    expect(estSurSaBranche("main", "main")).toBe(false);
-    expect(estSurSaBranche("master", "master")).toBe(false);
+  it("refuses the main branch, whatever its name", () => {
+    expect(isOnItsBranch("main", "main")).toBe(false);
+    expect(isOnItsBranch("master", "master")).toBe(false);
   });
 
-  it("refuse quand la branche ou la principale est inconnue", () => {
-    // proposer une transition qu'on ne peut pas situer vaut moins que rien
-    expect(estSurSaBranche(undefined, "main")).toBe(false);
-    expect(estSurSaBranche("cadrage-2026-002", "")).toBe(false);
+  it("refuses when the branch or the main one is unknown", () => {
+    // offering a transition that cannot be placed is worth less than nothing
+    expect(isOnItsBranch(undefined, "main")).toBe(false);
+    expect(isOnItsBranch("cadrage-2026-002", "")).toBe(false);
   });
 });

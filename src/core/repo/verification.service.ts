@@ -1,124 +1,157 @@
 import { inject } from "../injection";
 import { checkRepo } from "@ssk-it/canon-check";
-import { ReferentielStore } from "./referentiel.store";
+import { SpecificationStore } from "./specification.store";
 import {
-  Cadrage,
-  NatureCible,
-  OperationImpact,
-  Referentiel,
+  Scoping,
+  TargetKind,
+  ImpactOperation,
+  Specification,
 } from "../model/model";
 
-/** Ce que la vérification rapporte d'un cadrage en cours de rédaction. */
+/** What the verifier reads of a scoping: the scoping being entered, or a scoping from the specification. */
+type ScopingEntry = Pick<Scoping, "id" | "domains" | "statements"> & {
+  readonly impacts: ScopingInput["impacts"];
+};
+
+/** What verification reports of a scoping being authored. */
 export interface Verdict {
-  /** Ce qui empêcherait la livraison. */
-  readonly erreurs: readonly string[];
-  /** Ce qui mérite l'attention sans bloquer. */
-  readonly avertissements: readonly string[];
+  /** What would prevent delivery. */
+  readonly errors: readonly string[];
+  /** What deserves attention without blocking. */
+  readonly warnings: readonly string[];
 }
 
-/** Un cadrage tel que saisi, pas encore écrit. */
-export interface CadrageSaisi {
+/** A scoping as entered, not written yet. */
+export interface ScopingInput {
   readonly id: string;
-  readonly titre: string;
-  readonly domaines: readonly string[];
+  readonly title: string;
+  readonly domains: readonly string[];
   readonly impacts: ReadonlyArray<{
-    readonly cible: string;
-    readonly nature?: NatureCible;
-    readonly operation: OperationImpact;
+    readonly target: string;
+    readonly kind?: TargetKind;
+    readonly operation: ImpactOperation;
   }>;
-  readonly enonces: ReadonlyMap<string, string>;
+  readonly statements: ReadonlyMap<string, string>;
 }
 
 /**
- * Vérification d'intégrité pendant la rédaction.
+ * Integrity verification during authoring.
  *
- * Les règles sont celles de `@ssk-it/canon-check`, le même module que l'Action
- * exécute avant chaque livraison. Il ne dépend d'aucun système de fichiers :
- * l'Action lui donne un référentiel lu sur disque, l'application lui donne celui
- * qu'elle a chargé. Une seule implémentation, deux moments.
+ * The rules are those of `@ssk-it/canon-check`, the same module the Action
+ * runs before each delivery. It depends on no file system: the Action gives
+ * it a specification read from disk, the application gives it the one it has
+ * loaded. A single implementation, two moments.
  *
- * **Ce qui reste moins fiable ici qu'en intégration continue.** L'application
- * connaît le référentiel de la branche principale, augmenté du seul cadrage en
- * cours. Un cadrage voisin, ouvert sur une autre branche, lui échappe — les
- * contrôles portant sur les index dérivés ou les règles abrogées peuvent donc
- * conclure moins que la vérification finale.
+ * **What remains less reliable here than in continuous integration.** The
+ * application knows the main branch's specification, augmented with only the
+ * scoping in progress. A neighbouring scoping, open on another branch,
+ * escapes it — checks on derived indexes or repealed rules may therefore
+ * conclude less than the final verification.
  *
- * Le désaccord va toujours dans le même sens : l'application signale moins,
- * jamais plus. Ce qu'elle affirme est vrai ; ce qu'elle tait peut encore
- * apparaître à la livraison, où la vérification reste l'autorité.
+ * The disagreement always goes the same way: the application reports less,
+ * never more. What it asserts is true; what it leaves unsaid may still
+ * appear at delivery, where verification remains the authority.
  */
 export class VerificationService {
-  private readonly store = inject(ReferentielStore);
+  private readonly store = inject(SpecificationStore);
 
   /**
-   * Vérifie le référentiel tel qu'il serait avec ce cadrage.
+   * Verifies the specification as it would be with this scoping.
    *
-   * Le cadrage saisi remplace sa version enregistrée : c'est bien l'effet de ce
-   * qu'on est en train d'écrire qu'on veut mesurer, pas celui de ce qui est
-   * déjà dans le dépôt.
+   * The scoping being entered replaces its saved version: it is indeed the
+   * effect of what is being written that we want to measure, not that of what
+   * is already in the repo.
    */
-  verifierCadrage(saisi: CadrageSaisi, contexte?: Referentiel): Verdict {
-    // Le contexte de la branche éditée, quand il est connu : un cadrage crée
-    // souvent le domaine ou les règles qu'il déclare, et ceux-ci n'existent pas
-    // encore sur la branche principale. Les ignorer signalerait comme inconnu
-    // ce que le cadrage apporte lui-même — un défaut qui n'en est pas un, et
-    // que la vérification à la livraison ne relève pas.
-    const ref = contexte ?? this.store.referentiel();
+  checkScoping(input: ScopingInput, context?: Specification): Verdict {
+    // The context of the edited branch, when it is known: a scoping often
+    // creates the domain or the rules it declares, and these do not exist yet
+    // on the main branch. Ignoring them would report as unknown what the
+    // scoping itself brings — a defect that is not one, and that verification
+    // at delivery does not raise.
+    const ref = context ?? this.store.specification();
 
-    const cadrages = new Map(ref.cadrages);
-    // `statut` est retiré de ce qu'on avait chargé : le vérificateur refuse un
-    // statut déclaré, et le modèle de l'application en porte un, déduit. Le lui
-    // passer ferait échouer la rédaction sur un champ que le fichier n'a pas.
-    const { statut: _ignore, ...existant } =
-      cadrages.get(saisi.id) ?? ({} as Partial<Cadrage>);
-    cadrages.set(saisi.id, {
-      ...existant,
-      id: saisi.id,
-      titre: saisi.titre,
-      domaines: saisi.domaines,
-      impacts: saisi.impacts,
-      enonces: saisi.enonces,
-    } as unknown as Cadrage);
+    const scopings = new Map<string, ScopingEntry>(ref.scopings);
+    scopings.set(input.id, {
+      id: input.id,
+      domains: input.domains,
+      impacts: input.impacts,
+      statements: input.statements,
+    });
 
-    // `ignorerIndexDerives` : `cree_par` et `modifie_par` sont écrits par la
-    // propagation, après la livraison. Les exiger corrects pendant la rédaction
-    // signalerait comme faute ce que le cadrage n'a pas encore produit.
-    // Le modèle de l'application nomme ses entités en français, le vérificateur
-    // en anglais : la correspondance se fait ici, à un seul endroit.
+    // `ignorerIndexDerives`: `cree_par` and `modifie_par` are written by
+    // propagation, after delivery. Requiring them correct during authoring
+    // would report as a fault what the scoping has not produced yet.
     const { errors, warnings } = checkRepo(
       {
-        domains: ref.domaines,
-        features: ref.fonctionnalites,
-        rules: ref.regles,
-        // Sans elles, le vérificateur tiendrait toute cible d'architecture pour
-        // inconnue : il cherche chaque impact dans la collection que sa nature
-        // désigne, et une collection absente se lit comme vide.
-        decisions: ref.decisions,
-        architecture: ref.architecture,
-        cadrages,
+        domains: ref.domains,
+        features: mapValues(ref.features, (f) => ({
+          id: f.id,
+          domaines: f.domains,
+        })),
+        rules: mapValues(ref.rules, (r) => ({
+          ...derivedIndexes(r),
+          fonctionnalites: r.features,
+        })),
+        // Without them, the verifier would hold every architecture target as
+        // unknown: it looks for each impact in the collection its kind designates,
+        // and an absent collection reads as empty.
+        decisions: mapValues(ref.decisions, derivedIndexes),
+        architecture: mapValues(ref.architecture, derivedIndexes),
+        cadrages: mapValues(scopings, toCheckedScoping),
         errors: [],
       },
-      // Les cadrages livrés sont ceux que porte la branche principale, que le
-      // store distingue par l'absence de provenance. Sans cet ensemble, aucun
-      // ne serait tenu pour livré, et une règle créée par un cadrage livré
-      // passerait pour manquante.
       {
         ignorerIndexDerives: true,
         livres: new Set(
-          [...ref.cadrages.values()]
+          [...ref.scopings.values()]
             .filter((c) => !c.provenance)
             .map((c) => c.id),
         ),
       },
     );
 
-    // Seul ce qui nomme ce cadrage est rapporté : le rédacteur n'est pas
-    // responsable d'un défaut ailleurs dans le référentiel, et le lui montrer
-    // ici l'empêcherait de distinguer ce qu'il doit corriger.
-    const leSien = (m: string) => m.includes(saisi.id);
+    const concernsIt = (m: string) => m.includes(input.id);
     return {
-      erreurs: errors.filter(leSien),
-      avertissements: warnings.filter(leSien),
+      errors: errors.filter(concernsIt),
+      warnings: warnings.filter(concernsIt),
     };
   }
+}
+
+/*
+ * The verifier reads entities under the SSK Canon format's names — `domaines`, `statut`, `enonces`, and each impact's key that states its kind (`regle`, `adr`, `architecture`) —, the model names them in English. The mapping is done here, in a single place: a missing property would be reported by no compilation, only by a check that no longer checks anything.
+ */
+
+function mapValues<T, U>(
+  map: ReadonlyMap<string, T>,
+  convert: (value: T) => U,
+): ReadonlyMap<string, U> {
+  return new Map([...map].map(([id, value]) => [id, convert(value)]));
+}
+
+function derivedIndexes(entry: {
+  readonly id: string;
+  readonly status: string;
+  readonly createdBy: string | null;
+  readonly modifiedBy: readonly string[];
+}) {
+  return {
+    id: entry.id,
+    statut: entry.status,
+    cree_par: entry.createdBy,
+    modifie_par: entry.modifiedBy,
+  };
+}
+
+/** A scoping does not declare its status: the verifier would refuse to read one. */
+function toCheckedScoping(scoping: ScopingEntry) {
+  return {
+    id: scoping.id,
+    domaines: scoping.domains,
+    enonces: scoping.statements,
+    impacts: scoping.impacts.map((i) => ({
+      [i.kind ?? "regle"]: i.target,
+      operation: i.operation,
+    })),
+  };
 }
