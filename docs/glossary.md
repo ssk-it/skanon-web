@@ -57,7 +57,7 @@ Where a value is still written in French in the code, it is a value of the forma
 | dépôt de projet / dépôt de cadrage | scoping repo (`isScopingRepo`)                        | The repo that holds a project's specification and scopings, recognised by its `ssk-canon.yml`. The two French names designate the same repo. |
 | dépôt cadré                        | `framed` (`KnownRepo.framed`)                         | Said of a repo that is a scoping repo.                                                                                                       |
 | dépôt de code                      | code repo (`CodeRepo`, `codeRepos`)                   | A repo that implements the project, declared under `depots_code` in `ssk-canon.yml`.                                                         |
-| identité (d'un projet), symbole    | project identity (`ProjectIdentityService`), `symbol` | The project's symbol images under `identite/`, chosen by background variant.                                                                 |
+| identité (d'un projet), symbole    | project identity (`ProjectIdentityService`), `symbol` | The project's symbol images under `identite/` (or the name the repo declares), chosen by background variant.                                 |
 | empreinte                          | `fingerprint`                                         | A Git object SHA used as a content key; never "hash", which is a URL fragment in the router.                                                 |
 | arborescence                       | `tree`                                                | The Git tree of a ref.                                                                                                                       |
 

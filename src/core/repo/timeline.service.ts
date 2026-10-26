@@ -1,5 +1,6 @@
 import { inject } from "../injection";
 import { GithubClient, RepoRef } from "../github/github-client";
+import { DEFAULT_NAMES, RepoNames, ruleFile } from "./repo-names";
 
 /** An entry of a rule's timeline. */
 export interface TimelineEntry {
@@ -95,11 +96,12 @@ export class TimelineService {
   async loadRuleHistory(
     repoRef: RepoRef,
     ruleId: string,
+    names: RepoNames = DEFAULT_NAMES,
   ): Promise<TimelineCommit[]> {
     const response = await this.github.graphql<HistoryResponse>(HISTORY_QUERY, {
       owner: repoRef.owner,
       repo: repoRef.repo,
-      path: `rules/${ruleId}.md`,
+      path: ruleFile(names, ruleId),
       max: MAX_COMMITS,
     });
 
@@ -127,6 +129,7 @@ export class TimelineService {
     repoRef: RepoRef,
     ruleId: string,
     oid: string,
+    names: RepoNames = DEFAULT_NAMES,
   ): Promise<string | null> {
     const response = await this.github.graphql<{
       repository: { object: { text: string } | null } | null;
@@ -137,7 +140,7 @@ export class TimelineService {
       {
         owner: repoRef.owner,
         repo: repoRef.repo,
-        expr: `${oid}:rules/${ruleId}.md`,
+        expr: `${oid}:${ruleFile(names, ruleId)}`,
       },
     );
     return response.repository?.object?.text ?? null;

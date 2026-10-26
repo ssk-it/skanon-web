@@ -4,6 +4,7 @@ import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { TokenService } from "../github/token.service";
 import {
   ContentCache,
+  DeclaredIdentityDirectory,
   KnownProjectIdentity,
   KnownSymbol,
 } from "./content-cache";
@@ -17,6 +18,10 @@ import {
   formatImageType,
   listSymbolCandidates,
 } from "./identity-names";
+import { DEFAULT_NAMES, namesFromConfigText } from "./repo-names";
+
+/** The configuration file, at the root of a framed repo. */
+const CONFIG_NAME = "ssk-canon.yml";
 
 /** What is shown for a repo on a background, and under which erasure it was read. */
 interface PublishedSymbol {
@@ -172,15 +177,17 @@ export class ProjectIdentityService {
     let etag: string | null;
     let directory: string | null;
     let files: readonly IdentityFile[];
+    let config: DeclaredIdentityDirectory | null = previous?.config ?? null;
     if (root === null && previous) {
       ({ etag, directory } = previous);
       files = previous.files ?? [];
     } else {
       etag = root?.etag ?? null;
+      const entries = root?.entries ?? [];
+      config = await this.declaredDirectory(repoRef, entries, config);
+      const name = config?.directory ?? REPERTOIRE_IDENTITE;
       directory =
-        root?.entries.find(
-          (e) => e.path === REPERTOIRE_IDENTITE && e.type === "tree",
-        )?.sha ?? null;
+        entries.find((e) => e.path === name && e.type === "tree")?.sha ?? null;
       files = !directory
         ? []
         : directory === previous?.directory && previous.files
@@ -221,7 +228,58 @@ export class ProjectIdentityService {
     // Nothing says, at this stage, whether the repo is public: everything an
     // access has read is treated as private. Erasing too much costs only a
     // download; keeping too much would outlive the access.
-    return { channel: "api", etag, directory, files, symbols, private: true };
+    return {
+      channel: "api",
+      etag,
+      directory,
+      files,
+      config,
+      symbols,
+      private: true,
+    };
+  }
+
+  /**
+   * The identity directory's name, when the repo may declare another one than
+   * the format's (RG-noms-declares).
+   *
+   * Read only when it can matter: a root carrying `identite/`, or only
+   * directories under the format's names, has nothing to look for elsewhere —
+   * the home page keeps paying a single conditional request for it. The
+   * configuration is designated by its fingerprint, and read once.
+   */
+  private async declaredDirectory(
+    repoRef: RepoRef,
+    entries: readonly { path: string; sha: string; type: string }[],
+    known: DeclaredIdentityDirectory | null,
+  ): Promise<DeclaredIdentityDirectory | null> {
+    const formatNames = new Set<string>(Object.values(DEFAULT_NAMES.dossiers));
+    const elsewhere = entries.some(
+      (e) =>
+        e.type === "tree" &&
+        !e.path.startsWith(".") &&
+        !formatNames.has(e.path),
+    );
+    const hasDefault = entries.some(
+      (e) => e.path === REPERTOIRE_IDENTITE && e.type === "tree",
+    );
+    const file = entries.find((e) => e.path === CONFIG_NAME);
+    if (hasDefault || !elsewhere || !file) return null;
+    if (known?.sha === file.sha) return known;
+    try {
+      const text = new TextDecoder().decode(
+        await this.github.loadBlobBytes(repoRef, file.sha),
+      );
+      return {
+        sha: file.sha,
+        directory: namesFromConfigText(text).dossiers.identite,
+      };
+    } catch (e) {
+      // An unreadable configuration hides nothing but the identity: the
+      // format's name applies, and the next visit tries again.
+      if (isDenial(e)) throw e;
+      return null;
+    }
   }
 
   /**
@@ -233,15 +291,22 @@ export class ProjectIdentityService {
     variant: IdentityVariant,
     known: KnownProjectIdentity | null,
   ): Promise<KnownProjectIdentity> {
-    let symbol: KnownSymbol | null = null;
-    for (const name of listSymbolCandidates(variant)) {
-      const bytes = await this.github.loadRawBytes(
-        repoRef,
-        `${REPERTOIRE_IDENTITE}/${name}`,
-      );
-      if (!bytes || bytes.byteLength > POIDS_MAX_IDENTITE) continue;
-      symbol = { path: name, sha: null, source: toDataUrl(bytes, name) };
-      break;
+    let symbol = await this.readSymbolViaRaw(
+      repoRef,
+      variant,
+      REPERTOIRE_IDENTITE,
+    );
+    // Not under the format's name: the repo may declare another one
+    // (RG-noms-declares). Asked only then, so that a repo under the format's
+    // names costs nothing more.
+    if (!symbol) {
+      const config = await this.github.loadRawBytes(repoRef, CONFIG_NAME);
+      const declared = config
+        ? namesFromConfigText(new TextDecoder().decode(config)).dossiers
+            .identite
+        : REPERTOIRE_IDENTITE;
+      if (declared !== REPERTOIRE_IDENTITE)
+        symbol = await this.readSymbolViaRaw(repoRef, variant, declared);
     }
     const previousOnes = known?.channel === "raw" ? known.symbols : {};
     return {
@@ -252,6 +317,23 @@ export class ProjectIdentityService {
       symbols: { ...previousOnes, [variant]: symbol },
       private: false,
     };
+  }
+
+  /** The first candidate symbol a directory serves, through the uncounted channel. */
+  private async readSymbolViaRaw(
+    repoRef: RepoRef,
+    variant: IdentityVariant,
+    directory: string,
+  ): Promise<KnownSymbol | null> {
+    for (const name of listSymbolCandidates(variant)) {
+      const bytes = await this.github.loadRawBytes(
+        repoRef,
+        `${directory}/${name}`,
+      );
+      if (!bytes || bytes.byteLength > POIDS_MAX_IDENTITE) continue;
+      return { path: name, sha: null, source: toDataUrl(bytes, name) };
+    }
+    return null;
   }
 
   private publish(

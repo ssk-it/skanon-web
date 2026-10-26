@@ -195,7 +195,11 @@ async function loadHistory(ruleId: string): Promise<void> {
   gitUnavailable.value = false;
   gitLoading.value = true;
   try {
-    const read = await timeline.loadRuleHistory(store.repoRef(), ruleId);
+    const read = await timeline.loadRuleHistory(
+      store.repoRef(),
+      ruleId,
+      store.names(),
+    );
     // the rule may have changed during the call: do not overwrite with stale data
     if (id.value === ruleId) commits.value = read;
   } catch (e) {

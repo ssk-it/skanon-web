@@ -1,5 +1,6 @@
 import { inject } from "../injection";
 import { computed, signal } from "../signals";
+import { DEFAULT_NAMES, scopingFolder } from "./repo-names";
 import { UnconfirmedState, RepoLoader } from "./repo-loader";
 import { ContentCache } from "./content-cache";
 import { deriveStatus } from "./derived-status";
@@ -85,6 +86,12 @@ export class SpecificationStore {
   readonly specification = signal<Specification>(EMPTY);
 
   readonly repoRef = this.config.repoRef;
+
+  /**
+   * The names of the repo's folders and conventional files, the format's
+   * until the specification says otherwise — RG-noms-declares.
+   */
+  readonly names = computed(() => this.specification().names ?? DEFAULT_NAMES);
 
   // --- derived views ---
 
@@ -347,7 +354,7 @@ export class SpecificationStore {
     try {
       const date = await this.github.creationDate(
         this.config.repoRef(),
-        `cadrages/${scopingId}`,
+        scopingFolder(this.names(), scopingId),
       );
       this.dates.update((m) => new Map(m).set(scopingId, date));
     } finally {
