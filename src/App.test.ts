@@ -10,6 +10,7 @@ import {
   provideHttpTesting,
   type HttpTestingController,
 } from "./core/http/http-testing";
+import { LocaleService } from "./core/i18n/locale.service";
 import { inject, provide } from "./core/injection";
 import { SpecificationStore } from "./core/repo/specification.store";
 import { RELOAD_PAGE } from "./core/ui/version.service";
@@ -345,6 +346,24 @@ describe("Desktop shell", () => {
     expect(b.exists()).toBe(true);
     expect(b.text()).toContain("ne sera pas retrouvé au lancement suivant");
   });
+
+  it("says in English that an installation failed, and that the vault refused", async () => {
+    inject(LocaleService).choice.set("en");
+    activate.mockRejectedValue("installation-echouee");
+    const view = await mountView();
+    await announce();
+    expect(view.find(".bandeau-version button").text()).toBe("Relaunch");
+    (view.find(".bandeau-version button").element as HTMLElement).click();
+    await flushPromises();
+    expect(view.find(".bandeau-version").text()).toContain(
+      "The new version could not be installed.",
+    );
+    inject(TokenService).vaultRefused.set("ecriture");
+    await nextTick();
+    expect(view.find(".bandeau-coffre").text()).toContain(
+      "The system vault did not keep your token",
+    );
+  });
 });
 
 /**
@@ -354,14 +373,17 @@ describe("Shell extension points", () => {
   const alert = signal(false);
   const visible = signal(true);
   const activate = vi.fn();
-  const bannerText = signal("Un bandeau apporté");
+  const bannerText = signal({
+    fr: "Un bandeau apporté",
+    en: "A contributed banner",
+  });
 
   beforeEach(() => {
     provideHttpTesting();
     alert.set(false);
     visible.set(true);
     activate.mockClear();
-    bannerText.set("Un bandeau apporté");
+    bannerText.set({ fr: "Un bandeau apporté", en: "A contributed banner" });
     provide(
       COMPOSITION,
       compose([
@@ -371,9 +393,15 @@ describe("Shell extension points", () => {
             toolbarActions: [
               {
                 id: "action-factice",
-                label: "Une action apportée",
+                label: {
+                  fr: "Une action apportée",
+                  en: "A contributed action",
+                },
                 icon: () => (alert() ? "warning" : "star"),
-                title: () => (alert() ? "En alerte" : "Au repos"),
+                title: () =>
+                  alert()
+                    ? { fr: "En alerte", en: "Alert" }
+                    : { fr: "Au repos", en: "At rest" },
                 alert: () => alert(),
                 visible: () => visible(),
                 activate,
@@ -446,9 +474,76 @@ describe("Shell extension points", () => {
     expect(banner.text()).toContain("Un bandeau apporté");
     expect(banner.attributes("role")).toBe("status");
 
-    bannerText.set("");
+    bannerText.set({ fr: "", en: "" });
     await nextTick();
     expect(view.find('[data-apport="bandeau-factice"]').exists()).toBe(false);
+  });
+
+  it("renders the contributions in the displayed language", async () => {
+    inject(LocaleService).choice.set("en");
+    const view = await mountView();
+    const button = view.find('.barre [aria-label="A contributed action"]');
+    expect(button.attributes("title")).toBe("At rest");
+    expect(view.find('[data-apport="bandeau-factice"]').text()).toContain(
+      "A contributed banner",
+    );
+    expect(view.text()).not.toContain("apporté");
+  });
+});
+
+/**
+ * RG-langue-choisie: the language is a choice of the person, offered on every screen in the bottom bar — the top bar is full —, and applied without reloading.
+ */
+describe("Display language", () => {
+  beforeEach(() => {
+    provideHttpTesting();
+  });
+
+  async function mountView(url = "/ssk-it/ssk-canon/referentiel") {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push(url);
+    await router.isReady();
+    const view = mount(App, {
+      global: { plugins: [router] },
+      attachTo: document.body,
+    });
+    await nextTick();
+    return view;
+  }
+
+  it("shows the shell in English when English is chosen", async () => {
+    inject(LocaleService).choice.set("en");
+    const view = await mountView();
+    const bar = view.find(".barre");
+    expect(bar.text()).toContain("Functional");
+    expect(bar.text()).toContain("Scopings");
+    expect(bar.find('[aria-label="Sign in to GitHub"]').exists()).toBe(true);
+    expect(view.find(".pied").text()).toContain("Legal notice");
+    expect(view.text()).not.toContain("Mentions légales");
+    view.unmount();
+  });
+
+  it("offers the three choices in the bottom bar, and applies one without reloading", async () => {
+    const view = await mountView();
+    const trigger = view.find('.pied [aria-label="Langue"]');
+    expect(trigger.exists()).toBe(true);
+    expect(trigger.text()).toContain("Français");
+    await trigger.trigger("click");
+    await nextTick();
+    const entries = [...document.querySelectorAll(".ui-menu__entree")];
+    expect(entries.map((e) => e.textContent?.trim())).toEqual([
+      expect.stringContaining("Langue du navigateur"),
+      expect.stringContaining("Français"),
+      expect.stringContaining("English"),
+    ]);
+    (entries[2] as HTMLElement).click();
+    await flushPromises();
+    expect(inject(LocaleService).choice()).toBe("en");
+    expect(view.find(".pied").text()).toContain("Legal notice");
+    expect(view.find('.pied [aria-label="Language"]').text()).toContain(
+      "English",
+    );
+    view.unmount();
   });
 });
 

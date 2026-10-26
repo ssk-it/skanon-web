@@ -1,3 +1,5 @@
+import type { Localized } from "../i18n/language";
+import { LocaleService } from "../i18n/locale.service";
 import { inject } from "../injection";
 import { effect, signal } from "../signals";
 import type { RouteLocationNormalized, Router } from "vue-router";
@@ -23,6 +25,7 @@ export const APPLICATION = "Skanon";
  */
 export class TitleStrategy {
   private readonly store = inject(SpecificationStore);
+  private readonly locale = inject(LocaleService);
 
   /** The last known route state, to recompose without navigation. */
   private readonly currentState = signal<RouteLocationNormalized | null>(null);
@@ -31,9 +34,11 @@ export class TitleStrategy {
     // The specification loads after navigation: without this follow-up, the
     // title would stay on its fallback — « ssk-it/projet » instead of the name,
     // and the identifier alone instead of the scoping's title. It is the last
-    // state the history keeps, hence the one that must be right.
+    // state the history keeps, hence the one that must be right. A language
+    // switch recomposes it too.
     effect(() => {
       this.store.specification();
+      this.locale.language();
       const state = this.currentState();
       if (state) document.title = this.compose(state);
     });
@@ -90,8 +95,11 @@ export class TitleStrategy {
       typeof state.params["id"] === "string" ? state.params["id"] : null;
     const path = fullPath(state);
 
-    if (!id)
-      return routeHeading(leaf(state)?.meta["title"] as string | undefined);
+    if (!id) {
+      const heading = leaf(state)?.meta["heading"] as
+        Localized<string> | undefined;
+      return heading?.[this.locale.language()] ?? null;
+    }
 
     const prefix = this.store.specification().project.prefix;
     const shown = displayIdentifier(id, prefix);
@@ -138,19 +146,4 @@ function leaf(state: RouteLocationNormalized) {
 /** The route's full path, segments of all branches joined. */
 function fullPath(state: RouteLocationNormalized): string {
   return state.path;
-}
-
-/**
- * The label declared by the route, stripped of the application's name.
- *
- * Routes have always carried it as a suffix; recomposing it here would add
- * it twice.
- */
-function routeHeading(title: string | undefined): string | null {
-  if (!title) return null;
-  const withoutSuffix = title.replace(
-    new RegExp(`\\s*—\\s*${APPLICATION}\\s*$`),
-    "",
-  );
-  return withoutSuffix || null;
 }

@@ -21,7 +21,8 @@ export const legalNoticeMessages = defineMessages({
     personalData: "Données personnelles",
     noTracking:
       "Skanon ne dépose aucun cookie et n’emploie aucun outil de mesure d’audience. Il n’a pas de serveur qui garde vos données : ce qu’il lit, il le tient de GitHub, et le garde sur ce poste.",
-    seeHelp: "Ce que Skanon fait de vos jetons, ce qu’il garde, et à qui il parle :",
+    seeHelp:
+      "Ce que Skanon fait de vos jetons, ce qu’il garde, et à qui il parle :",
     help: "Fonctionnement de Skanon",
   },
   en: {
@@ -45,7 +46,8 @@ export const legalNoticeMessages = defineMessages({
     personalData: "Personal data",
     noTracking:
       "Skanon sets no cookie and uses no audience measurement tool. It has no server that keeps your data: what it reads, it gets from GitHub, and keeps on this device.",
-    seeHelp: "What Skanon does with your tokens, what it keeps, and whom it talks to:",
+    seeHelp:
+      "What Skanon does with your tokens, what it keeps, and whom it talks to:",
     help: "How Skanon works",
   },
 });
