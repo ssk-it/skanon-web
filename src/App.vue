@@ -2,26 +2,26 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { GithubClient, type RepoRef } from "./core/github/github-client";
-import { IdentityService } from "./core/github/identite.service";
+import { IdentityService } from "./core/github/identity.service";
 import { TokenService } from "./core/github/token.service";
 import { inject } from "./core/injection";
-import { PLATFORM } from "./plateforme/jeton";
-import { LinksService } from "./core/repo/liens.service";
+import { PLATFORM } from "./platform/platform-token";
+import { LinksService } from "./core/repo/links.service";
 import { COMPOSITION } from "./extension/composer";
 import type { Contribution } from "./extension/extension";
-import { SpecificationStore } from "./core/repo/referentiel.store";
-import { APPLICATION } from "./core/repo/titre.strategy";
+import { SpecificationStore } from "./core/repo/specification.store";
+import { APPLICATION } from "./core/repo/title.strategy";
 import { ThemeService } from "./core/ui/theme.service";
 import { VersionService, isInputUrl } from "./core/ui/version.service";
-import { INSTALLATION_FAILED_MESSAGE } from "./features/shared/causes-version";
-import { INSTALLATION_FAILED } from "./plateforme/ports";
-import { openSignIn } from "./features/shared/ouvrir-connexion";
-import ProjectSymbol from "./features/shared/SymboleProjet.vue";
+import { INSTALLATION_FAILED_MESSAGE } from "./features/shared/version-causes";
+import { INSTALLATION_FAILED } from "./platform/ports";
+import { openSignIn } from "./features/shared/open-sign-in";
+import ProjectSymbol from "./features/shared/ProjectSymbol.vue";
 import { DialogService } from "./ui/dialog.service";
-import UiProgressBar from "./ui/UiBarreProgression.vue";
-import UiButton from "./ui/UiBouton.vue";
-import UiDialogHost from "./ui/UiDialogHote.vue";
-import UiIcon from "./ui/UiIcone.vue";
+import UiProgressBar from "./ui/UiProgressBar.vue";
+import UiButton from "./ui/UiButton.vue";
+import UiDialogHost from "./ui/UiDialogHost.vue";
+import UiIcon from "./ui/UiIcon.vue";
 
 /**
  * La coquille : la barre du haut, les bandeaux d'état, l'hôte des dialogues, la vue de la route et la barre du bas.
@@ -153,7 +153,7 @@ function sameViewElsewhere(repoRef: RepoRef): string {
  * Les dialogues sont chargés à l'ouverture, non au démarrage : ils portent la saisie du dépôt et celle du jeton, un poids que la barre imposerait à tout le monde pour deux boutons qu'on ne clique pas toujours.
  */
 function openRepoDialog(): void {
-  void import("./features/shared/DepotDialog.vue").then(
+  void import("./features/shared/RepoDialog.vue").then(
     async ({ default: RepoDialog }) => {
       const repoRef = await dialog.open<RepoRef>(RepoDialog, {
         focus: "dialogue",
@@ -222,7 +222,7 @@ function openSearch(): void {
   if (searchOpen || dialog.openDialogs().length) return;
   searchOpen = true;
   const view = segmentsOf(route.fullPath)[2];
-  void import("./features/recherche/PaletteRecherche.vue")
+  void import("./features/search/SearchPalette.vue")
     .then(async ({ default: SearchPalette }) => {
       await dialog.open(SearchPalette, {
         data: { onPastState: view === "evolution" },

@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse, HttpHeaders } from "../http/http";
 import { inject } from "../injection";
-import { signal } from "../signaux";
+import { signal } from "../signals";
 import { RateLimiter } from "./rate-limiter";
 import { TokenService } from "./token.service";
 import { ReviewDecision } from "../model/model";

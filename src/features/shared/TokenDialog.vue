@@ -1,23 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { GithubClient } from "../../core/github/github-client";
-import { IdentityService } from "../../core/github/identite.service";
+import { IdentityService } from "../../core/github/identity.service";
 import { TokenService, repoKeys } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
-import { PLATFORM } from "../../plateforme/jeton";
+import { PLATFORM } from "../../platform/platform-token";
 import { GUARANTEES, ACCESS_MODE_LABEL } from "../../core/model/model";
-import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { SpecificationStore } from "../../core/repo/specification.store";
 import { RepoConfig } from "../../core/repo/repo-config";
-import UiButton from "../../ui/UiBouton.vue";
-import UiCheckbox from "../../ui/UiCaseACocher.vue";
-import UiTextField from "../../ui/UiChamp.vue";
-import UiDialog from "../../ui/UiDialogue.vue";
-import UiIcon from "../../ui/UiIcone.vue";
+import UiButton from "../../ui/UiButton.vue";
+import UiCheckbox from "../../ui/UiCheckbox.vue";
+import UiTextField from "../../ui/UiTextField.vue";
+import UiDialog from "../../ui/UiDialog.vue";
+import UiIcon from "../../ui/UiIcon.vue";
 import UiSelect from "../../ui/UiSelect.vue";
 
 // Où vit le jeton n'est pas le même selon la cible (INV-8) : le texte le dit, sans promettre plus que ce que fait chacune.
 const onDesktop = inject(PLATFORM).target === "bureau";
-import TokenHelp from "./AideJeton.vue";
+import TokenHelp from "./TokenHelp.vue";
 
 /**
  * La connexion à GitHub : le jeton, sa portée, ce que le mode d'accès du projet garantit — ou, sous une identité tierce, la connexion auprès du fournisseur du projet. Se ferme sur `true` quand l'accès a changé et que le dépôt doit être relu.

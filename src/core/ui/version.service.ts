@@ -1,10 +1,7 @@
-import { PLATFORM } from "../../plateforme/jeton";
-import {
-  INSTALLATION_FAILED,
-  type NoVersionCause,
-} from "../../plateforme/ports";
+import { PLATFORM } from "../../platform/platform-token";
+import { INSTALLATION_FAILED, type NoVersionCause } from "../../platform/ports";
 import { InjectionToken, inject, onDestroy } from "../injection";
-import { signal } from "../signaux";
+import { signal } from "../signals";
 
 /**
  * Où en est la version que cette fenêtre exécute.

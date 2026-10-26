@@ -1,5 +1,5 @@
 import { markRaw, type Component } from "vue";
-import { signal } from "../core/signaux";
+import { signal } from "../core/signals";
 
 /**
  * Comment s'ouvre un dialogue. Tout est facultatif.

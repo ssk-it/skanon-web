@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defineComponent, h, nextTick } from "vue";
 import { inject } from "../core/injection";
 import { DialogService } from "./dialog.service";
-import UiDialogHost from "./UiDialogHote.vue";
+import UiDialogHost from "./UiDialogHost.vue";
 
 /** Un dialogue d'essai : un champ, deux boutons, et ce qu'il a reçu. */
 const Sample = defineComponent({

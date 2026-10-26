@@ -1,4 +1,4 @@
-import { computed, effect, signal } from "../signaux";
+import { computed, effect, signal } from "../signals";
 
 /**
  * Le thème voulu par l'utilisateur.

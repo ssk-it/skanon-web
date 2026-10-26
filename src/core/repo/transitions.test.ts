@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseAccessMode, parseIdentity } from "./repo-loader";
-import { isOnItsBranch } from "./redaction.service";
+import { isOnItsBranch } from "./authoring.service";
 
 describe("mode d’accès déclaré par le projet", () => {
   it("retient le jeton personnel quand rien n’est déclaré", () => {

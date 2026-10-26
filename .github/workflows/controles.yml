@@ -68,4 +68,4 @@ jobs:
         run: pnpm exec playwright install --with-deps webkit
 
       - name: Tests du navigateur
-        run: pnpm test:navigateur
+        run: pnpm test:browser

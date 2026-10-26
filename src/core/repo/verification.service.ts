@@ -1,6 +1,6 @@
 import { inject } from "../injection";
 import { checkRepo } from "@ssk-it/canon-check";
-import { SpecificationStore } from "./referentiel.store";
+import { SpecificationStore } from "./specification.store";
 import {
   Scoping,
   TargetKind,

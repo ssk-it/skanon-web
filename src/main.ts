@@ -1,5 +1,5 @@
-import { start } from "./demarrage";
-import { createWebPlatform } from "./plateforme/web";
+import { start } from "./startup";
+import { createWebPlatform } from "./platform/web";
 import { webExtension } from "./web/extension";
 
 /**

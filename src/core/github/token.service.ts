@@ -1,14 +1,14 @@
 import { inject } from "../injection";
-import { computed, signal } from "../signaux";
-import { PLATFORM } from "../../plateforme/jeton";
+import { computed, signal } from "../signals";
+import { PLATFORM } from "../../platform/platform-token";
 import type {
   VaultWrite,
   SealingState,
   SealingOutcome,
   StoredTokens,
-} from "../../plateforme/ports";
+} from "../../platform/ports";
 import type { TokenProtection } from "../model/model";
-import { ContentCache } from "../repo/contenus-cache";
+import { ContentCache } from "../repo/content-cache";
 
 /**
  * La clé de l'ancien coffre chiffré, effacée au démarrage.

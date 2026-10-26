@@ -4,9 +4,9 @@ import { provideHttpTesting } from "./core/http/http-testing";
 import { provide } from "./core/injection";
 import { COMPOSITION, compose } from "./extension/composer";
 import type { Extension } from "./extension/extension";
-import { PLATFORM } from "./plateforme/jeton";
-import { createWebPlatform } from "./plateforme/web";
-import { createAppRouter } from "./routeur";
+import { PLATFORM } from "./platform/platform-token";
+import { createWebPlatform } from "./platform/web";
+import { createAppRouter } from "./router";
 
 /**
  * Une page hors projet — l'aide, les mentions —, telle qu'un livrable la montre : sa cible, ses extensions. Pour les tests des extensions, qui éprouvent leurs apports dans la page qui les rend.
