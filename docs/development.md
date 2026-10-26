@@ -9,12 +9,13 @@ src/                    The interface, shared by the web version and the desktop
   extension/            The extension contract, and its composition (ADR-extensions-commerciales)
   web/                  The web version's extension: its host, its service worker, its licence
   platform/             The ports towards the system, and the browser adapter
-  router.ts             The routes, all under /:owner/:repo/
+  router.ts             The routes, all under /:owner/:repo/; their headings in router.messages.ts
   App.vue               The shell: the top bar, the banners, the dialog host
   styles.css            The style tokens: the Material 3 colours (--mat-sys-*), the product's (--pc-*)
   core/                 The core of the interface, without components
     signals.ts          signal(), computed(), effect() on Vue's reactivity
     injection.ts        inject() and provide(): one instance per service
+    i18n/               The display language and the typed catalogues, French and English (RG-langue-choisie)
     http/               The HTTP client on fetch, and its test fake
   ui/                   The kit that stands in for Angular Material: buttons, fields, menus, dialogs
   features/             The views, one folder per domain
@@ -85,7 +86,7 @@ A request is only registered when the client emits it: if the caller awaits a pr
 
 ### Adding a view
 
-A component `src/features/<domain>/<Name>Page.vue`, a route in `src/router.ts` under `/:owner/:repo/`, lazy-loaded (`component: () => import(…)`). The page title carries the project and the item being viewed.
+A component `src/features/<domain>/<Name>Page.vue`, a route in `src/router.ts` under `/:owner/:repo/`, lazy-loaded (`component: () => import(…)`), its heading in each language in `src/router.messages.ts`. The page title carries the project and the item being viewed. Its texts go in a catalogue next to it, `<name>.messages.ts`, in French and English ([conventions.md](conventions.md#interface)).
 
 The view is built with the kit of `src/ui/` — `UiButton`, `UiIcon`, `UiTextField`, `UiSelect`, `UiCheckbox`, `UiAutocomplete`, `UiMenu`, `UiSpinner`, `UiProgressBar` —, each component stating its use at the top of its file. Colours are the `--mat-sys-*` and `--pc-*` variables of `src/styles.css`, under the names they had in SSK Canon. A link to an outside address goes through `ExternalLink`: a `target="_blank"` does not open in an embedded web view, such as the desktop application's. Loading, error and empty repo are handled by `ViewState`, in `src/features/shared/`.
 

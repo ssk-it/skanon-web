@@ -4,6 +4,8 @@ import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { GithubClient, type RepoRef } from "./core/github/github-client";
 import { IdentityService } from "./core/github/identity.service";
 import { TokenService } from "./core/github/token.service";
+import { LANGUAGES, type Language, type Localized } from "./core/i18n/language";
+import { LocaleService, type LanguageChoice } from "./core/i18n/locale.service";
 import { inject } from "./core/injection";
 import { PLATFORM } from "./platform/platform-token";
 import { LinksService } from "./core/repo/links.service";
@@ -22,6 +24,8 @@ import UiProgressBar from "./ui/UiProgressBar.vue";
 import UiButton from "./ui/UiButton.vue";
 import UiDialogHost from "./ui/UiDialogHost.vue";
 import UiIcon from "./ui/UiIcon.vue";
+import UiMenu, { type MenuAction } from "./ui/UiMenu.vue";
+import { appMessages, LANGUAGE_NAMES } from "./app.messages";
 
 /**
  * The shell: the top bar, the status banners, the dialog host, the route's view and the bottom bar.
@@ -42,11 +46,18 @@ const theme = inject(ThemeService);
 const links = inject(LinksService);
 const dialog = inject(DialogService);
 const version = inject(VersionService);
+const locale = inject(LocaleService);
+const t = locale.messages(appMessages);
 /** What the deliverable adds to the shell, without the shell knowing what it is (ADR-extensions-commerciales). */
 const composition = inject(COMPOSITION);
 
 function isVisible(contribution: Contribution): boolean {
   return contribution.visible?.() ?? true;
+}
+
+/** A contributed phrase, in the displayed language. */
+function inLanguage(phrase: Localized<string>): string {
+  return phrase[locale.language()];
 }
 /** Where secrets live differs by target (INV-8): the vault banner says so. */
 const platform = inject(PLATFORM);
@@ -116,13 +127,29 @@ const themeIcon = computed(() => {
 const themeLabel = computed(() => {
   switch (theme.theme()) {
     case "clair":
-      return "Thème clair — cliquer pour le thème sombre";
+      return t().theme.light;
     case "sombre":
-      return "Thème sombre — cliquer pour suivre le système";
+      return t().theme.dark;
     default:
-      return "Thème du système — cliquer pour le thème clair";
+      return t().theme.system;
   }
 });
+
+/**
+ * RG-langue-choisie: three states, the browser's first. Each language is named in itself; the trigger shows the language displayed, so that whoever cannot read the current one still recognises theirs.
+ */
+const languageActions = computed<MenuAction[]>(() => [
+  {
+    label: t().language.browser(LANGUAGE_NAMES[locale.language()]),
+    icon: locale.choice() === "browser" ? "check" : "language",
+    action: () => locale.choice.set("browser"),
+  },
+  ...LANGUAGES.map((language: Language) => ({
+    label: LANGUAGE_NAMES[language],
+    icon: locale.choice() === language ? "check" : "translate",
+    action: () => locale.choice.set(language as LanguageChoice),
+  })),
+]);
 
 /**
  * The project name is shown only if it adds something: when it is identical to the product name, repeating it only takes up space.
@@ -230,7 +257,7 @@ function openSearch(): void {
         maxWidth: "calc(100vw - 32px)",
         top: "12vh",
         className: "palette-recherche",
-        label: "Rechercher dans le référentiel",
+        label: t().searchSpecification,
       });
       searchOpen = false;
     })
@@ -262,15 +289,15 @@ const quotaLow = computed(() => {
 
 const tokenTitle = computed(() =>
   tokens.present()
-    ? "Connecté à GitHub " + tokens.fingerprint()
+    ? t().signedInAs(tokens.fingerprint() ?? "")
     : quotaLow.value
-      ? "Quota bientôt épuisé — se connecter"
-      : "Se connecter à GitHub",
+      ? t().quotaLowSignIn
+      : t().signIn,
 );
 
 /** The date of a read, to the minute: enough to judge how old it is. */
 function formatReadDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR", {
+  return new Date(iso).toLocaleString(locale.formatLocale(), {
     dateStyle: "long",
     timeStyle: "short",
   });
@@ -339,22 +366,22 @@ function reloadVersion(): void {
       <RouterLink
         :to="links.path('referentiel')"
         :class="{ actif: isActive(links.path('referentiel')) }"
-        >Fonctionnel</RouterLink
+        >{{ t().tabs.functional }}</RouterLink
       >
       <RouterLink
         :to="links.path('architecture')"
         :class="{ actif: isActive(links.path('architecture')) }"
-        >Architecture</RouterLink
+        >{{ t().tabs.architecture }}</RouterLink
       >
       <RouterLink
         :to="links.path('cadrages')"
         :class="{ actif: isActive(links.path('cadrages')) }"
-        >Cadrages</RouterLink
+        >{{ t().tabs.scopings }}</RouterLink
       >
       <RouterLink
         :to="links.path('evolution')"
         :class="{ actif: isActive(links.path('evolution')) }"
-        >Évolution</RouterLink
+        >{{ t().tabs.evolution }}</RouterLink
       >
     </nav>
 
@@ -365,18 +392,14 @@ function reloadVersion(): void {
       <UiButton
         variant="icon"
         class="recherche"
-        :title="'Rechercher (' + searchShortcut + ')'"
-        aria-label="Rechercher dans le référentiel"
+        :title="t().search(searchShortcut)"
+        :aria-label="t().searchSpecification"
         aria-keyshortcuts="Meta+K Control+K"
         @click="openSearch()"
       >
         <UiIcon name="search" />
       </UiButton>
-      <UiButton
-        class="depot"
-        title="Changer de dépôt"
-        @click="openRepoDialog()"
-      >
+      <UiButton class="depot" :title="t().changeRepo" @click="openRepoDialog()">
         <ProjectSymbol :repo-ref="store.repoRef()" :size="20" />
         <span class="libelle">{{ repoLabel }}</span>
       </UiButton>
@@ -384,8 +407,8 @@ function reloadVersion(): void {
       <UiButton
         variant="icon"
         :href="links.toGithub()"
-        :title="'Ouvrir ' + repoLabel + ' sur GitHub'"
-        :aria-label="'Ouvrir ' + repoLabel + ' sur GitHub'"
+        :title="t().openOnGithub(repoLabel)"
+        :aria-label="t().openOnGithub(repoLabel)"
       >
         <UiIcon name="open_in_new" />
       </UiButton>
@@ -393,8 +416,8 @@ function reloadVersion(): void {
         variant="icon"
         class="recharger"
         :disabled="store.state() === 'chargement'"
-        title="Recharger depuis GitHub"
-        aria-label="Recharger depuis GitHub"
+        :title="t().reloadFromGithub"
+        :aria-label="t().reloadFromGithub"
         @click="reloadSpecification()"
       >
         <UiIcon name="refresh" />
@@ -406,8 +429,8 @@ function reloadVersion(): void {
         v-if="isVisible(action)"
         variant="icon"
         :class="{ alerte: action.alert?.() }"
-        :title="action.title()"
-        :aria-label="action.label"
+        :title="inLanguage(action.title())"
+        :aria-label="inLanguage(action.label)"
         @click="action.activate()"
       >
         <UiIcon :name="action.icon()" />
@@ -418,9 +441,7 @@ function reloadVersion(): void {
       variant="icon"
       :class="{ alerte: quotaLow }"
       :title="tokenTitle"
-      :aria-label="
-        tokens.present() ? 'Connecté à GitHub' : 'Se connecter à GitHub'
-      "
+      :aria-label="tokens.present() ? t().signedIn : t().signIn"
       @click="openTokenDialog()"
     >
       <UiIcon :name="tokens.present() ? 'lock' : 'lock_open'" />
@@ -440,8 +461,8 @@ function reloadVersion(): void {
       variant="icon"
       to="/aide"
       :class="{ actif: isActive('/aide') }"
-      title="Fonctionnement de Skanon"
-      aria-label="Fonctionnement de Skanon"
+      :title="t().help"
+      :aria-label="t().help"
     >
       <UiIcon name="help" />
     </UiButton>
@@ -452,8 +473,8 @@ function reloadVersion(): void {
       variant="icon"
       :to="links.path('reglages')"
       :class="{ actif: isActive(links.path('reglages')) }"
-      title="Réglages du projet"
-      aria-label="Réglages du projet"
+      :title="t().settings"
+      :aria-label="t().settings"
     >
       <UiIcon name="settings" />
     </UiButton>
@@ -467,13 +488,13 @@ function reloadVersion(): void {
     <UiIcon :name="github.quotaRemaining() === 0 ? 'error_outline' : 'info'" />
     <p>
       <template v-if="github.quotaRemaining() === 0">
-        Plus aucune requête GitHub disponible pour cette heure.
+        {{ t().quota.exhausted }}
       </template>
       <template v-else>
-        Il reste {{ github.quotaRemaining() }} requêtes GitHub pour cette heure.
+        {{ t().quota.remaining(github.quotaRemaining() ?? 0) }}
       </template>
-      <UiButton @click="openTokenDialog()">Se connecter</UiButton>
-      pour lever la limite.
+      <UiButton @click="openTokenDialog()">{{ t().quota.signIn }}</UiButton>
+      {{ t().quota.toLift }}
     </p>
   </div>
 
@@ -489,28 +510,25 @@ function reloadVersion(): void {
     />
     <p>
       <template v-if="version.state() === 'perdue'">
-        Cette version de Skanon n’est plus entièrement disponible : certaines
-        pages pourraient ne plus s’ouvrir.
-        <UiButton @click="reloadVersion()">Recharger</UiButton>
-        pour passer à la version publiée.
+        {{ t().version.lost }}
+        <UiButton @click="reloadVersion()">{{ t().version.reload }}</UiButton>
+        {{ t().version.toPublished }}
       </template>
       <template v-else>
-        Une nouvelle version de Skanon est prête.
+        {{ t().version.ready }}
         <UiButton @click="reloadVersion()">{{
-          version.relaunches ? "Relancer" : "Recharger"
+          version.relaunches ? t().version.relaunch : t().version.reload
         }}</UiButton>
-        pour l’utiliser.
+        {{ t().version.toUse }}
       </template>
       <template v-if="version.cause() === INSTALLATION_FAILED">
-        {{ INSTALLATION_FAILED_MESSAGE }} Réessayez, ou relancez Skanon
-        vous-même.
+        {{ inLanguage(INSTALLATION_FAILED_MESSAGE) }} {{ t().version.retry }}
       </template>
       <template v-if="onInput">
-        Enregistrez d’abord : une saisie non enregistrée serait perdue.
+        {{ t().version.saveFirst }}
       </template>
       <template v-if="tokens.source() === 'identite_tierce'">
-        {{ version.relaunches ? "La relance" : "Le rechargement" }} mettra fin à
-        l’accès obtenu par votre identité vérifiée.
+        {{ t().version.endsAccess(version.relaunches) }}
       </template>
     </p>
   </div>
@@ -524,22 +542,10 @@ function reloadVersion(): void {
     <UiIcon name="no_encryption" />
     <p>
       <template v-if="tokens.vaultRefused() === 'effacement'">
-        {{
-          onDesktop
-            ? "Le coffre du système a refusé d’effacer votre jeton"
-            : "Le navigateur a refusé d’effacer votre jeton"
-        }}
-        : il ne vaut plus pour cette session, mais sera retrouvé au lancement
-        suivant.
+        {{ t().vault.eraseRefused(onDesktop) }}
       </template>
       <template v-else-if="tokens.vaultRefused() === 'ecriture'">
-        {{
-          onDesktop
-            ? "Le coffre du système n’a pas gardé votre jeton"
-            : "Le navigateur n’a pas gardé votre jeton"
-        }}
-        : il vaut pour cette session, et ne sera pas retrouvé au lancement
-        suivant.
+        {{ t().vault.writeRefused(onDesktop) }}
       </template>
     </p>
   </div>
@@ -549,40 +555,35 @@ function reloadVersion(): void {
     <UiIcon :name="passkeyBanner === 'verrouille' ? 'lock' : 'no_encryption'" />
     <p>
       <template v-if="passkeyBanner === 'verrouille'">
-        Vos jetons sont protégés par une passkey.
-        <UiButton @click="unlockTokens()">Déverrouiller</UiButton>
-        pour vous en servir dans cet onglet.
+        {{ t().passkey.locked }}
+        <UiButton @click="unlockTokens()">{{ t().passkey.unlock }}</UiButton>
+        {{ t().passkey.toUseInTab }}
         <template v-if="tokens.passkeyFailure() === 'illisible'">
-          La passkey ne les ouvre plus :
-          <UiButton @click="tokens.erase()">Oublier ces jetons</UiButton>
-          puis saisissez de nouveau votre jeton.
+          {{ t().passkey.unreadable }}
+          <UiButton @click="tokens.erase()">{{ t().passkey.forget }}</UiButton>
+          {{ t().passkey.typeAgain }}
         </template>
         <template v-else-if="tokens.passkeyFailure() === 'annule'">
-          Le déverrouillage n’a pas abouti. Si la passkey a été supprimée de
-          votre trousseau, ces jetons ne s’ouvriront plus :
-          <UiButton @click="tokens.erase()">Oublier ces jetons</UiButton>
+          {{ t().passkey.unlockCancelled }}
+          <UiButton @click="tokens.erase()">{{ t().passkey.forget }}</UiButton>
         </template>
       </template>
       <template v-else-if="passkeyBanner === 'exigee'">
-        Ce projet exige que votre jeton soit protégé par une passkey : il n’est
-        gardé que pour cet onglet.
-        <UiButton @click="protectTokens()">Protéger par une passkey</UiButton>
+        {{ t().passkey.required }}
+        <UiButton @click="protectTokens()">{{ t().passkey.protect }}</UiButton>
         <template v-if="tokens.passkeyFailure() === 'impossible'">
-          Ce navigateur ne sait pas créer une passkey qui protège le jeton :
-          l’application de bureau, ou un navigateur récent, le garderont d’une
-          ouverture à l’autre.
+          {{ t().passkey.impossible }}
         </template>
         <template v-else-if="tokens.passkeyFailure() === 'annule'">
-          La passkey n’a pas été créée.
+          {{ t().passkey.notCreated }}
         </template>
       </template>
       <template v-else>
-        La passkey n’a pas été créée : votre jeton est gardé en clair dans ce
-        navigateur.
-        <UiButton @click="protectTokens()">Réessayer</UiButton>
-        <UiButton @click="tokens.dismissPasskeyFailure()"
-          >Le laisser en clair</UiButton
-        >
+        {{ t().passkey.inClear }}
+        <UiButton @click="protectTokens()">{{ t().passkey.retry }}</UiButton>
+        <UiButton @click="tokens.dismissPasskeyFailure()">{{
+          t().passkey.leaveInClear
+        }}</UiButton>
       </template>
     </p>
   </div>
@@ -590,13 +591,13 @@ function reloadVersion(): void {
   <!-- The banners the deliverable contributes: it gives their text, the shell their form. -->
   <template v-for="bandeau in composition.banners" :key="bandeau.id">
     <div
-      v-if="isVisible(bandeau) && bandeau.text()"
+      v-if="isVisible(bandeau) && inLanguage(bandeau.text())"
       class="bandeau-quota"
       :data-apport="bandeau.id"
       role="status"
     >
       <UiIcon :name="bandeau.icon" />
-      <p>{{ bandeau.text() }}</p>
+      <p>{{ inLanguage(bandeau.text()) }}</p>
     </div>
   </template>
 
@@ -608,10 +609,10 @@ function reloadVersion(): void {
   >
     <UiIcon name="cloud_off" />
     <p>
-      État lu le {{ formatReadDate(unconfirmed.readAt) }}, non confirmé :
-      {{ unconfirmed.cause }} Les enregistrements sont indisponibles jusqu’à ce
-      qu’il ait été relu.
-      <UiButton @click="reloadSpecification()">Réessayer</UiButton>
+      {{
+        t().unconfirmed(formatReadDate(unconfirmed.readAt), unconfirmed.cause)
+      }}
+      <UiButton @click="reloadSpecification()">{{ t().retry }}</UiButton>
     </p>
   </div>
 
@@ -627,7 +628,20 @@ function reloadVersion(): void {
   <!-- What one does not consult while working: the top bar is full (2026-041, 2026-054). -->
   <footer class="pied">
     <span v-if="currentVersion">{{ PRODUCT_NAME }} {{ currentVersion }}</span>
-    <RouterLink to="/mentions-legales">Mentions légales</RouterLink>
+    <RouterLink to="/mentions-legales">{{ t().legalNotice }}</RouterLink>
+    <UiMenu :actions="languageActions">
+      <template #declencheur="{ attributs }">
+        <button
+          type="button"
+          class="langue"
+          v-bind="attributs"
+          :aria-label="t().language.label"
+          :title="t().language.label"
+        >
+          <UiIcon name="translate" />{{ LANGUAGE_NAMES[locale.language()] }}
+        </button>
+      </template>
+    </UiMenu>
   </footer>
 
   <UiDialogHost />
@@ -833,6 +847,25 @@ function reloadVersion(): void {
 
   a {
     color: inherit;
+  }
+
+  /* The language is chosen here and not in the top bar, which is full: like the legal notice, it is not consulted while working (RG-langue-choisie). */
+  .langue {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+
+    .material-symbols-outlined {
+      font-size: 15px;
+      width: 15px;
+      height: 15px;
+    }
   }
 }
 

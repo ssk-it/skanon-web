@@ -1,3 +1,4 @@
+import type { Localized } from "../core/i18n/language";
 import { InjectionToken } from "../core/injection";
 import type {
   Composition,
@@ -50,7 +51,7 @@ export function compose(extensions: readonly Extension[]): Composition {
 function phrases(
   extensions: readonly Extension[],
   section: HelpSection,
-): readonly string[] {
+): readonly Localized<string>[] {
   return extensions.flatMap((e) => e.pages?.help?.[section] ?? []);
 }
 

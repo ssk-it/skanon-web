@@ -2,7 +2,8 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
-import { provide } from "../../core/injection";
+import { LocaleService } from "../../core/i18n/locale.service";
+import { inject, provide } from "../../core/injection";
 import { COMPOSITION, compose } from "../../extension/composer";
 import type { Extension } from "../../extension/extension";
 import { createAppRouter } from "../../router";
@@ -38,9 +39,10 @@ describe("« Mentions légales » page", () => {
     const router = createAppRouter(createMemoryHistory());
     await router.push("/mentions-legales");
     expect(router.currentRoute.value.path).toBe("/mentions-legales");
-    expect(router.currentRoute.value.meta["title"]).toBe(
-      "Mentions légales — Skanon",
-    );
+    expect(router.currentRoute.value.meta["heading"]).toEqual({
+      fr: "Mentions légales",
+      en: "Legal notice",
+    });
   });
 
   it("names the publisher and its identifiers", async () => {
@@ -70,9 +72,11 @@ describe("« Mentions légales » page", () => {
         id: "factice",
         pages: {
           legalNotice: {
-            host: "Un hébergeur apporté.",
-            data: ["Une donnée apportée."],
-            ownership: ["Une licence apportée."],
+            host: { fr: "Un hébergeur apporté.", en: "A brought host." },
+            data: [{ fr: "Une donnée apportée.", en: "A brought datum." }],
+            ownership: [
+              { fr: "Une licence apportée.", en: "A brought licence." },
+            ],
           },
         },
       },
@@ -104,12 +108,22 @@ describe("« Mentions légales » page", () => {
           legalNotice: {
             ownership: [
               {
-                before: "Ses sources sont sur ",
-                link: {
-                  label: "le dépôt",
-                  href: "https://exemple.test/depot",
+                fr: {
+                  before: "Ses sources sont sur ",
+                  link: {
+                    label: "le dépôt",
+                    href: "https://exemple.test/depot",
+                  },
+                  after: ".",
                 },
-                after: ".",
+                en: {
+                  before: "Its sources are in ",
+                  link: {
+                    label: "the repo",
+                    href: "https://exemple.test/depot",
+                  },
+                  after: ".",
+                },
               },
             ],
           },
@@ -120,5 +134,70 @@ describe("« Mentions légales » page", () => {
     expect(page.get('a[href="https://exemple.test/depot"]').text()).toBe(
       "le dépôt",
     );
+  });
+
+  // RG-textes-traduits: the English notice is a translation, and says the French one is authoritative (RG-mentions-legales holds for the French one).
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("is titled in English", async () => {
+      const router = createAppRouter(createMemoryHistory());
+      await router.push("/mentions-legales");
+      const text = await mountView();
+      expect(text).toContain("Legal notice");
+      expect(text).toContain("Publisher");
+      expect(text).toContain("Personal data");
+      expect(text).not.toContain("Mentions légales");
+    });
+
+    it("says the French version is authoritative", async () => {
+      expect(await mountView()).toContain(
+        "This notice is a translation: the French version is authoritative.",
+      );
+    });
+
+    it("keeps the publisher's identifiers as they are", async () => {
+      const text = await mountView();
+      expect(text).toContain("511 992 406 00047");
+      expect(text).toContain("43330 Saint-Ferréol-d’Auroure, France");
+    });
+
+    it("says what the deliverable brings, in English", async () => {
+      const page = await mountPage([
+        {
+          id: "factice",
+          pages: {
+            legalNotice: {
+              host: { fr: "Un hébergeur apporté.", en: "A brought host." },
+              data: [{ fr: "Une donnée apportée.", en: "A brought datum." }],
+              ownership: [
+                {
+                  fr: {
+                    before: "Ses sources sont sur ",
+                    link: { label: "le dépôt", href: "https://exemple.test/d" },
+                  },
+                  en: {
+                    before: "Its sources are in ",
+                    link: { label: "the repo", href: "https://exemple.test/d" },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ]);
+      const text = page.text();
+      expect(text).toContain("A brought host.");
+      expect(text).toContain("A brought datum.");
+      expect(text).toContain("Its sources are in the repo");
+      expect(text).not.toContain("apporté");
+    });
+
+    it("switches language without being mounted again", async () => {
+      const page = await mountPage();
+      inject(LocaleService).choice.set("fr");
+      await flushPromises();
+      expect(page.text()).toContain("Mentions légales");
+    });
   });
 });

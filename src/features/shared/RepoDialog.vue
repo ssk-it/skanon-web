@@ -2,6 +2,7 @@
 import { computed, ref } from "vue";
 import type { RepoRef } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { KnownReposService } from "../../core/repo/known-repos.service";
 import { RepoConfig, sameRepo } from "../../core/repo/repo-config";
@@ -12,6 +13,7 @@ import UiIcon from "../../ui/UiIcon.vue";
 import UiSpinner from "../../ui/UiSpinner.vue";
 import OrganizationAvatar from "./OrganizationAvatar.vue";
 import ProjectSymbol from "./ProjectSymbol.vue";
+import { repoDialogMessages } from "./repo-dialog.messages";
 
 /**
  * The choice of the framing repo to open: those that carry a specification, the others the token opens, or free input. Closes on the chosen repo, or without an answer.
@@ -22,6 +24,7 @@ const emit = defineEmits<{ close: [depot?: RepoRef] }>();
 const config = inject(RepoConfig);
 const known = inject(KnownReposService);
 const tokens = inject(TokenService);
+const t = useMessages(repoDialogMessages);
 
 const input = ref(`${config.repoRef().owner}/${config.repoRef().repo}`);
 const error = ref<string | null>(null);
@@ -52,7 +55,7 @@ function forget(repoRef: RepoRef): void {
 function validateRepo(): void {
   const repoRef = RepoConfig.parseRepo(input.value);
   if (!repoRef) {
-    error.value = "Format attendu : organisation/depot";
+    error.value = t().expectedFormat;
     return;
   }
   emit("close", repoRef);
@@ -63,9 +66,9 @@ function validateRepo(): void {
   Inherited defect, ported as is (CLAUDE.md, « Porter sans changer »): in SSK Canon, the input's `mat-error` is never displayed — Material only shows it for an invalid field, and no validator makes it so. A malformed input therefore clears the hint without saying anything. Here too: the message is held in `error`, and only the hint disappears.
 -->
 <template>
-  <UiDialog title="Ouvrir un dépôt de projet">
+  <UiDialog :title="t().title">
     <template v-if="framedRepos.length">
-      <p class="titre-liste">Dépôts cadrés</p>
+      <p class="titre-liste">{{ t().framedRepos }}</p>
       <ul class="depots">
         <li
           v-for="d in framedRepos"
@@ -74,14 +77,16 @@ function validateRepo(): void {
           <button type="button" class="depot" @click="choose(d.repoRef)">
             <ProjectSymbol :repo-ref="d.repoRef" />
             <span class="nom">{{ d.repoRef.owner }}/{{ d.repoRef.repo }}</span>
-            <span v-if="isOpen(d.repoRef)" class="marque">ouvert</span>
-            <span v-else-if="d.recent" class="marque">déjà ouvert</span>
+            <span v-if="isOpen(d.repoRef)" class="marque">{{ t().open }}</span>
+            <span v-else-if="d.recent" class="marque">{{
+              t().alreadyOpened
+            }}</span>
           </button>
           <UiButton
             v-if="d.recent"
             variant="icon"
             class="oublier"
-            aria-label="Retirer de la liste"
+            :aria-label="t().removeFromList"
             @click="forget(d.repoRef)"
           >
             <UiIcon name="close" />
@@ -91,7 +96,7 @@ function validateRepo(): void {
     </template>
 
     <details v-if="others.length" class="autres">
-      <summary>Autres dépôts autorisés ({{ others.length }})</summary>
+      <summary>{{ t().otherRepos(others.length) }}</summary>
       <ul class="depots">
         <li v-for="d in others" :key="d.repoRef.owner + '/' + d.repoRef.repo">
           <button type="button" class="depot" @click="choose(d.repoRef)">
@@ -100,15 +105,12 @@ function validateRepo(): void {
           </button>
         </li>
       </ul>
-      <p class="aide">
-        Ceux-ci ne portent pas encore de référentiel. En ouvrir un propose de
-        l’amorcer.
-      </p>
+      <p class="aide">{{ t().othersHelp }}</p>
     </details>
 
     <p v-if="known.inProgress()" class="attente">
       <UiSpinner :diameter="16" />
-      <span>Recherche des dépôts autorisés…</span>
+      <span>{{ t().searching }}</span>
     </p>
 
     <p v-if="known.error()" class="echec">
@@ -116,24 +118,25 @@ function validateRepo(): void {
     </p>
 
     <p v-if="!tokens.present() && !known.inProgress()" class="aide">
-      Sans connexion, seuls les dépôts publics sont lisibles, et l’application
-      ne peut pas dire lesquels vous sont autorisés.
+      {{ t().signedOut }}
     </p>
 
     <UiTextField
       v-model="input"
       class="champ"
-      label="Ou saisir un dépôt"
-      placeholder="organisation/depot"
+      :label="t().enterRepo"
+      :placeholder="t().placeholder"
       autocomplete="off"
       data-focus-initial
-      :hint="error ? null : 'Un nom court, ou une URL GitHub complète'"
+      :hint="error ? null : t().hint"
       @keyup.enter="validateRepo()"
     />
 
     <template #actions>
-      <UiButton @click="emit('close')">Annuler</UiButton>
-      <UiButton variant="filled" @click="validateRepo()">Ouvrir</UiButton>
+      <UiButton @click="emit('close')">{{ t().cancel }}</UiButton>
+      <UiButton variant="filled" @click="validateRepo()">{{
+        t().confirm
+      }}</UiButton>
     </template>
   </UiDialog>
 </template>

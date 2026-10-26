@@ -1,0 +1,131 @@
+import { defineMessages } from "../../core/i18n/language";
+import type { TargetKind } from "../../core/model/model";
+
+/**
+ * The scoping editor. The section names it reads and writes in the file (`Objectif`, `Parcours utilisateur`) are the format's and stay in `authoring.service.ts`; the labels here are only displayed. The problems the shared checker reports keep its own wording, that of the pull request's check.
+ */
+export const editScopingMessages = defineMessages({
+  fr: {
+    back: "Cadrages",
+    type: "Reprendre un cadrage",
+    loadedFromBefore: "Chargé depuis",
+    loadedFromAfter: ". Les écritures y restent jusqu’à la livraison.",
+    status: "Statut",
+    mustBeConsistent:
+      "Le cadrage doit être cohérent avant de changer de statut.",
+    toggleFailed:
+      "La demande de fusion n’a pas basculé : le statut n’a pas changé. Réessayer, ou basculer la demande sur la plateforme.",
+    loading: "Chargement du cadrage…",
+    title: "Titre",
+    domains: "Domaines",
+    domainsHint: "Séparés par des virgules.",
+    goal: "Objectif",
+    journey: "Parcours utilisateur",
+    impactsOnRules: "Impacts sur les règles",
+    add: "Ajouter",
+    noImpact:
+      "Aucun impact déclaré. Un cadrage peut n’en porter aucun tant qu’il n’a pas conclu ce qu’il change.",
+    kind: "Nature",
+    kindLabel: {
+      regle: "Règle",
+      adr: "Décision",
+      architecture: "Document",
+    } as Record<TargetKind, string>,
+    operation: "Opération",
+    removeImpact: "Retirer cet impact",
+    statement: "Énoncé de la règle",
+    statementHint:
+      "Le texte de la règle après ce cadrage. C’est lui que la propagation écrira au référentiel.",
+    decisions: "Décisions",
+    noDecision:
+      "Aucune décision. Ce qui a le plus de valeur six mois plus tard, ce sont les options écartées et le motif qui a tranché.",
+    question: "La question posée",
+    removeDecision: "Retirer cette décision",
+    openBecause: "Ce qui rendait la question ouverte",
+    options: "Options",
+    option: "Option",
+    unchoose: "Option retenue — cliquer pour ne plus la retenir",
+    choose: "Désigner comme retenue",
+    optionName: "Nom de l’option",
+    optionNameHint: "En minuscules, avec des tirets — il ne se renomme plus.",
+    optionBody: "Ce qu’elle propose, pour et contre",
+    removeOption: "Retirer cette option",
+    settledBy: "Ce qui a tranché",
+    settledByHint: "Le critère qui a fait pencher, non la liste des avantages.",
+    saved: "Cadrage enregistré sur sa branche.",
+    close: "Fermer",
+    saving: "Enregistrement…",
+    save: "Enregistrer",
+    missingTitle: "Il manque un titre.",
+    missingGoal: "Il manque un objectif.",
+    missingJourney: "Il manque un parcours.",
+    withoutRule: (n: number) => `${n} impact(s) ne désignent aucune règle.`,
+    statusFailed: "Le changement de statut a échoué.",
+    noFrontmatter: "Ce cadrage n’a pas de frontmatter.",
+    loadFailed: "Le cadrage n’a pas pu être chargé.",
+    saveFailed: "L’enregistrement a échoué.",
+  },
+  en: {
+    back: "Scopings",
+    type: "Resume a scoping",
+    loadedFromBefore: "Loaded from",
+    loadedFromAfter: ". Writes stay there until delivery.",
+    status: "Status",
+    mustBeConsistent: "The scoping must be consistent before changing status.",
+    toggleFailed:
+      "The pull request did not toggle: the status has not changed. Try again, or toggle the request on the platform.",
+    loading: "Loading the scoping…",
+    title: "Title",
+    domains: "Domains",
+    domainsHint: "Separated by commas.",
+    goal: "Goal",
+    journey: "User journey",
+    impactsOnRules: "Impacts on rules",
+    add: "Add",
+    noImpact:
+      "No impact declared. A scoping may carry none as long as it has not concluded what it changes.",
+    kind: "Kind",
+    kindLabel: {
+      regle: "Rule",
+      adr: "Decision",
+      architecture: "Document",
+    },
+    operation: "Operation",
+    removeImpact: "Remove this impact",
+    statement: "Rule statement",
+    statementHint:
+      "The rule’s text after this scoping. It is what propagation will write into the specification.",
+    decisions: "Decisions",
+    noDecision:
+      "No decision. What is most valuable six months later is the options set aside and the reason that settled it.",
+    question: "The question asked",
+    removeDecision: "Remove this decision",
+    openBecause: "What made the question open",
+    options: "Options",
+    option: "Option",
+    unchoose: "Chosen option — click to no longer choose it",
+    choose: "Mark as chosen",
+    optionName: "Option name",
+    optionNameHint: "Lowercase, with hyphens — it can no longer be renamed.",
+    optionBody: "What it proposes, for and against",
+    removeOption: "Remove this option",
+    settledBy: "What settled it",
+    settledByHint:
+      "The criterion that tipped the balance, not the list of advantages.",
+    saved: "Scoping saved on its branch.",
+    close: "Close",
+    saving: "Saving…",
+    save: "Save",
+    missingTitle: "A title is missing.",
+    missingGoal: "A goal is missing.",
+    missingJourney: "A journey is missing.",
+    withoutRule: (n: number) =>
+      n === 1
+        ? "1 impact designates no rule."
+        : `${n} impacts designate no rule.`,
+    statusFailed: "The status change failed.",
+    noFrontmatter: "This scoping has no frontmatter.",
+    loadFailed: "The scoping could not be loaded.",
+    saveFailed: "Saving failed.",
+  },
+});

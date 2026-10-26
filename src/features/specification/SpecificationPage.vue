@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import { displayIdentifier } from "../../core/repo/scoping-reference";
@@ -10,12 +11,14 @@ import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import StatusChip from "../shared/StatusChip.vue";
+import { specificationPageMessages } from "./specification-page.messages";
 
 /** The latest delivered ones shown at the top: enough to see what is moving, not a list. */
 const LATEST_DELIVERED = 3;
 
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
+const t = useMessages(specificationPageMessages);
 
 /** The complete list: a hue is computed relative to the whole. */
 const domainIds = computed(() => store.domains().map((d) => d.id));
@@ -54,22 +57,23 @@ function show(id: string): string {
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
       <header class="entete">
-        <h1>Référentiel fonctionnel</h1>
-        <p class="sous-titre">
-          L’état courant du produit : ce que chaque fonctionnalité fait
-          aujourd’hui, et les règles qui la définissent.
-        </p>
+        <h1>{{ t().title }}</h1>
+        <p class="sous-titre">{{ t().subtitle }}</p>
         <p class="compte">
-          {{ store.domains().length }} domaines ·
-          {{ store.features().length }} fonctionnalités ·
-          {{ store.activeRules().length }} règles actives
+          {{
+            t().counts(
+              store.domains().length,
+              store.features().length,
+              store.activeRules().length,
+            )
+          }}
         </p>
       </header>
 
       <div v-if="store.specification().anomalies.length" class="anomalies">
         <UiIcon name="warning_amber" />
         <div>
-          <p class="a-titre">Anomalies au chargement</p>
+          <p class="a-titre">{{ t().anomalies }}</p>
           <p
             v-for="a in store.specification().anomalies"
             :key="a"
@@ -81,13 +85,13 @@ function show(id: string): string {
       </div>
 
       <!-- RG-vue-ensemble-fonctionnelle: what is moving before what is. Whoever opens a project often knows it already, and comes to see what has changed or what is under discussion. -->
-      <section class="bouge" aria-label="Ce qui bouge">
+      <section class="bouge" :aria-label="t().moving">
         <div class="volet livres">
           <div class="volet-entete">
-            <h2 class="surtitre">Livré récemment</h2>
-            <RouterLink class="suite" :to="links.path('evolution')"
-              >Ce qui a changé</RouterLink
-            >
+            <h2 class="surtitre">{{ t().recentlyDelivered }}</h2>
+            <RouterLink class="suite" :to="links.path('evolution')">{{
+              t().whatChanged
+            }}</RouterLink>
           </div>
           <RouterLink
             v-for="c in latestDelivered"
@@ -99,13 +103,13 @@ function show(id: string): string {
             <span class="titre">{{ c.title }}</span>
           </RouterLink>
           <p v-if="!latestDelivered.length" class="explication">
-            Aucun cadrage n’a encore été livré.
+            {{ t().noneDelivered }}
           </p>
         </div>
 
         <!-- Separate, and always there: a slot that comes and goes does not teach that it exists — RG-cadrages-ouverts-visibles. -->
         <div class="volet en-cours">
-          <h2 class="surtitre">En cours</h2>
+          <h2 class="surtitre">{{ t().inProgress }}</h2>
           <RouterLink
             v-for="c in store.scopingsInProgress()"
             :key="c.id"
@@ -123,16 +127,14 @@ function show(id: string): string {
           </RouterLink>
           <template v-if="!store.scopingsInProgress().length">
             <p v-if="store.loadingBranches()" class="explication">
-              Lecture des branches en cours…
+              {{ t().readingBranches }}
             </p>
             <template v-else>
-              <p class="explication">
-                Aucun cadrage n’est en discussion. Ceux qui le seront
-                apparaîtront ici, marqués de leur demande de fusion, à part de
-                ce que le référentiel porte déjà.
-              </p>
-              <RouterLink class="suite" :to="links.path('cadrages', 'nouveau')"
-                >Ouvrir un cadrage</RouterLink
+              <p class="explication">{{ t().noneInProgress }}</p>
+              <RouterLink
+                class="suite"
+                :to="links.path('cadrages', 'nouveau')"
+                >{{ t().openScoping }}</RouterLink
               >
             </template>
           </template>
@@ -161,19 +163,19 @@ function show(id: string): string {
                   >{{ f.name }}</RouterLink
                 >
                 <span v-if="formatOtherDomains(f.domains, d.id)" class="aussi">
-                  · aussi {{ formatOtherDomains(f.domains, d.id) }}</span
+                  {{ t().also(formatOtherDomains(f.domains, d.id)) }}</span
                 >
               </span>
               <span
                 class="nb"
-                :title="store.listRulesByFeature(f.id).length + ' règles'"
+                :title="t().ruleCount(store.listRulesByFeature(f.id).length)"
                 >{{ store.listRulesByFeature(f.id).length }}</span
               >
             </li>
           </ul>
         </article>
         <p v-if="!store.domains().length" class="vide">
-          Ce dépôt ne contient aucun domaine.
+          {{ t().noDomain }}
         </p>
       </div>
     </template>

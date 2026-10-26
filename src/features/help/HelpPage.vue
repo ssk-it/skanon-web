@@ -1,19 +1,31 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { TokenService } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { COMPOSITION } from "../../extension/composer";
 import { PLATFORM } from "../../platform/platform-token";
 import UiIcon from "../../ui/UiIcon.vue";
+import { helpMessages } from "./help.messages";
 
 /**
  * How Skanon works, on one page: what it does with tokens, what it keeps on the machine, how it finds projects, whom it talks to.
  *
- * A statement, in the sense of RG-secret-conserve-localement: every sentence must remain true of the code. What differs from one target to the other is said for the target one is on, not for both — readers need not know which one they use to understand what concerns them (RG-aide-fidele).
+ * A statement, in the sense of RG-secret-conserve-localement: every sentence must remain true of the code, in each language. What differs from one target to the other is said for the target one is on, not for both — readers need not know which one they use to understand what concerns them (RG-aide-fidele).
  */
+const locale = inject(LocaleService);
+const t = locale.messages(helpMessages);
 const onDesktop = inject(PLATFORM).target === "bureau";
-/** What the deliverable says about itself — its hosting, its updates, its licence —, which the page renders without knowing it (ADR-extensions-commerciales). */
-const help = inject(COMPOSITION).help;
+/** What the deliverable says about itself — its hosting, its updates, its licence —, which the page renders without knowing it (ADR-extensions-commerciales), in the displayed language. */
+const brought = inject(COMPOSITION).help;
+const help = computed(() => {
+  const language = locale.language();
+  return {
+    jetons: brought.jetons.map((phrase) => phrase[language]),
+    cache: brought.cache.map((phrase) => phrase[language]),
+    communications: brought.communications.map((phrase) => phrase[language]),
+  };
+});
 /** In the browser, tokens are sealed by a passkey or kept in clear: the help says which is the case (RG-secret-conserve-localement). */
 const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
 </script>
@@ -21,173 +33,85 @@ const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
 <template>
   <article class="aide-page">
     <header class="entete">
-      <h1>Fonctionnement de Skanon</h1>
-      <p class="sous-titre">
-        Skanon lit et écrit le référentiel d’un projet directement dans son
-        dépôt GitHub. Il n’a pas de serveur qui garde vos données : ce qu’il
-        sait, il le tient de GitHub, et le garde sur ce poste.
-      </p>
+      <h1>{{ t().title }}</h1>
+      <p class="sous-titre">{{ t().subtitle }}</p>
     </header>
 
     <section>
-      <h2><UiIcon name="key" />Jetons</h2>
+      <h2><UiIcon name="key" />{{ t().tokens.title }}</h2>
       <ul>
-        <li>
-          Un dépôt public se lit sans connexion. Se connecter lève la limite
-          d’appels de GitHub (60 par heure sans jeton, 5 000 avec), ouvre les
-          dépôts privés, et permet d’écrire.
-        </li>
-        <li v-if="onDesktop">
-          Le jeton est rangé dans le coffre du système — le Trousseau sur macOS,
-          le gestionnaire d’identifiants sur Windows. Si le coffre refuse de le
-          garder, il ne vaut que pour la session, et un bandeau le dit.
-        </li>
+        <li>{{ t().tokens.publicRead }}</li>
+        <li v-if="onDesktop">{{ t().tokens.desktopVault }}</li>
         <template v-else-if="sealedTokens">
-          <li>
-            Vos jetons sont protégés par une passkey : ce navigateur n’en garde
-            que le chiffré, que Touch ID ou le code de l’appareil ouvrent dans
-            chaque onglet. Un programme qui lit le profil du navigateur ne les
-            trouve pas. Une extension ou un script qui s’exécute sur cette page,
-            onglet déverrouillé, pourrait toujours les lire.
-          </li>
-          <li>
-            Si la passkey disparaît de votre trousseau, les jetons ne s’ouvrent
-            plus : on les oublie, et on saisit de nouveau son jeton.
-          </li>
+          <li>{{ t().tokens.sealed }}</li>
+          <li>{{ t().tokens.passkeyLost }}</li>
         </template>
         <template v-else>
-          <li>
-            Le jeton est gardé dans ce navigateur, en clair : une extension ou
-            un script qui s’exécute sur cette page pourrait le lire, comme un
-            programme qui lit le profil du navigateur.
-          </li>
-          <li>
-            Il peut être protégé par une passkey, à sa saisie : ce navigateur
-            n’en garde alors que le chiffré, que Touch ID ou le code de
-            l’appareil ouvrent dans chaque onglet. Un script sur la page, onglet
-            déverrouillé, le lirait toujours.
-          </li>
-          <li>
-            Un projet peut exiger cette protection : sans passkey, le jeton ne
-            vaut alors que pour l’onglet.
-          </li>
+          <li>{{ t().tokens.inClear }}</li>
+          <li>{{ t().tokens.canSeal }}</li>
+          <li>{{ t().tokens.projectRequires }}</li>
         </template>
-        <li v-if="!onDesktop">
-          Dans tous les cas, préférez un jeton limité aux dépôts utiles, en
-          lecture seule si vous ne faites que lire, et qui expire.
-        </li>
+        <li v-if="!onDesktop">{{ t().tokens.preferLimited }}</li>
         <li>
-          Il n’est envoyé qu’à <code>api.github.com</code>. Seuls ses quatre
-          derniers caractères s’affichent.
+          {{ t().tokens.sentOnlyTo.before }}<code>api.github.com</code
+          >{{ t().tokens.sentOnlyTo.after }}
         </li>
-        <li>
-          Un jeton peut valoir pour une organisation ou pour un seul dépôt : le
-          plus précis l’emporte, puis le jeton général.
-        </li>
-        <li>
-          Quand un projet le prévoit, on peut aussi entrer par son identité
-          vérifiée. L’accès obtenu ne vit qu’en mémoire, pour une heure environ,
-          et prend fin au rechargement.
-        </li>
-        <li>
-          Se déconnecter efface les jetons, l’accès temporaire, et les contenus
-          privés gardés en cache.
-        </li>
+        <li>{{ t().tokens.scope }}</li>
+        <li>{{ t().tokens.verifiedIdentity }}</li>
+        <li>{{ t().tokens.signOut }}</li>
         <li v-for="phrase in help.jetons" :key="phrase">{{ phrase }}</li>
       </ul>
     </section>
 
     <section>
-      <h2><UiIcon name="cached" />Mise en cache</h2>
+      <h2><UiIcon name="cached" />{{ t().cache.title }}</h2>
       <ul>
+        <li>{{ t().cache.byHash }}</li>
+        <li>{{ t().cache.tree }}</li>
         <li>
-          Les fichiers lus sont gardés sur ce poste, sous leur empreinte : un
-          fichier inchangé n’est jamais redemandé, quelle que soit la branche.
-          Ce cache est une copie, jamais une source.
+          {{ t().cache.publicFiles.before
+          }}<code>raw.githubusercontent.com</code
+          >{{ t().cache.publicFiles.after }}
         </li>
-        <li>
-          Chaque ouverture relit l’arborescence du dépôt — un seul appel compté
-          — pour savoir ce qui a changé. Les fichiers sont lus au commit, donc
-          tels qu’ils sont à cet instant.
-        </li>
-        <li>
-          Les fichiers publics passent par
-          <code>raw.githubusercontent.com</code>, qui ne compte pas dans la
-          limite d’appels. Ceux d’un dépôt privé passent par l’API, un appel par
-          fichier manquant.
-        </li>
-        <li>
-          Quand GitHub ne répond pas — hors ligne, limite atteinte, panne —, le
-          dernier état lu s’affiche, avec sa date et la cause. Rien ne
-          s’enregistre tant qu’il n’a pas été relu.
-        </li>
-        <li>
-          Ce qu’aucune branche ne cite plus est retiré. Les contenus privés
-          durent autant que l’accès qui les a lus ; ceux qu’une identité
-          vérifiée a lus ne sont pas gardés du tout.
-        </li>
+        <li>{{ t().cache.offline }}</li>
+        <li>{{ t().cache.eviction }}</li>
         <li v-if="!onDesktop && sealedTokens">
-          Les contenus privés sont gardés sous la même clé que les jetons, et ne
-          se lisent qu’une fois l’onglet déverrouillé.
+          {{ t().cache.sealedContents }}
         </li>
-        <li>
-          Les douze derniers projets ouverts sont retenus, pour l’accueil.
-        </li>
+        <li>{{ t().cache.recent }}</li>
         <li v-for="phrase in help.cache" :key="phrase">{{ phrase }}</li>
       </ul>
     </section>
 
     <section>
-      <h2><UiIcon name="travel_explore" />Découverte des projets</h2>
+      <h2><UiIcon name="travel_explore" />{{ t().discovery.title }}</h2>
       <ul>
+        <li>{{ t().discovery.knownFirst }}</li>
         <li>
-          L’accueil montre d’abord les projets déjà ouverts sur ce poste, sans
-          attendre le réseau.
+          {{ t().discovery.probed.before }}<code>ssk-canon.yml</code
+          >{{ t().discovery.probed.after }}
         </li>
-        <li>
-          Chaque jeton connu demande ensuite à GitHub les dépôts qu’il autorise
-          (jusqu’à 500 par jeton). Chacun est éprouvé par la lecture de son
-          <code>ssk-canon.yml</code> : un dépôt qui en a un porte un
-          référentiel.
-        </li>
-        <li>
-          Les projets qui portent un référentiel viennent en premier, par
-          organisation. Les autres restent sous « Autres dépôts autorisés ».
-        </li>
-        <li>
-          Sans jeton, rien n’est découvert : on ouvre un projet par son adresse,
-          et il est retenu ensuite.
-        </li>
+        <li>{{ t().discovery.order }}</li>
+        <li>{{ t().discovery.withoutToken }}</li>
       </ul>
     </section>
 
     <section>
-      <h2><UiIcon name="lan" />Communications extérieures</h2>
+      <h2><UiIcon name="lan" />{{ t().communications.title }}</h2>
       <ul>
+        <li><code>api.github.com</code>{{ t().communications.api }}</li>
         <li>
-          <code>api.github.com</code> — lecture, écriture et découverte, avec
-          votre jeton.
+          <code>raw.githubusercontent.com</code>{{ t().communications.raw }}
         </li>
         <li>
-          <code>raw.githubusercontent.com</code> — les fichiers publics, sans
-          jeton.
+          <code>avatars.githubusercontent.com</code
+          >{{ t().communications.avatars }}
         </li>
-        <li>
-          <code>avatars.githubusercontent.com</code> — l’avatar des
-          organisations, sans jeton.
-        </li>
-        <li>
-          L’émetteur d’identité et le service d’échange qu’un projet déclare —
-          seulement pour ce projet, et seulement si l’on entre par son identité
-          vérifiée.
-        </li>
+        <li>{{ t().communications.identity }}</li>
         <li v-for="phrase in help.communications" :key="phrase">
           {{ phrase }}
         </li>
-        <li>
-          Aucune mesure d’audience, aucun rapport d’erreur. Les polices sont
-          embarquées. Un lien externe s’ouvre dans votre navigateur.
-        </li>
+        <li>{{ t().communications.nothingElse }}</li>
       </ul>
     </section>
   </article>

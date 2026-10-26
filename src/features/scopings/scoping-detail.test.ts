@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
@@ -103,28 +104,37 @@ function row(el: HTMLElement, heading: string): HTMLElement | null {
 
 describe("The impact count", () => {
   it("reads by operation, in order of what changes most", () => {
-    expect(formatImpactCount(MIX)).toBe(
+    expect(formatImpactCount(MIX, "fr")).toBe(
       "2 règles créées · 1 modifiée · 2 touchées",
     );
   });
 
   it("agrees in the singular and omits what is zero", () => {
-    expect(formatImpactCount([impact("RG-a", "abroge")])).toBe(
+    expect(formatImpactCount([impact("RG-a", "abroge")], "fr")).toBe(
       "1 règle abrogée",
     );
   });
 
   it("speaks of targets when not all are rules", () => {
     expect(
-      formatImpactCount([
-        impact("RG-a", "cree"),
-        impact("ADR-x", "cree", "adr"),
-      ]),
+      formatImpactCount(
+        [impact("RG-a", "cree"), impact("ADR-x", "cree", "adr")],
+        "fr",
+      ),
     ).toBe("2 cibles créées");
   });
 
+  it("reads in English, with the noun once", () => {
+    expect(formatImpactCount(MIX, "en")).toBe(
+      "2 rules created · 1 modified · 2 touched",
+    );
+    expect(formatImpactCount([impact("ADR-x", "abroge", "adr")], "en")).toBe(
+      "1 target repealed",
+    );
+  });
+
   it("says nothing of a scoping without impacts", () => {
-    expect(formatImpactCount([])).toBe("");
+    expect(formatImpactCount([], "fr")).toBe("");
   });
 });
 
@@ -294,5 +304,120 @@ describe("A stale branch", () => {
     const el = await mountView(scoping("2026-032"));
 
     expect(el.querySelector(".branches-survivantes")).toBeNull();
+  });
+});
+
+describe("A scoping's page, in English", () => {
+  beforeEach(() => {
+    provideHttpTesting();
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
+    inject(LocaleService).choice.set("en");
+  });
+
+  it("labels its header, its sections and its table of contents in English", async () => {
+    const el = await mountView(
+      scoping("2026-002", {
+        status: "en_relecture",
+        impacts: MIX,
+        journey: "Un parcours.",
+        provenance: {
+          branch: "cadrage-2026-002",
+          pullRequest: 9,
+          draft: false,
+        },
+      }),
+    );
+
+    expect(el.querySelector(".retour")?.textContent?.trim()).toContain(
+      "Scopings",
+    );
+    expect(
+      [...el.querySelectorAll(".identite dt")].map((d) =>
+        d.textContent?.trim(),
+      ),
+    ).toEqual(["Scoping", "Impacts", "Resources"]);
+    expect(row(el, "Impacts")?.textContent?.trim()).toBe(
+      "2 rules created · 1 modified · 2 touched",
+    );
+    expect(row(el, "Resources")?.textContent).toContain("Pull request #9");
+    expect(row(el, "Resources")?.textContent).toContain("Add a link");
+    expect(el.querySelector(".editer")?.textContent?.trim()).toContain(
+      "Resume",
+    );
+    expect(
+      [...el.querySelectorAll("h2.section")].map((h) => h.textContent?.trim()),
+    ).toEqual(["Goal", "User journey", "Impacts on business rules"]);
+    expect(el.querySelector("#impacts-touches h3")?.textContent).toBe(
+      "2 rules touched",
+    );
+    const text = el.textContent ?? "";
+    for (const french of ["Objectif", "Ressources", "Demande de fusion"])
+      expect(text).not.toContain(french);
+  });
+
+  it("names the state of each decision in English", async () => {
+    const el = await mountView(
+      scoping("2026-001", {
+        decisions: [
+          {
+            id: "01-a",
+            title: "Où ranger ?",
+            status: "retenue",
+            chosenOption: "a",
+            description: "",
+            options: [
+              {
+                id: "a",
+                title: "Ici",
+                chosen: true,
+                body: "**Retenue.** Simple.",
+              },
+            ],
+            body: "",
+          },
+          {
+            id: "02-b",
+            title: "Quand ?",
+            status: "annulee",
+            chosenOption: null,
+            description: "",
+            options: [],
+            body: "",
+          },
+        ],
+      }),
+    );
+
+    expect(el.querySelector(".d-statut.retenue")?.textContent?.trim()).toBe(
+      "settled",
+    );
+    expect(el.querySelector(".d-statut.annulee")?.textContent?.trim()).toBe(
+      "cancelled",
+    );
+    expect(el.querySelector(".o-marque")?.textContent?.trim()).toBe("chosen");
+    expect(el.querySelector(".p-titre")?.textContent?.trim()).toBe(
+      "Settled decisions",
+    );
+  });
+
+  it("flags a stale branch in English", async () => {
+    const el = await mountView(
+      scoping("2026-032", { staleBranches: ["cadrage-2026-032"] }),
+    );
+
+    const note = el.querySelector(".branches-survivantes")?.textContent ?? "";
+    expect(note).toContain("still carries this scoping");
+    expect(note).not.toContain("sans effet");
+  });
+
+  it("says in English that a scoping is being read, then not found", async () => {
+    const store = inject(SpecificationStore);
+    store.loadingBranches.set(true);
+    const el = await mountAt("2026-002", [scoping("2026-001")]);
+    expect(el.textContent).toContain("Reading scopings in progress…");
+
+    store.loadingBranches.set(false);
+    await nextTick();
+    expect(el.textContent).toContain("Scoping not found: 2026-002");
   });
 });

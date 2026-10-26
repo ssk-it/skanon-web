@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import {
   groupByHorizon,
-  Horizon,
   linkedRoadmapItems,
   RoadmapItemsService,
 } from "../../core/repo/roadmap-items.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import ExternalLink from "../../ui/ExternalLink.vue";
 import UiIcon from "../../ui/UiIcon.vue";
+import { roadmapItemsSectionMessages } from "./roadmap-items-section.messages";
 
 /**
  * What is envisaged for a domain or a feature — RG-pistes-a-part.
@@ -28,15 +29,9 @@ const props = defineProps<{
 const store = inject(SpecificationStore);
 const service = inject(RoadmapItemsService);
 const links = inject(LinksService);
+const t = useMessages(roadmapItemsSectionMessages);
 
 const open = ref(false);
-
-const LABELS: Record<Horizon, string> = {
-  maintenant: "Maintenant",
-  ensuite: "Ensuite",
-  "plus-tard": "Plus tard",
-  "non-classee": "Non classées",
-};
 
 const roadmapItems = computed(() =>
   linkedRoadmapItems(
@@ -53,7 +48,7 @@ const label = computed(
     `${props.collection === "domains" ? "domaine" : "fonctionnalite"}/${props.id}`,
 );
 const subject = computed(() =>
-  props.collection === "domains" ? "ce domaine" : "cette fonctionnalité",
+  props.collection === "domains" ? t().thisDomain : t().thisFeature,
 );
 
 onMounted(() => void service.load(store.repoRef()));
@@ -69,36 +64,33 @@ onMounted(() => void service.load(store.repoRef()));
       @click="open = !open"
     >
       <UiIcon :name="open ? 'expand_less' : 'expand_more'" />
-      <span class="titre">À venir</span>
+      <span class="titre">{{ t().title }}</span>
       <span v-if="service.state() === 'pret'" class="compte">
         · {{ roadmapItems.length }}
       </span>
     </button>
 
     <div v-if="open" id="contenu-pistes" class="contenu">
-      <p class="avertissement">
-        Des pistes, non des règles : rien n’y est décidé tant qu’un cadrage ne
-        les a pas instruites.
-      </p>
+      <p class="avertissement">{{ t().warning }}</p>
 
       <p v-if="service.state() === 'chargement'" class="vide">
-        Lecture des pistes…
+        {{ t().loading }}
       </p>
       <p v-else-if="service.state() === 'droit-manquant'" class="vide">
-        Le jeton ne permet pas de lire les issues de ce dépôt, où vivent les
-        pistes. Lui accorder la permission <strong>Issues</strong> en lecture.
+        {{ t().missingPermissionBefore }}<strong>Issues</strong
+        >{{ t().missingPermissionAfter }}
       </p>
       <p v-else-if="service.state() === 'erreur'" class="vide">
         {{ service.error() }}
       </p>
       <p v-else-if="!roadmapItems.length" class="vide">
-        Aucune piste pour {{ subject }}. Une piste est une issue de ce dépôt
-        étiquetée <code>piste</code> et <code>{{ label }}</code
-        >, rangée par son jalon : « maintenant », « ensuite » ou « plus tard ».
+        {{ t().emptyBefore(subject) }}<code>piste</code>{{ t().emptyAnd
+        }}<code>{{ label }}</code
+        >{{ t().emptyAfter }}
       </p>
 
       <template v-for="g in groups" v-else :key="g.horizon">
-        <h3 class="horizon">{{ LABELS[g.horizon] }}</h3>
+        <h3 class="horizon">{{ t().horizons[g.horizon] }}</h3>
         <ul class="liste">
           <li v-for="p in g.roadmapItems" :key="p.number" class="piste">
             <ExternalLink class="issue" :href="p.url">
@@ -111,7 +103,7 @@ onMounted(() => void service.load(store.repoRef()));
               class="cadrage"
               :to="links.path('cadrages', c)"
             >
-              en cours · {{ c }}
+              {{ t().inProgress }} · {{ c }}
             </RouterLink>
           </li>
         </ul>

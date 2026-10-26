@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watchEffect } from "vue";
 import { GithubError } from "../../core/github/github-client";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { BootstrapService } from "../../core/repo/bootstrap.service";
 import { AutomationService } from "../../core/repo/automation.service";
@@ -11,6 +12,7 @@ import UiCheckbox from "../../ui/UiCheckbox.vue";
 import UiTextField from "../../ui/UiTextField.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import RepoAccessHelp from "./RepoAccessHelp.vue";
+import { viewStateMessages } from "./view-state.messages";
 
 /**
  * Loading, error, empty repo. Isolated because every screen must handle it, and a useful error message is better than a blank screen.
@@ -23,6 +25,7 @@ const store = inject(SpecificationStore);
 const dialog = inject(DialogService);
 const bootstrapService = inject(BootstrapService);
 const automation = inject(AutomationService);
+const t = useMessages(viewStateMessages);
 
 function retry(): void {
   void store.loadSpecification();
@@ -71,7 +74,7 @@ async function bootstrapProject(): Promise<void> {
     bootstrapError.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
-        : "Le dépôt n’a pas pu être amorcé.";
+        : t().bootstrapFailed;
   } finally {
     bootstrap.value = false;
   }
@@ -81,33 +84,33 @@ async function bootstrapProject(): Promise<void> {
 <template>
   <div class="etat-vue">
     <div v-if="store.state() === 'chargement'" class="etat">
-      <p class="titre">Chargement du référentiel…</p>
+      <p class="titre">{{ t().loading }}</p>
       <p v-if="store.progression()" class="detail">
-        {{ store.progression()?.loadedCount }} /
-        {{ store.progression()?.total }} fichiers
+        {{
+          t().files(
+            store.progression()?.loadedCount ?? 0,
+            store.progression()?.total ?? 0,
+          )
+        }}
       </p>
     </div>
     <template v-else-if="store.state() === 'erreur'">
       <div v-if="store.emptyRepo()" class="etat amorcage">
         <UiIcon name="rocket_launch" />
-        <p class="titre">Ce dépôt est vide</p>
-        <p class="detail">
-          Il n’a encore rien reçu. L’application peut y déposer la structure
-          d’un référentiel — les répertoires, la configuration, et de quoi s’y
-          retrouver.
-        </p>
+        <p class="titre">{{ t().emptyRepo }}</p>
+        <p class="detail">{{ t().emptyRepoDetail }}</p>
 
         <div class="champs">
           <UiTextField
             v-model="projectName"
-            label="Nom du projet"
+            :label="t().projectName"
             name="nomProjet"
             :disabled="bootstrap"
           />
 
           <UiTextField
             v-model="projectDescription"
-            label="En une phrase"
+            :label="t().projectDescription"
             multiline
             :rows="2"
             name="descriptionProjet"
@@ -116,12 +119,9 @@ async function bootstrapProject(): Promise<void> {
         </div>
 
         <UiCheckbox v-model="withAutomation" :disabled="bootstrap">
-          Installer l’automatisation
+          {{ t().installAutomation }}
         </UiCheckbox>
-        <p class="detail note">
-          Vérifie les cadrages avant leur livraison, et met à jour les règles
-          une fois livrés. Demande un accès autorisé à écrire les workflows.
-        </p>
+        <p class="detail note">{{ t().automationDetail }}</p>
 
         <p v-if="bootstrapError" class="detail echec">{{ bootstrapError }}</p>
 
@@ -130,27 +130,24 @@ async function bootstrapProject(): Promise<void> {
           :disabled="bootstrap || !projectName.trim()"
           @click="bootstrapProject()"
         >
-          {{ bootstrap ? "Dépôt en cours…" : "Amorcer le référentiel" }}
+          {{ bootstrap ? t().bootstrapping : t().bootstrap }}
         </UiButton>
-        <p class="detail note">
-          Écrit directement sur la branche principale : il n’y a rien à relire
-          dans un dépôt vide.
-        </p>
+        <p class="detail note">{{ t().bootstrapNote }}</p>
       </div>
       <div v-else class="etat erreur">
         <UiIcon name="error_outline" />
-        <p class="titre">Le dépôt n’a pas pu être chargé</p>
+        <p class="titre">{{ t().loadFailed }}</p>
         <p class="detail">{{ store.error() }}</p>
         <RepoAccessHelp
           v-if="store.tokenWithoutAccess()"
           :repo-ref="store.repoRef()"
           @replace="openTokenDialog()"
         />
-        <UiButton variant="filled" @click="retry()">Réessayer</UiButton>
+        <UiButton variant="filled" @click="retry()">{{ t().retry }}</UiButton>
       </div>
     </template>
     <div v-else-if="store.state() === 'vide'" class="etat">
-      <p class="titre">Aucun dépôt ouvert</p>
+      <p class="titre">{{ t().noRepo }}</p>
     </div>
   </div>
 </template>
