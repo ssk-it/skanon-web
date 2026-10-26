@@ -1,18 +1,18 @@
 <script setup lang="ts">
 /**
- * La structure d'un dialogue : `mat-dialog-title`, `mat-dialog-content` et `mat-dialog-actions`, en un composant.
+ * The structure of a dialog: `mat-dialog-title`, `mat-dialog-content` and `mat-dialog-actions`, in one component.
  *
  * ```vue
- * <UiDialogue titre="Supprimer ce lien ?">
+ * <UiDialog title="Supprimer ce lien ?">
  *   <p>Le message.</p>
  *   <template #actions>
- *     <UiBouton @click="emit('close', false)">Annuler</UiBouton>
- *     <UiBouton variante="filled" @click="emit('close', true)">Supprimer</UiBouton>
+ *     <UiButton @click="emit('close', false)">Annuler</UiButton>
+ *     <UiButton variant="filled" @click="emit('close', true)">Supprimer</UiButton>
  *   </template>
- * </UiDialogue>
+ * </UiDialog>
  * ```
  *
- * Le contenu défile seul au-delà de 65 % de la hauteur de la fenêtre ; titre et actions restent en place. Les actions s'alignent à droite, espacées de 8 px. Une vue qui doit régler le contenu — sa hauteur, sa largeur, sa disposition — le vise par `:deep(.ui-dialogue__contenu)` depuis une classe posée sur `UiDialogue`.
+ * The content scrolls on its own beyond 65 % of the window height; title and actions stay in place. Actions align to the right, 8 px apart. A view that must adjust the content — its height, its width, its layout — targets it with `:deep(.ui-dialogue__contenu)` from a class placed on `UiDialog`.
  */
 defineProps<{ title?: string }>();
 </script>

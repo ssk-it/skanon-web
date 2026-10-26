@@ -12,26 +12,26 @@ import ExternalLink from "./ExternalLink.vue";
 import UiIcon from "./UiIcon.vue";
 
 /**
- * Le bouton de Material 3, sans Material.
+ * The Material 3 button, without Material.
  *
- * | Variante   | Remplace                                     |
+ * | Variant    | Replaces                                     |
  * | ---------- | -------------------------------------------- |
- * | `text`     | `matButton`, `mat-button` (le défaut)        |
+ * | `text`     | `matButton`, `mat-button` (the default)      |
  * | `filled`   | `matButton="filled"`, `mat-flat-button`      |
  * | `tonal`    | `matButton="tonal"`                          |
  * | `outlined` | `matButton="outlined"`, `mat-stroked-button` |
  * | `icon`     | `matIconButton`, `mat-icon-button`           |
  *
  * ```vue
- * <UiBouton variante="filled" @click="valider()">Enregistrer</UiBouton>
- * <UiBouton variante="icon" aria-label="Recharger" @click="recharger()"><UiIcone nom="refresh" /></UiBouton>
- * <UiBouton :to="liens.chemin('reglages')" active-class="actif">Réglages</UiBouton>
- * <UiBouton href="https://github.com/…">Ouvrir sur GitHub</UiBouton>
+ * <UiButton variant="filled" @click="validate()">Enregistrer</UiButton>
+ * <UiButton variant="icon" aria-label="Recharger" @click="reload()"><UiIcon name="refresh" /></UiButton>
+ * <UiButton :to="links.path('reglages')" active-class="actif">Réglages</UiButton>
+ * <UiButton href="https://github.com/…">Ouvrir sur GitHub</UiButton>
  * ```
  *
- * Un `<button type="button">` d'office : un bouton posé dans un formulaire ne le soumet que si on le demande (`type="submit"`). Avec `to`, c'est un `RouterLink` ; avec `href`, un `LienExterne`, ouvert dans le navigateur de l'utilisateur.
+ * A `<button type="button">` by default: a button placed in a form only submits it when asked to (`type="submit"`). With `to`, it is a `RouterLink`; with `href`, an `ExternalLink`, opened in the user's browser.
  *
- * Comme chez Material, les `UiIcone` du contenu sortent du libellé et se placent devant lui, à 18 px, et le bouton resserre sa marge de ce côté. Le libellé est `.ui-bouton__libelle` : une vue qui doit le tronquer le vise par `:deep(.ui-bouton__libelle)`, comme elle visait `.mdc-button__label`.
+ * As in Material, the content's `UiIcon`s leave the label and are placed in front of it, at 18 px, and the button tightens its padding on that side. The label is `.ui-bouton__libelle`: a view that must truncate it targets it with `:deep(.ui-bouton__libelle)`, as it targeted `.mdc-button__label`.
  */
 const props = withDefaults(
   defineProps<{
@@ -52,7 +52,7 @@ const props = withDefaults(
 
 const slots = useSlots();
 
-/** Les nœuds d'un emplacement, sans les fragments que `v-if` et `v-for` y laissent. */
+/** The nodes of a slot, without the fragments `v-if` and `v-for` leave in it. */
 function flatten(nodes: readonly VNode[]): VNode[] {
   return nodes.flatMap((n) =>
     n.type === Fragment && Array.isArray(n.children)
@@ -147,7 +147,7 @@ const bindings = computed(() => {
   appearance: none;
 }
 
-/* Le calque d'état : la couleur du texte, à l'opacité que Material 3 donne au survol, au focus et à l'appui. */
+/* The state layer: the text colour, at the opacity Material 3 gives to hover, focus and press. */
 .ui-bouton::before {
   content: "";
   position: absolute;
@@ -170,12 +170,12 @@ const bindings = computed(() => {
   position: relative;
 }
 
-/* Au-dessus du calque d'état, qui est positionné. */
+/* Above the state layer, which is positioned. */
 .ui-bouton > .material-symbols-outlined {
   position: relative;
 }
 
-/* L'icône qui précède un libellé. Un bouton d'icône garde la sienne à 24 px et centrée : réduite et tirée vers la gauche, elle sortait du disque de son calque d'état. */
+/* The icon that precedes a label. An icon button keeps its own at 24 px and centred: shrunk and pulled to the left, it went outside the disc of its state layer. */
 .ui-bouton:not(.ui-bouton--icon) > .material-symbols-outlined {
   font-size: 1.125rem;
   width: 1.125rem;

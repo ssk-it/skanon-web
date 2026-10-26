@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { TokenService } from "./token.service";
 
 /**
- * L'environnement de test n'expose qu'un localStorage partiel — ce qui tombe
- * bien : le service doit fonctionner quand le stockage est indisponible, en
- * navigation privée par exemple. On le remplace par une implémentation en
- * mémoire pour contrôler l'état, et un cas vérifie explicitement le repli.
+ * The test environment only exposes a partial localStorage — which is
+ * convenient: the service must work when storage is unavailable, in
+ * private browsing for instance. We replace it with an in-memory implementation
+ * to control the state, and one case explicitly checks the fallback.
  */
 function stubStorage(): Map<string, string> {
   const data = new Map<string, string>();
@@ -33,30 +33,30 @@ describe("TokenService", () => {
     service = inject(TokenService);
   });
 
-  it("démarre sans jeton", () => {
+  it("starts without a token", () => {
     expect(service.present()).toBe(false);
     expect(service.source()).toBe("aucune");
     expect(service.fingerprint()).toBeNull();
   });
 
-  it("conserve un jeton et n’en expose que les derniers caractères", () => {
+  it("keeps a token and exposes only its last characters", () => {
     service.set("ghp_abcdefghijklmnopqrst1234");
     expect(service.present()).toBe(true);
     expect(service.source()).toBe("personnel");
-    // l'empreinte identifie le jeton sans le divulguer
+    // the fingerprint identifies the token without disclosing it
     expect(service.fingerprint()).toBe("…1234");
     expect(service.fingerprint()).not.toContain("abcdefgh");
   });
 
-  it("efface le jeton et le stockage", () => {
+  it("erases the token and the storage", () => {
     service.set("ghp_abcdefghijklmnopqrst1234");
     service.erase();
     expect(service.present()).toBe(false);
     expect(storage.has("ssk-canon.token")).toBe(false);
   });
 
-  /** RG-acces-par-portee, RG-acces-temporaire : un jeton d'une seule organisation, ou un accès temporaire, est déjà un accès en place. */
-  it("ne dit aucun accès en place que sans jeton, de quelque portée, ni accès temporaire", () => {
+  /** RG-acces-par-portee, RG-acces-temporaire: a token for a single organisation, or a temporary access, is already an access in place. */
+  it("reports no access in place only without a token, of any scope, nor temporary access", () => {
     expect(service.noAccess()).toBe(true);
 
     service.setForScope("ssk-it", "ghp_abcdefghijklmnopqrst1234");
@@ -74,14 +74,14 @@ describe("TokenService", () => {
     expect(service.noAccess()).toBe(false);
   });
 
-  it("ignore une saisie vide", () => {
+  it("ignores an empty input", () => {
     service.set("   ");
     expect(service.present()).toBe(false);
   });
 
-  it("fonctionne quand le stockage est indisponible", () => {
-    // navigation privée, stockage bloqué : le jeton doit rester utilisable
-    // pour la session plutôt que de faire échouer l'application
+  it("works when storage is unavailable", () => {
+    // private browsing, blocked storage: the token must stay usable
+    // for the session rather than make the application fail
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
       value: {
@@ -105,7 +105,7 @@ describe("TokenService", () => {
     expect(s.present()).toBe(false);
   });
 
-  describe("un coffre qui refuse — RG-secret-conserve-localement", () => {
+  describe("a vault that refuses — RG-secret-conserve-localement", () => {
     function block(): void {
       const deny = () => {
         throw new Error("bloqué");
@@ -117,13 +117,13 @@ describe("TokenService", () => {
       resetInjection();
     }
 
-    it("se tait quand le coffre garde le jeton", async () => {
+    it("stays silent when the vault keeps the token", async () => {
       service.set("ghp_abcdefghijklmnopqrst1234");
       await flushPromises();
       expect(service.vaultRefused()).toBeNull();
     });
 
-    it("dit que le jeton ne vaut que pour la session", async () => {
+    it("says the token is only valid for the session", async () => {
       block();
       const s = inject(TokenService);
       s.set("ghp_abcdefghijklmnopqrst1234");
@@ -132,7 +132,7 @@ describe("TokenService", () => {
       expect(s.present()).toBe(true);
     });
 
-    it("dit qu’un jeton oublié reste dans le coffre", async () => {
+    it("says a forgotten token remains in the vault", async () => {
       block();
       const s = inject(TokenService);
       s.erase();
@@ -141,7 +141,7 @@ describe("TokenService", () => {
       expect(s.present()).toBe(false);
     });
 
-    it("cesse de le dire quand le coffre accepte de nouveau", async () => {
+    it("stops saying so when the vault accepts again", async () => {
       block();
       const s = inject(TokenService);
       s.set("ghp_abcdefghijklmnopqrst1234");
@@ -153,16 +153,16 @@ describe("TokenService", () => {
     });
   });
 
-  describe("vérification de forme", () => {
-    it("accepte les préfixes GitHub connus", () => {
+  describe("shape check", () => {
+    it("accepts known GitHub prefixes", () => {
       expect(TokenService.checkForm("ghp_abcdefghijklmnopqrst")).toBeNull();
       expect(
         TokenService.checkForm("github_pat_11ABCDEFG0abcdefghij"),
       ).toBeNull();
     });
 
-    it("refuse ce qui ne ressemble pas à un jeton", () => {
-      // erreur de saisie la plus fréquente : coller autre chose que le jeton
+    it("refuses what does not look like a token", () => {
+      // most frequent input error: pasting something other than the token
       expect(TokenService.checkForm("mon-identifiant")).toContain("ghp_");
       expect(TokenService.checkForm("")).toContain("Saisir");
       expect(TokenService.checkForm("ghp_abc def")).toContain("espace");

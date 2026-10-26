@@ -13,10 +13,10 @@ import UiIcon from "../../ui/UiIcon.vue";
 import RepoAccessHelp from "./RepoAccessHelp.vue";
 
 /**
- * Chargement, erreur, dépôt vide. Isolé parce que chaque écran doit le gérer, et qu'un message d'erreur utile vaut mieux qu'un écran blanc.
+ * Loading, error, empty repo. Isolated because every screen must handle it, and a useful error message is better than a blank screen.
  *
  * ```vue
- * <EtatVue v-if="store.etat() !== 'pret'" />
+ * <ViewState v-if="store.state() !== 'pret'" />
  * ```
  */
 const store = inject(SpecificationStore);
@@ -28,7 +28,7 @@ function retry(): void {
   void store.loadSpecification();
 }
 
-/** Le même dialogue que la barre, rechargeant le dépôt si le jeton a changé. */
+/** The same dialog as the bar, reloading the repo if the token changed. */
 function openTokenDialog(): void {
   void import("./TokenDialog.vue").then(async ({ default: TokenDialog }) => {
     const change = await dialog.open<boolean>(TokenDialog, {
@@ -41,11 +41,11 @@ function openTokenDialog(): void {
 const projectName = ref("");
 const projectDescription = ref("");
 const bootstrap = ref(false);
-/** Cochée d'emblée : un dépôt cadré sans automatisation ne tient pas ses promesses, et l'oubli ne se voit qu'à la première livraison incohérente. */
+/** Checked from the start: a framed repo without automation does not keep its promises, and the omission only shows at the first inconsistent delivery. */
 const withAutomation = ref(true);
 const bootstrapError = ref<string | null>(null);
 
-// Le nom du dépôt sert de proposition : c'est ce que le rédacteur vient d'ouvrir, et le retaper à l'identique n'apprend rien à personne.
+// The repo name serves as a suggestion: it is what the author has just opened, and retyping it identically teaches no one anything.
 watchEffect(() => {
   if (store.emptyRepo() && !projectName.value) {
     projectName.value = store.repoRef().repo;
@@ -57,13 +57,13 @@ async function bootstrapProject(): Promise<void> {
   bootstrap.value = true;
   bootstrapError.value = null;
   try {
-    // Pas de description inventée : une phrase que personne n'a écrite est prise pour vraie par ceux qui la lisent ensuite, et se recopie.
+    // No invented description: a sentence no one wrote is taken as true by those who read it next, and gets copied.
     await bootstrapService.bootstrapProject({
       name: projectName.value.trim(),
       description: projectDescription.value.trim(),
     });
 
-    // Après l'amorçage, non pendant : le référentiel existe désormais, et si l'accès ne permet pas d'écrire les workflows, le dépôt reste amorcé — l'installation se reprend depuis les réglages.
+    // After the bootstrap, not during it: the specification now exists, and if the access does not allow writing the workflows, the repo stays bootstrapped — the installation resumes from the settings.
     if (withAutomation.value) {
       await automation.install();
     }
@@ -169,7 +169,7 @@ async function bootstrapProject(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* L'écran est centré : des champs pleine page y flotteraient. */
+  /* The screen is centred: full-page fields would float in it. */
   width: min(100%, 34rem);
   margin-top: 6px;
   text-align: left;

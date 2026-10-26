@@ -11,9 +11,9 @@ import { createWebPlatform } from "../../platform/web";
 import { createAppRouter } from "../../router";
 
 /**
- * L'aide est une annonce : elle dit ce que l'application fait de ce qu'on lui confie, cible par cible, et ne promet rien qu'elle ne tienne (RG-aide-fidele, RG-secret-conserve-localement).
+ * The help is a statement: it says what the application does with what it is entrusted with, target by target, and promises nothing it does not keep (RG-aide-fidele, RG-secret-conserve-localement).
  */
-describe("page « Fonctionnement de Skanon »", () => {
+describe("« Fonctionnement de Skanon » page", () => {
   beforeEach(() => {
     provideHttpTesting();
   });
@@ -33,13 +33,13 @@ describe("page « Fonctionnement de Skanon »", () => {
     return view.text();
   }
 
-  it("a sa propre adresse, hors de tout projet", async () => {
+  it("has its own address, outside any project", async () => {
     const router = createAppRouter(createMemoryHistory());
     await router.push("/aide");
     expect(router.currentRoute.value.path).toBe("/aide");
   });
 
-  it("couvre les quatre sujets", async () => {
+  it("covers the four topics", async () => {
     const text = await mountView("web");
     for (const title of [
       "Jetons",
@@ -50,19 +50,19 @@ describe("page « Fonctionnement de Skanon »", () => {
       expect(text).toContain(title);
   });
 
-  it("dit, dans le navigateur, que le jeton y est gardé en clair", async () => {
+  it("says, in the browser, that the token is kept there in clear", async () => {
     const text = await mountView("web");
     expect(text).toContain("gardé dans ce navigateur, en clair");
     expect(text).not.toContain("coffre du système");
   });
 
-  it("propose, dans le navigateur, de protéger le jeton par une passkey, et dit qu’un projet peut l’exiger", async () => {
+  it("offers, in the browser, to protect the token with a passkey, and says a project may require it", async () => {
     const text = await mountView("web");
     expect(text).toContain("protégé par une passkey");
     expect(text).toContain("Un projet peut exiger");
   });
 
-  it("dit des jetons scellés que le navigateur n’en garde que le chiffré, sans rien promettre contre la page", async () => {
+  it("says of sealed tokens that the browser keeps only their ciphertext, without promising anything against the page", async () => {
     vi.spyOn(inject(TokenService), "form").mockReturnValue("scelle");
     const text = await mountView("web");
     expect(text).toContain("n’en garde que le chiffré");
@@ -71,13 +71,13 @@ describe("page « Fonctionnement de Skanon »", () => {
     expect(text).toContain("sous la même clé que les jetons");
   });
 
-  it("dit, sur le bureau, que le jeton est dans le coffre du système", async () => {
+  it("says, on the desktop, that the token is in the system keychain", async () => {
     const text = await mountView("bureau");
     expect(text).toContain("rangé dans le coffre du système");
     expect(text).not.toContain("gardé dans ce navigateur");
   });
 
-  it("nomme chaque hôte que tout livrable contacte", async () => {
+  it("names every host that every deliverable contacts", async () => {
     const text = await mountView("web");
     for (const host of [
       "api.github.com",
@@ -87,8 +87,8 @@ describe("page « Fonctionnement de Skanon »", () => {
       expect(text).toContain(host);
   });
 
-  // ADR-extensions-commerciales : ce qui tient au livrable vient de son extension, la page ne sait pas ce qu'elle rend.
-  it("dit, dans chaque section, ce que le livrable apporte", async () => {
+  // ADR-extensions-commerciales: what belongs to the deliverable comes from its extension; the page does not know what it renders.
+  it("says, in each section, what the deliverable brings", async () => {
     const text = await mountView("web", [
       {
         id: "factice",
@@ -106,7 +106,7 @@ describe("page « Fonctionnement de Skanon »", () => {
     expect(text).toContain("Hôte apporté.");
   });
 
-  it("place l'hôte apporté avant ce qu'aucun livrable ne contacte", async () => {
+  it("places the brought host before what no deliverable contacts", async () => {
     const text = await mountView("web", [
       { id: "factice", pages: { help: { communications: ["Hôte apporté."] } } },
     ]);

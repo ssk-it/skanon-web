@@ -11,12 +11,11 @@ import {
 import { buildSearchIndex, findResults } from "./search";
 
 /**
- * La recherche — RG-recherche-perimetre et RG-recherche-en-cours-a-part.
+ * Search — RG-recherche-perimetre and RG-recherche-en-cours-a-part.
  *
- * L'index est une fonction pure du référentiel en mémoire : ce qui est éprouvé
- * ici, c'est sur quoi il porte, et ce qu'il range à part. Qu'il ne coûte aucun
- * appel découle de sa forme même — il ne reçoit rien d'autre que ce qui est
- * déjà chargé.
+ * The index is a pure function of the in-memory specification: what is tested
+ * here is what it covers, and what it sets apart. That it costs no call follows
+ * from its very form — it receives nothing other than what is already loaded.
  */
 
 function rule(id: string, statement: string): Rule {
@@ -134,8 +133,8 @@ function search(ref: Specification, query: string) {
   return findResults(buildSearchIndex(ref), query);
 }
 
-describe("la recherche", () => {
-  describe("ce sur quoi elle porte", () => {
+describe("search", () => {
+  describe("what it covers", () => {
     const ref = specification({
       rules: [rule("RG-quota", "Le **quota** anonyme est de soixante appels.")],
       decisions: [adr("ADR-quota-cache", "Les contenus échappent au quota.")],
@@ -149,7 +148,7 @@ describe("la recherche", () => {
       ],
     });
 
-    it("trouve une règle, une décision, un document d’architecture et un cadrage", () => {
+    it("finds a rule, a decision, an architecture document and a scoping", () => {
       const r = search(ref, "quota");
 
       expect(r.specification.map((x) => [x.kind, x.id])).toEqual(
@@ -162,13 +161,13 @@ describe("la recherche", () => {
       );
     });
 
-    it("cherche dans le corps, non seulement dans le titre", () => {
+    it("searches the body, not only the title", () => {
       const r = search(ref, "soixante");
 
       expect(r.specification.map((x) => x.id)).toEqual(["RG-quota"]);
     });
 
-    it("trouve une décision de cadrage, et mène à son ancre dans le cadrage", () => {
+    it("finds a scoping decision, and leads to its anchor in the scoping", () => {
       const r = search(ref, "canal");
 
       const found = r.specification.find((x) => x.kind === "decision");
@@ -177,7 +176,7 @@ describe("la recherche", () => {
       expect(found?.anchor).toBe("decision-01-canal");
     });
 
-    it("trouve le motif d’une option écartée", () => {
+    it("finds the reason of a rejected option", () => {
       const ref = specification({
         scopings: [
           scoping("2026-001", "Support de persistance", {
@@ -196,7 +195,7 @@ describe("la recherche", () => {
       ).toEqual(["2026-001/01-support"]);
     });
 
-    it("mène chaque nature à sa vue habituelle", () => {
+    it("leads each kind to its usual view", () => {
       const links = Object.fromEntries(
         search(ref, "quota").specification.map((x) => [x.id, x.link]),
       );
@@ -216,7 +215,7 @@ describe("la recherche", () => {
     });
   });
 
-  describe("la requête", () => {
+  describe("the query", () => {
     const ref = specification({
       rules: [
         rule(
@@ -227,7 +226,7 @@ describe("la recherche", () => {
       ],
     });
 
-    it("ignore la casse et les accents", () => {
+    it("ignores case and accents", () => {
       expect(search(ref, "PIECE").specification.map((x) => x.id)).toEqual([
         "RG-pieces-jointes",
       ]);
@@ -236,21 +235,21 @@ describe("la recherche", () => {
       ).toEqual(["RG-ordre-upload"]);
     });
 
-    it("exige chaque mot, dans n’importe quel ordre", () => {
+    it("requires each word, in any order", () => {
       expect(
         search(ref, "empreinte pièce").specification.map((x) => x.id),
       ).toEqual(["RG-pieces-jointes"]);
       expect(search(ref, "empreinte commit").specification).toEqual([]);
     });
 
-    it("ne rend rien pour une requête vide", () => {
+    it("returns nothing for an empty query", () => {
       const r = search(ref, "   ");
 
       expect(r.specification).toEqual([]);
       expect(r.inProgress).toEqual([]);
     });
 
-    it("place en tête ce qui correspond par l’identifiant", () => {
+    it("puts first what matches by identifier", () => {
       const ref = specification({
         rules: [
           rule("RG-autre", "Rien à voir, sinon le mot cache."),
@@ -265,8 +264,8 @@ describe("la recherche", () => {
     });
   });
 
-  describe("l’extrait", () => {
-    it("montre le passage où le mot apparaît, sans balisage", () => {
+  describe("the excerpt", () => {
+    it("shows the passage where the word appears, without markup", () => {
       const long = `${"Préambule sans rapport. ".repeat(20)}Le **quota** anonyme est de soixante appels.`;
       const ref = specification({ rules: [rule("RG-quota", long)] });
 
@@ -278,7 +277,7 @@ describe("la recherche", () => {
     });
   });
 
-  describe("les cadrages en cours", () => {
+  describe("scopings in progress", () => {
     const ref = specification({
       rules: [
         rule("RG-barre", "La barre de navigation présente quatre entrées."),
@@ -294,7 +293,7 @@ describe("la recherche", () => {
       ],
     });
 
-    it("les range à part, avec leurs décisions", () => {
+    it("sets them apart, with their decisions", () => {
       const r = search(ref, "barre");
 
       expect(r.specification.map((x) => x.id)).toEqual(
@@ -307,15 +306,15 @@ describe("la recherche", () => {
       ]);
     });
 
-    it("portent la marque de leur demande de fusion", () => {
+    it("carry the mark of their pull request", () => {
       const r = search(ref, "étroit");
 
       expect(r.inProgress[0].pullRequest).toBe(61);
     });
   });
 
-  describe("l’identifiant affiché", () => {
-    it("porte le préfixe du projet, et se trouve par lui", () => {
+  describe("the displayed identifier", () => {
+    it("carries the project prefix, and is found by it", () => {
       const ref = specification({
         prefix: "SC",
         scopings: [scoping("2026-042", "Recherche")],

@@ -4,9 +4,9 @@ import type { Rule, Specification } from "../model/model";
 import { VerificationService, type ScopingInput } from "./verification.service";
 
 /**
- * La vérification pendant la rédaction, par `checkRepo` de `@ssk-it/canon-check`. Le vérificateur lit les entités sous les noms du format (`domaines`, `statut`, `enonces`, `regle`…), le modèle les nomme en anglais : ces cas éprouvent la correspondance, qui ne se voit à aucune compilation.
+ * Verification during authoring, through `checkRepo` from `@ssk-it/canon-check`. The verifier reads entities under the format's names (`domaines`, `statut`, `enonces`, `regle`…), the model names them in English: these cases test the mapping, which no compilation reveals.
  */
-describe("vérification d'un cadrage en cours de rédaction", () => {
+describe("verifying a scoping being authored", () => {
   function rule(id: string, status: Rule["status"]): Rule {
     return {
       id,
@@ -60,16 +60,16 @@ describe("vérification d'un cadrage en cours de rédaction", () => {
     service = inject(VerificationService);
   });
 
-  it("ne reproche rien à un cadrage cohérent avec le référentiel", () => {
+  it("finds no fault with a scoping consistent with the specification", () => {
     expect(service.checkScoping(input(), SPECIFICATION).errors).toEqual([]);
   });
 
-  it("trouve la cible de chaque impact sous sa nature", () => {
+  it("finds each impact's target under its kind", () => {
     const { errors } = service.checkScoping(input(), SPECIFICATION);
     expect(errors.join("\n")).not.toContain("impact sans cible");
   });
 
-  it("signale un domaine que le référentiel ne connaît pas", () => {
+  it("reports a domain the specification does not know", () => {
     const { errors, warnings } = service.checkScoping(
       input({ domains: ["d-inconnu"] }),
       SPECIFICATION,
@@ -77,7 +77,7 @@ describe("vérification d'un cadrage en cours de rédaction", () => {
     expect([...errors, ...warnings].join("\n")).toContain("d-inconnu");
   });
 
-  it("signale un impact sur une règle inconnue", () => {
+  it("reports an impact on an unknown rule", () => {
     const { errors } = service.checkScoping(
       input({
         impacts: [
@@ -89,7 +89,7 @@ describe("vérification d'un cadrage en cours de rédaction", () => {
     expect(errors.join("\n")).toContain("RG-absente");
   });
 
-  it("lit le statut des règles : avertit d'un impact sur une règle abrogée", () => {
+  it("reads rule statuses: warns of an impact on a repealed rule", () => {
     const { warnings } = service.checkScoping(
       input({
         impacts: [

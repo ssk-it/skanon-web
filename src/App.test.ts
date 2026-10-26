@@ -19,9 +19,9 @@ import { createWebPlatform } from "./platform/web";
 import { createAppRouter } from "./router";
 
 /**
- * Le chargement est déclenché par le garde de route, non par la barre : c'est l'adresse qui dit quel dépôt ouvrir. Ces cas visent donc le store, appelé comme le garde l'appelle.
+ * Loading is triggered by the route guard, not by the bar: the address says which repo to open. These cases therefore target the store, called the way the guard calls it.
  */
-describe("Chargement du dépôt", () => {
+describe("Loading the repo", () => {
   let httpMock: HttpTestingController;
   let store: SpecificationStore;
 
@@ -30,16 +30,16 @@ describe("Chargement du dépôt", () => {
     store = inject(SpecificationStore);
   });
 
-  it("demande l’arborescence du dépôt", async () => {
+  it("requests the repo tree", async () => {
     void store.loadSpecification({ owner: "ssk-it", repo: "ssk-canon" });
 
-    // un seul appel d'API pour l'arborescence : les contenus passent par raw, qui n'est pas décompté du quota
+    // a single API call for the tree: contents go through raw, which does not count against the quota
     const query = httpMock.expectOne((r) => r.url.includes("/git/trees/"));
     expect(query.request.url).toContain("recursive=1");
     expect(store.state()).toBe("chargement");
   });
 
-  it("passe à l’état prêt une fois l’arborescence vide reçue", async () => {
+  it("turns ready once the empty tree is received", async () => {
     const pending = store.loadSpecification({
       owner: "ssk-it",
       repo: "ssk-canon",
@@ -53,7 +53,7 @@ describe("Chargement du dépôt", () => {
     expect(store.state()).toBe("pret");
   });
 
-  it("signale une erreur lisible quand le dépôt est introuvable", async () => {
+  it("reports a readable error when the repo cannot be found", async () => {
     const pending = store.loadSpecification({
       owner: "ssk-it",
       repo: "absent",
@@ -65,7 +65,7 @@ describe("Chargement du dépôt", () => {
 
     await pending;
     expect(store.state()).toBe("erreur");
-    // le message doit dire quoi faire, pas seulement que ça a échoué
+    // the message must say what to do, not only that it failed
     expect(store.error()).toContain("public");
   });
 });
@@ -75,7 +75,7 @@ describe("App", () => {
     provideHttpTesting();
   });
 
-  it("affiche le nom du produit dans la barre", async () => {
+  it("shows the product name in the bar", async () => {
     const router = createAppRouter(createMemoryHistory());
     await router.push("/");
     await router.isReady();
@@ -86,9 +86,9 @@ describe("App", () => {
     expect(view.find(".barre").text()).toContain("Skanon");
   });
 
-  // RG-aide-a-portee : l'aide n'est pas une vue d'un projet, sa porte est partout.
+  // RG-aide-a-portee: help is not a view of a project, its door is everywhere.
   it.each([["/"], ["/ssk-it/ssk-canon/referentiel"]])(
-    "mène à l’aide depuis la barre, sur %s",
+    "leads to help from the bar, on %s",
     async (url) => {
       const router = createAppRouter(createMemoryHistory());
       await router.push(url);
@@ -103,9 +103,9 @@ describe("App", () => {
     },
   );
 
-  // La barre du haut est pleine (2026-041, 2026-054) : ce qu'on ne consulte pas en travaillant va en bas.
+  // The top bar is full (2026-041, 2026-054): what one does not consult while working goes at the bottom.
   it.each([["/"], ["/ssk-it/ssk-canon/referentiel"]])(
-    "porte, en bas, la version et les mentions légales, sur %s",
+    "carries the version and the legal notice at the bottom, on %s",
     async (url) => {
       provide(PLATFORM, {
         ...createWebPlatform(),
@@ -125,7 +125,7 @@ describe("App", () => {
     },
   );
 
-  it("tait la version que la plateforme ne sait pas dire", async () => {
+  it("omits the version the platform cannot tell", async () => {
     provide(PLATFORM, {
       ...createWebPlatform(),
       loadVersion: () => Promise.reject(new Error("indisponible")),
@@ -145,9 +145,9 @@ describe("App", () => {
 });
 
 /**
- * Le bandeau de version — RG-nouvelle-version-proposee, RG-version-perdue-signalee. L'annonceur de la plateforme est simulé : seules ses annonces comptent ici, la vérification est l'affaire du service.
+ * The version banner — RG-nouvelle-version-proposee, RG-version-perdue-signalee. The platform's announcer is simulated: only its announcements matter here, checking is the service's business.
  */
-describe("Bandeau de version", () => {
+describe("Version banner", () => {
   let listeners: Set<(a: VersionAnnouncement) => void>;
   let activate: ReturnType<typeof vi.fn>;
   let reload: ReturnType<typeof vi.fn>;
@@ -193,23 +193,23 @@ describe("Bandeau de version", () => {
     return found.exists() ? (found.element as HTMLElement) : null;
   }
 
-  it("ne montre rien tant qu’aucune version n’attend", async () => {
+  it("shows nothing while no version is waiting", async () => {
     const view = await mountView();
     expect(banner(view)).toBeNull();
   });
 
-  it("annonce la version prête et propose de recharger", async () => {
+  it("announces the ready version and offers to reload", async () => {
     const view = await mountView();
     await announce();
 
     const b = banner(view)!;
     expect(b.textContent).toContain("nouvelle version de Skanon est prête");
     expect(b.querySelector("button")?.textContent).toContain("Recharger");
-    // rien ne s'efface sans que le rédacteur l'ait décidé
+    // nothing is wiped unless the author decided it
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it("recharge au clic, après avoir activé la version", async () => {
+  it("reloads on click, after activating the version", async () => {
     const view = await mountView();
     await announce();
 
@@ -220,25 +220,25 @@ describe("Bandeau de version", () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
-  it("se montre aussi hors d’un projet", async () => {
+  it("also shows outside a project", async () => {
     const view = await mountView("/");
     await announce();
     expect(banner(view)).not.toBeNull();
   });
 
-  it("prévient qu’une saisie non enregistrée serait perdue", async () => {
+  it("warns that unsaved input would be lost", async () => {
     const view = await mountView("/ssk-it/ssk-canon/cadrages/2026-049/editer");
     await announce();
     expect(banner(view)!.textContent).toContain("saisie non enregistrée");
   });
 
-  it("ne parle pas de saisie sur une page de lecture", async () => {
+  it("does not mention input on a reading page", async () => {
     const view = await mountView("/ssk-it/ssk-canon/cadrages/2026-049");
     await announce();
     expect(banner(view)!.textContent).not.toContain("saisie");
   });
 
-  it("prévient que l’accès temporaire prendra fin — RG-acces-temporaire", async () => {
+  it("warns that temporary access will end — RG-acces-temporaire", async () => {
     inject(TokenService).setAccess({
       token: "ghs_temporaire",
       validUntil: new Date(Date.now() + 3_600_000).toISOString(),
@@ -250,14 +250,14 @@ describe("Bandeau de version", () => {
     expect(banner(view)!.textContent).toContain("identité vérifiée");
   });
 
-  it("nomme une version perdue, avec sa cause propre", async () => {
+  it("names a lost version, with its own cause", async () => {
     const view = await mountView();
     await announce("perdue");
 
     const b = banner(view)!;
     expect(b.classList).toContain("perdue");
     expect(b.textContent).toContain("n’est plus entièrement disponible");
-    // une cause distincte de l'absence de réseau ne partage pas son texte
+    // a cause distinct from the lack of network does not share its text
     expect(b.textContent).not.toContain("prête");
     expect(reload).not.toHaveBeenCalled();
 
@@ -269,9 +269,9 @@ describe("Bandeau de version", () => {
 });
 
 /**
- * L'application de bureau : la relance, le coffre qui refuse — RG-nouvelle-version-proposee, RG-secret-conserve-localement. L'annonceur est simulé : ce sont les textes et les gestes de la coquille qui comptent ici. Ce que l'application de bureau y ajoute s'éprouve dans son dépôt, avec ses extensions.
+ * The desktop application: the relaunch, the vault that refuses — RG-nouvelle-version-proposee, RG-secret-conserve-localement. The announcer is simulated: the shell's texts and gestures are what matter here. What the desktop application adds is tested in its own repo, with its extensions.
  */
-describe("Coquille du bureau", () => {
+describe("Desktop shell", () => {
   let listeners: Set<(a: VersionAnnouncement) => void>;
   let activate: ReturnType<typeof vi.fn>;
   let reload: ReturnType<typeof vi.fn>;
@@ -313,7 +313,7 @@ describe("Coquille du bureau", () => {
     await nextTick();
   }
 
-  it("propose de relancer, et relance au clic sans recharger la page", async () => {
+  it("offers to relaunch, and relaunches on click without reloading the page", async () => {
     const view = await mountView();
     await announce();
 
@@ -326,7 +326,7 @@ describe("Coquille du bureau", () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
-  it("dit qu’une installation a échoué, dans le bandeau", async () => {
+  it("says in the banner that an installation failed", async () => {
     activate.mockRejectedValue("installation-echouee");
     const view = await mountView();
     await announce();
@@ -337,7 +337,7 @@ describe("Coquille du bureau", () => {
     );
   });
 
-  it("dit qu’un jeton que le coffre a refusé ne sera pas retrouvé au lancement suivant", async () => {
+  it("says that a token the vault refused will not be found at the next launch", async () => {
     const view = await mountView();
     inject(TokenService).vaultRefused.set("ecriture");
     await nextTick();
@@ -348,9 +348,9 @@ describe("Coquille du bureau", () => {
 });
 
 /**
- * Ce qu'un livrable ajoute à la coquille, par une extension factice : l'interface commune ne sait pas ce qu'elle rend — ADR-extensions-commerciales.
+ * What a deliverable adds to the shell, through a fake extension: the shared interface does not know what it renders — ADR-extensions-commerciales.
  */
-describe("Points d'extension de la coquille", () => {
+describe("Shell extension points", () => {
   const alert = signal(false);
   const visible = signal(true);
   const activate = vi.fn();
@@ -401,7 +401,7 @@ describe("Points d'extension de la coquille", () => {
     return view;
   }
 
-  it("rend une action de barre apportée, qui suit ses signaux", async () => {
+  it("renders a contributed toolbar action, which follows its signals", async () => {
     const view = await mountView();
     const button = view.find('.barre [aria-label="Une action apportée"]');
     expect(button.exists()).toBe(true);
@@ -419,7 +419,7 @@ describe("Points d'extension de la coquille", () => {
     expect(activate).toHaveBeenCalledOnce();
   });
 
-  it("place l'action apportée avant la connexion à GitHub", async () => {
+  it("places the contributed action before the GitHub sign-in", async () => {
     const view = await mountView();
     const labels = view
       .findAll(".barre [aria-label]")
@@ -430,7 +430,7 @@ describe("Points d'extension de la coquille", () => {
     );
   });
 
-  it("cache une action que son extension dit invisible", async () => {
+  it("hides an action its extension says is invisible", async () => {
     const view = await mountView();
     expect(view.find('[aria-label="Une action apportée"]').exists()).toBe(true);
     visible.set(false);
@@ -440,7 +440,7 @@ describe("Points d'extension de la coquille", () => {
     );
   });
 
-  it("rend un bandeau apporté dans le style de la coquille, tant qu'il a quelque chose à dire", async () => {
+  it("renders a contributed banner in the shell's style, as long as it has something to say", async () => {
     const view = await mountView();
     const banner = view.find('.bandeau-quota[data-apport="bandeau-factice"]');
     expect(banner.text()).toContain("Un bandeau apporté");
@@ -453,9 +453,9 @@ describe("Points d'extension de la coquille", () => {
 });
 
 /**
- * Le jeton sous passkey, dans la version web — RG-secret-conserve-localement, RG-protection-du-jeton-par-projet. Les états du service des jetons sont simulés : ce sont les textes et les gestes de la coquille qui comptent ici.
+ * The token under a passkey, in the web version — RG-secret-conserve-localement, RG-protection-du-jeton-par-projet. The token service's states are simulated: the shell's texts and gestures are what matter here.
  */
-describe("Bandeau de la passkey", () => {
+describe("Passkey banner", () => {
   let tokens: TokenService;
 
   beforeEach(() => {
@@ -472,12 +472,12 @@ describe("Bandeau de la passkey", () => {
     return view;
   }
 
-  it("ne montre rien tant que le jeton n’attend rien de la passkey", async () => {
+  it("shows nothing while the token expects nothing from the passkey", async () => {
     const view = await mountView();
     expect(view.find(".bandeau-passkey").exists()).toBe(false);
   });
 
-  it("sollicite la passkey dès l’ouverture, puis relit le dépôt", async () => {
+  it("requests the passkey as soon as it opens, then rereads the repo", async () => {
     vi.spyOn(tokens, "locked").mockReturnValue(true);
     const unlock = vi
       .spyOn(tokens, "unlockWithoutGesture")
@@ -491,7 +491,7 @@ describe("Bandeau de la passkey", () => {
     expect(reread).toHaveBeenCalled();
   });
 
-  it("propose de déverrouiller des jetons scellés, puis relit le dépôt", async () => {
+  it("offers to unlock sealed tokens, then rereads the repo", async () => {
     vi.spyOn(tokens, "locked").mockReturnValue(true);
     vi.spyOn(tokens, "unlockWithoutGesture").mockResolvedValue("annule");
     const unlock = vi.spyOn(tokens, "unlock").mockResolvedValue("ouvert");
@@ -510,7 +510,7 @@ describe("Bandeau de la passkey", () => {
     expect(reread).toHaveBeenCalled();
   });
 
-  it("propose d’oublier des jetons que la passkey n’ouvre plus", async () => {
+  it("offers to forget tokens the passkey no longer opens", async () => {
     vi.spyOn(tokens, "locked").mockReturnValue(true);
     vi.spyOn(tokens, "passkeyFailure").mockReturnValue("illisible");
     const erase = vi.spyOn(tokens, "erase").mockImplementation(() => {});
@@ -524,7 +524,7 @@ describe("Bandeau de la passkey", () => {
     expect(erase).toHaveBeenCalled();
   });
 
-  it("dit qu’un projet exige la passkey, et propose de protéger le jeton", async () => {
+  it("says that a project requires the passkey, and offers to protect the token", async () => {
     vi.spyOn(tokens, "form").mockReturnValue("session");
     vi.spyOn(tokens, "noAccess").mockReturnValue(false);
     const protect = vi.spyOn(tokens, "protect").mockResolvedValue("scelle");
@@ -539,7 +539,7 @@ describe("Bandeau de la passkey", () => {
     expect(protect).toHaveBeenCalled();
   });
 
-  it("nomme ce qui reste quand ce navigateur ne sait pas protéger le jeton", async () => {
+  it("names what remains when this browser cannot protect the token", async () => {
     vi.spyOn(tokens, "form").mockReturnValue("session");
     vi.spyOn(tokens, "noAccess").mockReturnValue(false);
     vi.spyOn(tokens, "passkeyFailure").mockReturnValue("impossible");
@@ -549,7 +549,7 @@ describe("Bandeau de la passkey", () => {
     );
   });
 
-  it("dit en clair un jeton dont la passkey n’a pas été créée, et propose de réessayer", async () => {
+  it("states plainly a token whose passkey was not created, and offers to retry", async () => {
     vi.spyOn(tokens, "form").mockReturnValue("en-clair");
     vi.spyOn(tokens, "passkeyFailure").mockReturnValue("annule");
     vi.spyOn(tokens, "noAccess").mockReturnValue(false);

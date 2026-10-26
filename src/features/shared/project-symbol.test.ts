@@ -9,11 +9,11 @@ import { ThemeService } from "../../core/ui/theme.service";
 import ProjectSymbol from "./ProjectSymbol.vue";
 
 /**
- * RG-identite-affichee : le symbole du thème réellement appliqué, en image seulement, puis l'avatar ou l'icône de dossier, à la même place.
+ * RG-identite-affichee: the symbol of the theme actually applied, as an image only, then the avatar or the folder icon, in the same place.
  *
- * `pc-symbole-projet` et `pc-avatar-organisation`, les hôtes Angular, sont ici les racines `.symbole-projet` et `.avatar-organisation` ; `mat-icon`, la `.material-symbols-outlined` de `UiIcone`.
+ * `pc-symbole-projet` and `pc-avatar-organisation`, the Angular hosts, are here the `.symbole-projet` and `.avatar-organisation` roots; `mat-icon`, `UiIcon`'s `.material-symbols-outlined`.
  */
-describe("symbole d’un projet", () => {
+describe("a project's symbol", () => {
   const PLAIN = "data:image/svg+xml;base64,Y2xhaXI=";
   const DARK = "data:image/svg+xml;base64,c29tYnJl";
 
@@ -40,7 +40,7 @@ describe("symbole d’un projet", () => {
       findSymbol: (_: unknown, v: IdentityVariant) => sources()[v] ?? null,
       request: async (_: unknown, v: IdentityVariant) => void requests.push(v),
     });
-    // L'hôte de SSK Canon : un conteneur où le symbole est posé.
+    // SSK Canon's host: a container where the symbol is placed.
     const root = document.createElement("div");
     mount(ProjectSymbol, {
       props: {
@@ -53,7 +53,7 @@ describe("symbole d’un projet", () => {
     return { root: root };
   }
 
-  it("montre la variante du thème forcé, et la suit quand il change", async () => {
+  it("shows the forced theme's variant, and follows it when it changes", async () => {
     const { root: root } = mountView();
     const theme = inject(ThemeService);
     sources.set({ clair: PLAIN, sombre: DARK });
@@ -72,24 +72,24 @@ describe("symbole d’un projet", () => {
     ).toBe(PLAIN);
   });
 
-  it("ne l’insère jamais dans le document : une image, sans texte à lire", async () => {
+  it("never inserts it into the document: an image, with no text to read", async () => {
     const { root: root } = mountView();
     sources.set({ clair: PLAIN, sombre: PLAIN });
     await nextTick();
 
     expect(root.querySelector(".symbole-projet svg")).toBeNull();
     const image = root.querySelector("img.symbole")!;
-    // Le nom du projet est écrit à côté : le symbole ne le répète pas.
+    // The project name is written next to it: the symbol does not repeat it.
     expect(image.getAttribute("alt")).toBe("");
   });
 
-  it("retombe sur l’avatar de l’organisation sans symbole", () => {
+  it("falls back to the organisation's avatar without a symbol", () => {
     const { root: root } = mountView("avatar");
     expect(root.querySelector("img.symbole")).toBeNull();
     expect(root.querySelector(".avatar-organisation")).not.toBeNull();
   });
 
-  it("retombe sur l’icône de dossier, sur l’accueil", () => {
+  it("falls back to the folder icon, on the home page", () => {
     const { root: root } = mountView("folder");
     expect(root.querySelector(".avatar-organisation")).toBeNull();
     expect(
@@ -97,7 +97,7 @@ describe("symbole d’un projet", () => {
     ).toBe("folder");
   });
 
-  it("retombe sur son repli quand l’image ne se lit pas", async () => {
+  it("falls back to its fallback when the image cannot be read", async () => {
     const { root: root } = mountView("folder");
     sources.set({ clair: PLAIN, sombre: PLAIN });
     await nextTick();
@@ -110,15 +110,15 @@ describe("symbole d’un projet", () => {
     ).toBe("folder");
   });
 
-  it("ne montre rien sans symbole quand aucun repli n’est voulu", () => {
+  it("shows nothing without a symbol when no fallback is wanted", () => {
     const { root: root } = mountView("aucun");
     const host = root.querySelector(".symbole-projet")!;
     expect(host.children).toHaveLength(0);
-    // La place ne se réserve pas : elle n'existait pas avant le symbole.
+    // The space is not reserved: it did not exist before the symbol.
     expect(host.classList).toContain("vide");
   });
 
-  it("prend la variante d’un fond imposé, quel que soit le thème", async () => {
+  it("takes the variant of an imposed background, whatever the theme", async () => {
     const { root: root } = mountView("aucun", "sombre");
     inject(ThemeService).theme.set("clair");
     sources.set({ clair: PLAIN, sombre: DARK });

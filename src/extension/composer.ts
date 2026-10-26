@@ -7,7 +7,7 @@ import type {
 } from "./extension";
 
 /**
- * Rassemble les extensions d'un livrable, point par point. Lève sur une composition fausse — deux extensions ou deux apports d'un même point de même identifiant, deux hébergeurs — : elle échoue au premier test, non chez l'utilisateur.
+ * Gathers a deliverable's extensions, point by point. Throws on a wrong composition — two extensions, or two contributions to the same point, with the same identifier, two hosts —: it fails at the first test, not at the user's.
  */
 export function compose(extensions: readonly Extension[]): Composition {
   unique(
@@ -63,7 +63,7 @@ function unique(ids: readonly string[], kind: string): void {
   }
 }
 
-/** Par rang, puis dans l'ordre de composition : le tri de JavaScript est stable. */
+/** By rank, then in composition order: JavaScript's sort is stable. */
 function sortByRank<T extends Contribution>(
   contributions: readonly T[],
   kind: string,
@@ -75,7 +75,7 @@ function sortByRank<T extends Contribution>(
   return [...contributions].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
 }
 
-/** Les apports du livrable, que la racine de composition fournit. Sans elle — dans les tests —, aucun. */
+/** The deliverable's contributions, which the composition root provides. Without it — in tests —, none. */
 export const COMPOSITION = new InjectionToken<Composition>("COMPOSITION", {
   factory: () => compose([]),
 });

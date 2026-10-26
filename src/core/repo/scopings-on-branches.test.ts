@@ -9,11 +9,11 @@ import { SpecificationStore } from "./specification.store";
 import { INDEXEDDB_FACTORY } from "./content-cache";
 
 /**
- * RG-cadrages-en-cours-visibles : les cadrages en cours se trouvent par les
- * demandes de fusion ouvertes et par les branches. Un cadrage commencé n'a pas
- * encore de demande, et c'est précisément le brouillon.
+ * RG-cadrages-en-cours-visibles: scopings in progress are found through open
+ * pull requests and through branches. A scoping just started has no pull
+ * request yet, and that is precisely the draft.
  */
-describe("les cadrages en cours, vus depuis le store", () => {
+describe("scopings in progress, seen from the store", () => {
   const REPO = { owner: "org", repo: "projet" };
   const API = "https://api.github.com/repos/org/projet";
   const RAW = "https://raw.githubusercontent.com/org/projet";
@@ -30,7 +30,7 @@ describe("les cadrages en cours, vus depuis le store", () => {
     store = inject(SpecificationStore);
   });
 
-  /** Répond à la requête dès qu'elle part, quel que soit l'ordre des appels. */
+  /** Answers the request as soon as it leaves, whatever the order of calls. */
   async function respond(url: string, body: unknown): Promise<void> {
     for (let i = 0; i < 100; i++) {
       const inFlight = http.match(url);
@@ -77,7 +77,7 @@ describe("les cadrages en cours, vus depuis le store", () => {
     await loading;
   }
 
-  it("montre en brouillon le cadrage d’une branche sans demande de fusion", async () => {
+  it("shows as draft the scoping of a branch without a pull request", async () => {
     await main({});
     await respond(PULLS, []);
     await respond(BRANCHES, [{ ref: "refs/heads/cadrage/2026-061" }]);
@@ -96,7 +96,7 @@ describe("les cadrages en cours, vus depuis le store", () => {
     expect(c?.provenance?.pullRequest).toBeUndefined();
   });
 
-  it("ne relit pas la branche d’une demande de fusion déjà lue", async () => {
+  it("does not re-read the branch of an already read pull request", async () => {
     await main({});
     await respond(PULLS, [
       { number: 3, draft: false, head: { ref: "cadrage-2026-062" } },
@@ -117,7 +117,7 @@ describe("les cadrages en cours, vus depuis le store", () => {
     http.verify();
   });
 
-  it("signale sur un cadrage livré la branche qui l’a ajouté et lui survit", async () => {
+  it("reports on a delivered scoping the branch that added it and outlives it", async () => {
     await main({ "cadrages/2026-032/cadrage.md": "k2" });
     await respond(PULLS, []);
     await respond(BRANCHES, [{ ref: "refs/heads/cadrage-2026-032" }]);
@@ -136,7 +136,7 @@ describe("les cadrages en cours, vus depuis le store", () => {
     http.verify();
   });
 
-  it("ne compare pas à la principale une branche qui porte un cadrage en cours", async () => {
+  it("does not compare to the main branch a branch that carries a scoping in progress", async () => {
     await main({ "cadrages/2026-032/cadrage.md": "k2" });
     await respond(PULLS, []);
     await respond(BRANCHES, [{ ref: "refs/heads/cadrage/2026-063" }]);

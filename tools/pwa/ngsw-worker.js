@@ -1,9 +1,9 @@
 /**
- * La relève du service worker de SSK Canon, publiée en `/ngsw-worker.js` dans la seule version web.
+ * The handover of SSK Canon's service worker, published as `/ngsw-worker.js` in the web version only.
  *
- * Les navigateurs où l'ancienne application est installée gardent une inscription dont le script est `/ngsw-worker.js`, et le revérifient à chaque navigation. Trouvant ce script-ci à la place de celui d'Angular, ils l'installent : il prend la place sans attendre, efface les caches d'Angular (`ngsw:*`), et désinscrit l'inscription. La navigation suivante va donc au réseau, reçoit Skanon, qui inscrit le sien (`/sw.js`).
+ * Browsers where the former application is installed keep a registration whose script is `/ngsw-worker.js`, and recheck it on every navigation. Finding this script instead of Angular's, they install it: it takes over without waiting, deletes Angular's caches (`ngsw:*`), and unregisters the registration. The next navigation therefore goes to the network, receives Skanon, which registers its own (`/sw.js`).
  *
- * Il ne sert rien, et ne recharge aucun onglet : un onglet de l'ancienne application resté ouvert continue de lire ses fichiers sur l'hébergement, qui les garde à côté de ceux de Skanon, jusqu'à ce que le rédacteur le recharge (RG-nouvelle-version-proposee). C'est le `safety-worker.js` qu'Angular publie pour cet usage, réécrit ici sans rien d'autre.
+ * It serves nothing, and reloads no tab: a tab of the former application left open keeps reading its files from the hosting, which keeps them alongside Skanon's, until the author reloads it (RG-nouvelle-version-proposee). This is the `safety-worker.js` Angular publishes for this purpose, rewritten here with nothing else.
  */
 self.addEventListener("install", () => {
   void self.skipWaiting();

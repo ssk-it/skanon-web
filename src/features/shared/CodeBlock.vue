@@ -1,5 +1,5 @@
 <script lang="ts">
-/** Les langages que l'application affiche. */
+/** The languages the application displays. */
 export type CodeLanguage = "bash" | "yaml" | "json";
 
 interface Fragment {
@@ -8,9 +8,9 @@ interface Fragment {
 }
 
 /**
- * Découpe une ligne en fragments colorés.
+ * Splits a line into coloured fragments.
  *
- * Une coloration minimale, écrite ici plutôt qu'apportée par une bibliothèque : trois langages, et seulement ce qui aide à lire — un commentaire qu'on saute, une clé qu'on cherche, une valeur qu'on recopie. Une bibliothèque de coloration pèserait plus que ce qu'elle colore.
+ * Minimal highlighting, written here rather than brought in by a library: three languages, and only what helps reading — a comment one skips, a key one looks for, a value one copies. A highlighting library would weigh more than what it colours.
  */
 function split(line: string, language: CodeLanguage): readonly Fragment[] {
   const comment = language === "json" ? null : line.indexOf("#");
@@ -26,7 +26,7 @@ function split(line: string, language: CodeLanguage): readonly Fragment[] {
   return splitBash(line);
 }
 
-/** Un `#` entre guillemets n'ouvre pas de commentaire. */
+/** A `#` inside quotes does not open a comment. */
 function inString(line: string, position: number): boolean {
   let quotes = 0;
   for (let i = 0; i < position; i++) {
@@ -36,7 +36,7 @@ function inString(line: string, position: number): boolean {
 }
 
 function splitYaml(line: string): readonly Fragment[] {
-  // `cle:` en début de ligne ou après un tiret, jusqu'aux deux-points.
+  // `cle:` at the start of a line or after a dash, up to the colon.
   const m = /^(\s*(?:-\s*)?)([\w.-]+)(:)(.*)$/.exec(line);
   if (m) {
     return [
@@ -51,7 +51,7 @@ function splitYaml(line: string): readonly Fragment[] {
 
 function splitJson(line: string): readonly Fragment[] {
   const fragments: Fragment[] = [];
-  // Les chaînes d'abord : une clé est une chaîne suivie de deux-points.
+  // Strings first: a key is a string followed by a colon.
   const re = /"(?:[^"\\]|\\.)*"|[{}[\],:]/g;
   let last = 0;
   for (const m of line.matchAll(re)) {
@@ -74,7 +74,7 @@ function splitJson(line: string): readonly Fragment[] {
 }
 
 function splitBash(line: string): readonly Fragment[] {
-  // La commande est le premier mot ; les options se repèrent à leur tiret.
+  // The command is the first word; options are spotted by their dash.
   const m = /^(\s*)([\w./-]+)(.*)$/.exec(line);
   if (!m) return [{ text: line, className: "" }];
 
@@ -104,9 +104,9 @@ function splitBash(line: string): readonly Fragment[] {
 import { computed } from "vue";
 
 /**
- * Un bloc de code affiché, coloré selon son langage.
+ * A displayed code block, coloured according to its language.
  *
- * Le texte reste sélectionnable et copiable tel quel : la coloration n'insère aucun caractère, seulement des balises autour de ce qui existe.
+ * The text stays selectable and copyable as is: highlighting inserts no character, only tags around what exists.
  */
 const props = defineProps<{ text: string; language: CodeLanguage }>();
 
@@ -142,7 +142,7 @@ code {
   display: block;
   white-space: pre;
 }
-/* Assez de contraste pour distinguer, assez peu pour ne pas crier : ce qu'on lit ici est du texte à recopier, non un programme à parcourir. */
+/* Enough contrast to distinguish, little enough not to shout: what one reads here is text to copy, not a program to go through. */
 .commentaire {
   color: var(--mat-sys-on-surface-variant);
   font-style: italic;

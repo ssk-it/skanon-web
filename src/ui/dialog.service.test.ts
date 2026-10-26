@@ -5,7 +5,7 @@ import { inject } from "../core/injection";
 import { DialogService } from "./dialog.service";
 import UiDialogHost from "./UiDialogHost.vue";
 
-/** Un dialogue d'essai : un champ, deux boutons, et ce qu'il a reçu. */
+/** A test dialog: a field, two buttons, and what it received. */
 const Sample = defineComponent({
   props: { data: { type: Object, default: null } },
   emits: ["close"],
@@ -18,7 +18,7 @@ const Sample = defineComponent({
           "button",
           {
             class: "non",
-            // Le focus initial se demande par les données : c'est tout ce qu'un dialogue reçoit.
+            // Initial focus is requested through the data: that is all a dialog receives.
             "data-focus-initial": props.data?.["focusInitial"] ? "" : undefined,
             onClick: () => emit("close", false),
           },
@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 describe("DialogService", () => {
-  it("monte le composant avec ses données, et rend le résultat qu’il émet", async () => {
+  it("mounts the component with its data, and returns the result it emits", async () => {
     const dialogs = mountView();
     const result = dialogs.open<boolean>(Sample, {
       data: { message: "Bonjour" },
@@ -77,7 +77,7 @@ describe("DialogService", () => {
     expect(panel()).toBeNull();
   });
 
-  it("ferme sans réponse à Échap", async () => {
+  it("closes without an answer on Escape", async () => {
     const dialogs = mountView();
     const result = dialogs.open(Sample);
     await flushPromises();
@@ -89,7 +89,7 @@ describe("DialogService", () => {
     expect(panel()).toBeNull();
   });
 
-  it("ferme sans réponse au clic sur le fond", async () => {
+  it("closes without an answer on a click on the backdrop", async () => {
     const dialogs = mountView();
     const result = dialogs.open(Sample);
     await flushPromises();
@@ -99,7 +99,7 @@ describe("DialogService", () => {
     expect(await result).toBeUndefined();
   });
 
-  it("ne ferme pas au clic dans le panneau", async () => {
+  it("does not close on a click in the panel", async () => {
     const dialogs = mountView();
     void dialogs.open(Sample);
     await flushPromises();
@@ -110,7 +110,7 @@ describe("DialogService", () => {
     expect(panel()).not.toBeNull();
   });
 
-  it("donne le focus au premier élément focalisable, ou au panneau sur demande", async () => {
+  it("gives focus to the first focusable element, or to the panel on request", async () => {
     const dialogs = mountView();
     void dialogs.open(Sample);
     await flushPromises();
@@ -123,7 +123,7 @@ describe("DialogService", () => {
     expect(document.activeElement).toBe(panel());
   });
 
-  it("préfère l’élément marqué pour le focus initial", async () => {
+  it("prefers the element marked for initial focus", async () => {
     const dialogs = mountView();
     void dialogs.open(Sample, { data: { focusInitial: true } });
     await flushPromises();
@@ -131,7 +131,7 @@ describe("DialogService", () => {
     expect(document.activeElement?.className).toBe("non");
   });
 
-  it("piège le focus : Tab boucle du dernier élément au premier, et l’inverse", async () => {
+  it("traps focus: Tab cycles from the last element to the first, and back", async () => {
     const dialogs = mountView();
     void dialogs.open(Sample);
     await flushPromises();
@@ -145,7 +145,7 @@ describe("DialogService", () => {
     expect(document.activeElement).toBe(yes);
   });
 
-  it("rend le focus à l’élément qui l’avait avant l’ouverture", async () => {
+  it("gives focus back to the element that had it before opening", async () => {
     const dialogs = mountView();
     const trigger = document.createElement("button");
     document.body.appendChild(trigger);
@@ -161,7 +161,7 @@ describe("DialogService", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("n’écoute Échap que dans le dernier dialogue ouvert", async () => {
+  it("listens to Escape only in the last dialog opened", async () => {
     const dialogs = mountView();
     const first = dialogs.open(Sample, { data: { message: "1" } });
     const second = dialogs.open(Sample, { data: { message: "2" } });
@@ -180,7 +180,7 @@ describe("DialogService", () => {
     expect(await first).toBeUndefined();
   });
 
-  it("pose la largeur, la position et le nom demandés", async () => {
+  it("sets the requested width, position and name", async () => {
     const dialogs = mountView();
     void dialogs.open(Sample, {
       width: "640px",
@@ -201,7 +201,7 @@ describe("DialogService", () => {
     expect(p.getAttribute("aria-modal")).toBe("true");
   });
 
-  it("ignore une seconde fermeture : la promesse ne se résout qu’une fois", async () => {
+  it("ignores a second close: the promise resolves only once", async () => {
     const dialogs = mountView();
     const result = dialogs.open<boolean>(Sample);
     await flushPromises();

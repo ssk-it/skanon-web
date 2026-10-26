@@ -11,7 +11,7 @@ import {
 } from "./version.service";
 
 /**
- * Un annonceur simulé, à la place du service worker : ce qu'il annonce, et les deux appels qu'on lui fait. Le vrai ne tourne pas sous jsdom, et ne tournerait de toute façon qu'avec une version déployée à côté.
+ * A simulated announcer, in place of the service worker: what it announces, and the two calls made to it. The real one does not run under jsdom, and would only run anyway with a version deployed next to it.
  */
 class FakeAnnouncer {
   active = true;
@@ -68,34 +68,34 @@ describe("VersionService", () => {
   afterEach(() => {
     resetInjection();
     vi.useRealTimers();
-    // la propriété définie par revenirAuPremierPlan masquait celle de jsdom
+    // the property defined by returnToForeground hid jsdom's
     delete (document as { visibilityState?: unknown }).visibilityState;
   });
 
-  it("reste sur la version courante tant que rien n’est annoncé", () => {
+  it("stays on the current version as long as nothing is announced", () => {
     expect(create().state()).toBe("courante");
   });
 
-  it("se dit prête quand une nouvelle version est téléchargée", () => {
+  it("reports ready when a new version is downloaded", () => {
     const service = create();
     sw.announce("prete");
     expect(service.state()).toBe("prete");
   });
 
-  it("ignore les étapes qui précèdent la version prête", () => {
-    // Le service worker de Skanon n'annonce que la version installée, prête à servir : une version détectée, encore en téléchargement, ne franchit pas le port. Rien n'est annoncé tant qu'elle n'est pas prête.
+  it("ignores the steps that precede the ready version", () => {
+    // Skanon's service worker only announces the installed version, ready to serve: a detected version, still downloading, does not cross the port. Nothing is announced as long as it is not ready.
     const service = create();
     expect(service.state()).toBe("courante");
   });
 
-  it("ne recharge jamais d’elle-même — RG-nouvelle-version-proposee", () => {
+  it("never reloads by itself — RG-nouvelle-version-proposee", () => {
     create();
     sw.announce("prete");
     expect(reload).not.toHaveBeenCalled();
     expect(sw.activate).not.toHaveBeenCalled();
   });
 
-  it("active la nouvelle version puis recharge, sur demande", async () => {
+  it("activates the new version then reloads, on request", async () => {
     const service = create();
     sw.announce("prete");
 
@@ -108,8 +108,8 @@ describe("VersionService", () => {
     );
   });
 
-  it("recharge même si l’activation échoue", async () => {
-    // le rechargement suffit à servir la version prête : un échec de l'activation ne doit pas laisser le bouton sans effet
+  it("reloads even if activation fails", async () => {
+    // reloading is enough to serve the ready version: a failed activation must not leave the button without effect
     sw.activate.mockRejectedValue(new Error("échec"));
     const service = create();
     sw.announce("prete");
@@ -119,38 +119,38 @@ describe("VersionService", () => {
     expect(reload).toHaveBeenCalledOnce();
   });
 
-  it("se dit perdue quand le service worker ne peut plus servir la version", () => {
+  it("reports lost when the service worker can no longer serve the version", () => {
     const service = create();
     sw.announce("perdue");
     expect(service.state()).toBe("perdue");
   });
 
-  it("reste perdue si une nouvelle version devient prête ensuite", () => {
-    // le défaut le plus grave garde la parole : c'est lui qu'il faut expliquer
+  it("stays lost if a new version becomes ready afterwards", () => {
+    // the most serious defect keeps the floor: it is the one that needs explaining
     const service = create();
     sw.announce("perdue");
     sw.announce("prete");
     expect(service.state()).toBe("perdue");
   });
 
-  it("ne recharge pas d’elle-même une version perdue — RG-version-perdue-signalee", async () => {
+  it("does not reload a lost version by itself — RG-version-perdue-signalee", async () => {
     const service = create();
     sw.announce("perdue");
     expect(reload).not.toHaveBeenCalled();
 
     await service.reloadVersion();
-    // rien à activer : seule la version publiée peut encore être servie
+    // nothing to activate: only the published version can still be served
     expect(sw.activate).not.toHaveBeenCalled();
     expect(reload).toHaveBeenCalledOnce();
   });
 
-  it("vérifie au retour au premier plan", () => {
+  it("checks on return to the foreground", () => {
     create();
     returnToForeground();
     expect(sw.check).toHaveBeenCalledOnce();
   });
 
-  it("ne vérifie pas quand la fenêtre passe à l’arrière-plan", () => {
+  it("does not check when the window goes to the background", () => {
     create();
     Object.defineProperty(document, "visibilityState", {
       value: "hidden",
@@ -160,7 +160,7 @@ describe("VersionService", () => {
     expect(sw.check).not.toHaveBeenCalled();
   });
 
-  it("vérifie toutes les heures", () => {
+  it("checks every hour", () => {
     vi.useFakeTimers();
     create();
 
@@ -174,7 +174,7 @@ describe("VersionService", () => {
     expect(sw.check).toHaveBeenCalledTimes(2);
   });
 
-  it("se tait quand une vérification échoue hors ligne", async () => {
+  it("stays silent when a check fails offline", async () => {
     sw.check.mockRejectedValue(new Error("Failed to fetch"));
     const service = create();
 
@@ -182,7 +182,7 @@ describe("VersionService", () => {
     expect(service.state()).toBe("courante");
   });
 
-  it("cesse de vérifier une fois détruit", () => {
+  it("stops checking once destroyed", () => {
     vi.useFakeTimers();
     create();
     resetInjection();
@@ -192,8 +192,8 @@ describe("VersionService", () => {
     expect(sw.check).not.toHaveBeenCalled();
   });
 
-  it("ne fait rien quand le service worker est désactivé", () => {
-    // le cas du serveur de développement, où la version web n'inscrit pas de service worker
+  it("does nothing when the service worker is disabled", () => {
+    // the development server's case, where the web version registers no service worker
     sw.active = false;
     vi.useFakeTimers();
     const service = create();
@@ -204,23 +204,23 @@ describe("VersionService", () => {
     expect(service.state()).toBe("courante");
   });
 
-  describe("sur le bureau", () => {
+  describe("on the desktop", () => {
     beforeEach(() => {
       sw.relaunches = true;
     });
 
-    it("relance par l’annonceur, sans recharger la page", async () => {
+    it("relaunches through the announcer, without reloading the page", async () => {
       const service = create();
       sw.announce("prete");
 
       await service.reloadVersion();
 
       expect(sw.activate).toHaveBeenCalledOnce();
-      // la relance remplace la fenêtre : recharger la page avant n'aurait servi que l'ancienne version
+      // the relaunch replaces the window: reloading the page first would only have served the old version
       expect(reload).not.toHaveBeenCalled();
     });
 
-    it("dit que l’installation a échoué, et garde la version prête", async () => {
+    it("says the installation failed, and keeps the version ready", async () => {
       sw.activate.mockRejectedValue("installation-echouee");
       const service = create();
       sw.announce("prete");
@@ -232,11 +232,11 @@ describe("VersionService", () => {
       expect(reload).not.toHaveBeenCalled();
     });
 
-    it("dit pourquoi aucune version n’est annoncée — RG-nouvelle-version-proposee", () => {
+    it("says why no version is announced — RG-nouvelle-version-proposee", () => {
       const service = create();
       expect(service.cause()).toBeNull();
 
-      // une cause que seul le livrable connaît : le service la relaie sans la lire
+      // a cause only the deliverable knows: the service relays it without reading it
       const cause = "une-cause-du-livrable" as NoVersionCause;
       sw.sayCause(cause);
       expect(service.cause()).toBe(cause);
@@ -247,20 +247,20 @@ describe("VersionService", () => {
     });
   });
 
-  it("se passe d’un service worker absent", () => {
-    // jsdom n'a pas de service worker : la plateforme web par défaut n'a rien à annoncer
+  it("does without an absent service worker", () => {
+    // jsdom has no service worker: the default web platform has nothing to announce
     provide(RELOAD_PAGE, reload);
     expect(inject(VersionService).state()).toBe("courante");
   });
 });
 
-describe("estUrlDeSaisie", () => {
+describe("isInputUrl", () => {
   it.each([
     "/ssk-it/ssk-canon/cadrages/nouveau",
     "/ssk-it/ssk-canon/cadrages/2026-049/editer",
     "/ssk-it/ssk-canon/cadrages/2026-049/editer?onglet=decisions",
     "/ssk-it/ssk-canon/reglages",
-  ])("reconnaît une page de saisie : %s", (url) => {
+  ])("recognises an input page: %s", (url) => {
     expect(isInputUrl(url)).toBe(true);
   });
 
@@ -270,9 +270,9 @@ describe("estUrlDeSaisie", () => {
     "/ssk-it/ssk-canon/cadrages",
     "/ssk-it/ssk-canon/cadrages/2026-049",
     "/ssk-it/ssk-canon/cadrages/2026-049#01-recharger-ou-proposer",
-    // un dépôt nommé comme une vue ne fait pas d'une page de lecture une saisie
+    // a repo named like a view does not make a reading page an input page
     "/ssk-it/reglages/referentiel",
-  ])("ne confond pas une page de lecture : %s", (url) => {
+  ])("does not mistake a reading page: %s", (url) => {
     expect(isInputUrl(url)).toBe(false);
   });
 });

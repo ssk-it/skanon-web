@@ -17,9 +17,9 @@ const PARTICIPLES: ReadonlyArray<[ImpactOperation, string, string]> = [
 ];
 
 /**
- * Ce qu'un cadrage change, par opération : « 3 règles créées · 7 touchées » — RG-en-tete-cadrage.
+ * What a scoping changes, by operation: « 3 règles créées · 7 touchées » — RG-en-tete-cadrage.
  *
- * Il dit d'un coup d'œil si le cadrage change le comportement du produit ou s'il le commente. Le nom ne figure qu'une fois, au premier compte : la suite se lit dans son élan. « Cibles » dès qu'une décision ou un document d'architecture s'y mêle, pour ne pas appeler règle ce qui n'en est pas une.
+ * It tells at a glance whether the scoping changes the product's behaviour or comments on it. The noun appears only once, at the first count: the rest reads in its momentum. « Cibles » as soon as a decision or an architecture document is mixed in, so as not to call a rule what is not one.
  */
 export function formatImpactCount(impacts: readonly Impact[]): string {
   const rules = impacts.every((i) => i.kind === "regle");
@@ -80,27 +80,27 @@ const dialog = inject(DialogService);
 const authoring = inject(AuthoringService);
 
 /**
- * L'écriture en cours, désignée par l'adresse du lien qu'elle touche.
+ * The write in progress, designated by the address of the link it touches.
  *
- * Une adresse plutôt qu'un booléen : c'est elle qui dit lequel des chips s'estompe. `AJOUT` tient la place quand aucun lien n'existe encore.
+ * An address rather than a boolean: it is what tells which of the chips fades. `ADDITION` holds the place when no link exists yet.
  */
 const ADDITION = "\u0000ajout";
 const writing = ref<string | null>(null);
 const linkError = ref<string | null>(null);
-/** Ce qu'on vient d'écrire, tant que la relecture ne l'a pas ramené. */
+/** What was just written, until the re-read has brought it back. */
 const expected = ref<{
   readonly arrived: (links: readonly Lien[]) => boolean;
 } | null>(null);
 
-/** L'identifiant tel qu'il se donne à lire, préfixé si le projet en déclare un. */
+/** The identifier as it is shown, prefixed if the project declares one. */
 function show(scopingId: string): string {
   return displayIdentifier(scopingId, store.specification().project.prefix);
 }
 
 /**
- * L'identifiant stocké derrière ce que porte l'adresse.
+ * The stored identifier behind what the address carries.
  *
- * L'adresse accepte les deux formes : nue, telle qu'elle a été posée dans les issues et les demandes de fusion, ou préfixée du projet. Un préfixe qui n'est pas le sien ne désigne rien ici — le cadrage ne sera pas trouvé, ce qui est le comportement voulu.
+ * The address accepts both forms: bare, as it was set in issues and pull requests, or prefixed with the project's prefix. A prefix that is not the project's own designates nothing here — the scoping will not be found, which is the intended behaviour.
  */
 const resolvedId = computed(() =>
   extractScopingIdentifier(id.value, store.specification().project.prefix),
@@ -108,14 +108,14 @@ const resolvedId = computed(() =>
 
 const scoping = computed(() => {
   const resolved = resolvedId.value;
-  // `null` dit une adresse qui ne désigne rien ici — un préfixe étranger, par exemple. Retomber sur la valeur brute trouverait le cadrage malgré tout, et ferait passer pour valide une adresse qui ne l'est pas.
+  // `null` means an address that designates nothing here — a foreign prefix, for instance. Falling back on the raw value would find the scoping anyway, and would pass off as valid an address that is not.
   return resolved ? store.findScoping(resolved) : null;
 });
 
 /**
- * Vrai tant que l'écriture n'est pas revenue du dépôt.
+ * True until the write has come back from the repo.
  *
- * Dérivé plutôt que posé une fois : les cadrages en branche sont lus après coup, sans bloquer le premier rendu, si bien que le lien peut arriver une seconde après le rechargement. Un drapeau posé à ce moment-là resterait affiché sous un lien pourtant visible.
+ * Derived rather than set once: branch scopings are read afterwards, without blocking the first render, so the link may arrive a second after the reload. A flag set at that moment would stay displayed under a link that is nonetheless visible.
  */
 const recentWrite = computed(() => {
   const pending = expected.value;
@@ -124,9 +124,9 @@ const recentWrite = computed(() => {
 });
 
 /**
- * Saisit un lien et l'écrit dans le cadrage.
+ * Captures a link and writes it into the scoping.
  *
- * Le référentiel est rechargé après coup plutôt que corrigé en mémoire : le lien peut avoir rejoint la branche du cadrage, que la vue courante ne lit pas. Modifier la mémoire l'y ferait apparaître alors qu'il vit ailleurs, puis disparaître au rechargement suivant.
+ * The specification is reloaded afterwards rather than patched in memory: the link may have joined the scoping's branch, which the current view does not read. Modifying memory would make it appear there while it lives elsewhere, then disappear on the next reload.
  */
 async function addLink(): Promise<void> {
   const link = await enterLink();
@@ -139,14 +139,14 @@ async function addLink(): Promise<void> {
   );
 }
 
-/** Corrige un lien existant, son adresse comprise. */
+/** Corrects an existing link, its address included. */
 async function editLink(current: Lien): Promise<void> {
   const link = await enterLink(current);
   if (!link) return;
   await write(
     current.url,
     () => authoring.editLink(id.value, current.url, link),
-    // La relecture est arrivée quand le lien s'y trouve tel qu'il a été saisi — comparer la seule adresse manquerait la correction d'un nom.
+    // The re-read has arrived when the link is there as it was entered — comparing the address alone would miss a corrected name.
     (list) =>
       list.some(
         (l) => l.url === link.url && l.name === link.name && l.tag === link.tag,
@@ -156,9 +156,9 @@ async function editLink(current: Lien): Promise<void> {
 }
 
 /**
- * Détache un lien, après confirmation.
+ * Detaches a link, after confirmation.
  *
- * L'écriture commite dans le dépôt et l'application ne sait pas la défaire : retrouver l'adresse demanderait de passer par l'historique GitHub.
+ * The write commits to the repo and the application cannot undo it: recovering the address would require going through the GitHub history.
  */
 async function deleteLink(link: Lien): Promise<void> {
   if (writing.value) return;
@@ -180,7 +180,7 @@ async function deleteLink(link: Lien): Promise<void> {
   );
 }
 
-/** Ouvre l'écran de saisie, garni du lien à corriger le cas échéant. */
+/** Opens the input screen, filled with the link to correct if any. */
 async function enterLink(initial?: Lien): Promise<Lien | undefined> {
   if (writing.value) return undefined;
   return dialog.open<Lien>(LinkDialog, {
@@ -190,9 +190,9 @@ async function enterLink(initial?: Lien): Promise<Lien | undefined> {
 }
 
 /**
- * Écrit, puis relit — le corps commun aux trois opérations.
+ * Writes, then re-reads — the body common to the three operations.
  *
- * `arrive` dit à quoi se reconnaît la relecture réussie ; il est posé avant le rechargement parce qu'un cadrage en branche n'est relu qu'en second, et le dire vaut mieux que de laisser conclure à un échec — l'écriture, elle, a bien eu lieu.
+ * `arrived` says how a successful re-read is recognised; it is set before the reload because a branch scoping is only re-read second, and saying so is better than letting one conclude to a failure — the write itself did happen.
  */
 async function write(
   target: string,
@@ -215,7 +215,7 @@ async function write(
   }
 }
 
-/** Le nom saisi, ou la nature du lien pour ceux écrits avant qu'il existe. */
+/** The name entered, or the link's kind for those written before the name existed. */
 function formatLabel(l: Lien): string {
   return l.name.trim() || formatTagLabel(l.tag);
 }
@@ -224,13 +224,13 @@ function formatTagLabel(tag: string): string {
   return LINK_TAG_LABEL[tag] ?? tag;
 }
 
-/** L'ensemble du dépôt : une teinte se calcule par rapport aux autres. */
+/** The whole repo: a hue is computed relative to the others. */
 const domainIds = computed(() => store.domains().map((d) => d.id));
 
 /**
- * Où mène une cible, selon sa nature.
+ * Where a target leads, according to its kind.
  *
- * Un impact d'architecture pointait vers la page des règles : le lien menait à une règle inexistante, silencieusement.
+ * An architecture impact used to point to the rules page: the link led to a non-existent rule, silently.
  */
 function targetLink(impact: Impact): string {
   switch (impact.kind) {
@@ -244,7 +244,7 @@ function targetLink(impact: Impact): string {
 }
 
 /**
- * Une décision annulée a beau porter une option retenue dans son frontmatter, elle n'a plus rien tranché : la garder au récapitulatif ferait passer pour acquis un choix révoqué.
+ * A cancelled decision may well carry a chosen option in its frontmatter, it no longer settled anything: keeping it in the summary would pass off a revoked choice as settled.
  */
 const decided = computed(() => {
   const c = scoping.value;
@@ -267,18 +267,18 @@ const impacts = computed(() => {
   return c ? store.listTargetsByScoping(c) : [];
 });
 
-/** Les impacts qui changent leur cible, dans l'ordre déclaré. */
+/** The impacts that change their target, in declared order. */
 const changingImpacts = computed(() =>
   impacts.value.filter((i) => i.impact.operation !== "touche"),
 );
 
-/** Ceux qui ne font que la mentionner, présentés à part. */
+/** Those that only mention it, presented separately. */
 const touchImpacts = computed(() =>
   impacts.value.filter((i) => i.impact.operation === "touche"),
 );
 
 /**
- * Les deux blocs d'impacts, sous un seul gabarit de fiche : le `ng-template` que SSK Canon instanciait deux fois. Le bloc de ce qui change n'a ni ancre ni intitulé ; il se rend dans un `div` sans classe, sans effet sur la mise en page.
+ * The two impact blocks, under a single page template: the `ng-template` SSK Canon instantiated twice. The block of what changes has neither anchor nor heading; it renders in a `div` without a class, with no effect on layout.
  */
 const impactBlocks = computed(() => {
   const blocks: {
@@ -301,7 +301,7 @@ const impactBlocks = computed(() => {
   return blocks;
 });
 
-/** « 7 règles touchées », ou « cibles » si une décision s'y mêle. */
+/** « 7 règles touchées », or « cibles » if a decision is mixed in. */
 function formatTouched(n: number): string {
   const rules = touchImpacts.value.every((i) => i.impact.kind === "regle");
   const name = rules
@@ -315,9 +315,9 @@ function formatTouched(n: number): string {
 }
 
 /**
- * Les éléments repliés, par ancre.
+ * The collapsed elements, by anchor.
  *
- * L'ensemble retient les repliés et non les dépliés : la fiche s'ouvre entière, si bien que l'ensemble vide est déjà le bon état. Retenir les dépliés obligerait à le remplir au chargement, puis à le refaire à chaque cadrage ouvert.
+ * The set keeps the collapsed ones and not the expanded ones: the page opens in full, so the empty set is already the right state. Keeping the expanded ones would require filling it on load, then redoing it for each scoping opened.
  */
 const collapsed = ref<ReadonlySet<string>>(new Set());
 
@@ -331,13 +331,13 @@ function toggleCollapsed(anchor: string): void {
   collapsed.value = next;
 }
 
-/** L'option retenue, pour la résumer quand la décision est repliée. */
+/** The chosen option, to summarise it when the decision is collapsed. */
 function findChosenOption(decision: Decision): Option | null {
   return decision.options.find((o) => o.id === decision.chosenOption) ?? null;
 }
 
 /**
- * Le sommaire reprend la structure réelle du cadrage : les sections, mais aussi chaque décision et chaque impact nommément. C'est ce qu'on cherche en revenant sur une fiche — « où était la décision sur le stockage ? » — et une liste de cinq sections n'y répondrait pas.
+ * The table of contents follows the scoping's actual structure: the sections, but also each decision and each impact by name. That is what one looks for when coming back to a page — "where was the decision on storage?" — and a list of five sections would not answer it.
  */
 const toc = computed<TocEntry[]>(() => {
   const c = scoping.value;
@@ -375,7 +375,7 @@ const toc = computed<TocEntry[]>(() => {
         badge: OPERATION_LABEL[i.operation],
       });
     }
-    // Une entrée pour tous : listés au même rang que les créations, ils noyaient ce que le cadrage change — RG-sommaire-fiche-longue.
+    // One entry for all: listed at the same rank as creations, they drowned out what the scoping changes — RG-sommaire-fiche-longue.
     const touched = c.impacts.filter((i) => i.operation === "touche").length;
     if (touched) {
       entries.push({
@@ -404,13 +404,13 @@ const toc = computed<TocEntry[]>(() => {
   return entries;
 });
 
-/** Même comportement que le sommaire : rejoindre sans polluer l'historique. */
+/** Same behaviour as the table of contents: jump there without polluting the history. */
 function scrollToDecision(event: Event, idDecision: string): void {
   const target = document.getElementById(`decision-${idDecision}`);
   if (!target) return;
   event.preventDefault();
 
-  // Atterrir sur une décision repliée ne montrerait pas ce qu'on vient lire. Le dépli ne rend qu'au tour suivant : défiler avant viserait la hauteur repliée, et la fiche s'arrêterait trop bas.
+  // Landing on a collapsed decision would not show what one came to read. Expanding only renders on the next tick: scrolling before would aim at the collapsed height, and the page would stop too low.
   if (isCollapsed(`decision-${idDecision}`)) {
     toggleCollapsed(`decision-${idDecision}`);
     queueMicrotask(() => scrollTo(target));
@@ -434,7 +434,7 @@ function buildMissingRuleMessage(): string {
 }
 
 /**
- * Un cadrage porte l'énoncé au moment de sa livraison. Signaler l'écart évite qu'un lecteur prenne une différence légitime pour une incohérence.
+ * A scoping carries the statement as of its delivery. Flagging the gap prevents a reader from taking a legitimate difference for an inconsistency.
  */
 function isDivergent(carries: string, current: string | undefined): boolean {
   if (!current) return false;
@@ -447,7 +447,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-// Le pipe `date` d'Angular en locale fr, au format `'longDate'`.
+// Angular's `date` pipe in the fr locale, with the `'longDate'` format.
 const LONG_DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
 
 function formatDate(iso: string): string {
@@ -470,13 +470,13 @@ function formatDate(iso: string): string {
       <header class="fiche-entete">
         <h1>{{ scoping.title }}</h1>
 
-        <!-- Le titre dit de quoi il s'agit ; ce qui suit dit à quoi on a affaire. Les intitulés portent la distinction, qu'une rangée de pastilles côte à côte laissait deviner. -->
+        <!-- The title says what it is about; what follows says what one is dealing with. The labels carry the distinction, which a row of pills side by side left to guesswork. -->
         <dl class="identite">
           <dt>Cadrage</dt>
           <dd class="ligne-type">
             <span class="cid">{{ show(scoping.id) }}</span>
             <StatusChip :status="scoping.status" />
-            <!-- Un cadrage livré ne se reprend plus : ses impacts sont propagés, et le rouvrir ferait diverger le référentiel de ses cadrages. -->
+            <!-- A delivered scoping is no longer resumed: its impacts are propagated, and reopening it would make the specification diverge from its scopings. -->
             <RouterLink
               v-if="scoping.status !== 'livree'"
               class="editer"
@@ -508,11 +508,11 @@ function formatDate(iso: string): string {
             </dd>
           </template>
 
-          <!-- Livré et sans lien, il n'y a rien à montrer : l'intitulé resterait seul en face d'une case vide. Non livré, le bouton d'ajout occupe toujours la rangée. -->
+          <!-- Delivered and without links, there is nothing to show: the label would stand alone facing an empty cell. Not delivered, the add button always occupies the row. -->
           <template v-if="scoping.links.length || scoping.status !== 'livree'">
             <dt>Ressources</dt>
             <dd class="liens">
-              <!-- Un cadrage en cours se discute sur sa demande de fusion : c'est le premier lien qu'on y cherche. -->
+              <!-- A scoping in progress is discussed on its pull request: it is the first link one looks for there. -->
               <ExternalLink
                 v-if="scoping.provenance?.pullRequest"
                 class="lien demande"
@@ -521,7 +521,7 @@ function formatDate(iso: string): string {
                 <UiIcon name="call_split" />
                 Demande de fusion #{{ scoping.provenance.pullRequest }}
               </ExternalLink>
-              <!-- Sans demande de fusion, un cadrage commencé se trouve sur sa branche : c'est elle qu'on ouvre. -->
+              <!-- Without a pull request, a started scoping is found on its branch: that is what gets opened. -->
               <ExternalLink
                 v-else-if="scoping.provenance"
                 class="lien demande"
@@ -535,7 +535,7 @@ function formatDate(iso: string): string {
                 <UiIcon name="call_split" />
                 Branche {{ scoping.provenance.branch }}
               </ExternalLink>
-              <!-- Ouvrir reste le geste direct : le menu ne s'ouvre que sur demande, et l'ancre garde la surface du chip. -->
+              <!-- Opening remains the direct gesture: the menu opens only on request, and the anchor keeps the chip's surface. -->
               <span
                 v-for="l in scoping.links"
                 :key="l.url"
@@ -578,7 +578,7 @@ function formatDate(iso: string): string {
                   </template>
                 </UiMenu>
               </span>
-              <!-- Un cadrage livré ne se reprend plus : lui ajouter un lien écrirait dans le référentiel hors de tout cadrage. -->
+              <!-- A delivered scoping is no longer resumed: adding a link to it would write into the specification outside of any scoping. -->
               <button
                 v-if="scoping.status !== 'livree'"
                 type="button"
@@ -595,7 +595,7 @@ function formatDate(iso: string): string {
           </template>
         </dl>
 
-        <!-- RG-branches-survivantes-signalees : une branche qui porte encore ce cadrage livré est sans effet, mais on la reprendrait en croyant travailler sur un cadrage en cours. Le dire, sans rien interdire. -->
+        <!-- RG-branches-survivantes-signalees: a branch still carrying this delivered scoping has no effect, but one might pick it up believing they are working on a scoping in progress. Say so, without forbidding anything. -->
         <p
           v-if="scoping.staleBranches?.length"
           class="branches-survivantes"
@@ -686,7 +686,7 @@ function formatDate(iso: string): string {
             </button>
 
             <template v-if="isCollapsed('decision-' + d.id)">
-              <!-- Repliée, la décision garde ce qu'elle a tranché : le reste est du raisonnement, celle-ci est la réponse. -->
+              <!-- Collapsed, the decision keeps what it settled: the rest is reasoning, this is the answer. -->
               <p v-if="findChosenOption(d)" class="d-resume">
                 <UiIcon name="check" />
                 {{ findChosenOption(d)?.title }}
@@ -720,7 +720,7 @@ function formatDate(iso: string): string {
 
       <section v-if="scoping.impacts.length" id="impacts" class="bloc">
         <h2 class="section">Impacts sur les règles de gestion</h2>
-        <!-- RG-sommaire-fiche-longue : ce qui ne change rien à sa cible vient après ce qui change, réuni sous un intitulé qui le compte. Le sommaire y mène d'une seule entrée. -->
+        <!-- RG-sommaire-fiche-longue: what changes nothing about its target comes after what changes, gathered under a heading that counts it. The table of contents leads there with a single entry. -->
         <div
           v-for="b in impactBlocks"
           :id="b.id"
@@ -736,7 +736,7 @@ function formatDate(iso: string): string {
               class="impact"
             >
               <div class="i-entete">
-                <!-- La bascule est un bouton à part, et non l'entête entière : celle-ci porte déjà un lien vers la règle, qu'un bouton englobant rendrait inatteignable. -->
+                <!-- The toggle is a separate button, not the whole header: the header already carries a link to the rule, which an enclosing button would make unreachable. -->
                 <button
                   type="button"
                   class="i-bascule"
@@ -812,7 +812,7 @@ function formatDate(iso: string): string {
         </div>
       </section>
 
-      <!-- Ce que le gabarit ne présente pas ailleurs se lit ici plutôt que nulle part. Le titre d'origine est conservé : c'est lui qui dit de quoi la section parle, « Divers » ne fait que les rassembler. -->
+      <!-- What the template does not present elsewhere is read here rather than nowhere. The original title is kept: it is what says what the section is about, « Divers » only gathers them. -->
       <section v-if="scoping.misc.length" id="divers" class="bloc">
         <h2 class="section">Divers</h2>
         <div class="divers">
@@ -858,7 +858,7 @@ function formatDate(iso: string): string {
       </section>
     </div>
 
-    <!-- Ce qui a été tranché est ce qu'on vient revérifier le plus souvent sur un cadrage relu. Le récapitulatif le tient sous les yeux pendant qu'on parcourt le reste de la fiche ; le raisonnement, lui, reste à sa place dans la section Décisions. -->
+    <!-- What was settled is what one comes back to check most often on a reviewed scoping. The summary keeps it in view while browsing the rest of the page; the reasoning stays in its place in the Decisions section. -->
     <aside v-if="decided.length" class="rail-tranchees">
       <div class="panneau">
         <p class="p-titre">Décisions tranchées</p>
@@ -883,7 +883,7 @@ function formatDate(iso: string): string {
       </div>
     </aside>
   </div>
-  <!-- Un cadrage en cours vit sur sa branche, lue après la principale : le dire introuvable d'ici là annoncerait absent ce qui arrive. -->
+  <!-- A scoping in progress lives on its branch, read after the main one: calling it not found until then would announce as missing what is on its way. -->
   <p v-else-if="store.loadingBranches()" class="vide">
     Lecture des cadrages en cours…
   </p>
@@ -899,7 +899,7 @@ function formatDate(iso: string): string {
 .rail {
   display: none;
 }
-/* RG-mesure-de-lecture : la colonne entière est bornée, titre compris. Borner le seul texte le repliait sous un titre pleine largeur. */
+/* RG-mesure-de-lecture: the whole column is bounded, title included. Bounding only the text folded it under a full-width title. */
 .fiche {
   min-width: 0;
   max-width: var(--pc-mesure);
@@ -908,12 +908,12 @@ function formatDate(iso: string): string {
   display: none;
 }
 
-/* Le sommaire n'apparaît que là où il ne coûte rien à la lecture. En dessous de cette largeur, la fiche reprend toute la place. */
+/* The table of contents appears only where it costs reading nothing. Below this width, the page takes the whole space back. */
 @media (min-width: 1100px) {
   .mise-en-page {
     grid-template-columns: 244px minmax(0, var(--pc-mesure));
     column-gap: 44px;
-    /* surtout pas align-items: start — la colonne se rétracterait à la hauteur de son contenu, et le sommaire collant n'aurait plus rien pour le retenir pendant le défilement */
+    /* above all not align-items: start — the column would shrink to the height of its content, and the sticky table of contents would no longer have anything to hold it while scrolling */
     align-items: stretch;
   }
   .rail {
@@ -921,7 +921,7 @@ function formatDate(iso: string): string {
   }
 }
 
-/* La troisième colonne n'arrive qu'une fois les deux autres servies : en dessous, elle prendrait sa largeur sur le corps de la fiche, qui porte le texte long. */
+/* The third column only comes once the other two are served: below that, it would take its width from the page body, which carries the long text. */
 @media (min-width: 1440px) {
   .mise-en-page {
     grid-template-columns: 244px minmax(0, var(--pc-mesure)) 280px;
@@ -931,7 +931,7 @@ function formatDate(iso: string): string {
   }
 }
 
-/* les ancres ne doivent pas atterrir sous la barre collante */
+/* anchors must not land under the sticky bar */
 .bloc,
 .decision,
 .impact,
@@ -976,7 +976,7 @@ function formatDate(iso: string): string {
   font-size: 14px;
 }
 
-/* Nom propre, et non .entete : celui-ci sert aussi aux décisions et aux sections libres, dont la règle écraserait celle-ci. */
+/* A proper name, not .entete: that one also serves decisions and free sections, whose rule would override this one. */
 .fiche-entete {
   margin-bottom: 40px;
   padding: 22px 24px;
@@ -984,14 +984,14 @@ function formatDate(iso: string): string {
   border: 1px solid var(--mat-sys-outline-variant);
   background: var(--mat-sys-surface-container-low);
 }
-/* Deux colonnes : l'intitulé au plus juste, la valeur prend le reste. Les intitulés alignés donnent un bord de lecture que des pastilles mises bout à bout n'offraient pas. */
+/* Two columns: the label as tight as possible, the value takes the rest. Aligned labels give a reading edge that pills placed end to end did not offer. */
 .identite {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   gap: 10px 18px;
   margin: 0;
 }
-/* Aligné en haut, et non centré : une rangée de liens qui se replie sur trois lignes laisserait sinon son intitulé flotter à mi-hauteur. Le décalage l'amène sur la première ligne de chips. */
+/* Aligned to the top, not centred: a row of links wrapping over three lines would otherwise leave its label floating halfway up. The offset brings it onto the first line of chips. */
 .identite dt {
   padding-top: 5px;
   font-size: 12px;
@@ -1032,7 +1032,7 @@ function formatDate(iso: string): string {
   letter-spacing: 0.04em;
   color: var(--mat-sys-on-surface-variant);
 }
-/* Pas de max-width : la colonne borne déjà la ligne, et brider à 30ch cassait un titre ordinaire en quatre lignes. */
+/* No max-width: the column already bounds the line, and capping at 30ch broke an ordinary title into four lines. */
 h1 {
   margin: 0 0 16px;
   font-size: 28px;
@@ -1045,7 +1045,7 @@ h1 {
   flex-wrap: wrap;
   gap: 6px;
 }
-/* Même teinte que dans la liste : un domaine doit se reconnaître d'un écran à l'autre, sans quoi la couleur n'est qu'une décoration. */
+/* Same hue as in the list: a domain must be recognisable from one screen to the next, otherwise the colour is mere decoration. */
 .pastille {
   font-size: 12px;
   padding: 3px 10px;
@@ -1064,7 +1064,7 @@ h1 {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* Le chip et son menu ne font qu'un cadre : deux bordures côte à côte se liraient comme deux liens. */
+/* The chip and its menu form a single frame: two borders side by side would read as two links. */
 .bloc-lien {
   display: inline-flex;
   align-items: stretch;
@@ -1083,7 +1083,7 @@ h1 {
     padding-right: 4px;
   }
 }
-/* Discret au repos, il ne se montre qu'au survol ou au focus clavier — mais garde sa place, sinon la rangée se réagencerait sous le curseur. */
+/* Discreet at rest, it shows only on hover or keyboard focus — but keeps its place, otherwise the row would rearrange under the cursor. */
 .menu-lien {
   display: inline-flex;
   align-items: center;
@@ -1129,7 +1129,7 @@ h1 {
     height: 15px;
   }
 }
-/* Le bouton reprend la forme des liens qu'il complète : il appartient à la même rangée, et s'en distinguer le ferait lire comme un ailleurs. */
+/* The button takes the shape of the links it complements: it belongs to the same row, and standing apart would make it read as somewhere else. */
 .lien.ajout {
   font-family: inherit;
   font-size: 13px;
@@ -1214,7 +1214,7 @@ h1 {
   flex-direction: column;
   gap: 18px;
 }
-/* Une section libre porte un titre venu du cadrage, non du gabarit : l'encadré des décisions est ce qui le distingue des niveaux 3 que le Markdown rend au-dessous. */
+/* A free section carries a title coming from the scoping, not from the template: the decisions' frame is what distinguishes it from the level-3 headings Markdown renders below. */
 .decision,
 .libre {
   padding: 20px 22px;
@@ -1238,11 +1238,11 @@ h1 {
   font-weight: 500;
   line-height: 1.35;
 }
-/* Plus grand que les niveaux 3 que le Markdown rend au-dessous : sans cet écart, une sous-section se lit comme la sœur de la section qui la porte. */
+/* Larger than the level-3 headings Markdown renders below: without this gap, a subsection reads as the sibling of the section that holds it. */
 .libre h3 {
   font-size: 18px;
 }
-/* Un bouton pleine largeur, qui doit continuer de se lire comme un titre. L'alignement repasse au fil : le space-between de .entete tiendrait le chevron à l'autre bout de la carte, loin du titre qu'il commande. C'est h3 qui repousse le statut, par sa marge. */
+/* A full-width button, which must keep reading as a title. Alignment goes back to the flow: the space-between of .entete would hold the chevron at the other end of the card, far from the title it controls. It is h3 that pushes the status away, through its margin. */
 .bascule {
   align-items: center;
   justify-content: flex-start;
@@ -1277,7 +1277,7 @@ h1 {
 .d-corps {
   margin-top: 10px;
 }
-/* Repliée, la décision se résume à ce qu'elle a tranché. Aligné sur le titre au-dessus, chevron déduit, pour que la ligne se lise comme sa suite et non comme un élément de plus. */
+/* Collapsed, the decision comes down to what it settled. Aligned with the title above, minus the chevron, so that the line reads as its continuation and not as one more element. */
 .d-resume {
   display: flex;
   align-items: center;

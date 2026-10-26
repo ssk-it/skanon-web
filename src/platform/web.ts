@@ -1,28 +1,28 @@
 import type { VersionAnnouncement, VersionAnnouncer, Platform } from "./ports";
 import { BrowserAuthenticator, BrowserSealedVault } from "./web-sealing";
 
-/** Le script du service worker de Skanon, émis par `outils/pwa/pwa.ts` dans la seule version web. */
+/** Skanon's service worker script, emitted by `tools/pwa/pwa.ts` in the web version only. */
 export const SCRIPT_SERVICE_WORKER = "/sw.js";
 
-/** Ce que le service worker dit à la page : un fichier de la version en cours n'est plus servi (`outils/pwa/sw.js`). */
+/** What the service worker tells the page: a file of the current version is no longer served (`tools/pwa/sw.js`). */
 export const VERSION_LOST_MESSAGE = "VERSION_PERDUE";
 
-/** Ce que la page demande au service worker en attente : servir dès maintenant. */
+/** What the page asks of the waiting service worker: serve right now. */
 export const ACTIVATE_MESSAGE = "SKIP_WAITING";
 
-/** Ce que l'on attend au plus le changement de service worker avant de recharger malgré tout. */
+/** The longest the service worker change is awaited before reloading anyway. */
 const ACTIVATION_DELAY = 3000;
 
 /**
- * Les versions, apprises du service worker (RG-nouvelle-version-proposee, RG-version-perdue-signalee).
+ * Versions, learned from the service worker (RG-nouvelle-version-proposee, RG-version-perdue-signalee).
  *
- * Une version est prête quand un nouveau service worker a fini de s'installer — tout ce qu'il servira est alors en cache — et qu'un autre sert encore cette page : la première installation n'est pas une nouvelle version, et une version qui se télécharge encore n'est pas prête, puisque recharger servirait encore l'ancienne.
+ * A version is ready when a new service worker has finished installing — everything it will serve is then cached — and another one still serves this page: the first installation is not a new version, and a version still downloading is not ready, since reloading would still serve the old one.
  *
- * Une annonce faite avant qu'on l'écoute — l'inscription précède le montage de la coquille — est rejouée à qui écoute ensuite.
+ * An announcement made before anyone listens — registration precedes mounting the shell — is replayed to whoever listens afterwards.
  */
 export class ServiceWorkerAnnouncer implements VersionAnnouncer {
   readonly active: boolean;
-  /** La version prête sert au rechargement de la page, non à une relance. */
+  /** The ready version is served by reloading the page, not by a relaunch. */
   readonly relaunches = false;
   private readonly registration: Promise<ServiceWorkerRegistration> | null;
   private readonly listeners = new Set<(a: VersionAnnouncement) => void>();
@@ -46,7 +46,7 @@ export class ServiceWorkerAnnouncer implements VersionAnnouncer {
     );
     this.registration.then(
       (r) => this.track(r),
-      // Inscription refusée — navigation privée, stockage bloqué : l'application marche sans, et sans hors-ligne.
+      // Registration refused — private browsing, blocked storage: the application works without it, and without offline mode.
       () => {},
     );
   }
@@ -57,7 +57,7 @@ export class ServiceWorkerAnnouncer implements VersionAnnouncer {
     return () => this.listeners.delete(onAnnouncement);
   }
 
-  /** Le service worker ne dit pas pourquoi il n'a rien trouvé : il n'y a rien à expliquer. */
+  /** The service worker does not say why it found nothing: there is nothing to explain. */
   listenCause(): () => void {
     return () => {};
   }
@@ -97,7 +97,7 @@ export class ServiceWorkerAnnouncer implements VersionAnnouncer {
   }
 
   /**
-   * Vrai quand une version de Skanon sert déjà cette page. Sous le service worker de l'ancienne application, ou sans aucun, celui qui s'installe ne remplace pas une version de Skanon : il n'y a rien à proposer.
+   * True when a version of Skanon already serves this page. Under the former application's service worker, or without any, the one installing does not replace a version of Skanon: there is nothing to offer.
    */
   private servedBySkanon(): boolean {
     const current = this.container?.controller?.scriptURL;
@@ -111,7 +111,7 @@ export class ServiceWorkerAnnouncer implements VersionAnnouncer {
   }
 }
 
-/** L'inscription attend la fin du chargement : le préchargement ne dispute pas la bande passante à la première page. */
+/** Registration waits for the end of loading: precaching does not compete with the first page for bandwidth. */
 function afterLoad(): Promise<void> {
   if (document.readyState === "complete") return Promise.resolve();
   return new Promise((end) =>
@@ -120,7 +120,7 @@ function afterLoad(): Promise<void> {
 }
 
 /**
- * Le service worker n'est inscrit que dans la version web construite : le serveur de développement n'en publie pas, les tests n'en ont pas, et l'application de bureau n'en a pas l'usage.
+ * The service worker is only registered in the built web version: the development server publishes none, tests have none, and the desktop application has no use for it.
  */
 function serviceWorkerAvailable(): ServiceWorkerContainer | undefined {
   if (
@@ -133,7 +133,7 @@ function serviceWorkerAvailable(): ServiceWorkerContainer | undefined {
 }
 
 export function createWebPlatform(): Platform {
-  // Un seul objet pour les deux ports : le scellement décide de ce que le coffre écrit.
+  // A single object for both ports: sealing decides what the vault writes.
   const vault = new BrowserSealedVault(new BrowserAuthenticator());
   return {
     target: "web",
@@ -144,10 +144,10 @@ export function createWebPlatform(): Platform {
         window.open(url, "_blank", "noopener");
       },
     },
-    // La version web reçoit ses liens par l'adresse même (`/lien?…`) : rien à écouter.
+    // The web version receives its links through the address itself (`/lien?…`): nothing to listen to.
     links: { async listen() {} },
     version: new ServiceWorkerAnnouncer(serviceWorkerAvailable()),
-    // Le site se redéploie à chaque fusion, sans numéro : le commit construit le désigne (`vite.config.ts`).
+    // The site is redeployed on every merge, without a number: the built commit designates it (`vite.config.ts`).
     loadVersion: async () => import.meta.env.VITE_VERSION,
   };
 }

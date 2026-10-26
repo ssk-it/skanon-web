@@ -3,9 +3,9 @@ import type { Platform } from "./ports";
 import { createWebPlatform } from "./web";
 
 /**
- * La plateforme choisie au démarrage, que la racine de composition fournit. Sans elle — dans les tests —, celle du navigateur : les tests hérités de SSK Canon lisent et écrivent le stockage local, et la retrouvent ainsi.
+ * The platform chosen at startup, which the composition root provides. Without it — in tests —, the browser's: the tests inherited from SSK Canon read and write local storage, and so find it again.
  *
- * C'est ce jeton que le cœur et les vues demandent, jamais la racine : eux ne choisissent pas d'adaptateur (docs/pratiques.md, « Les couches »).
+ * It is this token that the core and the views request, never the root: they do not choose an adapter (docs/practices.md, "Layers").
  */
 export const PLATFORM = new InjectionToken<Platform>("PLATEFORME", {
   factory: createWebPlatform,

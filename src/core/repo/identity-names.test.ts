@@ -6,17 +6,17 @@ import {
 } from "./identity-names";
 
 /**
- * RG-identite-du-projet et RG-identite-affichee : des noms fixés, trois formats
- * dans un ordre de préférence, et la variante de l'autre fond jamais employée.
+ * RG-identite-du-projet and RG-identite-affichee: fixed names, three formats
+ * in an order of preference, and the other background's variant never used.
  */
-describe("noms de l’identité d’un projet", () => {
+describe("names of a project's identity", () => {
   const file = (path: string, size = 800) => ({
     path,
     sha: `sha-${path}`,
     size,
   });
 
-  it("lit un nom convenu, et refuse les autres", () => {
+  it("reads an agreed name, and refuses the others", () => {
     expect(lireNomIdentite("symbole-sombre.svg")).toEqual({
       element: "symbole",
       variante: "sombre",
@@ -32,7 +32,7 @@ describe("noms de l’identité d’un projet", () => {
     expect(lireNomIdentite("README.md")).toBeNull();
   });
 
-  it("cherche la variante du thème, puis la version sans suffixe, jamais l’autre fond", () => {
+  it("looks for the theme's variant, then the unsuffixed version, never the other background", () => {
     expect(listSymbolCandidates("sombre")).toEqual([
       "symbole-sombre.svg",
       "symbole-sombre.webp",
@@ -46,7 +46,7 @@ describe("noms de l’identité d’un projet", () => {
     ).toBe(false);
   });
 
-  it("préfère le SVG au WebP, et le WebP au PNG", () => {
+  it("prefers SVG to WebP, and WebP to PNG", () => {
     const files = [
       file("symbole-clair.png"),
       file("symbole-clair.webp"),
@@ -58,18 +58,18 @@ describe("noms de l’identité d’un projet", () => {
     );
   });
 
-  it("préfère la variante du thème à la version sans suffixe", () => {
+  it("prefers the theme's variant to the unsuffixed version", () => {
     const files = [file("symbole.svg"), file("symbole-sombre.png")];
     expect(chooseSymbol(files, "sombre")?.path).toBe("symbole-sombre.png");
     expect(chooseSymbol(files, "clair")?.path).toBe("symbole.svg");
   });
 
-  it("ne retient ni le logotype, ni la variante de l’autre fond", () => {
+  it("keeps neither the logotype nor the other background's variant", () => {
     const files = [file("logotype-sombre.svg"), file("symbole-clair.svg")];
     expect(chooseSymbol(files, "sombre")).toBeNull();
   });
 
-  it("écarte un fichier au-delà de la borne de poids", () => {
+  it("sets aside a file beyond the weight limit", () => {
     const files = [
       file("symbole.svg", 400 * 1024),
       file("symbole.png", 20 * 1024),

@@ -7,11 +7,11 @@ import UiIcon from "../../ui/UiIcon.vue";
 const onDesktop = inject(PLATFORM).target === "bureau";
 
 /**
- * Comment créer un jeton d'accès GitHub.
+ * How to create a GitHub access token.
  *
- * Ce contenu vit dans l'application plutôt que dans un fichier du dépôt : il est lu au moment précis où l'on en a besoin, par quelqu'un qui n'ira pas chercher une documentation ailleurs.
+ * This content lives in the application rather than in a file of the repo: it is read at the precise moment one needs it, by someone who will not go looking for documentation elsewhere.
  *
- * `collerOu` dit où coller le jeton créé : « ici » dans la connexion, ailleurs là où l'aide se lit sans champ de saisie.
+ * `pasteWhere` says where to paste the created token: « ici » in sign-in, elsewhere where the help is read without an input field.
  */
 withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
 </script>
@@ -152,7 +152,7 @@ withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
 </template>
 
 <style scoped>
-/* Une ligne d'environ 75 caractères, celle de RG-mesure-de-lecture : le panneau qui l'accueille est plus large, et le tableau la suit. */
+/* A line of about 75 characters, that of RG-mesure-de-lecture: the panel hosting it is wider, and the table follows it. */
 .aide {
   max-width: 75ch;
 }
@@ -212,7 +212,7 @@ a {
     text-transform: uppercase;
     color: var(--mat-sys-on-surface-variant);
   }
-  /* Les deux colonnes d'usage ont la même largeur : les comparer d'un coup d'œil est tout l'intérêt du tableau. */
+  /* The two usage columns have the same width: comparing them at a glance is the whole point of the table. */
   th:not(:first-child),
   td:not(:first-child) {
     width: 30%;

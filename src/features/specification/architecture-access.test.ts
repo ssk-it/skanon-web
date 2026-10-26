@@ -14,19 +14,19 @@ import ArchitecturePage from "./ArchitecturePage.vue";
 import SpecificationPage from "./SpecificationPage.vue";
 
 /**
- * L'accès au référentiel technique — RG-architecture-au-premier-niveau et RG-vue-vide-dit-ce-qui-manque.
+ * Access to the technical specification — RG-architecture-au-premier-niveau and RG-vue-vide-dit-ce-qui-manque.
  *
- * Ce qui est éprouvé ici n'est pas que la page sait s'afficher : elle le savait déjà. C'est qu'on y arrive sans la chercher, et que le projet qui ne décrit rien l'apprend au lieu de voir des listes vides.
+ * What is tested here is not that the page can display itself: it already could. It is that one gets there without looking for it, and that the project that describes nothing learns so instead of seeing empty lists.
  */
 
-/** Un dépôt sans le moindre document d'architecture — le cas majoritaire. */
+/** A repo without a single architecture document — the majority case. */
 const TREE_WITHOUT_ARCHITECTURE = {
   sha: "racine",
   truncated: false,
   tree: [{ path: "domains/facturation.md", sha: "d1", type: "blob" }],
 };
 
-/** Le même, décrivant un composant et un flux qui le touche. */
+/** The same, describing a component and a flow that touches it. */
 const TREE_WITH_ARCHITECTURE = {
   sha: "racine",
   truncated: false,
@@ -105,7 +105,7 @@ async function routerAt(address: string) {
   return router;
 }
 
-/** La coquille entière : sa racine est un fragment, d'où une lecture par l'enveloppe plutôt que par l'élément. */
+/** The whole shell: its root is a fragment, hence reading through the wrapper rather than through the element. */
 async function mountApp(address: string): Promise<VueWrapper> {
   const router = await routerAt(address);
   const view = mount(App, { global: { plugins: [router] } });
@@ -126,12 +126,12 @@ function tabs(app: VueWrapper): string[] {
   return app.findAll(".onglets a").map((a) => a.text().trim());
 }
 
-describe("Accès à l’architecture depuis la barre", () => {
+describe("Access to architecture from the top bar", () => {
   beforeEach(() => {
     http = provideHttpTesting();
   });
 
-  it("propose l’architecture au même rang que le fonctionnel", async () => {
+  it("offers architecture at the same rank as the functional part", async () => {
     const app = await mountApp("/test/test/referentiel");
 
     expect(tabs(app)).toEqual([
@@ -142,52 +142,52 @@ describe("Accès à l’architecture depuis la barre", () => {
     ]);
   });
 
-  it("propose l’architecture même quand le projet n’en décrit aucune", async () => {
+  it("offers architecture even when the project describes none", async () => {
     await load(TREE_WITHOUT_ARCHITECTURE);
     const app = await mountApp("/test/test/referentiel");
 
-    // L'entrée ne dépend pas du contenu : celui qui n'a rien décrit est précisément celui à qui la possibilité doit être montrée.
+    // The entry does not depend on the content: whoever has described nothing is precisely the one to whom the possibility must be shown.
     expect(tabs(app)).toContain("Architecture");
   });
 
-  it("ne propose aucune vue hors d’un projet", async () => {
+  it("offers no view outside a project", async () => {
     const app = await mountApp("/");
 
     expect(app.find(".onglets").exists()).toBe(false);
   });
 
-  it("ne garde pas de carte d’accès sur la page fonctionnelle", async () => {
+  it("keeps no access card on the functional page", async () => {
     await load(TREE_WITH_ARCHITECTURE);
     const el = await mountPage(SpecificationPage);
 
-    // L'accès est dans la barre : le redoubler ici entretiendrait l'idée que l'architecture s'atteint en traversant le fonctionnel.
+    // Access is in the top bar: duplicating it here would sustain the idea that architecture is reached by going through the functional part.
     expect(el.querySelector(".vers-architecture")).toBeNull();
   });
 });
 
-describe("Architecture sans contenu", () => {
+describe("Architecture without content", () => {
   beforeEach(() => {
     http = provideHttpTesting();
   });
 
-  it("dit ce que la vue accueillerait, au lieu de lister du vide", async () => {
+  it("says what the view would hold, instead of listing emptiness", async () => {
     await load(TREE_WITHOUT_ARCHITECTURE);
     const el = await mountPage(ArchitecturePage);
     const text = el.textContent ?? "";
 
     expect(el.querySelector(".vide-instruit")).not.toBeNull();
     expect(text).toContain("ne décrit pas encore son architecture");
-    // les quatre natures sont nommées : le lecteur apprend ce qu'il pourrait écrire
+    // the four kinds are named: the reader learns what they could write
     for (const kind of ["Composants", "Flux", "Contexte", "Décisions"]) {
       expect(text).toContain(kind);
     }
-    // et par où commencer, le référentiel ne s'éditant pas directement
+    // and where to start, the specification not being edited directly
     expect(text).toContain("cadrage");
-    // aucune liste vide ne subsiste à côté de l'explication
+    // no empty list remains next to the explanation
     expect(el.querySelectorAll(".liste").length).toBe(0);
   });
 
-  it("s’efface dès que le projet décrit quelque chose", async () => {
+  it("clears as soon as the project describes something", async () => {
     await load(TREE_WITH_ARCHITECTURE);
     const el = await mountPage(ArchitecturePage);
 

@@ -4,12 +4,12 @@ import { LinksService } from "./links.service";
 import { RepoConfig } from "./repo-config";
 
 /**
- * Le lien qui mène au dépôt de cadrage sur GitHub.
+ * The link that leads to the framing repo on GitHub.
  *
- * L'adresse est construite à un seul endroit : une vue qui l'écrirait en dur
- * pointerait encore l'ancien projet après un changement de dépôt.
+ * The address is built in a single place: a view that hard-coded it
+ * would still point to the old project after a repo change.
  */
-describe("Lien vers GitHub", () => {
+describe("Link to GitHub", () => {
   let storage: Record<string, string>;
 
   beforeEach(() => {
@@ -26,7 +26,7 @@ describe("Lien vers GitHub", () => {
     resetInjection();
   });
 
-  it("mène au dépôt ouvert", () => {
+  it("leads to the open repo", () => {
     const config = inject(RepoConfig);
     config.repoRef.set({ owner: "ssk-it", repo: "ssk-canon" });
 
@@ -35,7 +35,7 @@ describe("Lien vers GitHub", () => {
     );
   });
 
-  it("suit le dépôt quand on en change", () => {
+  it("follows the repo when it changes", () => {
     const config = inject(RepoConfig);
     const links = inject(LinksService);
 
@@ -46,7 +46,7 @@ describe("Lien vers GitHub", () => {
     expect(links.toGithub()).toBe("https://github.com/autre-org/autre-depot");
   });
 
-  it("accepte des segments et les encode", () => {
+  it("accepts segments and encodes them", () => {
     const config = inject(RepoConfig);
     config.repoRef.set({ owner: "ssk-it", repo: "ssk-canon" });
     const links = inject(LinksService);
@@ -54,7 +54,7 @@ describe("Lien vers GitHub", () => {
     expect(links.toGithub("issues")).toBe(
       "https://github.com/ssk-it/ssk-canon/issues",
     );
-    // Un segment ne doit jamais pouvoir sortir du dépôt qu'il désigne.
+    // A segment must never be able to escape the repo it designates.
     expect(links.toGithub("../evasion")).toBe(
       "https://github.com/ssk-it/ssk-canon/..%2Fevasion",
     );

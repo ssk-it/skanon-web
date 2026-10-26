@@ -4,13 +4,13 @@ import { join } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 
 /**
- * Ce qui fait de la version web une application installable : le manifeste, ses icônes, le service worker de Skanon (`sw.js`) et la relève de celui de SSK Canon (`ngsw-worker.js`). Le greffon ne s'applique qu'au build de la version web (`vite.config.ts`) : l'application de bureau n'en a pas l'usage.
+ * What makes the web version an installable application: the manifest, its icons, Skanon's service worker (`sw.js`) and the handover of SSK Canon's one (`ngsw-worker.js`). The plugin only applies to the build of the web version (`vite.config.ts`): the desktop application has no use for it.
  *
- * Écrit à la main plutôt que par `vite-plugin-pwa` : une liste de fichiers à précharger et deux balises à poser ne valent pas une dépendance et Workbox derrière elle.
+ * Written by hand rather than with `vite-plugin-pwa`: a list of files to precache and two tags to add are not worth a dependency with Workbox behind it.
  */
 const ICI = import.meta.dirname;
 
-/** Le manifeste reste à l'adresse et sous le `scope`, le `start_url` et le `protocol_handlers` de SSK Canon : c'est ce qui fait que Chrome tient l'application installée pour la même, et la met à jour au lieu de la perdre. */
+/** The manifest stays at the address and under the `scope`, the `start_url` and the `protocol_handlers` of SSK Canon: this is what makes Chrome take the installed application for the same one, and update it instead of losing it. */
 const MANIFESTE = "manifest.webmanifest";
 
 const BALISES = [
@@ -22,11 +22,11 @@ const BALISES = [
   { tag: "meta", attrs: { name: "theme-color", content: "#2f5cff" } },
 ] as const;
 
-/** Ce que le service worker ne précharge pas : lui-même, et la relève. */
+/** What the service worker does not precache: itself, and the handover. */
 const HORS_PRECHARGEMENT = new Set(["sw.js", "ngsw-worker.js"]);
 
 function listerFichiers(racine: string): string[] {
-  // les fichiers cachés — `.DS_Store` — ne sont pas publiés
+  // hidden files — `.DS_Store` — are not published
   return readdirSync(racine)
     .filter((nom) => !nom.startsWith("."))
     .flatMap((nom) => {
@@ -50,7 +50,7 @@ export function pwa(): Plugin {
       return BALISES.map((b) => ({ ...b, injectTo: "head" as const }));
     },
     generateBundle(_options, bundle) {
-      // Ce que ce greffon émet n'apparaît pas dans `bundle` pendant ce même crochet : il le compte lui-même.
+      // What this plugin emits does not appear in `bundle` during this same hook: it counts it itself.
       const emis = new Map<string, Uint8Array>();
       const emettre = (fileName: string, source: Uint8Array | string) => {
         const contenu =
@@ -72,7 +72,7 @@ export function pwa(): Plugin {
         .filter((f) => !HORS_PRECHARGEMENT.has(f))
         .sort();
 
-      // L'empreinte de la version : les noms des scripts et des feuilles portent celle de leur contenu ; pour les autres — `index.html`, le manifeste, les fichiers publics —, le contenu entre ici.
+      // The version's fingerprint: script and stylesheet names carry their content's fingerprint; for the others — `index.html`, the manifest, the public files —, the content goes in here.
       const empreinte = createHash("sha256");
       for (const f of fichiers) {
         empreinte.update(f);

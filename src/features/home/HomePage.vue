@@ -20,9 +20,9 @@ import { openSignIn } from "../shared/open-sign-in";
 import ProjectSymbol from "../shared/ProjectSymbol.vue";
 
 /**
- * Le seuil de l'application : choisir le projet avant d'y entrer.
+ * The application's threshold: choose the project before entering it.
  *
- * Aucun dépôt n'est ouvert d'office. Chaque vue vit sous l'adresse de son projet, et entrer par la racine sans avoir choisi afficherait un référentiel dont rien ne dirait lequel c'est.
+ * No repo is opened by default. Each view lives under its project's address, and entering through the root without having chosen would show a specification with nothing saying which one it is.
  */
 const known = inject(KnownReposService);
 const tokens = inject(TokenService);
@@ -43,7 +43,7 @@ const otherCount = computed(() =>
 );
 
 void known.refresh();
-// Revenir à l'accueil redemande chaque identité, sous condition : c'est là qu'on cherche le projet à ouvrir.
+// Coming back home asks again for each identity, conditionally: this is where one looks for the project to open.
 inject(ProjectIdentityService).reread();
 
 function open(repoRef: RepoRef): void {
@@ -57,7 +57,7 @@ function forget(repoRef: RepoRef): void {
   void known.refresh();
 }
 
-/** Un accès enregistré change les dépôts autorisés : la liste se relit. */
+/** A saved access changes the authorised repos: the list is read again. */
 function signIn(): void {
   void openSignIn().then((change) => {
     if (change) void known.refresh();
@@ -175,7 +175,7 @@ function validateRepo(): void {
       <UiButton variant="filled" type="submit">Ouvrir</UiButton>
     </form>
 
-    <!-- RG-connexion-optionnelle, RG-modes-acces : l'aide se propose, sous la liste, sans se poser en préalable — un dépôt public se lit sans jeton, et un projet en identité tierce n'en demande aucun. -->
+    <!-- RG-connexion-optionnelle, RG-modes-acces: the help offers itself, below the list, without posing as a prerequisite — a public repo is read without a token, and a project under third-party identity asks for none. -->
     <section v-if="tokens.noAccess()" class="connexion">
       <h2>Connexion à GitHub, facultative</h2>
       <p class="aide">
@@ -201,7 +201,7 @@ function validateRepo(): void {
   margin: 0 auto;
   padding: 40px 24px 64px;
 }
-/* Les textes gardent leur largeur de lecture ; seules les cartes profitent de la place. */
+/* Texts keep their reading width; only the cards benefit from the space. */
 .entete,
 .saisie,
 .attente,
@@ -220,7 +220,7 @@ function validateRepo(): void {
   line-height: 1.6;
   max-width: 56ch;
 }
-/* Une grille, et non des colonnes : une organisation de vingt dépôts y remplirait seule une colonne et laisserait les autres vides. */
+/* A grid, not columns: an organisation with twenty repos would fill one column on its own and leave the others empty. */
 .groupes {
   container-type: inline-size;
   display: grid;
@@ -237,7 +237,7 @@ function validateRepo(): void {
   border-radius: 12px;
   background: var(--mat-sys-surface-container-low);
 }
-/* Une grande organisation s'étale sur deux colonnes, sa liste aussi — seulement quand deux colonnes tiennent. */
+/* A large organisation spreads over two columns, its list too — only when two columns fit. */
 @container (min-width: 41rem) {
   .organisation.etendue {
     grid-column: span 2;

@@ -9,9 +9,9 @@ import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 
 /**
- * Une décision d'architecture, et les cadrages qui l'ont produite.
+ * An architecture decision, and the scopings that produced it.
  *
- * L'énoncé affiché est l'état courant. Le raisonnement — options écartées, critère qui a tranché — vit dans le cadrage, et c'est par lui qu'on y accède : le recopier ici créerait deux textes qui finiraient par se contredire.
+ * The statement displayed is the current state. The reasoning — options set aside, criterion that settled it — lives in the scoping, and it is through the scoping that one reaches it: copying it here would create two texts that would end up contradicting each other.
  */
 const route = useRoute();
 const store = inject(SpecificationStore);
@@ -63,7 +63,7 @@ const scopings = computed(() =>
 </template>
 
 <style scoped>
-/* RG-mesure-de-lecture : la fiche entière est un texte à lire. */
+/* RG-mesure-de-lecture: the whole page is a text to be read. */
 .page-decision-architecture {
   display: block;
   max-width: var(--pc-mesure);

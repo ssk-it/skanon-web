@@ -7,13 +7,13 @@ import UiButton from "../../ui/UiButton.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 
 /**
- * Comment donner à un jeton l'accès au dépôt qu'il n'ouvre pas.
+ * How to give a token access to the repo it does not open.
  *
- * Montré là où l'échec se constate plutôt que dans l'aide à la création : celui qui le lit a déjà un jeton, et c'est ce jeton-là qu'il faut corriger. Le corriger sur la plateforme garde sa valeur — rien à ressaisir ici, sauf lorsque le dépôt appartient à un autre propriétaire que celui du jeton.
+ * Shown where the failure is observed rather than in the creation help: whoever reads it already has a token, and it is that token which needs correcting. Correcting it on the platform keeps its value — nothing to re-enter here, except when the repo belongs to another owner than the token's.
  */
 const props = defineProps<{ repoRef: { owner: string; repo: string } }>();
 
-/** Demande d'ouvrir la saisie d'un jeton. */
+/** Asks to open the token input. */
 const emit = defineEmits<{ replace: [] }>();
 
 const tokens = inject(TokenService);
@@ -21,7 +21,7 @@ const tokens = inject(TokenService);
 const fullName = computed(() => `${props.repoRef.owner}/${props.repoRef.repo}`);
 
 /**
- * Un jeton classique n'a ni sélection de dépôts ni propriétaire : les étapes d'un jeton à portée fine n'y trouveraient rien à régler.
+ * A classic token has neither a repo selection nor an owner: the steps for a fine-grained token would find nothing to set there.
  */
 const classic = computed(() => tokens.value()?.startsWith("ghp_") ?? false);
 </script>

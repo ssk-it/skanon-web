@@ -1,13 +1,13 @@
 <script lang="ts">
 /**
- * Au-delà, la colonne des voisines cesse d'aider à s'orienter et se met à dupliquer la fiche de la fonctionnalité, qui les liste toutes.
+ * Beyond that, the column of neighbours stops helping one find one's way and starts duplicating the feature page, which lists them all.
  */
 const MAX_NEIGHBORS = 8;
 
 /**
- * Les règles à montrer autour de la règle courante.
+ * The rules to show around the current rule.
  *
- * Toutes quand elles tiennent ; sinon une fenêtre qui place la règle courante vers le haut, calée sur le début ou la fin de la liste. C'est souvent la règle d'à côté qu'on cherchait, et l'ordre des identifiants rapproche celles qui parlent de la même chose.
+ * All of them when they fit; otherwise a window that places the current rule near the top, snapped to the start or end of the list. It is often the next rule over that one was looking for, and identifier order brings together those that talk about the same thing.
  */
 export function listNeighbors(
   ids: readonly string[],
@@ -20,7 +20,7 @@ export function listNeighbors(
   return ids.slice(begin, begin + max);
 }
 
-/** Le `date: 'd MMM y'` d'Angular, en locale française. */
+/** Angular's `date: 'd MMM y'`, in the French locale. */
 const DATE_FORMAT = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
   month: "short",
@@ -62,7 +62,7 @@ const rule = computed(() => store.findRule(id.value));
 
 const domainIds = computed(() => store.domains().map((d) => d.id));
 
-/** Les domaines de la règle, chacun une fois, par nom — via ses fonctionnalités. */
+/** The rule's domains, each once, by name — via its features. */
 const domains = computed(() => {
   const r = rule.value;
   if (!r) return [];
@@ -74,9 +74,9 @@ const domains = computed(() => {
 });
 
 /**
- * Les autres règles de chacune de ses fonctionnalités.
+ * The other rules of each of its features.
  *
- * Les abrogées en sont écartées : on s'oriente parmi ce qui s'applique. Une fonctionnalité qui ne porte que cette règle n'a rien à proposer, et son bloc ne ferait que répéter le titre de la page.
+ * Repealed ones are left out: one finds one's way among what applies. A feature that carries only this rule has nothing to offer, and its block would merely repeat the page title.
  */
 const neighbors = computed(() => {
   const r = rule.value;
@@ -98,7 +98,7 @@ const neighbors = computed(() => {
 });
 
 /**
- * Cadrages impactant cette règle, les livrés d'abord et du plus récent au plus ancien : on lit une histoire à rebours, en partant de l'état actuel.
+ * Scopings impacting this rule, delivered ones first and from most recent to oldest: one reads a story backwards, starting from the current state.
  */
 const impacts = computed(() =>
   [...store.listScopingsImpactingRule(id.value)].sort((a, b) => {
@@ -108,18 +108,18 @@ const impacts = computed(() =>
   }),
 );
 
-/** Commits ayant touché le fichier de cette règle, indexés par cadrage. */
+/** Commits that touched this rule's file, indexed by scoping. */
 const commits = ref<readonly TimelineCommit[]>([]);
 const gitLoading = ref(false);
 /**
- * Pourquoi l'historique manque, s'il manque. Affiché plutôt que tu : sans jeton, GitHub refuse toute requête GraphQL même sur un dépôt public, et le lecteur doit savoir que la vue est incomplète et comment la compléter.
+ * Why the history is missing, if it is. Displayed rather than kept quiet: without a token, GitHub refuses any GraphQL request even on a public repo, and the reader must know that the view is incomplete and how to complete it.
  */
 const gitError = ref<string | null>(null);
 
 /**
- * Les données Git enrichissent la chronologie, elles ne la fondent pas.
+ * Git data enrich the timeline, they do not found it.
  *
- * Un cadrage sans commit correspondant reste affiché : c'est le cas d'un référentiel rédigé après coup, où les premiers cadrages décrivent des décisions antérieures au dépôt. Voir `ChronologieService`.
+ * A scoping with no matching commit stays displayed: that is the case of a specification written after the fact, where the first scopings describe decisions predating the repo. See `TimelineService`.
  */
 const gitByScoping = computed(() => {
   const ids = impacts.value.map((i) => i.scoping.id);
@@ -127,7 +127,7 @@ const gitByScoping = computed(() => {
   return new Map(pairs.map((e) => [e.scoping, e.commit]));
 });
 
-/** Chaque entrée de l'histoire, avec ce que le gabarit en lit : le commit apparié et l'énoncé porté. */
+/** Each entry of the story, with what the template reads from it: the matched commit and the statement carried. */
 const history = computed(() => {
   const r = rule.value;
   return impacts.value.map((i) => ({
@@ -137,7 +137,7 @@ const history = computed(() => {
   }));
 });
 
-// Chargé à l'affichage de la règle, pas au chargement du référentiel : l'historique coûte un appel par règle consultée, et la plupart ne le seront jamais.
+// Loaded when the rule is displayed, not when the specification is loaded: the history costs one call per rule consulted, and most never will be.
 watchEffect(() => {
   const ruleId = id.value;
   if (store.state() !== "pret" || !store.findRule(ruleId)) return;
@@ -145,9 +145,9 @@ watchEffect(() => {
 });
 
 /**
- * Ce qu'on affiche d'une entrée sans commit correspondant.
+ * What is displayed for an entry with no matching commit.
  *
- * Trois situations distinctes produisent la même absence, et les confondre ferait affirmer une cause qu'on ignore : un cadrage non livré n'a pas encore touché le référentiel ; un impact `touche` ne modifie aucun fichier par définition ; et un cadrage livré sans commit décrit une décision antérieure au dépôt. Ne nommer que ce qui est établi.
+ * Three distinct situations produce the same absence, and confusing them would assert a cause we do not know: an undelivered scoping has not touched the specification yet; a `touche` impact modifies no file by definition; and a delivered scoping without a commit describes a decision predating the repo. Name only what is established.
  */
 function labelWithoutCommit(
   status: ScopingStatus,
@@ -171,7 +171,7 @@ function reasonWithoutCommit(
   return "Aucun commit de ce dépôt ne correspond à ce cadrage — il décrit une décision antérieure.";
 }
 
-/** Lien vers la pull request sur github.com, dans le dépôt courant. */
+/** Link to the pull request on github.com, in the current repo. */
 function pullRequestLink(number: number): string {
   const d = store.repoRef();
   return `https://github.com/${d.owner}/${d.repo}/pull/${number}`;
@@ -187,7 +187,7 @@ async function loadHistory(ruleId: string): Promise<void> {
   gitLoading.value = true;
   try {
     const read = await timeline.loadRuleHistory(store.repoRef(), ruleId);
-    // la règle a pu changer pendant l'appel : ne pas écraser avec du périmé
+    // the rule may have changed during the call: do not overwrite with stale data
     if (id.value === ruleId) commits.value = read;
   } catch (e) {
     const message =
@@ -205,7 +205,7 @@ async function loadHistory(ruleId: string): Promise<void> {
   <div class="page-regle">
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="rule">
-      <!-- RG-regle-situee : une règle s'atteint souvent par la recherche ou par un impact, sans passer par l'arborescence. Le fil dit alors de quoi elle fait partie ; il remplace le seul retour vers le référentiel. -->
+      <!-- RG-regle-situee: a rule is often reached through search or through an impact, without going through the tree. The breadcrumb then says what it is part of; it replaces the lone link back to the specification. -->
       <nav class="fil" aria-label="Fil d’Ariane">
         <ol>
           <li>
@@ -398,7 +398,7 @@ async function loadHistory(ruleId: string): Promise<void> {
   color: var(--mat-sys-primary);
   text-decoration: underline;
 }
-/* RG-couleur-porteuse : la couleur dit le domaine, le nom reste écrit. */
+/* RG-couleur-porteuse: the colour tells the domain, the name stays written. */
 .fil .domaine {
   color: var(--pc-domaine);
 }
@@ -421,7 +421,7 @@ async function loadHistory(ruleId: string): Promise<void> {
   flex: 999 1 560px;
   min-width: 0;
 }
-/* Sur écran étroit, les voisines passent sous la fiche : elles orientent, elles ne doivent pas précéder ce qu'on est venu lire. */
+/* On a narrow screen, the neighbours move below the page: they help orient, they must not come before what one came to read. */
 .voisines {
   flex: 1 1 260px;
   max-width: 320px;
@@ -507,7 +507,7 @@ h1 {
 .bandeau-abrogee .material-symbols-outlined {
   flex: none;
 }
-/* RG-mesure-de-lecture : l'énoncé et l'histoire se lisent sur la mesure. */
+/* RG-mesure-de-lecture: the statement and the story are read on the measure. */
 .bloc {
   margin-bottom: 40px;
   max-width: var(--pc-mesure);
@@ -625,7 +625,7 @@ h1 {
 .git .pr:hover {
   text-decoration: underline;
 }
-/* Un cadrage sans commit n'est pas une anomalie : le référentiel peut décrire des décisions antérieures au dépôt. D'où un ton neutre. */
+/* A scoping without a commit is not an anomaly: the specification may describe decisions predating the repo. Hence a neutral tone. */
 .git-vide {
   font-size: 12.5px;
   font-style: italic;

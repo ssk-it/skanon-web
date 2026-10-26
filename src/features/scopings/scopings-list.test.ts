@@ -18,9 +18,9 @@ import { createAppRouter } from "../../router";
 import ScopingsPage from "./ScopingsPage.vue";
 
 /**
- * La liste des cadrages — RG-liste-cadrages-sobre et RG-liste-cadrages-filtrable.
+ * The scopings list — RG-liste-cadrages-sobre and RG-liste-cadrages-filtrable.
  *
- * Ce qui est éprouvé ici, c'est qu'une ligne ne dit que ce qui la distingue, et que la liste se parcourt par un mot ou un domaine sans perdre son ordre.
+ * What is tested here is that a row says only what distinguishes it, and that the list can be browsed by a word or a domain without losing its order.
  */
 
 function scoping(
@@ -145,7 +145,7 @@ function domain(f: VueWrapper, name: string): HTMLButtonElement {
   ].find((b) => b.textContent?.includes(name))!;
 }
 
-/** Fait échouer les lectures de dates en vol : chacune rend alors `null`. */
+/** Makes in-flight date reads fail: each then returns `null`. */
 async function denyDates(): Promise<void> {
   for (let round = 0; round < 20; round++) {
     await Promise.resolve();
@@ -156,7 +156,7 @@ async function denyDates(): Promise<void> {
   await new Promise((r) => setTimeout(r, 0));
 }
 
-describe("La liste des cadrages", () => {
+describe("The scopings list", () => {
   beforeEach(async () => {
     http = provideHttpTesting();
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
@@ -168,15 +168,15 @@ describe("La liste des cadrages", () => {
     await router.isReady();
   });
 
-  describe("une ligne sobre", () => {
-    it("nomme ses compteurs", async () => {
+  describe("a plain row", () => {
+    it("names its counters", async () => {
       const text = el(await mountView()).textContent ?? "";
 
       expect(text).toContain("2 décisions · 3 impacts");
       expect(text).toContain("1 décision · 1 impact");
     });
 
-    it("ne répète pas le statut des livrés, et garde celui des en cours", async () => {
+    it("does not repeat the status of delivered ones, and keeps that of in-progress ones", async () => {
       const f = await mountView();
 
       const bullets = [...el(f).querySelectorAll(".ligne .statut-chip")];
@@ -184,7 +184,7 @@ describe("La liste des cadrages", () => {
       expect(bullets[0].closest(".ligne")?.textContent).toContain("2026-005");
     });
 
-    it("garde l’identifiant affiché sur chaque ligne", async () => {
+    it("keeps the identifier displayed on each row", async () => {
       expect(lines(await mountView())).toEqual([
         "2026-005",
         "2026-004",
@@ -192,7 +192,7 @@ describe("La liste des cadrages", () => {
       ]);
     });
 
-    it("réunit les livrés sous « Livrés » tant qu’aucun n’est daté", async () => {
+    it("gathers delivered ones under « Livrés » as long as none is dated", async () => {
       const groups = [...el(await mountView()).querySelectorAll(".groupe")].map(
         (g) => g.firstChild?.textContent?.trim(),
       );
@@ -200,7 +200,7 @@ describe("La liste des cadrages", () => {
       expect(groups).toEqual(["En cours", "Livrés"]);
     });
 
-    it("dit une fois, avec sa cause, que les dates n’ont pas pu être lues", async () => {
+    it("says once, with its cause, that the dates could not be read", async () => {
       const f = await mountView();
       await denyDates();
       await flushPromises();
@@ -208,13 +208,13 @@ describe("La liste des cadrages", () => {
       const notes = el(f).querySelectorAll(".note-dates");
       expect(notes.length).toBe(1);
       expect(notes[0].textContent).toContain("n’ont pas pu être lues");
-      // sans jeton, la cause probable est la limite des requêtes anonymes
+      // without a token, the likely cause is the anonymous request limit
       expect(notes[0].textContent).toContain("Se connecter");
     });
   });
 
-  describe("un filtre", () => {
-    it("réduit la liste à un mot du titre, dans le même ordre", async () => {
+  describe("a filter", () => {
+    it("narrows the list to a word of the title, in the same order", async () => {
       const f = await mountView();
       await typeText(f, "diagrammes");
 
@@ -224,7 +224,7 @@ describe("La liste des cadrages", () => {
       );
     });
 
-    it("retient les cadrages des domaines choisis, en cours compris", async () => {
+    it("keeps the scopings of the chosen domains, in-progress ones included", async () => {
       const f = await mountView();
       domain(f, "Référentiel").click();
       await nextTick();
@@ -235,7 +235,7 @@ describe("La liste des cadrages", () => {
       );
     });
 
-    it("dit quand il ne retient rien, et s’efface", async () => {
+    it("says when it keeps nothing, and clears", async () => {
       const f = await mountView();
       await typeText(f, "introuvable");
 
@@ -250,7 +250,7 @@ describe("La liste des cadrages", () => {
       ).toBe("");
     });
 
-    it("se conserve au retour d’une fiche", async () => {
+    it("is kept when coming back from a scoping page", async () => {
       const first = await mountView();
       await typeText(first, "pièces");
       first.unmount();
@@ -262,7 +262,7 @@ describe("La liste des cadrages", () => {
       ).toBe("pièces");
     });
 
-    it("ne suit pas le lecteur dans un autre projet", async () => {
+    it("does not follow the reader into another project", async () => {
       const first = await mountView();
       await typeText(first, "pièces");
       first.unmount();

@@ -7,14 +7,14 @@ import { PLATFORM } from "../../platform/platform-token";
 import UiIcon from "../../ui/UiIcon.vue";
 
 /**
- * Le fonctionnement de Skanon, en une page : ce qu'il fait des jetons, ce qu'il garde sur le poste, comment il trouve les projets, à qui il parle.
+ * How Skanon works, on one page: what it does with tokens, what it keeps on the machine, how it finds projects, whom it talks to.
  *
- * Une annonce, au sens de RG-secret-conserve-localement : chaque phrase doit rester vraie du code. Ce qui diffère d'une cible à l'autre est dit pour la cible où l'on se trouve, non pour les deux — le lecteur n'a pas à savoir laquelle il utilise pour comprendre ce qui le concerne (RG-aide-fidele).
+ * A statement, in the sense of RG-secret-conserve-localement: every sentence must remain true of the code. What differs from one target to the other is said for the target one is on, not for both — readers need not know which one they use to understand what concerns them (RG-aide-fidele).
  */
 const onDesktop = inject(PLATFORM).target === "bureau";
-/** Ce que le livrable dit de lui-même — son hébergement, ses mises à jour, sa licence —, que la page rend sans le connaître (ADR-extensions-commerciales). */
+/** What the deliverable says about itself — its hosting, its updates, its licence —, which the page renders without knowing it (ADR-extensions-commerciales). */
 const help = inject(COMPOSITION).help;
-/** Dans le navigateur, les jetons sont scellés par une passkey ou gardés en clair : l'aide dit ce qui est (RG-secret-conserve-localement). */
+/** In the browser, tokens are sealed by a passkey or kept in clear: the help says which is the case (RG-secret-conserve-localement). */
 const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
 </script>
 

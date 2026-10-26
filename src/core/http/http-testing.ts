@@ -9,9 +9,9 @@ import {
 } from "./http";
 
 /**
- * La doublure du transport HTTP, dans la forme du `HttpTestingController` d'Angular : un test lance l'appel, trouve la requête par `expectOne`, puis y répond par `flush` ou `error`.
+ * The HTTP transport's fake, in the shape of Angular's `HttpTestingController`: a test starts the call, finds the request with `expectOne`, then answers it with `flush` or `error`.
  *
- * La requête est enregistrée au moment même où le client l'émet. Un appelant qui attend une promesse avant d'émettre — une file d'attente, un cache consulté d'abord — n'a pas encore émis quand le test reprend la main : `await settle()` laisse passer les microtâches en attente.
+ * The request is recorded at the very moment the client emits it. A caller that awaits a promise before emitting — a queue, a cache consulted first — has not emitted yet when the test resumes: `await settle()` lets pending microtasks through.
  */
 export class TestRequest {
   private answered = false;
@@ -51,7 +51,7 @@ export class TestRequest {
     );
   }
 
-  /** L'absence de réponse — réseau coupé, requête refusée par le navigateur — ou, avec un statut, une erreur sans corps. */
+  /** The absence of a response — network down, request refused by the browser — or, with a status, an error without a body. */
   error(
     cause: unknown,
     options: {
@@ -63,7 +63,7 @@ export class TestRequest {
     this.assertOpen();
     const status = options.status ?? 0;
     if (status === 0) {
-      // Comme `fetch` : aucune réponse, une erreur de statut 0 qui porte la cause.
+      // Like `fetch`: no response, a status 0 error carrying the cause.
       this.reject(
         new HttpErrorResponse(
           0,
@@ -186,14 +186,14 @@ function describe(criterion: Criterion): string {
   return `${criterion.method ?? "*"} ${criterion.url ?? "*"}`;
 }
 
-/** Installe la doublure dans le conteneur, et la rend. */
+/** Installs the fake in the container, and returns it. */
 export function provideHttpTesting(): HttpTestingController {
   const controller = new HttpTestingController();
   provide(HTTP_BACKEND, controller);
   return controller;
 }
 
-/** Laisse passer les microtâches en attente : ce qu'un appelant fait avant d'émettre sa requête. */
+/** Lets pending microtasks through: what a caller does before emitting its request. */
 export async function settle(rounds = 10): Promise<void> {
   for (let i = 0; i < rounds; i++) await Promise.resolve();
 }

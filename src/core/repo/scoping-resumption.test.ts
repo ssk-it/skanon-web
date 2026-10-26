@@ -5,19 +5,19 @@ import { RepoConfig } from "./repo-config";
 import { AuthoringService } from "./authoring.service";
 
 /**
- * Reprendre un cadrage — RG-cadrage-livre-immuable et
+ * Resuming a scoping — RG-cadrage-livre-immuable and
  * RG-cadrages-en-cours-visibles.
  *
- * Un cadrage que la branche principale porte est livré, et ne se modifie plus :
- * le charger depuis elle pour y écrire directement contournerait la
- * vérification. Un cadrage en cours, lui, se reprend depuis sa branche, qu'une
- * demande de fusion la porte ou non encore.
+ * A scoping the main branch carries is delivered, and is no longer modified:
+ * loading it from there to write to it directly would bypass verification. A
+ * scoping in progress, for its part, is resumed from its branch, whether or
+ * not a pull request carries it yet.
  */
-describe("Reprendre un cadrage", () => {
+describe("Resuming a scoping", () => {
   const PATH = "cadrages/2026-060/cadrage.md";
   const CONTENT = "---\nid: 2026-060\ntitre: Un cadrage\n---\n";
 
-  /** Ce que porte chaque branche du dépôt, par chemin. */
+  /** What each branch of the repo carries, by path. */
   let branches: Record<string, string[]>;
   let requests: Array<{ number: number; branch: string }>;
 
@@ -47,7 +47,7 @@ describe("Reprendre un cadrage", () => {
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
-  it("refuse un cadrage livré, et dit de passer par un nouveau cadrage", async () => {
+  it("refuses a delivered scoping, and says to go through a new scoping", async () => {
     branches.main = [PATH];
 
     await expect(
@@ -55,7 +55,7 @@ describe("Reprendre un cadrage", () => {
     ).rejects.toThrow(/livré.*nouveau cadrage/s);
   });
 
-  it("refuse un cadrage livré même quand une branche le porte encore", async () => {
+  it("refuses a delivered scoping even when a branch still carries it", async () => {
     branches.main = [PATH];
     branches["cadrage-2026-060"] = [PATH];
     requests = [{ number: 4, branch: "cadrage-2026-060" }];
@@ -65,7 +65,7 @@ describe("Reprendre un cadrage", () => {
     ).rejects.toThrow(/livré/);
   });
 
-  it("charge un cadrage en cours depuis la branche de sa demande de fusion", async () => {
+  it("loads a scoping in progress from its pull request's branch", async () => {
     branches["travail-de-luc"] = [PATH];
     requests = [{ number: 4, branch: "travail-de-luc" }];
 
@@ -74,7 +74,7 @@ describe("Reprendre un cadrage", () => {
     expect(readAt.source.branch).toBe("travail-de-luc");
   });
 
-  it("charge un cadrage en cours depuis sa branche, sans demande de fusion", async () => {
+  it("loads a scoping in progress from its branch, without a pull request", async () => {
     branches["cadrage/2026-060"] = [PATH];
 
     const readAt = await inject(AuthoringService).loadForEditing("2026-060");
@@ -83,7 +83,7 @@ describe("Reprendre un cadrage", () => {
     expect(readAt.source.sha).toBe("sha-cadrage/2026-060");
   });
 
-  it("dit qu’aucune branche ne porte un cadrage introuvable", async () => {
+  it("says that no branch carries a scoping not found", async () => {
     await expect(
       inject(AuthoringService).loadForEditing("2026-060"),
     ).rejects.toThrow(/aucune branche/);

@@ -4,12 +4,12 @@ import { SpecificationStore } from "./specification.store";
 import { RepoConfig, sameRepo } from "./repo-config";
 
 /**
- * Ouvre le dépôt que porte l'adresse.
+ * Opens the repo the address carries.
  *
- * L'URL fait autorité, non la mémoire du navigateur : une adresse partagée doit
- * montrer le même projet chez celui qui la reçoit. Le chargement n'est pas
- * attendu — les vues savent afficher leur état — mais il est lancé avant elles,
- * sans quoi chaque page devrait le déclencher elle-même.
+ * The URL is authoritative, not the browser's memory: a shared address must
+ * show the same project to whoever receives it. Loading is not awaited — the
+ * views know how to display their state — but it is started before them,
+ * otherwise each page would have to trigger it itself.
  */
 export const repoGuard: NavigationGuard = (to) => {
   const owner =
@@ -22,8 +22,8 @@ export const repoGuard: NavigationGuard = (to) => {
   const store = inject(SpecificationStore);
   const request = { owner, repo };
 
-  // Rechargé seulement si le dépôt change : sans ce contrôle, naviguer d'une
-  // vue à l'autre du même projet rejouerait cinquante-huit lectures.
+  // Reloaded only if the repo changes: without this check, navigating from
+  // one view to another of the same project would replay fifty-eight reads.
   if (!sameRepo(config.repoRef(), request) || store.state() === "vide") {
     void store.loadSpecification(request);
   }

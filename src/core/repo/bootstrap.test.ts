@@ -6,14 +6,14 @@ import { SpecificationStore } from "./specification.store";
 import { BootstrapService } from "./bootstrap.service";
 
 /**
- * L'amorçage d'un dépôt vide — RG-amorcage-depot, RG-statuts-cadrage.
+ * Bootstrapping an empty repo — RG-amorcage-depot, RG-statuts-cadrage.
  *
- * Le statut d'un cadrage se déduit du dépôt, et les opérations d'impact sont
- * fixes : les écrire dans `ssk-canon.yml` ferait passer pour réglable ce que
- * plus rien ne lit.
+ * A scoping's status is derived from the repo, and impact operations are
+ * fixed: writing them in `ssk-canon.yml` would pass off as configurable what
+ * nothing reads any more.
  */
-describe("L’amorçage d’un dépôt", () => {
-  it("n’écrit dans la configuration que ce qui se lit", async () => {
+describe("Bootstrapping a repo", () => {
+  it("only writes to the configuration what is read", async () => {
     const written = new Map<string, string>();
     resetInjection();
     provide(GithubClient, {
@@ -42,7 +42,7 @@ describe("L’amorçage d’un dépôt", () => {
     const config = written.get("ssk-canon.yml") ?? "";
     expect(config).toContain("nom: Essai");
     expect(config).toContain("tags_liens:");
-    // Une piste se cite depuis le cadrage qui la réalise (cadrage 2026-058).
+    // A roadmap item is cited from the scoping that carries it out (scoping 2026-058).
     expect(config).toContain("  - piste\n");
     expect(config).not.toMatch(/^statuts:/m);
     expect(config).not.toMatch(/^operations:/m);

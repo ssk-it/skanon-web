@@ -10,11 +10,11 @@ import { ContentCache, INDEXEDDB_FACTORY } from "./content-cache";
 import { GithubClient, GithubError } from "../github/github-client";
 
 /**
- * RG-dernier-etat-connu et RG-contenus-par-empreinte, vus depuis le store :
- * ce qu'on affiche quand le dépôt ne répond pas, et ce que le cache garde une
- * fois la branche principale et les branches de cadrage lues.
+ * RG-dernier-etat-connu and RG-contenus-par-empreinte, seen from the store:
+ * what is shown when the repo does not answer, and what the cache keeps once
+ * the default branch and the scoping branches have been read.
  */
-describe("dernier état connu et retrait du cache", () => {
+describe("last known state and removal from the cache", () => {
   const REPO = { owner: "org", repo: "projet" };
   const API = "https://api.github.com/repos/org/projet";
   const RAW = "https://raw.githubusercontent.com/org/projet";
@@ -52,7 +52,7 @@ describe("dernier état connu et retrait du cache", () => {
     });
   }
 
-  /** Une première visite : la principale, puis une branche de cadrage ouverte. */
+  /** A first visit: the default branch, then an open scoping branch. */
   async function firstVisit(): Promise<void> {
     newVisit();
     const loading = store.loadSpecification(REPO);
@@ -85,7 +85,7 @@ describe("dernier état connu et retrait du cache", () => {
     factory = new IDBFactory();
   });
 
-  it("affiche le dernier état lu, et refuse d’y écrire, quand le dépôt ne répond pas", async () => {
+  it("shows the last read state, and refuses to write to it, when the repo does not answer", async () => {
     await firstVisit();
 
     newVisit();
@@ -99,7 +99,7 @@ describe("dernier état connu et retrait du cache", () => {
     expect(store.findRule("RG-a")).toBeTruthy();
     expect(store.unconfirmed()?.cause).toContain("injoignable");
 
-    // L'écriture est refusée avant même de partir.
+    // The write is refused before it even goes out.
     const github = inject(GithubClient);
     await expect(
       github.createBranch(REPO, "cadrage-2", "c1"),
@@ -107,7 +107,7 @@ describe("dernier état connu et retrait du cache", () => {
     http.verify();
   });
 
-  it("lève la marque et rouvre l’écriture dès que le dépôt répond", async () => {
+  it("lifts the mark and reopens writing as soon as the repo answers", async () => {
     await firstVisit();
 
     newVisit();
@@ -126,7 +126,7 @@ describe("dernier état connu et retrait du cache", () => {
     expect(inject(GithubClient).writeSuspended()).toBeNull();
   });
 
-  it("retire ce que seule une branche refermée citait", async () => {
+  it("removes what only a closed branch cited", async () => {
     await firstVisit();
 
     newVisit();

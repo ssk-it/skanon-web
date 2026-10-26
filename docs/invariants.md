@@ -1,47 +1,47 @@
 # Invariants
 
-Les contraintes que Skanon ne transgresse pas. Elles découlent de contraintes vérifiées — de la plateforme GitHub, du stockage, du système —, pas de préférences. Les citer par leur numéro, en revue, en message de commit, en commentaire.
+The constraints Skanon does not break. They follow from verified constraints — of the GitHub platform, of storage, of the system —, not from preferences. Cite them by number, in review, in commit messages, in comments.
 
-**En changer** se fait par une décision explicite : la proposer dans une demande de fusion qui modifie ce fichier, et, si elle touche au produit, par un cadrage dans [ssk-it/ssk-canon](https://github.com/ssk-it/ssk-canon). Jamais par contournement. Un invariant levé garde son numéro, marqué comme levé, avec la date et la raison.
+**Changing one** takes an explicit decision: propose it in a pull request that modifies this file and, if it touches the product, through a scoping in [ssk-it/ssk-canon](https://github.com/ssk-it/ssk-canon). Never by working around it. A lifted invariant keeps its number, marked as lifted, with the date and the reason.
 
-`INV-1` à `INV-6` viennent de SSK Canon, dont Skanon hérite le format et la couche d'accès ; ils sont repris ici parce que leur raison n'a pas changé de plateforme.
+`INV-1` to `INV-6` come from SSK Canon, whose format and access layer Skanon inherits; they are restated here because their reason did not change with the platform.
 
-## INV-1 — Un chemin de fichier ne se renomme jamais
+## INV-1 — A file path is never renamed
 
-Aucune API GitHub ne suit les renommages : un fichier déplacé dans un dépôt de projet perd tout son historique visible depuis l'application. Les règles vivent à plat dans `rules/`, les fonctionnalités à plat dans `features/`, et les dossiers de cadrage portent l'identifiant seul. Sans cette règle, le défaut est silencieux : la règle s'affiche, mais sa chronologie commence au renommage.
+No GitHub API follows renames: a file moved in a project repo loses all its history as seen from the application. Rules live flat in `rules/`, features flat in `features/`, and scoping folders carry the identifier alone. Without this rule the defect is silent: the rule is displayed, but its timeline starts at the rename.
 
-## INV-2 — L'histoire ne se stocke pas, elle se dérive
+## INV-2 — History is not stored, it is derived
 
-Aucun champ `historique:` dans un frontmatter. Git porte déjà l'histoire ; la dupliquer garantit sa divergence. Les champs `cree_par` et `modifie_par` sont un index de performance écrit par l'automatisation, jamais une source de vérité, jamais écrits par l'application.
+No `historique:` field in a frontmatter. Git already holds the history; duplicating it guarantees divergence. The `cree_par` and `modifie_par` fields are a performance index written by the automation, never a source of truth, never written by the application.
 
-## INV-3 — Déposer une pièce jointe avant de commiter ce qui la cite
+## INV-3 — Upload an attachment before committing what cites it
 
-Une pièce jointe est stockée sous l'empreinte SHA-256 de son contenu, puis seulement le Markdown qui la référence est commité. L'ordre inverse produit des pointeurs morts, que rien ne signale jusqu'à ce qu'un lecteur clique.
+An attachment is stored under the SHA-256 fingerprint of its content, and only then is the Markdown that references it committed. The reverse order produces dead pointers, which nothing reports until a reader clicks.
 
-## INV-4 — Un objet stocké n'est ni modifié ni supprimé à la légère
+## INV-4 — A stored object is neither modified nor deleted lightly
 
-L'adressage par contenu rend la cohérence entre Git et le stockage automatique, à condition que les objets soient immuables. Plusieurs cadrages partagent le même objet : le comptage de références pour la collecte est global au dépôt, jamais local à un cadrage.
+Content addressing makes consistency between Git and storage automatic, provided objects are immutable. Several scopings share the same object: reference counting for collection is global to the repo, never local to a scoping.
 
-## INV-5 — Le composant d'échange est le seul endroit où les autorisations s'appliquent
+## INV-5 — The exchange component is the only place where authorisations apply
 
-L'application GitHub a les mêmes droits pour tout le monde ; si le composant d'échange se contentait de relayer, tout porteur d'une identité écrirait dans n'importe quel projet. Un binaire distribué n'y change rien : la clé privée de l'application GitHub ne vit jamais sur le poste.
+The GitHub App has the same rights for everyone; if the exchange component merely relayed, anyone holding an identity could write to any project. A distributed binary changes nothing: the GitHub App's private key never lives on the machine.
 
-## INV-6 — Les appels à GitHub sont régulés par le client
+## INV-6 — Calls to GitHub are throttled by the client
 
-Les limites secondaires de l'API — cent requêtes concurrentes, cinq cents écritures par heure — sont partagées par tous les utilisateurs d'une installation, et un composant sans état ne peut pas réguler. Deux files bornées dans la couche d'accès : six requêtes concurrentes vers l'API, vingt-quatre vers les contenus bruts, qui n'ont pas de quota.
+The API's secondary limits — one hundred concurrent requests, five hundred writes per hour — are shared by all users of an installation, and a stateless component cannot throttle. Two bounded queues in the access layer: six concurrent requests to the API, twenty-four to raw contents, which have no quota.
 
-## INV-7 — La lecture du format s'écrit une seule fois, dans `@ssk-it/canon-check`
+## INV-7 — Format reading is written once, in `@ssk-it/canon-check`
 
-Le découpage du frontmatter, les règles du format et leur vérification vivent dans la bibliothèque commune à l'application et à l'automatisation (RG-parseur-partage). Le cœur natif de l'application de bureau ne lit ni ne vérifie le format : il garde des secrets et parle au système. Sans cette règle, deux implémentations divergent, et un dépôt que l'application accepte est refusé par la vérification — ou l'inverse —, sans que ni l'une ni l'autre ne soit en faute.
+Frontmatter splitting, the format rules and their verification live in the library shared by the application and the automation (RG-parseur-partage). The native core of the desktop application neither reads nor verifies the format: it keeps secrets and talks to the system. Without this rule, two implementations diverge, and a repo the application accepts is rejected by the verification — or the reverse —, without either one being at fault.
 
-## INV-8 — Un jeton ne quitte le poste que vers GitHub
+## INV-8 — A token leaves the machine only towards GitHub
 
-Un jeton d'accès ne transite par aucun lien, aucune adresse, aucun journal, et ne s'affiche que par ses derniers caractères. Dans l'application de bureau, il ne s'écrit que dans le coffre que protège le système, jamais en clair sur le disque ; dans la version web, il vit dans le stockage local du navigateur — en clair, ou scellé par une passkey dont la clé ne quitte jamais le trousseau de l'utilisateur —, et l'interface dit lequel. Un projet qui exige la passkey ne voit jamais son jeton gardé en clair : sans elle, il ne vaut que pour l'onglet (RG-protection-du-jeton-par-projet, cadrage 2026-055).
+An access token travels through no link, no address, no log, and is displayed only by its last characters. In the desktop application it is written only to the vault the system protects, never in clear on disk; in the web version it lives in the browser's local storage — in clear, or sealed by a passkey whose key never leaves the user's keychain —, and the interface says which. A project that requires the passkey never sees its token kept in clear: without the passkey, the token is valid for the tab only (RG-protection-du-jeton-par-projet, scoping 2026-055).
 
-## INV-9 — Un seul code d'interface pour les deux livrables
+## INV-9 — One interface codebase for both deliverables
 
-L'application de bureau et la version web sont construites depuis les mêmes sources. Ce qui diffère d'un système à l'autre passe par les ports de `src/plateforme/ports.ts` ; ce qui tient au livrable, par les extensions de `src/extension/`. Chaque livrable a sa racine de composition — `src/main.ts` pour le web, celle de l'application de bureau dans son dépôt —, seule à choisir ses adaptateurs et ses extensions. Sans cette règle, une vue testée dans l'une casse dans l'autre, et la comparaison des deux livrables ne mesure plus le même produit.
+The desktop application and the web version are built from the same sources. What differs from one system to another goes through the ports of `src/platform/ports.ts`; what belongs to the deliverable, through the extensions of `src/extension/`. Each deliverable has its composition root — `src/main.ts` for the web, the desktop application's in its repo —, the only place that chooses its adapters and its extensions. Without this rule, a view tested in one breaks in the other, and comparing the two deliverables no longer measures the same product.
 
-## INV-10 — Le code commun ne nomme aucune extension
+## INV-10 — Shared code names no extension
 
-L'interface commune déclare des points d'extension et rend ce qu'on y met ; elle ne sait pas qui les remplit. Aucun fichier de ce dépôt n'importe le code de l'application de bureau, ni ne nomme ce qu'elle vend — son service de mise à jour, sa licence, ses causes —, et aucune vue ne teste la présence d'une extension. Un point se nomme d'après l'endroit de l'interface, jamais d'après une fonctionnalité. Sans cette règle, le dépôt public porterait la logique commerciale qu'il n'a pas à porter, et chaque évolution de l'offre payante demanderait une fusion publique (ADR-extensions-commerciales). `src/couches.test.ts` la fait respecter.
+The shared interface declares extension points and renders what is put in them; it does not know who fills them. No file in this repo imports the desktop application's code, or names what it sells — its update service, its licence, its causes —, and no view tests for the presence of an extension. A point is named after the place in the interface, never after a feature. Without this rule, the public repo would carry commercial logic it has no business carrying, and each change to the paid offer would require a public merge (ADR-extensions-commerciales). `src/layers.test.ts` enforces it.

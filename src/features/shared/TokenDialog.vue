@@ -15,12 +15,12 @@ import UiDialog from "../../ui/UiDialog.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import UiSelect from "../../ui/UiSelect.vue";
 
-// Où vit le jeton n'est pas le même selon la cible (INV-8) : le texte le dit, sans promettre plus que ce que fait chacune.
+// Where the token lives is not the same depending on the target (INV-8): the text says so, without promising more than what each one does.
 const onDesktop = inject(PLATFORM).target === "bureau";
 import TokenHelp from "./TokenHelp.vue";
 
 /**
- * La connexion à GitHub : le jeton, sa portée, ce que le mode d'accès du projet garantit — ou, sous une identité tierce, la connexion auprès du fournisseur du projet. Se ferme sur `true` quand l'accès a changé et que le dépôt doit être relu.
+ * Sign-in to GitHub: the token, its scope, what the project's access mode guarantees — or, under a third-party identity, sign-in with the project's provider. Closes on `true` when access has changed and the repo must be read again.
  */
 defineProps<{ data?: unknown }>();
 const emit = defineEmits<{ close: [change?: boolean] }>();
@@ -31,31 +31,31 @@ const store = inject(SpecificationStore);
 const identity = inject(IdentityService);
 const config = inject(RepoConfig);
 
-/** Mode d'accès du projet, et ce qu'il garantit. */
+/** The project's access mode, and what it guarantees. */
 const mode = computed(() => store.specification().settings.access);
 const modeLabel = computed(() => ACCESS_MODE_LABEL[mode.value]);
 const guarantees = computed(() => GUARANTEES[mode.value]);
 const viaThirdPartyIdentity = computed(() => mode.value === "identite_tierce");
 const who = computed(() => tokens.identity());
 
-/** Conduit vers l'émetteur d'identité — la page est quittée. */
+/** Leads to the identity issuer — the page is left. */
 async function signIn(): Promise<void> {
-  // Fermer avant de partir : au retour, l'application repart de zéro et un dialogue resté ouvert n'aurait plus de sens.
+  // Close before leaving: on return, the application starts from scratch and a dialog left open would no longer make sense.
   emit("close", false);
   await identity.signIn();
 }
 
-/** Ce que ce navigateur sait de la passkey, su à l'ouverture : `null` d'ici là. */
+/** What this browser knows of the passkey, learnt on opening: `null` until then. */
 const protectable = ref<boolean | null>(null);
 onMounted(async () => {
   protectable.value = await tokens.canProtect();
 });
 
-/** Ce que la saisie propose par défaut : protéger. Le rédacteur peut s'en passer, sauf quand le projet l'exige (RG-protection-du-jeton-par-projet). */
+/** What the input offers by default: protect. The author may do without it, except when the project requires it (RG-protection-du-jeton-par-projet). */
 const protect = ref(true);
 const protecting = ref(false);
 
-/** Ce que le dialogue dit de la protection du jeton, selon la cible, le projet et le navigateur. */
+/** What the dialog says about token protection, depending on the target, the project and the browser. */
 const protection = computed(() => {
   const form = tokens.form();
   if (form === "systeme" || protectable.value === null) return "aucune";
@@ -66,7 +66,7 @@ const protection = computed(() => {
   return tokens.protectionRequired() ? "exigee" : "proposee";
 });
 
-/** Où le jeton saisi sera gardé, pour le dire sans promettre plus que ce que fait chaque forme (INV-8). */
+/** Where the entered token will be kept, to say so without promising more than what each form does (INV-8). */
 const whereKept = computed(() => {
   switch (tokens.form()) {
     case "systeme":
@@ -80,7 +80,7 @@ const whereKept = computed(() => {
   }
 });
 
-/** Ouvre les jetons scellés ; part du clic, comme le navigateur l'exige. */
+/** Opens the sealed tokens; starts from the click, as the browser requires. */
 async function unlock(): Promise<void> {
   if ((await tokens.unlock()) === "ouvert") emit("close", true);
 }
@@ -88,15 +88,15 @@ async function unlock(): Promise<void> {
 const input = ref("");
 const viaApi = ref(github.contentsViaApi());
 /**
- * Le message d'une saisie refusée. Validée à la soumission plutôt que par un validateur : le champ n'est en erreur que tant qu'un message l'y met.
+ * The message of a rejected input. Validated on submit rather than by a validator: the field is in error only while a message puts it there.
  */
 const error = ref<string | null>(null);
 
-/** Les deux portées proposées, déduites du dépôt ouvert. */
+/** The two scopes offered, deduced from the open repo. */
 const organizationKey = computed(() => repoKeys(config.repoRef()).organization);
 const repoKey = computed(() => repoKeys(config.repoRef()).exact);
 
-/** L'organisation par défaut : c'est la frontière que la plateforme emploie. */
+/** The default organisation: it is the boundary the platform uses. */
 const scope = ref(repoKeys(config.repoRef()).organization);
 
 const scopeOptions = computed(() => [
@@ -121,9 +121,9 @@ function changeInput(value: string): void {
 }
 
 /**
- * Demande à la plateforme ce que ce jeton ouvre, avant de l'enregistrer.
+ * Asks the platform what this token opens, before saving it.
  *
- * Un jeton restreint à une sélection de dépôts est refusé sans motif lisible quand on ouvre un dépôt qu'il ne couvre pas. Le montrer maintenant évite de chercher la cause ailleurs.
+ * A token restricted to a selection of repos is refused without a readable reason when opening a repo it does not cover. Showing it now avoids looking for the cause elsewhere.
  */
 async function check(): Promise<void> {
   const problem = TokenService.checkForm(input.value);
@@ -161,7 +161,7 @@ function forget(key: string): void {
 }
 
 async function validate(): Promise<void> {
-  // sans saisie mais avec un jeton déjà présent, on ne change que l'option
+  // without input but with a token already present, only the option changes
   if (!input.value.trim() && tokens.present()) {
     github.useApiForContents(viaApi.value);
     emit("close", true);
@@ -173,8 +173,8 @@ async function validate(): Promise<void> {
     error.value = problem;
     return;
   }
-  // Une portée vide vaut « tous les autres dépôts » : c'est le jeton général, celui qui sert quand aucune portée ne correspond.
-  // Le scellement part de ce clic, sans attente avant lui : le navigateur ne sollicite la passkey que depuis un geste.
+  // An empty scope means « all other repos »: it is the general token, the one used when no scope matches.
+  // Sealing starts from this click, with no wait before it: the browser only prompts for the passkey from a gesture.
   if (
     protection.value === "exigee" ||
     (protection.value === "proposee" && protect.value)
@@ -191,10 +191,10 @@ async function validate(): Promise<void> {
   emit("close", true);
 }
 
-/** Oublie tout accès, quelle qu'en soit la source. */
+/** Forgets any access, whatever its source. */
 function signOut(): void {
   tokens.erase();
-  // sans jeton, charger par l'API épuiserait le quota en un chargement
+  // without a token, loading through the API would exhaust the quota in a single load
   github.useApiForContents(false);
   emit("close", true);
 }
@@ -212,7 +212,7 @@ function signOut(): void {
       pull requests, que GitHub refuse aux requêtes anonymes.
     </p>
 
-    <!-- RG-garanties-annoncees : un mode qui laisserait croire à une protection qu'il n'offre pas serait pire que son absence. -->
+    <!-- RG-garanties-annoncees: a mode that would suggest a protection it does not offer would be worse than its absence. -->
     <div class="garanties">
       <p class="mode">
         Ce projet emploie le mode <strong>{{ modeLabel }}</strong
@@ -239,7 +239,7 @@ function signOut(): void {
             l’application, non vérifié à la source.
           </template>
         </li>
-        <!-- RG-contenus-prives-au-repos : ce que le cache laisse sur le poste se dit, sans protection prétendue. -->
+        <!-- RG-contenus-prives-au-repos: what the cache leaves on the machine is said, without claiming protection. -->
         <li>
           <template v-if="viaThirdPartyIdentity">
             Les contenus d’un dépôt privé restent dans cet onglet le temps de la
@@ -345,7 +345,7 @@ function signOut(): void {
         hint="Un jeton par organisation : celui d’une autre ne s’en trouve pas écrasé."
       />
 
-      <!-- RG-secret-conserve-localement : la passkey protège le jeton au repos, non dans la page ; le texte n'en promet pas plus. -->
+      <!-- RG-secret-conserve-localement: the passkey protects the token at rest, not in the page; the text promises no more. -->
       <div v-if="protection !== 'aucune'" class="protection">
         <template v-if="protection === 'proposee'">
           <UiCheckbox v-model="protect">
@@ -407,7 +407,7 @@ function signOut(): void {
         {{ verifying ? "Vérification…" : "Vérifier ce que le jeton ouvre" }}
       </UiButton>
 
-      <!-- Dépliée tant que rien n'est enregistré : c'est le moment où l'on en a besoin. -->
+      <!-- Expanded as long as nothing is saved: that is the moment one needs it. -->
       <details class="guide" :open="tokens.noAccess()">
         <summary>Comment créer un jeton ?</summary>
         <TokenHelp />
@@ -458,7 +458,7 @@ function signOut(): void {
 </template>
 
 <style scoped>
-/* Sans hauteur bornée, l'aide dépliée pousse les boutons hors de l'écran et le reste du formulaire devient inatteignable. */
+/* Without a bounded height, the expanded help pushes the buttons off screen and the rest of the form becomes unreachable. */
 .token-dialog :deep(.ui-dialogue__contenu) {
   max-height: min(70vh, 620px);
 }
@@ -505,7 +505,7 @@ function signOut(): void {
     color: var(--mat-sys-on-surface-variant);
   }
   .courriel {
-    /* Le balisage avale l'espace entre un bloc conditionnel et ce qui le précède : la séparation vient donc du style. */
+    /* Markup swallows the space between a conditional block and what precedes it: the separation therefore comes from the style. */
     &::before {
       content: " · ";
     }

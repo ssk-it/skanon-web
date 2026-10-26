@@ -2,17 +2,17 @@ import { describe, expect, it } from "vitest";
 import { parseCodeRepos } from "./repo-loader";
 
 /**
- * Les dépôts de code viennent du fichier de configuration, donc d'un texte
- * écrit à la main. Le skill de cadrage s'en sert pour se situer : une entrée
- * douteuse doit être écartée et dite, jamais rendre le référentiel illisible.
+ * Code repos come from the configuration file, hence from text
+ * written by hand. The scoping skill uses them to situate itself: a dubious
+ * entry must be set aside and reported, never make the specification unreadable.
  */
-describe("dépôts de code déclarés par le projet", () => {
-  it("rend une liste vide quand rien n’est déclaré", () => {
+describe("code repos declared by the project", () => {
+  it("returns an empty list when nothing is declared", () => {
     expect(parseCodeRepos(undefined)).toEqual({ repos: [], anomalies: [] });
     expect(parseCodeRepos(null).repos).toEqual([]);
   });
 
-  it("lit un dépôt avec son rôle", () => {
+  it("reads a repo with its role", () => {
     const { repos, anomalies } = parseCodeRepos([
       { repo: "Wayne-Corp/wayne-front", role: "Application web" },
     ]);
@@ -22,13 +22,13 @@ describe("dépôts de code déclarés par le projet", () => {
     expect(anomalies).toEqual([]);
   });
 
-  it("admet la forme courte, le rôle n’apprenant rien sur un projet à un seul dépôt", () => {
+  it("accepts the short form, the role telling nothing about a single-repo project", () => {
     expect(parseCodeRepos(["ssk-it/ssk-canon-pwa"]).repos).toEqual([
       { repo: "ssk-it/ssk-canon-pwa", role: "" },
     ]);
   });
 
-  it("écarte un dépôt mal nommé, et dit lequel", () => {
+  it("sets aside a misnamed repo, and says which one", () => {
     const { repos, anomalies } = parseCodeRepos([
       "sans-organisation",
       { repo: "ssk-it/ssk-canon-pwa" },
@@ -38,7 +38,7 @@ describe("dépôts de code déclarés par le projet", () => {
     expect(anomalies[0]).toContain("sans-organisation");
   });
 
-  it("signale une valeur qui n’est pas une liste, sans rien retenir", () => {
+  it("flags a value that is not a list, keeping nothing", () => {
     const { repos, anomalies } = parseCodeRepos("ssk-it/ssk-canon-pwa");
     expect(repos).toEqual([]);
     expect(anomalies.length).toBe(1);

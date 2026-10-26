@@ -5,13 +5,13 @@ import UiOptionList from "./UiOptionList.vue";
 import { placeBelow, useOverlay, type Position } from "./overlay";
 
 /**
- * Un champ de saisie qui propose des valeurs : `matInput` et son `mat-autocomplete`.
+ * A text field that suggests values: `matInput` and its `mat-autocomplete`.
  *
  * ```vue
- * <UiAutocompletion v-model="tag" libelle="Nature" :options="tagsProposes" indice="Choisir dans la liste, ou saisir une nature nouvelle" />
+ * <UiAutocomplete v-model="tag" label="Nature" :options="proposedTags" hint="Choisir dans la liste, ou saisir une nature nouvelle" />
  * ```
  *
- * La saisie reste libre : une proposition choisie remplace le texte, rien n'oblige à en choisir une. Le filtrage appartient à l'appelant, qui passe les propositions déjà filtrées par ce qui est tapé. Comme chez Material, aucune proposition n'est active d'office : Entrée ne choisit qu'après une flèche. Les autres attributs, écouteurs et l'emplacement `#indice` passent à `UiChamp`.
+ * Input stays free: a chosen suggestion replaces the text, nothing forces choosing one. Filtering belongs to the caller, which passes the suggestions already filtered by what is typed. As in Material, no suggestion is active by default: Enter only chooses after an arrow key. The other attributes, listeners and the `#indice` slot pass to `UiTextField`.
  */
 defineOptions({ inheritAttrs: false });
 

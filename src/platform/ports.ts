@@ -1,126 +1,126 @@
 /**
- * Ce que l'interface demande au système, et rien de plus. Chaque cible — l'application de bureau, la version web — fournit ses adaptateurs ; seul `src/plateforme.ts` les choisit (docs/pratiques.md, « La frontière avec le système »).
+ * What the interface asks of the system, and nothing more. Each target — the desktop application, the web version — provides its adapters; only the composition root of each deliverable chooses them, `src/main.ts` for the web (docs/practices.md, "The boundary with the system").
  */
 
-/** Le jeton général, et les jetons par portée (RG-secret-conserve-localement). */
+/** The general token, and the tokens by scope (RG-secret-conserve-localement). */
 export interface StoredTokens {
   readonly general: string | null;
   readonly byScope: readonly (readonly [string, string])[];
 }
 
 /**
- * Ce qu'est devenue une écriture dans le coffre. Refusée, le secret vaut pour la session en mémoire, et l'interface le dit : il ne sera pas retrouvé au lancement suivant — ou, pour un effacement, il le sera (RG-secret-conserve-localement).
+ * What became of a write to the vault. Refused, the secret is valid for the session in memory, and the interface says so: it will not be found at the next launch — or, for an erasure, it will be (RG-secret-conserve-localement).
  */
 export type VaultWrite = "faite" | "refusee";
 
 /**
- * Où vivent les jetons d'accès. Aucune opération ne lève : un coffre indisponible laisse les jetons valoir pour la session en mémoire, il n'empêche pas l'application de démarrer.
+ * Where access tokens live. No operation throws: an unavailable vault leaves the tokens valid for the session in memory, it does not prevent the application from starting.
  */
 export interface TokenVault {
-  /** Ce que le coffre garde ; rien si le coffre est vide ou illisible. */
+  /** What the vault keeps; nothing if the vault is empty or unreadable. */
   loadTokens(): Promise<StoredTokens>;
   saveTokens(tokens: StoredTokens): Promise<VaultWrite>;
   deleteTokens(): Promise<VaultWrite>;
 }
 
 /**
- * Où en sont des jetons scellés par une passkey : aucun scellé (le coffre les garde en clair, ou n'en garde pas), scellés mais fermés pour cette page, ou ouverts par un geste de l'utilisateur.
+ * Where tokens sealed by a passkey stand: nothing sealed (the vault keeps them in plain text, or keeps none), sealed but closed for this page, or opened by a user gesture.
  */
 export type SealingState = "aucun" | "verrouille" | "ouvert";
 
-/** Ce qu'est devenue une demande de scellement. `impossible` : ce navigateur ou cet appareil ne rend pas de clé (PRF). */
+/** What became of a sealing request. `impossible`: this browser or this device returns no key (PRF). */
 export type SealingOutcome = "scelle" | "annule" | "impossible";
 
 /**
- * Ce qu'a rendu un déverrouillage. `annule` couvre aussi la passkey introuvable : le navigateur ne distingue pas un refus de l'utilisateur d'une passkey supprimée, par discrétion. `illisible` : la clé rendue n'ouvre pas le chiffré.
+ * What an unlock returned. `annule` also covers the passkey not found: the browser does not tell a user's refusal from a deleted passkey, out of discretion. `illisible`: the returned key does not open the ciphertext.
  */
 export type UnlockOutcome =
   | { readonly issue: "ouvert"; readonly tokens: StoredTokens }
   | { readonly issue: "annule" }
   | { readonly issue: "illisible" };
 
-/** Chiffre un texte sous la clé de la passkey, pour ce que le poste garde d'un dépôt privé (RG-contenus-prives-au-repos). */
+/** Encrypts a text under the passkey's key, for what the machine keeps of a private repo (RG-contenus-prives-au-repos). */
 export interface Cipher {
   seal(text: string): Promise<string>;
-  /** Le texte, ou `null` quand le scellé ne s'ouvre pas sous cette clé. */
+  /** The text, or `null` when the sealed text does not open under this key. */
   open(sealed: string): Promise<string | null>;
 }
 
 /**
- * Le scellement des jetons par une passkey, dans la version web (RG-secret-conserve-localement). La clé ne quitte jamais le trousseau de l'utilisateur, et ne s'obtient que par un geste : seul le chiffré reste dans le navigateur. Chaque appel qui sollicite la passkey doit partir d'un geste de l'utilisateur dans la page.
+ * Sealing tokens with a passkey, in the web version (RG-secret-conserve-localement). The key never leaves the user's keychain, and is only obtained through a gesture: only the ciphertext stays in the browser. Each call that requests the passkey must start from a user gesture in the page.
  *
- * L'application de bureau n'en a pas : le coffre du système garde déjà les jetons hors de la page.
+ * The desktop application has none: the system vault already keeps tokens outside the page.
  */
 export interface TokenSealing {
-  /** L'état depuis le dernier chargement, scellement ou déverrouillage. */
+  /** The state since the last load, sealing or unlock. */
   readonly state: SealingState;
-  /** Faux quand ce navigateur ne sait sûrement pas sceller ; vrai ne garantit rien, seul l'essai le dit. */
+  /** False when this browser surely cannot seal; true guarantees nothing, only trying tells. */
   isPossible(): Promise<boolean>;
-  /** Scelle ces jetons, et efface ce que le coffre gardait en clair. */
+  /** Seals these tokens, and erases what the vault kept in plain text. */
   sealTokens(tokens: StoredTokens): Promise<SealingOutcome>;
-  /** Ouvre les jetons scellés pour cette page. */
+  /** Opens the sealed tokens for this page. */
   unlockTokens(): Promise<UnlockOutcome>;
-  /** Le chiffreur des contenus privés, tant que les jetons sont ouverts ; `null` sinon. */
+  /** The cipher for private contents, as long as the tokens are open; `null` otherwise. */
   findCipher(): Cipher | null;
 }
 
-/** Ouvre une adresse hors de l'application, dans le navigateur de l'utilisateur. */
+/** Opens an address outside the application, in the user's browser. */
 export interface ExternalOpener {
   open(url: string): Promise<void>;
 }
 
 /**
- * Les liens d'ouverture que le système remet à l'application (RG-ouverture-par-protocole). Le récepteur les rend entiers, schéma compris : c'est la route `/ouvrir` qui les valide, pour les deux cibles.
+ * The deep links the system hands to the application (RG-ouverture-par-protocole). The receiver returns them whole, scheme included: the `/ouvrir` route is what validates them, for both targets.
  */
 export interface LinkReceiver {
-  /** Le lien qui a lancé l'application, s'il y en a un, puis chaque lien reçu ensuite. */
+  /** The link that launched the application, if there is one, then each link received afterwards. */
   listen(onLink: (link: string) => void): Promise<void>;
 }
 
 /**
- * Ce qu'annonce celui qui livre l'application : une version plus récente, prête à servir, ou la version en cours qui n'est plus entièrement disponible (RG-nouvelle-version-proposee, RG-version-perdue-signalee).
+ * What whoever delivers the application announces: a more recent version, ready to serve, or the current version that is no longer fully available (RG-nouvelle-version-proposee, RG-version-perdue-signalee).
  */
 export type VersionAnnouncement = "prete" | "perdue";
 
 /**
- * Pourquoi aucune version n'est annoncée. L'annonceur la nomme, et seul le livrable qui le connaît la formule (RG-message-nomme-la-cause) : l'interface commune la reçoit sans en connaître la liste. Le type est marqué pour qu'aucun texte de l'interface commune ne puisse en nommer une par mégarde.
+ * Why no version is announced. The announcer names it, and only the deliverable that knows it words it (RG-message-nomme-la-cause): the shared interface receives it without knowing the list. The type is branded so that no text of the shared interface can name one by mistake.
  */
 export type NoVersionCause = string & { readonly __noVersionCause: never };
 
-/** La seule cause que l'interface commune constate elle-même : la version prête n'a pas pu s'installer. */
+/** The only cause the shared interface observes itself: the ready version could not be installed. */
 export const INSTALLATION_FAILED = "installation-echouee" as NoVersionCause;
 
 /**
- * Ce qui annonce une version. La version web l'apprend de son service worker ; l'application de bureau, de son cœur natif.
+ * What announces a version. The web version learns it from its service worker; the desktop application, from its native core.
  */
 export interface VersionAnnouncer {
-  /** Faux quand rien ne peut être annoncé : pas de service worker, serveur de développement. */
+  /** False when nothing can be announced: no service worker, development server. */
   readonly active: boolean;
-  /** Vrai quand passer à la version prête relance l'application, plutôt que de recharger la page : sur le bureau. */
+  /** True when moving to the ready version relaunches the application, rather than reloading the page: on the desktop. */
   readonly relaunches: boolean;
-  /** Chaque annonce, à mesure qu'elle arrive ; rend de quoi cesser d'écouter. */
+  /** Each announcement, as it arrives; returns a way to stop listening. */
   listen(
     onAnnouncement: (announcement: VersionAnnouncement) => void,
   ): () => void;
-  /** La cause de la dernière vérification restée sans version, `null` quand elle a abouti. La version web n'en annonce aucune : son service worker se tait. */
+  /** The cause of the last check that found no version, `null` when it succeeded. The web version announces none: its service worker stays silent. */
   listenCause(onCause: (cause: NoVersionCause | null) => void): () => void;
-  /** Demande si une version plus récente est publiée ; la réponse arrive par `listen`. Peut échouer, hors ligne par exemple. */
+  /** Asks whether a more recent version is published; the answer arrives through `listen`. May fail, offline for instance. */
   check(): Promise<void>;
-  /** Fait servir la version prête : au prochain chargement sur le web, en relançant sur le bureau. Peut échouer. */
+  /** Has the ready version served: at the next load on the web, by relaunching on the desktop. May fail. */
   activate(): Promise<void>;
 }
 
 export interface Platform {
   readonly target: "bureau" | "web";
   readonly vault: TokenVault;
-  /** Le scellement des jetons par passkey ; `null` sur le bureau, où le coffre du système suffit. */
+  /** Token sealing by passkey; `null` on the desktop, where the system vault is enough. */
   readonly sealing: TokenSealing | null;
   readonly opener: ExternalOpener;
   readonly links: LinkReceiver;
   readonly version: VersionAnnouncer;
-  /** La version que cette fenêtre exécute, telle que la barre du bas l'affiche : le numéro publié sur le bureau, le commit construit sur le web. */
+  /** The version this window runs, as the bottom bar shows it: the published number on the desktop, the built commit on the web. */
   readonly loadVersion: () => Promise<string>;
 }
 
-/** Le schéma des liens d'ouverture : `skanon:ssk-it/ssk-canon/cadrages/2026-047`. */
+/** The deep link scheme: `skanon:ssk-it/ssk-canon/cadrages/2026-047`. */
 export const DEEP_LINK_SCHEME = "skanon";

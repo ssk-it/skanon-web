@@ -8,9 +8,9 @@ import type { Extension } from "../../extension/extension";
 import { createAppRouter } from "../../router";
 
 /**
- * Les mentions légales de l'éditeur, celles de https://www.ssk-it.fr/mentions-legales/. Comme l'aide, elles ne disent que ce qui vaut pour la cible où l'on se trouve (2026-054, décision 03) : l'hébergeur n'a de sens que pour la version web.
+ * The publisher's legal notice, the one at https://www.ssk-it.fr/mentions-legales/. Like the help, it says only what holds for the target one is on (2026-054, decision 03): the host only makes sense for the web version.
  */
-describe("page « Mentions légales »", () => {
+describe("« Mentions légales » page", () => {
   beforeEach(() => {
     provideHttpTesting();
   });
@@ -34,7 +34,7 @@ describe("page « Mentions légales »", () => {
     return view;
   }
 
-  it("a sa propre adresse, hors de tout projet", async () => {
+  it("has its own address, outside any project", async () => {
     const router = createAppRouter(createMemoryHistory());
     await router.push("/mentions-legales");
     expect(router.currentRoute.value.path).toBe("/mentions-legales");
@@ -43,7 +43,7 @@ describe("page « Mentions légales »", () => {
     );
   });
 
-  it("nomme l’éditeur et ses identifiants", async () => {
+  it("names the publisher and its identifiers", async () => {
     const text = await mountView();
     for (const notice of [
       "Sébastien Skorupski",
@@ -56,15 +56,15 @@ describe("page « Mentions légales »", () => {
       expect(text).toContain(notice);
   });
 
-  it("donne l’adresse de contact sans l’écrire en entier dans la page", async () => {
+  it("gives the contact address without writing it in full in the page", async () => {
     const text = await mountView();
     expect(text).toContain("skanon");
     expect(text).not.toContain("sebastien.skorupski");
     expect(text).not.toContain("@");
   });
 
-  // ADR-extensions-commerciales : l'hébergeur, les données et la licence propres au livrable viennent de son extension.
-  it("dit ce que le livrable apporte : son hébergeur, ses données, sa licence", async () => {
+  // ADR-extensions-commerciales: the host, the data and the licence specific to the deliverable come from its extension.
+  it("says what the deliverable brings: its host, its data, its licence", async () => {
     const text = await mountView([
       {
         id: "factice",
@@ -82,12 +82,12 @@ describe("page « Mentions légales »", () => {
     expect(text).toContain("Une licence apportée.");
   });
 
-  it("ne nomme aucun hébergeur que le livrable n'apporte pas", async () => {
+  it("names no host the deliverable does not bring", async () => {
     expect(await mountView()).not.toContain("SCALEWAY");
   });
 
-  // RG-mentions-legales : la propriété intellectuelle dit la licence de chaque partie ; ce qui vaut pour toutes n'en choisit aucune.
-  it("ne prête à aucune partie une licence qu'elle n'apporte pas", async () => {
+  // RG-mentions-legales: the intellectual property section states the licence of each part; what holds for all of them chooses none.
+  it("attributes to no part a licence it does not bring", async () => {
     const text = await mountView();
     expect(text).toContain(
       "Les droits d’auteur sur Skanon appartiennent à Sébastien Skorupski",
@@ -96,7 +96,7 @@ describe("page « Mentions légales »", () => {
     expect(text).not.toContain("FSL");
   });
 
-  it("rend en lien l'adresse qu'une phrase apportée désigne", async () => {
+  it("renders as a link the address a brought sentence designates", async () => {
     const page = await mountPage([
       {
         id: "factice",

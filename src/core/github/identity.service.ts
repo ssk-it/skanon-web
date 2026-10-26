@@ -4,13 +4,13 @@ import { SpecificationStore } from "../repo/specification.store";
 import { TokenService, TemporaryAccess } from "./token.service";
 import { IdentitySettings } from "../model/model";
 
-/** Ce qu'on garde entre le départ vers l'émetteur et le retour. */
+/** What is kept between leaving for the issuer and coming back. */
 const PENDING_KEY = "ssk-canon.identite.attente";
 
 interface PendingSignIn {
   readonly verifier: string;
   readonly state: string;
-  /** Où revenir une fois l'identité vérifiée. */
+  /** Where to come back once the identity is verified. */
   readonly returnPath: string;
 }
 
@@ -30,12 +30,12 @@ function base64url(bytes: Uint8Array): string {
 }
 
 /**
- * Empreinte du secret jetable, telle que l'émetteur l'attend.
+ * Fingerprint of the one-time secret, as the issuer expects it.
  *
- * C'est ce qui permet à une application sans secret de faire vérifier une
- * identité sans danger : seule l'empreinte part avec la demande, et le secret
- * lui-même n'est révélé qu'au moment de l'échange. Un code intercepté ne sert
- * donc à rien.
+ * This is what lets an application without a secret have an identity verified
+ * safely: only the fingerprint leaves with the request, and the secret
+ * itself is only revealed at the moment of the exchange. An intercepted code is
+ * therefore useless.
  */
 async function fingerprint(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest(
@@ -48,15 +48,15 @@ async function fingerprint(verifier: string): Promise<string> {
 export class SignInRefused extends Error {}
 
 /**
- * Connexion par identité tierce.
+ * Sign-in through a third-party identity.
  *
- * Le rédacteur se fait vérifier auprès de l'émetteur que le projet déclare, puis
- * échange cette identité contre un accès temporaire au dépôt. Il n'a besoin
- * d'aucun compte sur la plateforme de dépôt — c'est l'obstacle que ce mode lève.
+ * The author gets verified by the issuer the project declares, then
+ * exchanges this identity for temporary access to the repo. They need
+ * no account on the repo platform — that is the obstacle this mode removes.
  *
- * L'application ne détient aucun secret : ni celui de l'émetteur, ni celui de la
- * plateforme. Le composant d'échange détient le second, et c'est pourquoi il
- * existe.
+ * The application holds no secret: neither the issuer's, nor the
+ * platform's. The exchange component holds the second, and that is why it
+ * exists.
  */
 export class IdentityService {
   private readonly store = inject(SpecificationStore);
@@ -76,10 +76,10 @@ export class IdentityService {
   }
 
   /**
-   * Conduit le rédacteur vers l'émetteur d'identité.
+   * Leads the author to the identity issuer.
    *
-   * L'état et le secret jetable sont conservés dans la session : le navigateur
-   * quitte la page, et rien de ce qui vit en mémoire ne survit au retour.
+   * The state and the one-time secret are kept in the session: the browser
+   * leaves the page, and nothing that lives in memory survives the return.
    */
   async signIn(): Promise<void> {
     const r = this.settings();
@@ -104,10 +104,10 @@ export class IdentityService {
   }
 
   /**
-   * Termine la connexion au retour de l'émetteur, s'il y a lieu.
+   * Completes the sign-in on return from the issuer, if there is one.
    *
-   * Rend `true` si un retour a été traité — l'appelant sait alors qu'il doit
-   * nettoyer l'adresse, qui porte encore le code.
+   * Returns `true` if a return was handled — the caller then knows it must
+   * clean up the address, which still carries the code.
    */
   async completeReturn(): Promise<boolean> {
     const params = new URLSearchParams(location.search);
@@ -121,8 +121,8 @@ export class IdentityService {
 
     try {
       const pending = JSON.parse(raw) as PendingSignIn;
-      // L'état lie ce retour à la demande qui l'a produit : sans ce contrôle,
-      // un code obtenu ailleurs pourrait être glissé dans cette session.
+      // The state ties this return to the request that produced it: without this check,
+      // a code obtained elsewhere could be slipped into this session.
       if (params.get("state") !== pending.state) {
         throw new SignInRefused("La réponse ne correspond pas à la demande.");
       }
@@ -140,7 +140,7 @@ export class IdentityService {
     }
   }
 
-  /** Échange le code contre un jeton d'identité, en révélant le secret jetable. */
+  /** Exchanges the code for an identity token, revealing the one-time secret. */
   private async exchangeCode(code: string, verifier: string): Promise<string> {
     const r = this.settings();
     const response = await fetch(`${r.issuer}/protocol/openid-connect/token`, {
@@ -166,7 +166,7 @@ export class IdentityService {
     return access_token;
   }
 
-  /** Échange l'identité vérifiée contre un accès au dépôt. */
+  /** Exchanges the verified identity for access to the repo. */
   private async exchangeForAccess(
     identityToken: string,
   ): Promise<TemporaryAccess> {
@@ -181,8 +181,8 @@ export class IdentityService {
       unknown
     >;
     if (!response.ok) {
-      // Le message du composant nomme la cause — identité refusée, aucun projet
-      // ouvert — et vaut mieux qu'un code d'erreur.
+      // The component's message names the cause — identity refused, no project
+      // open — and is worth more than an error code.
       throw new SignInRefused(
         (body["erreur"] as string) ?? "L’accès au dépôt a été refusé.",
       );
@@ -191,10 +191,10 @@ export class IdentityService {
   }
 
   /**
-   * Adresse à laquelle l'émetteur renvoie.
+   * Address the issuer sends back to.
    *
-   * La racine, non la page courante : l'émetteur compare cette adresse à celles
-   * qu'il admet, et en déclarer une par page serait intenable.
+   * The root, not the current page: the issuer compares this address with those
+   * it admits, and declaring one per page would be untenable.
    */
   private returnAddress(): string {
     return `${location.origin}/`;

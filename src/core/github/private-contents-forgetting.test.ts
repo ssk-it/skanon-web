@@ -4,11 +4,11 @@ import { TokenService } from "./token.service";
 import { ContentCache, INDEXEDDB_FACTORY } from "../repo/content-cache";
 
 /**
- * RG-contenus-prives-au-repos : les contenus d'un dépôt privé ne survivent pas
- * à l'accès qui les a lus. La mémoire de l'onglet suffit à l'éprouver : le
- * stockage du navigateur suit les mêmes effacements, vérifiés à part.
+ * RG-contenus-prives-au-repos: a private repo's contents do not outlive
+ * the access that read them. The tab's memory is enough to test it: the
+ * browser storage follows the same erasures, verified separately.
  */
-describe("oubli d’un accès et contenus privés", () => {
+describe("forgetting an access and private contents", () => {
   const PRIVATE = { owner: "org", repo: "prive" };
   const OTHER = { owner: "autre", repo: "prive" };
   const PUBLIC = { owner: "org", repo: "public" };
@@ -35,7 +35,7 @@ describe("oubli d’un accès et contenus privés", () => {
     });
   });
 
-  it("efface tous les contenus privés à la déconnexion", async () => {
+  it("erases all private contents on sign-out", async () => {
     tokens.erase();
     await new Promise((r) => setTimeout(r, 0));
 
@@ -44,7 +44,7 @@ describe("oubli d’un accès et contenus privés", () => {
     expect(await cache.loadContent(PUBLIC, "a1")).toBe("public");
   });
 
-  it("n’efface, à l’oubli d’une portée, que les dépôts qu’elle couvrait", async () => {
+  it("erases, when a scope is forgotten, only the repos it covered", async () => {
     tokens.setForScope("org", "ghp_jetonDeTestSuffisammentLong");
     tokens.forgetScope("org");
     await new Promise((r) => setTimeout(r, 0));

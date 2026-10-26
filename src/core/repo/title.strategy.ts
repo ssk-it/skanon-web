@@ -4,34 +4,34 @@ import type { RouteLocationNormalized, Router } from "vue-router";
 import { SpecificationStore } from "./specification.store";
 import { displayIdentifier } from "./scoping-reference";
 
-/** Ce qui suit tout titre : l'application, pour qu'on la reconnaisse. */
+/** What follows every title: the application, so that it is recognised. */
 export const APPLICATION = "Skanon";
 
 /**
- * Compose le titre de la page à partir de la route et du référentiel chargé.
+ * Composes the page title from the route and the loaded specification.
  *
- * Les titres déclarés dans les routes sont les mêmes pour tous les projets et
- * tous les éléments : « Règle de gestion — SSK Canon » ne dit ni sur quel dépôt
- * on travaille, ni quelle règle on regarde. L'historique du navigateur, qui ne
- * retient que le titre, devient alors inexploitable — une dizaine d'entrées
- * identiques pour autant de pages différentes.
+ * The titles declared in routes are the same for all projects and all items:
+ * « Règle de gestion — SSK Canon » says neither which repo one is working on,
+ * nor which rule one is looking at. The browser history, which keeps only the
+ * title, then becomes unusable — a dozen identical entries for as many
+ * different pages.
  *
- * Le titre porte donc trois choses, de la plus précise à la plus générale :
- * l'élément consulté, le projet, l'application. C'est l'ordre qui survit à la
- * troncature d'un onglet ou d'une entrée d'historique : ce qui distingue vient
- * d'abord, ce qui est commun à tout ensuite.
+ * The title thus carries three things, from the most precise to the most
+ * general: the item consulted, the project, the application. This is the
+ * order that survives the truncation of a tab or a history entry: what
+ * distinguishes comes first, what is common to all comes after.
  */
 export class TitleStrategy {
   private readonly store = inject(SpecificationStore);
 
-  /** Le dernier état de route connu, pour recomposer sans navigation. */
+  /** The last known route state, to recompose without navigation. */
   private readonly currentState = signal<RouteLocationNormalized | null>(null);
 
   constructor() {
-    // Le référentiel se charge après la navigation : sans cette reprise, le
-    // titre resterait sur son repli — « ssk-it/projet » au lieu du nom, et
-    // l'identifiant seul au lieu du titre du cadrage. C'est le dernier état
-    // que l'historique retient, donc celui qui doit être le bon.
+    // The specification loads after navigation: without this follow-up, the
+    // title would stay on its fallback — « ssk-it/projet » instead of the name,
+    // and the identifier alone instead of the scoping's title. It is the last
+    // state the history keeps, hence the one that must be right.
     effect(() => {
       this.store.specification();
       const state = this.currentState();
@@ -39,7 +39,7 @@ export class TitleStrategy {
     });
   }
 
-  /** Suit les navigations du routeur : le titre se recompose à chacune. */
+  /** Follows the router's navigations: the title is recomposed on each one. */
   attach(router: Router): void {
     router.afterEach((state) => this.updateTitle(state));
   }
@@ -57,33 +57,33 @@ export class TitleStrategy {
   }
 
   /**
-   * Le projet, nommé s'il l'est.
+   * The project, named if it is.
    *
-   * Le nom lisible vient du référentiel et n'existe qu'une fois celui-ci
-   * chargé ; `owner/repo` vient de l'adresse et est là dès la navigation. Le
-   * repli garantit qu'aucun titre ne reste muet pendant le chargement, et le
-   * titre se précise quand le nom arrive — c'est ce dernier état que
-   * l'historique retient.
+   * The readable name comes from the specification and exists only once it is
+   * loaded; `owner/repo` comes from the address and is there from navigation.
+   * The fallback ensures no title stays silent during loading, and the title
+   * gets more precise when the name arrives — it is this last state that the
+   * history keeps.
    */
   private project(state: RouteLocationNormalized): string | null {
     const name = this.store.specification().project.name;
-    // « Projet » est le nom par défaut d'un dépôt qui n'en déclare aucun : il
-    // ne distingue rien, et le dépôt vaut mieux.
+    // « Projet » is the default name of a repo that declares none: it
+    // distinguishes nothing, and the repo is better.
     if (name && name !== "Projet") return name;
 
-    // Le dépôt est lu dans l'adresse et non dans la configuration : l'adresse
-    // le porte dès la navigation, là où la configuration n'est mise à jour que
-    // par le garde de route — le titre afficherait alors le dépôt précédent le
-    // temps que celui-ci s'exécute.
+    // The repo is read from the address and not from the configuration: the
+    // address carries it from navigation, whereas the configuration is only
+    // updated by the route guard — the title would then display the previous
+    // repo while the guard runs.
     return repoFromAddress(state);
   }
 
   /**
-   * Ce qui est consulté : l'élément désigné, ou l'intitulé de la route.
+   * What is consulted: the designated item, or the route's label.
    *
-   * Un élément dont le référentiel n'est pas encore chargé se donne par son
-   * identifiant seul — c'est déjà ce qui le distingue, et l'attendre laisserait
-   * un titre générique dans l'historique si l'utilisateur quitte la page avant.
+   * An item whose specification is not loaded yet is given by its identifier
+   * alone — that is already what distinguishes it, and waiting would leave a
+   * generic title in the history if the user leaves the page before.
    */
   private element(state: RouteLocationNormalized): string | null {
     const id =
@@ -96,9 +96,9 @@ export class TitleStrategy {
     const prefix = this.store.specification().project.prefix;
     const shown = displayIdentifier(id, prefix);
 
-    // Un titre fait davantage que nommer : il doit se retrouver dans une liste
-    // d'historique. Le titre du cadrage, du domaine ou de la fonctionnalité y
-    // sert mieux que l'identifiant seul, quand il existe.
+    // A title does more than name: it must be found again in a history list.
+    // The title of the scoping, the domain or the feature serves better there
+    // than the identifier alone, when it exists.
     const label = this.labelOf(path, id);
     return label ? `${shown} ${label}` : shown;
   }
@@ -113,38 +113,38 @@ export class TitleStrategy {
     if (path.includes("/fonctionnalite/")) {
       return this.store.specification().features.get(id)?.name ?? null;
     }
-    // Règles, décisions et documents d'architecture n'ont pas d'autre nom que
-    // leur identifiant : il se suffit.
+    // Rules, decisions and architecture documents have no other name than
+    // their identifier: it is enough.
     return null;
   }
 }
 
 /**
- * Le dépôt que porte l'adresse, sous la forme « owner/repo ».
+ * The repo the address carries, in the form « owner/repo ».
  *
- * Toute vue d'un projet vit sous `/:owner/:repo/` : les deux premiers segments
- * suffisent, et ils sont connus avant tout chargement.
+ * Every view of a project lives under `/:owner/:repo/`: the first two
+ * segments are enough, and they are known before any loading.
  */
 function repoFromAddress(state: RouteLocationNormalized): string | null {
   const segments = state.path.split("/").filter(Boolean);
   return segments.length >= 2 ? `${segments[0]}/${segments[1]}` : null;
 }
 
-/** La route affichée, au bout de la branche activée. */
+/** The displayed route, at the end of the activated branch. */
 function leaf(state: RouteLocationNormalized) {
   return state.matched[state.matched.length - 1];
 }
 
-/** Le chemin complet de la route, segments de toutes les branches réunis. */
+/** The route's full path, segments of all branches joined. */
 function fullPath(state: RouteLocationNormalized): string {
   return state.path;
 }
 
 /**
- * L'intitulé déclaré par la route, débarrassé du nom de l'application.
+ * The label declared by the route, stripped of the application's name.
  *
- * Les routes le portent en suffixe depuis toujours ; le recomposer ici
- * l'ajouterait deux fois.
+ * Routes have always carried it as a suffix; recomposing it here would add
+ * it twice.
  */
 function routeHeading(title: string | undefined): string | null {
   if (!title) return null;

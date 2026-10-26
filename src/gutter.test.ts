@@ -4,9 +4,9 @@ import process from "node:process";
 import { describe, expect, it } from "vitest";
 
 /**
- * Chaque bloc qui défile verticalement porte `scrollbar-gutter: stable` — voir `docs/pratiques.md`, « La mise en page ». Le test lit les sources plutôt que le DOM : jsdom ne calcule aucune mise en page, et un navigateur sans tête n'a que des barres superposées, qui ne prennent jamais de largeur. Le défaut ne se voit qu'avec des barres classiques ; seule la lecture des styles l'attrape partout.
+ * Every block that scrolls vertically carries `scrollbar-gutter: stable` — see `docs/practices.md`, "Page layout". The test reads the sources rather than the DOM: jsdom computes no layout, and a headless browser only has overlay scrollbars, which never take any width. The defect only shows with classic scrollbars; only reading the styles catches it everywhere.
  *
- * Sont lus : les fichiers `.css`, les blocs `<style>` des composants `.vue`, et les attributs `style="…"` de leurs gabarits. Le kit (`src/ui/`) étant en sources, ses dialogues, menus, listes de choix et autocomplétions sont lus comme le reste — là où, sous Material, il fallait en tenir la liste à part.
+ * Read are: `.css` files, the `<style>` blocks of `.vue` components, and the `style="…"` attributes of their templates. The kit (`src/ui/`) being in source form, its dialogs, menus, choice lists and autocompletes are read like the rest — whereas, under Material, their list had to be kept separately.
  */
 
 interface ScrollableBlock {
@@ -18,14 +18,14 @@ interface ScrollableBlock {
 
 const SCROLLS = /^(auto|scroll)$/;
 
-/** Vrai si les déclarations font défiler le bloc en hauteur. */
+/** True if the declarations make the block scroll vertically. */
 function scrollsVertically(declarations: string): boolean {
   let scrolls = false;
   for (const declaration of declarations.split(";")) {
     const [ownership, ...rest] = declaration.split(":");
     const name = ownership?.trim().toLowerCase();
     const values = rest.join(":").replace("!important", "").trim().split(/\s+/);
-    // `overflow: <x> <y>` : la seconde valeur, quand elle existe, vaut pour la hauteur.
+    // `overflow: <x> <y>`: the second value, when it exists, applies to the height.
     if (name === "overflow")
       scrolls = SCROLLS.test(values[1] ?? values[0] ?? "");
     if (name === "overflow-y" || name === "overflow-block")
@@ -39,14 +39,14 @@ function hasStableGutter(declarations: string): boolean {
 }
 
 /**
- * Relève les blocs défilants d'une feuille CSS. Le CSS imbrique les règles : seules les déclarations propres à un bloc comptent pour lui, celles de ses enfants non.
+ * Finds the scrolling blocks of a CSS sheet. CSS nests rules: only the declarations specific to a block count for it, not those of its children.
  */
 export function listScrollableBlocks(
   css: string,
   source: string,
   startLine = 1,
 ): ScrollableBlock[] {
-  // Les commentaires sont remplacés par des blancs de même longueur, pour que les numéros de ligne restent justes.
+  // Comments are replaced by blanks of the same length, so that line numbers stay right.
   const text = css.replace(/\/\*[\s\S]*?\*\//g, (c) =>
     c.replace(/[^\n]/g, " "),
   );
@@ -82,7 +82,7 @@ export function listScrollableBlocks(
   return blocks;
 }
 
-/** Les styles en ligne d'un gabarit : `style="…"` est un bloc à lui seul. */
+/** A template's inline styles: `style="…"` is a block on its own. */
 export function listInlineStyles(
   template: string,
   source: string,
@@ -102,7 +102,7 @@ export function listInlineStyles(
   return blocks;
 }
 
-/** Les blocs `<style>` d'un composant, et les styles en ligne de son `<template>`. */
+/** A component's `<style>` blocks, and the inline styles of its `<template>`. */
 export function listComponentScrollableBlocks(
   sfc: string,
   source: string,
@@ -131,7 +131,7 @@ function listFiles(folder: string): string[] {
   });
 }
 
-/** `pnpm test` se lance depuis la racine du dépôt, en local comme en CI. */
+/** `pnpm test` is run from the repo root, locally as in CI. */
 const ROOT = join(process.cwd(), "src");
 
 function listProjectScrollableBlocks(): ScrollableBlock[] {
@@ -145,8 +145,8 @@ function listProjectScrollableBlocks(): ScrollableBlock[] {
   });
 }
 
-describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
-  it("relève un bloc défilant, imbriqué ou non, et ignore le défilement en largeur", () => {
+describe("scrollbar-gutter: stable on scrolling blocks", () => {
+  it("finds a scrolling block, nested or not, and ignores horizontal scrolling", () => {
     const blocks = listScrollableBlocks(
       `
       .liste { overflow-y: auto; scrollbar-gutter: stable; }
@@ -167,7 +167,7 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
     ]);
   });
 
-  it("relève un style en ligne défilant", () => {
+  it("finds a scrolling inline style", () => {
     const blocks = listInlineStyles(
       '<div style="max-height: 50vh; overflow: auto">',
       "exemple.vue",
@@ -177,7 +177,7 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
     expect(blocks[0]!.hasGutter).toBe(false);
   });
 
-  it("lit les blocs <style> et le gabarit d’un composant, au bon numéro de ligne", () => {
+  it("reads a component's <style> blocks and template, at the right line number", () => {
     const blocks = listComponentScrollableBlocks(
       [
         '<script setup lang="ts">',
@@ -203,12 +203,12 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
     ]);
   });
 
-  it("trouve des blocs défilants dans le projet", () => {
-    // Sans cette garde, une lecture qui ne trouverait plus rien passerait le test suivant sans rien prouver.
+  it("finds scrolling blocks in the project", () => {
+    // Without this guard, a read that no longer found anything would pass the next test without proving anything.
     expect(listProjectScrollableBlocks().length).toBeGreaterThanOrEqual(8);
   });
 
-  it("lit les blocs que le kit fait défiler : dialogue, menu, liste de choix et autocomplétion", () => {
+  it("reads the blocks the kit makes scroll: dialog, menu, choice list and autocomplete", () => {
     const selectors = listProjectScrollableBlocks().flatMap((b) =>
       b.selector.split(",").map((s) => s.trim()),
     );
@@ -223,7 +223,7 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
     );
   });
 
-  it("exige la gouttière stable de chaque bloc défilant du projet", () => {
+  it("requires the stable gutter on every scrolling block of the project", () => {
     const withoutGutter = listProjectScrollableBlocks()
       .filter((b) => !b.hasGutter)
       .map((b) => `${b.source}:${b.line} ${b.selector}`);

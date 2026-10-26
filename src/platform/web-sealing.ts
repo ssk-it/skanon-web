@@ -11,19 +11,19 @@ import type {
 import { BrowserVault, toPairs } from "./web-vault";
 
 /**
- * Le scellé des jetons, et l'identifiant de la passkey qui l'ouvre. L'identifiant n'a rien de secret : il désigne la passkey, il n'en donne rien. Il survit à l'effacement des jetons, pour que le scellement suivant reprenne la même passkey plutôt que d'en ajouter une au trousseau.
+ * The tokens' sealed store, and the identifier of the passkey that opens it. The identifier is not secret at all: it designates the passkey, it gives nothing of it away. It survives the erasure of the tokens, so that the next sealing reuses the same passkey rather than adding one to the keychain.
  */
 const SEALED_KEY = "skanon.jetons-scelles";
 const PASSKEY_KEY = "skanon.passkey";
 
-/** Ce qu'on demande à la passkey de chiffrer par son secret (PRF) : une valeur fixe, que rien n'oblige à taire. La changer rendrait chaque scellé illisible. */
+/** What the passkey is asked to encrypt with its secret (PRF): a fixed value, which nothing requires to keep quiet. Changing it would make every sealed store unreadable. */
 const SALT = new TextEncoder().encode("skanon:coffre:v1");
 
-/** Deux clés tirées de la même sortie, une par usage : ce qui chiffre les jetons ne chiffre pas les contenus. */
+/** Two keys drawn from the same output, one per use: what encrypts the tokens does not encrypt the contents. */
 const TOKENS_USAGE = new TextEncoder().encode("skanon:jetons");
 const CONTENTS_USAGE = new TextEncoder().encode("skanon:contenus");
 
-/** Une passkey tout juste créée. `prf` : la sortie, quand le navigateur la rend dès la création ; `prfActif` faux : cette passkey ne sait pas en rendre. */
+/** A freshly created passkey. `prf`: the output, when the browser returns it at creation; `prfEnabled` false: this passkey cannot return one. */
 export interface CreatedPasskey {
   readonly id: Uint8Array<ArrayBuffer>;
   readonly prf: ArrayBuffer | null;
@@ -31,13 +31,13 @@ export interface CreatedPasskey {
 }
 
 /**
- * Ce que le coffre demande à WebAuthn, isolé pour que les tests le doublent : jsdom n'en a pas. Chaque appel sollicite l'utilisateur.
+ * What the vault asks of WebAuthn, isolated so that tests can fake it: jsdom has none. Each call prompts the user.
  */
 export interface Authenticator {
   isPossible(): Promise<boolean>;
-  /** Crée une passkey pour ce site ; `null` si l'utilisateur annule. */
+  /** Creates a passkey for this site; `null` if the user cancels. */
   create(salt: Uint8Array<ArrayBuffer>): Promise<CreatedPasskey | null>;
-  /** La sortie de cette passkey pour ce sel ; `null` si l'utilisateur annule ou qu'elle n'est plus dans le trousseau. */
+  /** This passkey's output for this salt; `null` if the user cancels or it is no longer in the keychain. */
   evaluate(
     id: Uint8Array<ArrayBuffer>,
     salt: Uint8Array<ArrayBuffer>,
@@ -50,9 +50,9 @@ interface Keys {
 }
 
 /**
- * Le coffre de la version web, qui sait sceller les jetons par une passkey (RG-secret-conserve-localement, 2026-055).
+ * The web version's vault, which can seal tokens with a passkey (RG-secret-conserve-localement, 2026-055).
  *
- * Tant que rien n'est scellé, il garde les jetons en clair, comme `CoffreDuNavigateur`. Scellés, il ne garde que leur chiffré, et la clé n'existe qu'en mémoire, après un geste de l'utilisateur : elle vient de la passkey, qui ne la rend qu'à ce site et qu'après Touch ID ou le code de l'appareil. Un programme qui lit le profil du navigateur ne trouve donc qu'un chiffré. Un script sur la page, elle ouverte, lit les jetons comme l'application : la protection porte sur le repos, non sur la page.
+ * As long as nothing is sealed, it keeps tokens in plain text, like `BrowserVault`. Sealed, it keeps only their ciphertext, and the key only exists in memory, after a user gesture: it comes from the passkey, which only returns it to this site and only after Touch ID or the device code. A program that reads the browser profile therefore finds only ciphertext. A script on the page, once open, reads the tokens as the application does: the protection covers data at rest, not the page.
  */
 export class BrowserSealedVault implements TokenVault, TokenSealing {
   private readonly clair = new BrowserVault();
@@ -69,7 +69,7 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
     return this.auth.isPossible();
   }
 
-  /** Scellés et fermés, les jetons ne se lisent pas : rien n'est rendu, et `etat` dit pourquoi. */
+  /** Sealed and closed, the tokens cannot be read: nothing is returned, and `state` says why. */
   async loadTokens(): Promise<StoredTokens> {
     if (!read(SEALED_KEY)) return this.clair.loadTokens();
     if (!this.keys) return NONE;
@@ -77,7 +77,7 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
   }
 
   async saveTokens(tokens: StoredTokens): Promise<VaultWrite> {
-    // Écrire en clair à côté du scellé défairait la protection ; l'écraser sans la clé perdrait les jetons scellés.
+    // Writing in plain text next to the sealed store would undo the protection; overwriting it without the key would lose the sealed tokens.
     if (!this.keys) {
       if (read(SEALED_KEY)) return "refusee";
       return this.clair.saveTokens(tokens);
@@ -97,7 +97,7 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
     try {
       output = await this.passkeyOutput();
     } catch {
-      // Ce que WebAuthn refuse autrement que par un geste — passkey non prise en charge, contexte non sûr — ne se réessaie pas.
+      // What WebAuthn refuses other than through a gesture — passkey not supported, insecure context — is not retried.
       return "impossible";
     }
     if (output === null) return "annule";
@@ -135,9 +135,9 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
   }
 
   /**
-   * La sortie de la passkey déjà inscrite, ou d'une passkey neuve.
+   * The output of the already registered passkey, or of a fresh passkey.
    *
-   * Le navigateur ne distingue pas, par discrétion, une passkey supprimée d'un refus de l'utilisateur : faute de sortie, on en crée une neuve. Un utilisateur qui a seulement refusé se voit proposer la création, qu'il peut refuser aussi.
+   * The browser does not tell, out of discretion, a deleted passkey from a user's refusal: lacking an output, a fresh one is created. A user who only refused is offered creation, which they can refuse too.
    */
   private async passkeyOutput(): Promise<ArrayBuffer | "impossible" | null> {
     const known = readId();
@@ -148,7 +148,7 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
     if (!created) return null;
     if (!created.prfEnabled) return "impossible";
     if (!write(PASSKEY_KEY, toBase64Url(created.id))) return "impossible";
-    // Certains navigateurs ne rendent la sortie qu'à l'authentification : un second geste la demande.
+    // Some browsers only return the output on authentication: a second gesture asks for it.
     return created.prf ?? this.auth.evaluate(created.id, SALT);
   }
 
@@ -159,7 +159,7 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
     const sealed = await seal(keys.tokens, writeSealedText(tokens));
     if (!write(SEALED_KEY, sealed)) return "refusee";
     this.keys = keys;
-    // Le clair ne survit pas au scellé : le garder défairait la protection.
+    // The plain text does not survive sealing: keeping it would undo the protection.
     await this.clair.deleteTokens();
     return "faite";
   }
@@ -172,13 +172,13 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
 }
 
 /**
- * Le texte scellé est un format stocké sur le poste : ses champs gardent leurs noms d'origine, `general` et `parPortee`, quels que soient ceux du code. Les renommer ferait perdre ses jetons scellés à qui met à jour.
+ * The sealed text is a format stored on the machine: its fields keep their original names, `general` and `parPortee`, whatever those of the code. Renaming them would make whoever updates lose their sealed tokens.
  */
 export function writeSealedText(tokens: StoredTokens): string {
   return JSON.stringify({ general: tokens.general, parPortee: tokens.byScope });
 }
 
-/** Les jetons d'un texte scellé ; `null` s'il est illisible. */
+/** The tokens of a sealed text; `null` if it is unreadable. */
 export function readSealedText(text: string): StoredTokens | null {
   try {
     const raw = JSON.parse(text) as { general?: unknown; parPortee?: unknown };
@@ -202,7 +202,7 @@ async function deriveKeys(output: ArrayBuffer): Promise<Keys> {
       { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(), info },
       base,
       { name: "AES-GCM", length: 256 },
-      // Non extractible : même ouverte, la clé ne se recopie pas hors de cette page.
+      // Not extractable: even once opened, the key cannot be copied outside this page.
       false,
       ["encrypt", "decrypt"],
     );
@@ -212,7 +212,7 @@ async function deriveKeys(output: ArrayBuffer): Promise<Keys> {
   };
 }
 
-/** `iv.chiffré`, en base64 : un vecteur neuf à chaque scellé, comme AES-GCM l'exige. */
+/** `iv.chiffré`, in base64: a fresh vector for each sealing, as AES-GCM requires. */
 async function seal(key: CryptoKey, text: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt(
@@ -233,7 +233,7 @@ async function unseal(key: CryptoKey, sealed: string): Promise<string | null> {
     );
     return new TextDecoder().decode(clair);
   } catch {
-    // Une autre clé, un scellé abîmé : AES-GCM le refuse, et c'est le comportement voulu.
+    // Another key, a damaged sealed store: AES-GCM refuses it, and that is the intended behaviour.
     return null;
   }
 }
@@ -242,7 +242,7 @@ function toBase64Url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes));
 }
 
-/** Lève sur un texte qui n'est pas du base64 : `desceller` le reçoit d'un stockage qu'il ne maîtrise pas, et le rattrape. */
+/** Throws on a text that is not base64: `unseal` receives it from a storage it does not control, and catches it. */
 function fromBase64(text: string | undefined): Uint8Array<ArrayBuffer> {
   if (!text) throw new Error("scellé incomplet");
   return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
@@ -258,7 +258,7 @@ function readId(): Uint8Array<ArrayBuffer> | null {
   }
 }
 
-// Le stockage peut être bloqué : une lecture rend alors rien, une écriture refusée le dit.
+// Storage may be blocked: a read then returns nothing, a refused write says so.
 function read(key: string): string | null {
   try {
     return localStorage.getItem(key);
@@ -286,7 +286,7 @@ function erase(key: string): boolean {
 }
 
 /**
- * WebAuthn, avec l'extension PRF. La passkey est liée au domaine qui sert l'application : déplacer l'hébergement la rendrait inutilisable, et le jeton se ressaisirait une fois (2026-055, « Ce qu'il faut éprouver »).
+ * WebAuthn, with the PRF extension. The passkey is bound to the domain that serves the application: moving the hosting would make it unusable, and the token would be entered again once (2026-055, « Ce qu'il faut éprouver »).
  */
 export class BrowserAuthenticator implements Authenticator {
   async isPossible(): Promise<boolean> {
@@ -296,7 +296,7 @@ export class BrowserAuthenticator implements Authenticator {
       !navigator.credentials
     )
       return false;
-    // Les navigateurs récents disent s'ils connaissent PRF ; les autres ne disent rien, et seul l'essai tranche.
+    // Recent browsers say whether they know PRF; the others say nothing, and only trying decides.
     const capabilities = await (
       PublicKeyCredential as unknown as {
         getClientCapabilities?: () => Promise<Record<string, boolean>>;
@@ -347,7 +347,7 @@ export class BrowserAuthenticator implements Authenticator {
     const assertion = await gesture(() =>
       navigator.credentials.get({
         publicKey: {
-          // Aucun serveur ne vérifie cette réponse : le défi n'est là que parce que WebAuthn l'exige.
+          // No server checks this response: the challenge is only there because WebAuthn requires it.
           challenge: crypto.getRandomValues(new Uint8Array(32)),
           allowCredentials: [{ type: "public-key", id }],
           userVerification: "required",
@@ -360,7 +360,7 @@ export class BrowserAuthenticator implements Authenticator {
   }
 }
 
-/** Un geste refusé, annulé ou expiré rend `null` ; tout autre refus de WebAuthn remonte à l'appelant. */
+/** A refused, cancelled or expired gesture returns `null`; any other WebAuthn refusal goes up to the caller. */
 async function gesture<T>(call: () => Promise<T>): Promise<T | null> {
   try {
     return await call();

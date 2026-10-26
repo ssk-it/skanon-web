@@ -13,39 +13,39 @@ import {
 } from "./frontmatter";
 
 /**
- * Le fichier produit ici est lu par le vérificateur d'intégrité, qui bloque la
- * pull request s'il ne convient pas. Ces cas portent donc sur ce que ce fichier
- * doit garantir, pas sur le confort de l'appelant.
+ * The file produced here is read by the integrity checker, which blocks the
+ * pull request if it does not fit. These cases are therefore about what this file
+ * must guarantee, not about the caller's comfort.
  */
-describe("identifiant du prochain cadrage", () => {
-  it("démarre à 001 pour une année sans cadrage", () => {
+describe("next scoping identifier", () => {
+  it("starts at 001 for a year without scopings", () => {
     expect(nextScopingId([], 2026)).toBe("2026-001");
   });
 
-  it("suit la plus haute séquence de l’année", () => {
+  it("follows the highest sequence of the year", () => {
     expect(nextScopingId(["2026-001", "2026-013", "2026-007"], 2026)).toBe(
       "2026-014",
     );
   });
 
-  it("ignore les cadrages des autres années", () => {
+  it("ignores the scopings of other years", () => {
     expect(nextScopingId(["2025-042", "2026-002"], 2026)).toBe("2026-003");
   });
 
-  it("ne comble jamais un trou", () => {
-    // un identifiant abandonné reste brûlé : le réutiliser ferait pointer
-    // d'anciennes références vers un cadrage sans rapport
+  it("never fills a gap", () => {
+    // an abandoned identifier stays burnt: reusing it would make
+    // old references point to an unrelated scoping
     expect(nextScopingId(["2026-001", "2026-002", "2026-005"], 2026)).toBe(
       "2026-006",
     );
   });
 
-  it("ignore un identifiant hors format", () => {
+  it("ignores an off-format identifier", () => {
     expect(nextScopingId(["brouillon", "2026-004"], 2026)).toBe("2026-005");
   });
 });
 
-describe("sérialisation d’un cadrage neuf", () => {
+describe("serialization of a new scoping", () => {
   const BASE = {
     title: "Un titre ordinaire",
     domains: ["cadrage", "referentiel"],
@@ -60,17 +60,17 @@ describe("sérialisation d’un cadrage neuf", () => {
     return r;
   }
 
-  it("produit un frontmatter relisible par le parseur du produit", () => {
+  it("produces a frontmatter the product's parser can re-read", () => {
     const { data } = reread(serializeNewScoping("2026-014", BASE));
     expect(data["id"]).toBe("2026-014");
-    // Aucun statut : il se déduit de l'état du dépôt, et le vérificateur de
-    // l'Action refuse un cadrage qui en déclare un.
+    // No status: it is derived from the repo state, and the Action's checker
+    // rejects a scoping that declares one.
     expect(data["statut"]).toBeUndefined();
     expect(data["domaines"]).toEqual(["cadrage", "referentiel"]);
   });
 
-  it("échappe un titre contenant « : », qui sinon casse le YAML", () => {
-    // la faute la plus fréquente du format, rencontrée en usage réel
+  it("escapes a title containing « : », which otherwise breaks the YAML", () => {
+    // the format's most frequent fault, met in real use
     const text = serializeNewScoping("2026-014", {
       ...BASE,
       title: "Écriture : par où commencer ?",
@@ -78,7 +78,7 @@ describe("sérialisation d’un cadrage neuf", () => {
     expect(reread(text).data["titre"]).toBe("Écriture : par où commencer ?");
   });
 
-  it("échappe une apostrophe dans un titre échappé", () => {
+  it("escapes a quote in an escaped title", () => {
     const text = serializeNewScoping("2026-014", {
       ...BASE,
       title: "L'écriture : c'est parti",
@@ -86,21 +86,21 @@ describe("sérialisation d’un cadrage neuf", () => {
     expect(reread(text).data["titre"]).toBe("L'écriture : c'est parti");
   });
 
-  it("n’échappe pas un titre qui n’en a pas besoin", () => {
+  it("does not escape a title that does not need it", () => {
     expect(serializeNewScoping("2026-014", BASE)).toContain(
       "titre: Un titre ordinaire\n",
     );
   });
 
-  it("déclare des impacts vides plutôt que de les omettre", () => {
-    // un cadrage neuf n'impacte rien encore ; omettre la clé ferait échouer la
-    // lecture chez qui la suppose présente
+  it("declares empty impacts rather than omitting them", () => {
+    // a new scoping impacts nothing yet; omitting the key would make reading
+    // fail for whoever assumes it is present
     expect(
       reread(serializeNewScoping("2026-014", BASE)).data["impacts"],
     ).toEqual([]);
   });
 
-  it("accepte un cadrage sans domaine", () => {
+  it("accepts a scoping without a domain", () => {
     const text = serializeNewScoping("2026-014", {
       ...BASE,
       domains: [],
@@ -108,14 +108,14 @@ describe("sérialisation d’un cadrage neuf", () => {
     expect(reread(text).data["domaines"]).toEqual([]);
   });
 
-  it("rend les sections attendues par le format", () => {
+  it("renders the sections the format expects", () => {
     const { body } = reread(serializeNewScoping("2026-014", BASE));
     expect(extractSection(body, "Objectif")).toBe("Le pourquoi.");
     expect(extractSection(body, "Parcours utilisateur")).toBe("1. Une étape.");
   });
 });
 
-describe("sérialisation d’un cadrage avec impacts", () => {
+describe("serialization of a scoping with impacts", () => {
   const BASE: EditableScoping = {
     title: "Un cadrage",
     domains: ["cadrage"],
@@ -131,7 +131,7 @@ describe("sérialisation d’un cadrage avec impacts", () => {
     return r;
   }
 
-  it("rend les impacts relisibles par le parseur", () => {
+  it("renders impacts the parser can re-read", () => {
     const text = serializeScoping("2026-020", {
       ...BASE,
       impacts: [
@@ -139,15 +139,15 @@ describe("sérialisation d’un cadrage avec impacts", () => {
         { target: "RG-b", operation: "touche", statement: "" },
       ],
     });
-    // Le fichier porte `regle:` — c'est le champ que la nature « regle » écrit,
-    // et ce que le parseur relit.
+    // The file carries `regle:` — the field the « regle » kind writes,
+    // and what the parser re-reads.
     expect(reread(text).data["impacts"]).toEqual([
       { regle: "RG-a", operation: "cree" },
       { regle: "RG-b", operation: "touche" },
     ]);
   });
 
-  it("place chaque énoncé sous un titre portant l’identifiant de sa règle", () => {
+  it("places each statement under a heading carrying its rule's identifier", () => {
     const text = serializeScoping("2026-020", {
       ...BASE,
       impacts: [
@@ -163,8 +163,8 @@ describe("sérialisation d’un cadrage avec impacts", () => {
     );
   });
 
-  it("omet la section Énoncés quand rien n’est à énoncer", () => {
-    // une section vide suggérerait au lecteur qu'il manque quelque chose
+  it("omits the Énoncés section when there is nothing to state", () => {
+    // an empty section would suggest to the reader that something is missing
     const text = serializeScoping("2026-020", {
       ...BASE,
       impacts: [{ target: "RG-b", operation: "touche", statement: "" }],
@@ -172,9 +172,9 @@ describe("sérialisation d’un cadrage avec impacts", () => {
     expect(text).not.toContain("## Énoncés");
   });
 
-  it("n’écrit aucun statut, que le vérificateur refuserait", () => {
-    // Le statut vit sur la demande de fusion, non dans le fichier. L'y écrire
-    // produisait un cadrage rejeté en intégration continue.
+  it("writes no status, which the checker would reject", () => {
+    // The status lives on the pull request, not in the file. Writing it there
+    // produced a scoping rejected in continuous integration.
     expect(
       reread(serializeScoping("2026-020", BASE)).data["statut"],
     ).toBeUndefined();

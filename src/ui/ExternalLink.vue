@@ -3,15 +3,15 @@ import { inject } from "../core/injection";
 import { PLATFORM } from "../platform/platform-token";
 
 /**
- * Un lien vers une adresse hors de l'application — github.com, une carte, une issue.
+ * A link to an address outside the application — github.com, a card, an issue.
  *
- * Dans l'application de bureau, un `target="_blank"` ne mène nulle part : la vue web intégrée n'ouvre pas de nouvel onglet. Le clic passe donc par l'ouvreur de la plateforme, qui confie l'adresse au navigateur de l'utilisateur. Le vrai `href` reste : le lien s'annonce comme tel, se copie, et s'ouvre encore au clic du milieu dans la version web.
+ * In the desktop application, a `target="_blank"` leads nowhere: the embedded web view does not open a new tab. The click therefore goes through the platform's opener, which hands the address to the user's browser. The real `href` stays: the link announces itself as such, can be copied, and still opens on middle click in the web version.
  *
  * ```vue
- * <LienExterne href="https://github.com/settings/tokens">les réglages GitHub</LienExterne>
+ * <ExternalLink href="https://github.com/settings/tokens">les réglages GitHub</ExternalLink>
  * ```
  *
- * Tout autre attribut (`class`, `title`, `aria-label`) passe à l'élément `<a>`.
+ * Any other attribute (`class`, `title`, `aria-label`) passes to the `<a>` element.
  */
 const props = defineProps<{ href: string }>();
 

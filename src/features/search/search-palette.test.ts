@@ -14,9 +14,9 @@ import { RepoConfig } from "../../core/repo/repo-config";
 import SearchPalette, { type PaletteData } from "./SearchPalette.vue";
 
 /**
- * La palette de recherche — RG-recherche-a-portee-de-clavier, RG-recherche-perimetre, RG-recherche-en-cours-a-part.
+ * The search palette — RG-recherche-a-portee-de-clavier, RG-recherche-perimetre, RG-recherche-en-cours-a-part.
  *
- * Ce qui est éprouvé ici, c'est ce que le lecteur voit : les résultats rangés par nature, les cadrages en cours à part, et ce que la palette dit quand elle n'a rien à montrer — un silence passerait pour une recherche en panne.
+ * What is tested here is what the reader sees: results sorted by kind, scopings in progress apart, and what the palette says when it has nothing to show — silence would pass for a broken search.
  */
 const VuePlaceholder = { render: () => "vue" };
 
@@ -99,14 +99,14 @@ const SPECIFICATION: Specification = {
   anomalies: [],
 };
 
-describe("La palette de recherche", () => {
+describe("The search palette", () => {
   let router: Router;
 
   async function mountView(
     data: PaletteData = { onPastState: false },
   ): Promise<VueWrapper> {
     provideHttpTesting();
-    // Le `{ path: '**' }` de SSK Canon : toute adresse mène à une vue sans garde, la palette seule est éprouvée.
+    // SSK Canon's `{ path: '**' }`: every address leads to an unguarded view; only the palette is tested.
     router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: "/:autre(.*)*", component: VuePlaceholder }],
@@ -135,7 +135,7 @@ describe("La palette de recherche", () => {
     );
   }
 
-  it("dit sur quoi elle cherche avant qu’on tape", async () => {
+  it("says what it searches before anything is typed", async () => {
     const el = (await mountView()).element as HTMLElement;
 
     const text = el.textContent ?? "";
@@ -145,7 +145,7 @@ describe("La palette de recherche", () => {
     expect(el.querySelectorAll('[role="option"]').length).toBe(0);
   });
 
-  it("range les résultats par nature, et les cadrages en cours à part", async () => {
+  it("sorts results by kind, and scopings in progress apart", async () => {
     const el = await typeText(await mountView(), "quota");
 
     expect(groupTitles(el)).toEqual([
@@ -157,14 +157,14 @@ describe("La palette de recherche", () => {
     const inProgress = el.querySelector(".groupe.en-cours")!;
     expect(inProgress.textContent).toContain("2026-050");
     expect(inProgress.textContent).toContain("#61");
-    // un cadrage en discussion ne se mêle jamais au référentiel
+    // a scoping under discussion never mixes with the specification
     const delivered = [...el.querySelectorAll(".groupe:not(.en-cours)")].map(
       (g) => g.textContent,
     );
     expect(delivered.join(" ")).not.toContain("2026-050");
   });
 
-  it("dit qu’aucun résultat ne correspond, et rappelle sur quoi elle cherche", async () => {
+  it("says that no result matches, and recalls what it searches", async () => {
     const el = await typeText(await mountView(), "introuvable");
 
     expect(el.querySelector(".vide")?.textContent).toContain("introuvable");
@@ -173,7 +173,7 @@ describe("La palette de recherche", () => {
     );
   });
 
-  it("dit que les cadrages en cours arrivent encore", async () => {
+  it("says that scopings in progress are still arriving", async () => {
     const f = await mountView();
     inject(SpecificationStore).loadingBranches.set(true);
     const el = await typeText(f, "soixante");
@@ -181,11 +181,11 @@ describe("La palette de recherche", () => {
     expect(el.querySelector(".groupe.en-cours")?.textContent).toContain(
       "Lecture des branches",
     );
-    // et ne cache pas ce qui est déjà trouvé
+    // and does not hide what has already been found
     expect(el.textContent).toContain("RG-quota");
   });
 
-  it("prévient que ses résultats valent pour aujourd’hui quand on remonte le temps", async () => {
+  it("warns that its results hold for today when going back in time", async () => {
     const el = (await mountView({ onPastState: true })).element as HTMLElement;
 
     expect(el.querySelector(".etat-courant")?.textContent).toContain(
@@ -193,13 +193,13 @@ describe("La palette de recherche", () => {
     );
   });
 
-  it("ne le dit pas sur l’état courant", async () => {
+  it("does not say so on the current state", async () => {
     const el = (await mountView()).element as HTMLElement;
 
     expect(el.querySelector(".etat-courant")).toBeNull();
   });
 
-  it("mène au résultat choisi au clavier, à son ancre, et se referme", async () => {
+  it("leads to the result chosen with the keyboard, at its anchor, and closes", async () => {
     const f = await mountView();
     const el = await typeText(f, "quota");
     const field = el.querySelector("input")!;
@@ -209,7 +209,7 @@ describe("La palette de recherche", () => {
     field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await flushPromises();
 
-    // la règle vient en tête, la décision du cadrage juste après
+    // the rule comes first, the scoping's decision right after
     expect(router.currentRoute.value.fullPath).toBe(
       "/org/depot/cadrages/2026-006#decision-01-canal",
     );

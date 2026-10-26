@@ -11,29 +11,29 @@ import type { TokenProtection } from "../model/model";
 import { ContentCache } from "../repo/content-cache";
 
 /**
- * La clé de l'ancien coffre chiffré, effacée au démarrage.
+ * The key of the former encrypted vault, erased at startup.
  *
- * Son contenu n'est pas récupérable : il était scellé sous une passphrase que
- * plus rien ne demande. Le garder n'entretiendrait que l'illusion qu'il l'est.
+ * Its content is not recoverable: it was sealed under a passphrase that
+ * nothing asks for anymore. Keeping it would only sustain the illusion that it is.
  */
 const LEGACY_VAULT_KEY = "ssk-canon.coffre";
 const LEGACY_SESSION_KEY = "ssk-canon.cle-session";
 
 /**
- * À quoi un jeton s'applique.
+ * What a token applies to.
  *
- * Deux niveaux, parce que la plateforme en emploie deux : l'organisation est la
- * frontière où se décident l'approbation et les politiques, et c'est donc le
- * cas courant ; un dépôt peut néanmoins demander le sien — un accès en écriture
- * là où le reste de l'organisation est en lecture.
+ * Two levels, because the platform uses two: the organisation is the
+ * boundary where approval and policies are decided, and so it is the
+ * common case; a repo may nonetheless ask for its own — write access
+ * where the rest of the organisation is read-only.
  */
 export interface ScopedToken {
-  /** `organisation` ou `organisation/depot`. */
+  /** `organisation` or `organisation/repo`. */
   readonly key: string;
   readonly token: string;
 }
 
-/** La clé d'organisation d'un dépôt, et la clé exacte du dépôt. */
+/** A repo's organisation key, and the repo's exact key. */
 export function repoKeys(repoRef: { owner: string; repo: string }): {
   organization: string;
   exact: string;
@@ -42,10 +42,10 @@ export function repoKeys(repoRef: { owner: string; repo: string }): {
   return { organization: org, exact: `${org}/${repoRef.repo.toLowerCase()}` };
 }
 
-/** Un accès obtenu contre une identité vérifiée, et ce qu'il ouvre. */
+/** An access obtained in exchange for a verified identity, and what it opens. */
 export interface TemporaryAccess {
   readonly token: string;
-  /** Instant au-delà duquel il ne doit plus être présenté. */
+  /** Instant beyond which it must no longer be presented. */
   readonly validUntil: string;
   readonly repos: readonly string[];
   readonly identity: {
@@ -55,53 +55,53 @@ export interface TemporaryAccess {
   };
 }
 
-/** D'où vient le jeton courant. */
+/** Where the current token comes from. */
 export type TokenSource = "aucune" | "personnel" | "identite_tierce";
 
 /**
- * Sous quelle forme les jetons sont gardés sur le poste, pour que l'interface le dise (RG-secret-conserve-localement) : dans le coffre du système (bureau), en clair dans le navigateur, scellés par une passkey, ou pour l'onglet seulement — un projet de l'onglet exige la passkey, et ils ne le sont pas (RG-protection-du-jeton-par-projet).
+ * In what form tokens are kept on the machine, so that the interface says so (RG-secret-conserve-localement): in the system vault (desktop), in plain text in the browser, sealed by a passkey, or for the tab only — a project in the tab requires the passkey, and they are not sealed (RG-protection-du-jeton-par-projet).
  */
 export type TokenForm = "systeme" | "en-clair" | "scelle" | "session";
 
-/** Ce qu'a donné la dernière sollicitation de la passkey, quand elle n'a pas abouti. */
+/** What the last passkey request gave, when it did not succeed. */
 export type PasskeyFailure = "annule" | "impossible" | "illisible";
 
 /**
- * Le jeton d'accès à GitHub.
+ * The GitHub access token.
  *
- * Point de substitution unique pour la phase 7 : le proxy remplacera la saisie
- * manuelle en fournissant un jeton d'installation, et rien d'autre ne changera
- * dans l'application — `GithubClient` interroge ce service, pas le stockage.
+ * Single substitution point for phase 7: the proxy will replace manual
+ * input by providing an installation token, and nothing else will change
+ * in the application — `GithubClient` queries this service, not the storage.
  *
- * Les jetons sont gardés dans le coffre de la cible — voir `plateforme/ports.ts`
- * pour ce que cela vaut. D'où le conseil, qui prime ici : n'accorder qu'un
- * jeton de moindre privilège, et le révoquer sur GitHub le jour où il n'a plus
- * lieu d'être.
+ * Tokens are kept in the target's vault — see `platform/ports.ts`
+ * for what that is worth. Hence the advice, which prevails here: grant only a
+ * least-privilege token, and revoke it on GitHub the day it no longer
+ * has a reason to exist.
  */
 export class TokenService {
   /**
-   * Les contenus privés lus sous un accès ne lui survivent pas : oublier un
-   * jeton efface ce qu'il avait ouvert. Voir RG-contenus-prives-au-repos.
+   * Private contents read under an access do not outlive it: forgetting a
+   * token erases what it had opened. See RG-contenus-prives-au-repos.
    */
   private readonly cache = inject(ContentCache);
 
   /**
-   * Le coffre de la cible : celui du système dans l'application de bureau, le stockage local dans la version web (INV-8). Ses écritures ne sont pas attendues : chaque appel part dans l'ordre où l'état change, et un coffre indisponible laisse les jetons valoir pour la session.
+   * The target's vault: the system's in the desktop application, local storage in the web version (INV-8). Its writes are not awaited: each call goes out in the order the state changes, and an unavailable vault leaves the tokens valid for the session.
    */
   private readonly vault = inject(PLATFORM).vault;
 
-  /** Le scellement par passkey de la version web ; `null` sur le bureau, dont le coffre du système suffit. */
+  /** The web version's passkey sealing; `null` on the desktop, whose system vault is enough. */
   private readonly sealing = inject(PLATFORM).sealing;
 
-  /** L'état du scellé, relevé après chaque geste : le coffre le tient, mais ne le signale pas. */
+  /** The sealed store's state, read after each gesture: the vault holds it, but does not report it. */
   private readonly sealingState = signal<SealingState>("aucun");
 
   /**
-   * Vrai dès qu'un projet ouvert dans cet onglet exige la passkey, et jusqu'à sa fermeture : un jeton peut ouvrir plusieurs projets, et il est gardé selon le plus exigeant d'entre eux (RG-protection-du-jeton-par-projet).
+   * True as soon as a project open in this tab requires the passkey, and until the tab closes: a token can open several projects, and it is kept according to the most demanding of them (RG-protection-du-jeton-par-projet).
    */
   private readonly required = signal(false);
 
-  /** Vrai quand des jetons scellés attendent un geste de l'utilisateur pour s'ouvrir. */
+  /** True when sealed tokens are waiting for a user gesture to open. */
   readonly locked = computed(() => this.sealingState() === "verrouille");
 
   readonly form = computed<TokenForm>(() => {
@@ -110,53 +110,53 @@ export class TokenService {
     return this.required() ? "session" : "en-clair";
   });
 
-  /** Vrai quand un projet de l'onglet exige la passkey, pour le dire. */
+  /** True when a project in the tab requires the passkey, to say so. */
   readonly protectionRequired = computed(() => this.required());
 
-  /** Ce qu'a donné la dernière sollicitation de la passkey, pour le dire ; `null` après un succès. */
+  /** What the last passkey request gave, to say so; `null` after a success. */
   readonly passkeyFailure = signal<PasskeyFailure | null>(null);
 
   /**
-   * Ce que le coffre a refusé à la dernière écriture : garder les jetons (`ecriture`) — ils valent pour la session et ne seront pas retrouvés au lancement suivant —, ou les effacer (`effacement`) — ils y seront retrouvés. `null` quand il a accepté. RG-secret-conserve-localement : l'interface le dit.
+   * What the vault refused at the last write: keeping the tokens (`ecriture`) — they are valid for the session and will not be found at the next launch —, or erasing them (`effacement`) — they will be found there. `null` when it accepted. RG-secret-conserve-localement: the interface says so.
    */
   readonly vaultRefused = signal<"ecriture" | "effacement" | null>(null);
 
   private readonly token = signal<string | null>(null);
 
   /**
-   * Les jetons par portée, du plus général au plus précis.
+   * Tokens by scope, from the most general to the most precise.
    *
-   * Un rédacteur travaille sur des projets appartenant à plusieurs
-   * organisations, et un jeton peut ne couvrir que l'une d'elles — restreint à
-   * une sélection de dépôts, soumis à l'approbation de l'organisation, expirant
-   * à sa propre date. N'en garder qu'un revenait à écraser le précédent sans
-   * rien dire, puis à présenter « dépôt introuvable » sur un dépôt bien réel.
+   * An author works on projects belonging to several
+   * organisations, and a token may cover only one of them — restricted to
+   * a selection of repos, subject to the organisation's approval, expiring
+   * on its own date. Keeping only one amounted to overwriting the previous one without
+   * a word, then presenting « dépôt introuvable » on a very real repo.
    */
   private readonly byScope = signal<ReadonlyMap<string, string>>(new Map());
 
   /**
-   * Le dépôt pour lequel le jeton est choisi.
+   * The repo for which the token is chosen.
    *
-   * Fourni de l'extérieur plutôt que lu : ce service est interrogé par la
-   * couche d'accès, et dépendre en retour de la configuration du dépôt ferait
-   * un cycle.
+   * Supplied from outside rather than read: this service is queried by the
+   * access layer, and depending in return on the repo's configuration would make
+   * a cycle.
    */
   private readonly currentRepo = signal<{
     owner: string;
     repo: string;
   } | null>(null);
 
-  /** Dit pour quel dépôt les jetons doivent être choisis. */
+  /** Says for which repo the tokens must be chosen. */
   targetRepo(repoRef: { owner: string; repo: string } | null): void {
     this.currentRepo.set(repoRef);
   }
 
-  /** La cible courante, pour la rétablir après l'avoir déplacée. */
+  /** The current target, to restore it after moving it. */
   currentTarget(): { owner: string; repo: string } | null {
     return this.currentRepo();
   }
 
-  /** Les portées déclarées, pour les présenter et les modifier. */
+  /** The declared scopes, to present and modify them. */
   readonly scopes = computed(() =>
     [...this.byScope().entries()]
       .map(([key, token]) => ({ key: key, token: token }))
@@ -164,12 +164,12 @@ export class TokenService {
   );
 
   /**
-   * Le jeton qui s'applique au dépôt courant.
+   * The token that applies to the current repo.
    *
-   * Le plus précis l'emporte : un jeton déclaré pour `org/depot` prime sur celui
-   * de `org`, qui prime sur le jeton général. Sans cette gradation, déclarer un
-   * accès particulier à un dépôt obligerait à le redéclarer pour tous les
-   * autres de l'organisation.
+   * The most precise wins: a token declared for `org/repo` takes precedence over that
+   * of `org`, which takes precedence over the general token. Without this gradation, declaring a
+   * particular access to one repo would require redeclaring it for all the
+   * others of the organisation.
    */
   private applicableToken(
     d: { owner: string; repo: string } | null = this.currentRepo(),
@@ -184,22 +184,22 @@ export class TokenService {
   }
 
   /**
-   * Accès obtenu contre une identité vérifiée.
+   * Access obtained in exchange for a verified identity.
    *
-   * Il ne va pas dans le stockage du navigateur : il expire en une heure, et le
-   * retrouver le lendemain ne produirait que des erreurs d'autorisation dont la
-   * cause serait invisible. Le perdre en rechargeant est le comportement juste —
-   * une nouvelle identité vérifiée le rend aussitôt.
+   * It does not go into browser storage: it expires within an hour, and
+   * finding it the next day would only produce authorisation errors whose
+   * cause would be invisible. Losing it on reload is the right behaviour —
+   * a new verified identity gives it back at once.
    */
   private readonly access = signal<TemporaryAccess | null>(null);
 
-  /** Vrai si un jeton est disponible, quelle qu'en soit la source. */
+  /** True if a token is available, whatever its source. */
   readonly present = computed(() => this.value() !== null);
 
   /**
-   * Vrai si rien n'est enregistré : ni jeton général, ni jeton d'une portée, ni accès temporaire.
+   * True if nothing is saved: no general token, no scoped token, no temporary access.
    *
-   * `present` ne répond que pour le dépôt ciblé : un jeton enregistré pour une autre organisation y compte pour rien, alors qu'il est bien en place (RG-acces-par-portee).
+   * `present` only answers for the targeted repo: a token saved for another organisation counts for nothing there, even though it is indeed in place (RG-acces-par-portee).
    */
   readonly noAccess = computed(
     () =>
@@ -213,22 +213,22 @@ export class TokenService {
     return this.applicableToken() === null ? "aucune" : "personnel";
   });
 
-  /** Qui a obtenu l'accès courant, s'il vient d'une identité vérifiée. */
+  /** Who obtained the current access, if it comes from a verified identity. */
   readonly identity = computed(() => this.access()?.identity ?? null);
 
-  /** Projets que cet accès atteint, s'il vient d'une identité vérifiée. */
+  /** Projects this access reaches, if it comes from a verified identity. */
   readonly repos = computed(() => this.access()?.repos ?? null);
 
-  /** Les quatre derniers caractères, pour identifier le jeton sans l'exposer. */
+  /** The last four characters, to identify the token without exposing it. */
   readonly fingerprint = computed(() => {
     const j = this.applicableToken();
     return j ? `…${j.slice(-4)}` : null;
   });
 
   /**
-   * Sous quelle portée le jeton courant s'applique, pour le dire à l'écran.
+   * Under which scope the current token applies, to show it on screen.
    *
-   * `null` quand aucun jeton ne s'applique, `''` quand c'est le jeton général.
+   * `null` when no token applies, `''` when it is the general token.
    */
   readonly currentScope = computed<string | null>(() => {
     const d = this.currentRepo();
@@ -242,47 +242,47 @@ export class TokenService {
   });
 
   /**
-   * Le jeton à présenter à la plateforme.
+   * The token to present to the platform.
    *
-   * L'accès temporaire prime sur le jeton personnel : quelqu'un qui vient de
-   * s'identifier attend d'écrire sous cette identité, non sous un jeton qu'il
-   * avait saisi la veille.
+   * Temporary access takes precedence over the personal token: someone who has just
+   * identified expects to write under that identity, not under a token they
+   * had entered the day before.
    *
-   * Un accès expiré n'est pas rendu — le présenter produirait un refus dont la
-   * cause serait invisible au rédacteur.
+   * An expired access is not returned — presenting it would produce a refusal whose
+   * cause would be invisible to the author.
    */
   value(): string | null {
     return this.valueFor(this.currentRepo());
   }
 
   /**
-   * Le jeton à présenter pour un dépôt nommé, sans déplacer la cible.
+   * The token to present for a named repo, without moving the target.
    *
-   * La cible est un état partagé : la déplacer le temps d'un appel ferait
-   * présenter le mauvais jeton aux appels lancés en parallèle — ceux qui
-   * vérifient, dépôt par dépôt, lequel porte un référentiel.
+   * The target is shared state: moving it for the duration of a call would
+   * present the wrong token to calls launched in parallel — those that
+   * check, repo by repo, which one carries a specification.
    */
   valueFor(repoRef: { owner: string; repo: string } | null): string | null {
     const a = this.access();
     if (a) {
       if (Date.parse(a.validUntil) > Date.now()) return a.token;
-      // expiré : on l'oublie, pour que la source cesse de l'annoncer
+      // expired: we forget it, so that the source stops announcing it
       this.access.set(null);
     }
     return this.applicableToken(repoRef);
   }
 
-  /** Enregistre un accès obtenu contre une identité vérifiée. */
+  /** Saves an access obtained in exchange for a verified identity. */
   setAccess(access: TemporaryAccess): void {
     this.access.set(access);
   }
 
   /**
-   * Oublie l'accès temporaire, sans toucher au jeton personnel.
+   * Forgets the temporary access, without touching the personal token.
    *
-   * Les contenus privés sont effacés tous : rien ne distingue ceux que cet
-   * accès a lus de ceux d'un jeton personnel, et en effacer trop ne coûte
-   * qu'un téléchargement, quand en garder trop survivrait à l'accès.
+   * Private contents are all erased: nothing distinguishes those this
+   * access read from those of a personal token, and erasing too much only costs
+   * a download, whereas keeping too much would outlive the access.
    */
   eraseAccess(): void {
     this.access.set(null);
@@ -290,11 +290,11 @@ export class TokenService {
   }
 
   /**
-   * Charge les jetons du coffre de la cible.
+   * Loads the tokens from the target's vault.
    *
-   * Appelé une fois au démarrage, avant que le routeur n'active quoi que ce
-   * soit : le garde de route lance la lecture du dépôt et doit la lancer avec le
-   * jeton en main plutôt qu'en anonyme.
+   * Called once at startup, before the router activates anything:
+   * the route guard starts reading the repo and must start it with the
+   * token in hand rather than anonymously.
    */
   async initialize(): Promise<void> {
     this.forgetLegacyVault();
@@ -305,7 +305,7 @@ export class TokenService {
   }
 
   /**
-   * Ce que demande le projet ouvert. Exigée, la passkey l'est pour le reste de l'onglet ; et des jetons que le navigateur gardait en clair en sont retirés aussitôt, l'onglet les gardant en mémoire : un jeton qui ouvre ce projet n'est jamais gardé en clair (RG-protection-du-jeton-par-projet).
+   * What the open project asks for. When required, the passkey is required for the rest of the tab; and tokens the browser kept in plain text are removed from it at once, the tab keeping them in memory: a token that opens this project is never kept in plain text (RG-protection-du-jeton-par-projet).
    */
   requireProtection(protection: TokenProtection): void {
     if (protection !== "exigee" || this.required()) return;
@@ -316,13 +316,13 @@ export class TokenService {
         .then((writing) => this.recordWrite(writing, "effacement"));
   }
 
-  /** Vrai quand ce navigateur peut sceller les jetons ; seul l'essai le confirme. */
+  /** True when this browser can seal the tokens; only trying confirms it. */
   async canProtect(): Promise<boolean> {
     return (await this.sealing?.isPossible()) ?? false;
   }
 
   /**
-   * Scelle les jetons en place par une passkey. À appeler depuis un geste de l'utilisateur : le navigateur ne sollicite la passkey qu'ainsi.
+   * Seals the tokens in place with a passkey. To be called from a user gesture: the browser only requests the passkey that way.
    */
   async protect(): Promise<SealingOutcome> {
     if (!this.sealing) return "impossible";
@@ -333,7 +333,7 @@ export class TokenService {
   }
 
   /**
-   * Enregistre un jeton et le scelle d'un même geste, sans jamais l'écrire en clair. `cle` vide : le jeton général. Si la passkey n'est pas créée, le jeton est gardé comme le projet le permet : en clair, ou pour l'onglet seulement.
+   * Saves a token and seals it in a single gesture, without ever writing it in plain text. Empty `key`: the general token. If the passkey is not created, the token is kept as the project allows: in plain text, or for the tab only.
    */
   async setProtected(key: string, token: string): Promise<SealingOutcome> {
     const own = token.trim();
@@ -344,12 +344,12 @@ export class TokenService {
     return issue;
   }
 
-  /** Le rédacteur a lu l'échec, et garde le jeton tel qu'il est : il n'est plus rappelé. */
+  /** The author has read the failure, and keeps the token as it is: it is no longer brought up. */
   dismissPasskeyFailure(): void {
     this.passkeyFailure.set(null);
   }
 
-  /** Ouvre les jetons scellés. À appeler depuis un geste de l'utilisateur. */
+  /** Opens the sealed tokens. To be called from a user gesture. */
   async unlock(): Promise<"ouvert" | PasskeyFailure> {
     if (!this.sealing) return "impossible";
     const opened = await this.sealing.unlockTokens();
@@ -362,7 +362,7 @@ export class TokenService {
   }
 
   /**
-   * Ouvre les jetons scellés dès l'ouverture de l'onglet, sans attendre de clic : Touch ID ou le code de l'appareil restent le geste (RG-secret-conserve-localement). Un navigateur qui exige un clic dans la page refuse comme on annule — WebAuthn ne les distingue pas —, et ce refus ne se dit pas : le bandeau propose simplement de déverrouiller.
+   * Opens the sealed tokens as soon as the tab opens, without waiting for a click: Touch ID or the device code remain the gesture (RG-secret-conserve-localement). A browser that requires a click in the page refuses the way one cancels — WebAuthn does not distinguish them —, and this refusal is not reported: the banner simply offers to unlock.
    */
   async unlockWithoutGesture(): Promise<"ouvert" | PasskeyFailure> {
     const issue = await this.unlock();
@@ -377,29 +377,29 @@ export class TokenService {
     else if (this.locked()) this.cache.lock();
   }
 
-  /** Ce que le cache gardait en clair ne survit pas au scellement : il se relira, sous la clé. */
+  /** What the cache kept in plain text does not survive sealing: it will be reread, under the key. */
   private async openCache(): Promise<void> {
     await this.cache.clearPrivate();
     this.readSealingState();
   }
 
   /**
-   * Efface ce qu'une version chiffrée avait laissé.
+   * Erases what an encrypted version had left.
    *
-   * Sans passphrase pour l'ouvrir, ce coffre n'est plus qu'un encombrant : le
-   * retirer libère la place et évite qu'un futur lecteur croie y trouver
-   * quelque chose.
+   * Without a passphrase to open it, this vault is nothing but clutter:
+   * removing it frees the space and keeps a future reader from believing they will find
+   * something in it.
    */
   private forgetLegacyVault(): void {
     try {
       localStorage.removeItem(LEGACY_VAULT_KEY);
       sessionStorage.removeItem(LEGACY_SESSION_KEY);
     } catch {
-      // stockage bloqué : rien à nettoyer
+      // blocked storage: nothing to clean up
     }
   }
 
-  /** Écrit l'état courant dans le coffre ; rien, quand ils ne valent que pour l'onglet. */
+  /** Writes the current state into the vault; nothing, when they are only valid for the tab. */
   private persist(): void {
     if (this.form() === "session") return;
     void this.vault
@@ -428,7 +428,7 @@ export class TokenService {
     this.persist();
   }
 
-  /** Garde un jeton en mémoire, sans l'écrire : `cle` vide, le jeton général. */
+  /** Keeps a token in memory, without writing it: empty `key`, the general token. */
   private keep(key: string, token: string): void {
     if (!key) {
       this.token.set(token);
@@ -439,7 +439,7 @@ export class TokenService {
     this.byScope.set(next);
   }
 
-  /** Efface tout : les jetons stockés, ceux en mémoire, et l'accès temporaire. */
+  /** Erases everything: stored tokens, those in memory, and the temporary access. */
   erase(): void {
     this.token.set(null);
     this.access.set(null);
@@ -448,14 +448,14 @@ export class TokenService {
       this.recordWrite(writing, "effacement");
       this.readSealingState();
     });
-    // Le scellé part avec les jetons : ce que le cache gardera ensuite le sera comme eux, en clair.
+    // The sealed store goes with the tokens: what the cache keeps afterwards will be kept like them, in plain text.
     this.sealingState.set("aucun");
     this.passkeyFailure.set(null);
     this.cache.encryptWith(null);
     void this.cache.clearPrivate();
   }
 
-  /** Enregistre un jeton pour une portée — une organisation, ou un dépôt. */
+  /** Saves a token for a scope — an organisation, or a repo. */
   setForScope(key: string, token: string): void {
     const own = token.trim();
     if (!own) return;
@@ -465,25 +465,25 @@ export class TokenService {
     this.persist();
   }
 
-  /** Retire le jeton d'une portée. */
+  /** Removes a scope's token. */
   forgetScope(key: string): void {
     const scope = key.toLowerCase();
     const next = new Map(this.byScope());
     next.delete(scope);
     this.byScope.set(next);
     this.persist();
-    // Un dépôt que le jeton général couvre encore sera simplement relu.
+    // A repo the general token still covers will simply be reread.
     void this.cache.clearPrivate(
       (repoRef) => repoRef === scope || repoRef.startsWith(`${scope}/`),
     );
   }
 
   /**
-   * Vérifie la forme d'un jeton avant de l'enregistrer.
+   * Checks a token's shape before saving it.
    *
-   * On ne valide pas la validité — seul GitHub peut le faire — mais on attrape
-   * les erreurs de saisie les plus fréquentes : un identifiant collé à la place
-   * du jeton, ou un jeton tronqué.
+   * We do not validate validity — only GitHub can do that — but we catch
+   * the most frequent input errors: an identifier pasted instead
+   * of the token, or a truncated token.
    */
   static checkForm(token: string): string | null {
     const j = token.trim();

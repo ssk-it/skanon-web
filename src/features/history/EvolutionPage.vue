@@ -18,9 +18,9 @@ import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import { LastVisit, periodStart, type Period } from "./periods";
 
 /**
- * Ce qui a changé dans le référentiel entre deux dates.
+ * What changed in the specification between two dates.
  *
- * La question posée n'est pas « qu'existe-t-il ? » — le référentiel y répond — mais « qu'a-t-on décidé depuis la dernière fois ? ». C'est celle d'un client qui revient après un trimestre, et à laquelle ni Git ni un wiki ne répondent sans une archéologie manuelle.
+ * The question asked is not "what exists?" — the specification answers that — but "what has been decided since last time?". It is the question of a client coming back after a quarter, and one that neither Git nor a wiki answers without manual archaeology.
  */
 
 const LABEL: Record<Evolution, string> = {
@@ -31,9 +31,9 @@ const LABEL: Record<Evolution, string> = {
 };
 
 /**
- * Bornes à l'heure près, et non au jour.
+ * Bounds to the hour, not to the day.
  *
- * Un dépôt jeune, ou une semaine où plusieurs cadrages sont livrés, tient entièrement dans une journée : une granularité au jour n'y montrerait rien. Le format attendu par le champ est `AAAA-MM-JJThh:mm`, en heure locale.
+ * A young repo, or a week in which several scopings are delivered, fits entirely within one day: a day granularity would show nothing there. The format the field expects is `AAAA-MM-JJThh:mm`, in local time.
  */
 function localInstant(d: Date): string {
   const offset = d.getTimezoneOffset() * 60_000;
@@ -41,14 +41,14 @@ function localInstant(d: Date): string {
 }
 
 /**
- * Les formats `d MMMM y, HH:mm` et `d MMM, HH:mm` du pipe `date` d'Angular, en locale fr. `Intl` seul écrirait « 6 octobre 2026 à 12:00 » : les parties se réassemblent donc au format de SSK Canon.
+ * The `d MMMM y, HH:mm` and `d MMM, HH:mm` formats of Angular's `date` pipe, in the fr locale. `Intl` alone would write « 6 octobre 2026 à 12:00 »: the parts are therefore reassembled into SSK Canon's format.
  */
 function formatDate(
   value: string | Date | null,
   month: "long" | "short",
   year: boolean,
 ): string {
-  // Comme le pipe `date`, une date absente ne s'écrit pas.
+  // Like the `date` pipe, a missing date is not written.
   if (value === null) return "";
   const parts = new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
@@ -66,7 +66,7 @@ function formatDate(
 const longDate = (v: string | Date | null) => formatDate(v, "long", true);
 const shortDate = (v: string | Date | null) => formatDate(v, "short", false);
 
-/** Les périodes proposées d'un geste, dans l'ordre où elles s'affichent. */
+/** The periods offered in one gesture, in the order they are displayed. */
 const PERIODS: ReadonlyArray<{
   readonly period: Period;
   readonly label: string;
@@ -87,13 +87,13 @@ const dialog = inject(DialogService);
 
 const today = localInstant(new Date());
 
-/** La visite précédente sur ce projet, lue une fois pour la session. */
+/** The previous visit to this project, read once for the session. */
 const visit = inject(LastVisit).visit(store.repoRef());
 
-/** Depuis la dernière visite, ou trente jours à défaut — 2026-044, décision 04. */
+/** Since the last visit, or thirty days failing that — 2026-044, decision 04. */
 const period = ref<Period>(visit ? "visite" : "30-jours");
 
-/** La dernière visite n'est proposée que si elle est connue. */
+/** The last visit is offered only if it is known. */
 const periods = computed(() =>
   PERIODS.filter((p) => p.period !== "visite" || visit),
 );
@@ -104,9 +104,9 @@ const departure = ref(
 const arrival = ref(today);
 
 /**
- * Premier enregistrement du dépôt, borne basse de toute consultation datée.
+ * First commit of the repo, lower bound of any dated query.
  *
- * Chargée à l'ouverture : sans elle, le lecteur découvre qu'une date est trop ancienne après avoir lancé une comparaison, alors que le champ pouvait le lui dire d'emblée. Reste `null` si l'appel échoue — la saisie est alors seulement moins guidée.
+ * Loaded on opening: without it, the reader discovers that a date is too old after launching a comparison, whereas the field could have told them up front. Stays `null` if the call fails — input is then merely less guided.
  */
 const lowerBound = ref<string | null>(null);
 
@@ -117,14 +117,14 @@ const result = ref<Comparison | null>(null);
 void start();
 
 /**
- * La borne basse d'abord : un dépôt plus jeune que la période retenue la relève, et comparer avant ferait échouer la première réponse de la vue.
+ * The lower bound first: a repo younger than the chosen period raises it, and comparing before would make the view's first answer fail.
  */
 async function start(): Promise<void> {
   await loadLowerBound();
   await launch();
 }
 
-/** Une période toute faite compare aussitôt ; les dates libres attendent. */
+/** A ready-made period compares at once; free dates wait. */
 function choose(p: Period): void {
   period.value = p;
   const begin = periodStart(p, new Date(), visit);
@@ -136,7 +136,7 @@ function choose(p: Period): void {
   void launch();
 }
 
-/** Le même dialogue que la barre : la connexion lève la limite anonyme. */
+/** The same dialog as the top bar: signing in lifts the anonymous limit. */
 function openTokenDialog(): void {
   void import("../shared/TokenDialog.vue").then(
     async ({ default: TokenDialog }) => {
@@ -152,23 +152,23 @@ async function loadLowerBound(): Promise<void> {
   const date = await github.firstCommitDate(store.repoRef());
   if (!date) return;
 
-  // Le champ ne descend pas sous la minute : tronquer la date du premier enregistrement placerait la borne juste avant lui, et la comparaison à cette borne ne trouverait rien. On arrondit donc à la minute supérieure.
+  // The field does not go below the minute: truncating the date of the first commit would place the bound just before it, and comparing at that bound would find nothing. So we round up to the next minute.
   const first = new Date(date);
   if (first.getSeconds() || first.getMilliseconds()) {
     first.setSeconds(60, 0);
   }
   const min = localInstant(first);
   lowerBound.value = min;
-  // Un dépôt plus jeune que le recul par défaut rendrait la borne de départ antérieure à son premier enregistrement, donc invalide dès l'ouverture.
+  // A repo younger than the default look-back would make the start bound earlier than its first commit, hence invalid from the moment the view opens.
   if (departure.value < min) departure.value = min;
 }
 
 const label = (e: Evolution) => LABEL[e];
 
 /**
- * Écarts regroupés par nature, dans l'ordre de leur portée.
+ * Differences grouped by kind, in order of their reach.
  *
- * À plat, les quelques règles modifiées — ce qu'on vient chercher — se perdent entre des dizaines d'ajouts. L'ordre place d'abord ce qui retire ou change du comportement existant, et laisse les ajouts en fin : une règle nouvelle ne contredit rien de ce que le lecteur croyait savoir.
+ * Laid flat, the few modified rules — what one comes looking for — get lost among dozens of additions. The order puts first what removes or changes existing behaviour, and leaves additions at the end: a new rule contradicts nothing the reader thought they knew.
  */
 const groups = computed(() => {
   const c = result.value;
@@ -182,7 +182,7 @@ const groups = computed(() => {
     .filter((g) => g.rules.length > 0);
 });
 
-/** Titre d'un cadrage tel qu'il était à la borne d'arrivée. */
+/** Title of a scoping as it was at the end bound. */
 function scopingTitle(c: Comparison, id: string): string {
   return c.arrival.specification.scopings.get(id)?.title ?? "";
 }
@@ -226,7 +226,7 @@ async function launch(): Promise<void> {
       </p>
     </header>
 
-    <!-- RG-periode-par-defaut : la question qu'on pose ici est presque toujours la même, et la vue y répond dès l'ouverture. Les dates libres restent, sur demande. -->
+    <!-- RG-periode-par-defaut: the question asked here is almost always the same, and the view answers it on opening. Free dates remain, on request. -->
     <div class="periodes" role="group" aria-label="Période">
       <button
         v-for="p of periods"
@@ -281,7 +281,7 @@ async function launch(): Promise<void> {
       <UiIcon name="error_outline" />
       <span>
         {{ error }}
-        <!-- Sans jeton, l'échec le plus probable est le quota anonyme : la connexion le lève. -->
+        <!-- Without a token, the most likely failure is the anonymous quota: signing in lifts it. -->
         <button
           v-if="!tokens.present()"
           type="button"
@@ -302,7 +302,7 @@ async function launch(): Promise<void> {
           >.
         </p>
         <p class="detail">
-          <!-- La date affichée est celle du dernier enregistrement antérieur à la borne demandée, et non la borne elle-même : c'est l'état qui a réellement existé. -->
+          <!-- The date displayed is that of the last commit before the requested bound, not the bound itself: it is the state that actually existed. -->
           Derniers enregistrements avant les bornes demandées :
           <code>{{ result.departure.commit.sha.slice(0, 7) }}</code> et
           <code>{{ result.arrival.commit.sha.slice(0, 7) }}</code
@@ -417,7 +417,7 @@ async function launch(): Promise<void> {
     font-weight: 500;
   }
 }
-/* Sur écran étroit, la rangée se replie : des pastilles séparées s'y lisent mieux qu'un bloc segmenté coupé en deux. */
+/* On a narrow screen, the row wraps: separate pills read better there than a segmented block cut in two. */
 @media (max-width: 640px) {
   .periodes {
     gap: 6px;
@@ -597,7 +597,7 @@ h1 {
   font-weight: 600;
   letter-spacing: 0.02em;
 
-  /* Le code couleur suit la portée du changement, pas sa nouveauté : une abrogation retire une règle du produit, c'est le plus lourd. */
+  /* The colour code follows the reach of the change, not its novelty: a repeal removes a rule from the product, it is the heaviest. */
   &.ajoutee {
     background: var(--pc-op-cree-bg, #e6f4ea);
     color: var(--pc-op-cree, #17663a);
@@ -638,7 +638,7 @@ details {
   gap: 16px;
   margin-top: 10px;
 
-  /* En dessous, deux colonnes rendent chaque énoncé illisible : mieux vaut les empiler que réduire la mesure à une trentaine de caractères. */
+  /* Below that, two columns make every statement unreadable: better to stack them than to shrink the measure to thirty-odd characters. */
   @media (max-width: 860px) {
     grid-template-columns: 1fr;
   }
@@ -656,7 +656,7 @@ details {
   text-transform: uppercase;
   color: var(--mat-sys-on-surface-variant);
 }
-/* Défaut de SSK Canon reproduit tel quel : sous l'encapsulation, `:first-child` et `:last-child` ne visent que des éléments de cette vue, jamais le Markdown rendu dans `.md` — ces deux règles n'y ont aucun effet. Il en va de même ici sous `scoped`. */
+/* SSK Canon defect reproduced as is: under encapsulation, `:first-child` and `:last-child` only target elements of this view, never the Markdown rendered in `.md` — these two rules have no effect there. The same holds here under `scoped`. */
 .md {
   font-size: 13.5px;
   line-height: 1.6;

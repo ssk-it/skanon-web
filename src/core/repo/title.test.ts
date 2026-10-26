@@ -7,13 +7,13 @@ import { Specification } from "../model/model";
 import { SpecificationStore } from "./specification.store";
 
 /**
- * Le titre de la page — ce que l'historique du navigateur retient.
+ * The page title — what the browser history keeps.
  *
- * Les titres déclarés par les routes sont identiques d'un projet à l'autre et
- * d'un élément à l'autre : une dizaine d'entrées « Règle de gestion — SSK
- * Canon » ne permettent de retrouver aucune des pages qu'elles désignent.
+ * The titles declared by routes are identical from one project to another and
+ * from one item to another: a dozen « Règle de gestion — SSK Canon » entries
+ * make it impossible to find any of the pages they designate.
  */
-describe("Titre de la page", () => {
+describe("Page title", () => {
   let router: Router;
   let store: SpecificationStore;
   const title = { getTitle: () => document.title };
@@ -24,7 +24,7 @@ describe("Titre de la page", () => {
     store = inject(SpecificationStore);
   });
 
-  /** Pose un référentiel chargé, sans passer par le réseau. */
+  /** Sets a loaded specification, without going through the network. */
   function loadTestSpecification(
     partial: Partial<Specification["project"]> = {},
     content = {},
@@ -42,9 +42,9 @@ describe("Titre de la page", () => {
     } as Specification);
   }
 
-  it("nomme le dépôt tant que le référentiel n’est pas chargé", async () => {
-    // L'adresse porte le dépôt dès la navigation ; le nom lisible n'arrive
-    // qu'après. Un titre muet en attendant ne dirait rien à l'historique.
+  it("names the repo as long as the specification is not loaded", async () => {
+    // The address carries the repo from navigation; the readable name only
+    // arrives afterwards. A silent title meanwhile would tell the history nothing.
     await router.push("/ssk-it/exemple-cadrage/referentiel");
 
     expect(title.getTitle()).toBe(
@@ -52,7 +52,7 @@ describe("Titre de la page", () => {
     );
   });
 
-  it("nomme le projet dès que le référentiel est chargé", async () => {
+  it("names the project as soon as the specification is loaded", async () => {
     await router.push("/ssk-it/exemple-cadrage/referentiel");
 
     loadTestSpecification();
@@ -60,16 +60,16 @@ describe("Titre de la page", () => {
     expect(title.getTitle()).toBe("Référentiel — Explorateur S3 — Skanon");
   });
 
-  it("retombe sur le dépôt quand le projet ne déclare pas de nom", async () => {
+  it("falls back on the repo when the project declares no name", async () => {
     await router.push("/ssk-it/exemple-cadrage/referentiel");
 
-    // « Projet » est le nom par défaut : il ne distingue rien.
+    // « Projet » is the default name: it distinguishes nothing.
     loadTestSpecification({ name: "Projet" });
 
     expect(title.getTitle()).toContain("ssk-it/exemple-cadrage");
   });
 
-  it("porte l’identifiant de l’élément consulté", async () => {
+  it("carries the identifier of the consulted item", async () => {
     await router.push(
       "/ssk-it/projet/referentiel/regle/RG-lien-partage-presigne",
     );
@@ -77,8 +77,8 @@ describe("Titre de la page", () => {
     expect(title.getTitle()).toContain("RG-lien-partage-presigne");
   });
 
-  it("remplace l’intitulé générique par l’élément", async () => {
-    // « Règle de gestion » ne distingue rien : c'est l'identifiant qui compte.
+  it("replaces the generic label with the item", async () => {
+    // « Règle de gestion » distinguishes nothing: the identifier is what counts.
     await router.push(
       "/ssk-it/projet/referentiel/regle/RG-secret-au-trousseau",
     );
@@ -89,7 +89,7 @@ describe("Titre de la page", () => {
     );
   });
 
-  it("ajoute le titre du cadrage à son identifiant", async () => {
+  it("adds the scoping's title to its identifier", async () => {
     await router.push("/ssk-it/projet/cadrages/2026-016");
 
     loadTestSpecification(
@@ -106,7 +106,7 @@ describe("Titre de la page", () => {
     );
   });
 
-  it("ajoute le nom du domaine à son identifiant", async () => {
+  it("adds the domain's name to its identifier", async () => {
     await router.push("/ssk-it/projet/referentiel/domaine/exploration");
 
     loadTestSpecification(
@@ -121,9 +121,9 @@ describe("Titre de la page", () => {
     expect(title.getTitle()).toContain("exploration Exploration");
   });
 
-  it("affiche l’identifiant préfixé comme le reste de l’application", async () => {
-    // RG-prefixe-projet : le préfixe s'ajoute à l'affichage, et le titre est un
-    // affichage comme un autre.
+  it("displays the prefixed identifier like the rest of the application", async () => {
+    // RG-prefixe-projet: the prefix is added on display, and the title is a
+    // display like any other.
     await router.push("/ssk-it/projet/cadrages/2026-016");
 
     loadTestSpecification({ prefix: "TSE" });
@@ -131,15 +131,15 @@ describe("Titre de la page", () => {
     expect(title.getTitle()).toContain("TSE-2026-016");
   });
 
-  it("se contente de l’identifiant quand l’élément n’est pas encore connu", async () => {
-    // Quitter la page avant la fin du chargement ne doit pas laisser un titre
-    // générique dans l'historique.
+  it("makes do with the identifier when the item is not known yet", async () => {
+    // Leaving the page before loading ends must not leave a generic title in
+    // the history.
     await router.push("/ssk-it/projet/cadrages/2026-016");
 
     expect(title.getTitle()).toBe("2026-016 — ssk-it/projet — Skanon");
   });
 
-  it("garde un titre lisible hors de tout projet", async () => {
+  it("keeps a readable title outside any project", async () => {
     await router.push("/");
 
     expect(title.getTitle()).toContain("Ouvrir un projet");

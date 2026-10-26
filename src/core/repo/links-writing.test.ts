@@ -17,7 +17,7 @@ import { normalizeTag } from "./link-tag";
 import { unionLinkTags } from "./specification.store";
 import { Scoping } from "../model/model";
 
-/** Relit ce qui vient d'être écrit, en échouant clairement s'il est illisible. */
+/** Reads back what was just written, failing clearly if it is unreadable. */
 function rereadLinks(text: string): ExternalLink[] {
   const parse = splitFrontmatter(text);
   if (parse === null) throw new Error("aucun frontmatter produit");
@@ -40,11 +40,11 @@ const base: EditableScoping = {
 };
 
 /**
- * Un lien écrit doit se relire à l'identique. L'écart ne se verrait qu'au
- * rechargement, une fois le fichier commité — le pire moment pour l'apprendre.
+ * A written link must read back identically. A difference would only show on
+ * reload, once the file is committed — the worst moment to learn it.
  */
-describe("écriture des liens externes", () => {
-  it("rend un lien tel qu’il a été saisi", () => {
+describe("writing external links", () => {
+  it("returns a link as it was entered", () => {
     const link = {
       tag: "issue_github",
       name: "Migration du stockage",
@@ -55,9 +55,9 @@ describe("écriture des liens externes", () => {
     ).toEqual([link]);
   });
 
-  it("échappe un nom que YAML lirait de travers", () => {
-    // Un « : » suivi d'une espace ferait du nom une clé, et le lien deviendrait
-    // illisible — un titre en porte presque toujours un.
+  it("escapes a name YAML would misread", () => {
+    // A « : » followed by a space would make the name a key, and the link would become
+    // unreadable — a title almost always carries one.
     const link = {
       tag: "document",
       name: "Stockage : ce qu’on retient",
@@ -68,17 +68,17 @@ describe("écriture des liens externes", () => {
     ).toEqual([link]);
   });
 
-  it("rend une liste vide quand le cadrage ne porte aucun lien", () => {
+  it("returns an empty list when the scoping carries no link", () => {
     expect(
       rereadLinks(serializeScoping("2026-001", { ...base, links: [] })),
     ).toEqual([]);
   });
 
   /**
-   * Le défaut le plus coûteux : un cadrage réécrit sans que ses liens soient
-   * relus les perdrait en silence, et rien dans l'écran ne le dirait.
+   * The costliest defect: a scoping rewritten without its links being
+   * re-read would lose them silently, and nothing on screen would say so.
    */
-  it("conserve les liens existants au fil des réécritures", () => {
+  it("keeps existing links across rewrites", () => {
     const links = [
       {
         tag: "carte_trello",
@@ -100,11 +100,11 @@ describe("écriture des liens externes", () => {
   });
 
   /**
-   * La forme doit être celle des liens écrits à la main dans le référentiel.
-   * En produire une autre ferait apparaître en relecture des lignes modifiées
-   * là où personne n'a rien touché — le bruit qui décrédibilise une revue.
+   * The form must be that of links written by hand in the specification.
+   * Producing another would show modified lines in review
+   * where nobody touched anything — the noise that discredits a review.
    */
-  it("écrit un lien sous la forme qu’a le référentiel", () => {
+  it("writes a link in the form the specification has", () => {
     const text = serializeScoping("2026-001", {
       ...base,
       links: [
@@ -120,7 +120,7 @@ describe("écriture des liens externes", () => {
     );
   });
 
-  it("écarte un lien sans adresse : il ne mènerait nulle part", () => {
+  it("sets aside a link without an address: it would lead nowhere", () => {
     const links = [
       { tag: "document", name: "Sans adresse", url: "" },
       { tag: "document", name: "Avec adresse", url: "https://example.org/d" },
@@ -131,10 +131,10 @@ describe("écriture des liens externes", () => {
   });
 
   /**
-   * Les cadrages écrits avant que le nom existe n'en portent pas. Les relire
-   * doit rendre un lien valide, que l'affichage nommera par son tag.
+   * Scopings written before the name existed do not carry one. Reading them back
+   * must return a valid link, which the display will name by its tag.
    */
-  it("accepte un lien sans nom, écrit avant que le champ existe", () => {
+  it("accepts a link without a name, written before the field existed", () => {
     const link = {
       tag: "issue_github",
       name: "",
@@ -147,56 +147,56 @@ describe("écriture des liens externes", () => {
   });
 });
 
-describe("natures de lien déclarées par le projet", () => {
-  it("retient celles du fichier de configuration", () => {
+describe("link kinds declared by the project", () => {
+  it("keeps those of the configuration file", () => {
     expect(parseLinkTags(["carte_trello", "ticket_jira"])).toEqual([
       "carte_trello",
       "ticket_jira",
     ]);
   });
 
-  // Le cadrage qui réalise une piste la cite par un lien `piste` : la nature
-  // doit se proposer d'emblée, sans quoi chacun la saisirait à sa façon
-  // (cadrage 2026-058, RG-piste-etat-deduit).
-  it("propose la nature piste par défaut, avec son libellé", () => {
+  // The scoping that carries out a roadmap item cites it with a `piste` link: the kind
+  // must be offered from the start, otherwise everyone would enter it their own way
+  // (scoping 2026-058, RG-piste-etat-deduit).
+  it("offers the piste kind by default, with its label", () => {
     expect(DEFAULT_LINK_TAGS).toContain("piste");
     expect(LINK_TAG_LABEL["piste"]).toBe("Piste");
   });
 
-  // Sans repli, la saisie d'un lien n'offrirait aucun choix.
-  it("rend celles par défaut quand le projet n’en déclare aucune", () => {
+  // Without a fallback, entering a link would offer no choice.
+  it("returns the default ones when the project declares none", () => {
     expect(parseLinkTags(undefined)).toEqual(DEFAULT_LINK_TAGS);
     expect(parseLinkTags([])).toEqual(DEFAULT_LINK_TAGS);
   });
 });
 
 /**
- * La nature se saisit librement : aucune liste déclarée d'avance ne couvre les
- * ressources que tous les projets référencent. Elle sert pourtant de clé dans
- * le frontmatter, d'où la normalisation — sans elle, « Ticket Jira » fonderait
- * une nature de plus à côté du « ticket_jira » déjà employé, et la liste
- * proposée se peuplerait de doublons que rien ne rapprocherait.
+ * The kind is entered freely: no list declared in advance covers the
+ * resources all projects reference. It is nonetheless used as a key in
+ * the frontmatter, hence the normalisation — without it, « Ticket Jira » would found
+ * one more kind next to the « ticket_jira » already in use, and the offered
+ * list would fill up with duplicates nothing would bring together.
  */
-describe("normalisation d’une nature saisie", () => {
-  it("laisse une nature connue inchangée", () => {
+describe("normalisation of an entered kind", () => {
+  it("leaves a known kind unchanged", () => {
     for (const t of DEFAULT_LINK_TAGS) expect(normalizeTag(t)).toBe(t);
   });
 
   /**
-   * Le champ de saisie montre le libellé, non la clé : voir « carte_trello »
-   * s'inscrire après avoir choisi « Carte Trello » ferait croire à une
-   * correction. La clé écrite s'en retrouve par normalisation, ce qui suppose
-   * que chaque libellé y ramène. Un libellé futur qui ne le ferait pas — deux
-   * mots qu'un tiret sépare, un accent porté par la clé — écrirait une nature
-   * différente de celle choisie, et rien ne le signalerait à la saisie.
+   * The input field shows the label, not the key: seeing « carte_trello »
+   * appear after choosing « Carte Trello » would look like a
+   * correction. The written key is recovered by normalisation, which assumes
+   * every label leads back to it. A future label that did not — two
+   * words separated by a hyphen, an accent carried by the key — would write a kind
+   * different from the one chosen, and nothing would flag it at input.
    */
-  it("ramène chaque libellé à la nature qu’il désigne", () => {
+  it("brings each label back to the kind it designates", () => {
     for (const [tag, label] of Object.entries(LINK_TAG_LABEL)) {
       expect(normalizeTag(label)).toBe(tag);
     }
   });
 
-  it("replie la casse, les accents et les séparateurs", () => {
+  it("folds case, accents and separators", () => {
     expect(normalizeTag("Ticket Jira")).toBe("ticket_jira");
     expect(normalizeTag("Spécification détaillée")).toBe(
       "specification_detaillee",
@@ -205,16 +205,16 @@ describe("normalisation d’une nature saisie", () => {
     expect(normalizeTag("  Maquette  ")).toBe("maquette");
   });
 
-  // Le champ ne portant rien de retenable ne doit pas produire une nature vide
-  // ni faite de soulignés : le lien s'écrirait avec une clé que rien ne nomme.
-  it("ne rend rien quand il ne reste aucun caractère utile", () => {
+  // A field carrying nothing keepable must not produce an empty kind
+  // nor one made of underscores: the link would be written with a key nothing names.
+  it("returns nothing when no useful character remains", () => {
     expect(normalizeTag("   ")).toBe("");
     expect(normalizeTag("—")).toBe("");
     expect(normalizeTag("!?")).toBe("");
   });
 });
 
-/** Un cadrage réduit à ce que l'union regarde : ses liens. */
+/** A scoping reduced to what the union looks at: its links. */
 function scopingWithLinks(id: string, tags: readonly string[]): Scoping {
   return {
     id,
@@ -226,8 +226,8 @@ function scopingWithLinks(id: string, tags: readonly string[]): Scoping {
   } as unknown as Scoping;
 }
 
-describe("natures proposées à la saisie", () => {
-  it("ajoute aux natures déclarées celles que les cadrages emploient", () => {
+describe("kinds offered at input", () => {
+  it("adds to the declared kinds those the scopings use", () => {
     expect(
       unionLinkTags(
         ["carte_trello", "document"],
@@ -239,9 +239,9 @@ describe("natures proposées à la saisie", () => {
     ).toEqual(["carte_trello", "document", "note", "ticket_jira"]);
   });
 
-  // Une nature déclarée que des cadrages emploient reste à sa place déclarée :
-  // la voir deux fois dans la liste laisserait croire à deux natures.
-  it("ne répète pas une nature à la fois déclarée et employée", () => {
+  // A declared kind that scopings use stays at its declared place:
+  // seeing it twice in the list would suggest two kinds.
+  it("does not repeat a kind both declared and used", () => {
     expect(
       unionLinkTags(
         ["carte_trello", "document"],
@@ -250,7 +250,7 @@ describe("natures proposées à la saisie", () => {
     ).toEqual(["carte_trello", "document"]);
   });
 
-  it("ignore les liens dont la nature est vide", () => {
+  it("ignores links whose kind is empty", () => {
     expect(
       unionLinkTags(["document"], [scopingWithLinks("2026-001", ["", "  "])]),
     ).toEqual(["document"]);
@@ -258,11 +258,11 @@ describe("natures proposées à la saisie", () => {
 });
 
 /**
- * Ajout, correction et retrait passent tous par la réécriture de la liste
- * entière : c'est là que se joue l'unicité des adresses, et un doublon écrit
- * ne se verrait qu'à la relecture du cadrage, une fois commité.
+ * Adding, correcting and removing all go through rewriting the whole
+ * list: that is where address uniqueness is decided, and a written duplicate
+ * would only show when re-reading the scoping, once committed.
  */
-describe("liste des liens d’un cadrage", () => {
+describe("list of a scoping's links", () => {
   const trello = {
     tag: "carte_trello",
     name: "La carte",
@@ -274,20 +274,20 @@ describe("liste des liens d’un cadrage", () => {
     url: "https://figma.com/f/1",
   };
 
-  it("ajoute un lien à la suite des existants", () => {
+  it("adds a link after the existing ones", () => {
     expect(withLink([trello], figma)).toEqual([trello, figma]);
   });
 
-  it("remplace celui qui portait déjà cette adresse plutôt que de doubler", () => {
+  it("replaces the one that already carried this address rather than duplicating", () => {
     const resumed = { ...trello, name: "La carte, renommée" };
     expect(withLink([trello, figma], resumed)).toEqual([figma, resumed]);
   });
 
   /**
-   * Le rang tient : un lien qui saute en fin de rangée pour un nom retouché
-   * ferait douter de ce qui a été écrit.
+   * The rank holds: a link that jumps to the end of the row for a retouched name
+   * would cast doubt on what was written.
    */
-  it("corrige un lien sans le déplacer", () => {
+  it("corrects a link without moving it", () => {
     const corrected = { ...trello, name: "Un autre nom" };
     expect(withLinkModified([trello, figma], trello.url, corrected)).toEqual([
       corrected,
@@ -295,7 +295,7 @@ describe("liste des liens d’un cadrage", () => {
     ]);
   });
 
-  it("corrige l’adresse d’un lien, l’ancienne servant à le retrouver", () => {
+  it("corrects a link's address, the old one serving to find it", () => {
     const moved = { ...trello, url: "https://trello.com/c/xyz" };
     expect(withLinkModified([trello, figma], trello.url, moved)).toEqual([
       moved,
@@ -304,10 +304,10 @@ describe("liste des liens d’un cadrage", () => {
   });
 
   /**
-   * Corriger une adresse pour celle d'un autre lien de la liste les fond en un
-   * seul : les garder tous deux romprait l'unicité que l'ajout maintient.
+   * Correcting an address to that of another link in the list merges them into
+   * one: keeping both would break the uniqueness that adding maintains.
    */
-  it("ne laisse pas deux liens sur une même adresse après correction", () => {
+  it("does not leave two links on the same address after a correction", () => {
     const to = {
       tag: "maquette",
       name: "Finalement la maquette",
@@ -317,18 +317,18 @@ describe("liste des liens d’un cadrage", () => {
   });
 
   /**
-   * Le lien a pu disparaître entre l'affichage et l'écriture — cadrage livré,
-   * ou repris depuis un autre onglet. Perdre la saisie sans rien dire serait
-   * pire que de l'ajouter.
+   * The link may have disappeared between display and write — scoping delivered,
+   * or taken up from another tab. Silently losing the input would be
+   * worse than adding it.
    */
-  it("ajoute le lien corrigé quand l’ancienne adresse n’est plus là", () => {
+  it("adds the corrected link when the old address is no longer there", () => {
     expect(withLinkModified([figma], trello.url, trello)).toEqual([
       figma,
       trello,
     ]);
   });
 
-  it("retire le lien portant l’adresse donnée, et lui seul", () => {
+  it("removes the link carrying the given address, and only that one", () => {
     expect(withoutLink([trello, figma], trello.url)).toEqual([figma]);
     expect(
       withoutLink([trello, figma], "https://example.org/inconnue"),

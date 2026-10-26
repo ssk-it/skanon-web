@@ -11,15 +11,15 @@ import { INDEXEDDB_FACTORY } from "./content-cache";
 import { TokenService } from "../github/token.service";
 
 /**
- * RG-lecture-identite : l'identité de chaque projet proposé est lue pour
- * l'accueil, conservée sur le poste, et redemandée sous condition. Connecté,
- * sous l'accès du projet ; sans connexion, par le canal non décompté. Celle
- * d'un dépôt privé disparaît avec l'accès qui l'a lue.
+ * RG-lecture-identite: the identity of each proposed project is read for
+ * the home page, kept on the machine, and asked again conditionally. Signed
+ * in, under the project's access; without sign-in, through the uncounted
+ * channel. That of a private repo disappears with the access that read it.
  *
- * Chaque cas peut jouer plusieurs visites sur le même stockage :
- * `nouvelleVisite` reconstruit l'application, sans la mémoire de l'onglet.
+ * Each case can play several visits on the same storage: `newVisit` rebuilds
+ * the application, without the tab's memory.
  */
-describe("lecture de l’identité d’un projet", () => {
+describe("reading a project's identity", () => {
   const REPO = { owner: "org", repo: "projet" };
   const API = "https://api.github.com/repos/org/projet";
   const RAW = "https://raw.githubusercontent.com/org/projet/HEAD/identite";
@@ -33,14 +33,14 @@ describe("lecture de l’identité d’un projet", () => {
     '<svg xmlns="http://www.w3.org/2000/svg"><rect fill="#eee"/></svg>';
   const asDataUrl = (svg: string) => `data:image/svg+xml;base64,${btoa(svg)}`;
 
-  /** Le répertoire `identite/` du dépôt joué, nom → contenu. */
+  /** The played repo's `identite/` directory, name → content. */
   let files: Record<string, string>;
   let factory: IDBFactory | null;
   let http: HttpTestingController;
   let identities: ProjectIdentityService;
   let tokens: TokenService;
   let storage: Record<string, string>;
-  /** Les adresses demandées pendant la visite, dans l'ordre. */
+  /** The addresses requested during the visit, in order. */
   let requests: TestRequest[];
 
   function newVisit(): void {
@@ -74,8 +74,8 @@ describe("lecture de l’identité d’un projet", () => {
   afterEach(() => http.verify());
 
   /**
-   * Copié dans un `ArrayBuffer` de ce contexte : celui que rend `TextEncoder`
-   * vient d'un autre, et la simulation HTTP le refuse.
+   * Copied into an `ArrayBuffer` of this context: the one `TextEncoder`
+   * returns comes from another, and the HTTP simulation refuses it.
    */
   const bytes = (text: string) => {
     const raw = new TextEncoder().encode(text);
@@ -84,12 +84,12 @@ describe("lecture de l’identité d’un projet", () => {
     return buffer;
   };
 
-  /** Répond comme GitHub, avec le répertoire `identite/` courant. */
+  /** Responds like GitHub, with the current `identite/` directory. */
   function github(r: TestRequest, outage?: { status: number }): void {
     requests.push(r);
     const url = r.request.url;
     if (outage) {
-      // Un statut nul est un réseau coupé : aucune réponse n'est arrivée.
+      // A zero status is a network down: no response arrived.
       if (outage.status === 0) r.error(new ProgressEvent("error"));
       else r.flush(null, { status: outage.status, statusText: "panne" });
       return;
@@ -143,7 +143,7 @@ describe("lecture de l’identité d’un projet", () => {
     r.flush(null, { status: 404, statusText: "Not Found" });
   }
 
-  /** Mène une lecture à son terme, en répondant à chaque appel. */
+  /** Carries a read through to its end, answering each call. */
   async function replay(
     read: Promise<void>,
     respond: (r: TestRequest) => void = (r) => github(r),
@@ -159,10 +159,10 @@ describe("lecture de l’identité d’un projet", () => {
 
   const urls = () => requests.map((r) => r.request.url);
 
-  describe("connecté", () => {
+  describe("signed in", () => {
     beforeEach(() => tokens.set(TOKEN));
 
-    it("lit le symbole par l’API, sous l’accès du projet, et jamais par une adresse brute", async () => {
+    it("reads the symbol through the API, under the project's access, and never through a raw address", async () => {
       await replay(identities.request(REPO, "sombre"));
 
       expect(identities.findSymbol(REPO, "sombre")).toBe(asDataUrl(SVG_DARK));
@@ -176,14 +176,14 @@ describe("lecture de l’identité d’un projet", () => {
       }
     });
 
-    it("redemande sous condition au retour, et ne rapatrie rien d’inchangé", async () => {
+    it("asks again conditionally on return, and fetches nothing unchanged", async () => {
       await replay(identities.request(REPO, "sombre"));
 
       newVisit();
       tokens.set(TOKEN);
       const read = identities.request(REPO, "sombre");
-      // Ce que le poste détient s'affiche avant la réponse : la liste ne se
-      // décale pas en attendant le réseau.
+      // What the machine holds is displayed before the response: the list does
+      // not shift while waiting for the network.
       for (let i = 0; i < 20 && !identities.findSymbol(REPO, "sombre"); i++) {
         await new Promise((r) => setTimeout(r, 0));
       }
@@ -195,12 +195,12 @@ describe("lecture de l’identité d’un projet", () => {
       expect(identities.findSymbol(REPO, "sombre")).toBe(asDataUrl(SVG_DARK));
     });
 
-    it("ne télécharge pas la variante d’un autre thème tant qu’elle n’est pas demandée", async () => {
+    it("does not download another theme's variant until it is requested", async () => {
       await replay(identities.request(REPO, "clair"));
       expect(urls().some((u) => u.includes("sombre"))).toBe(false);
     });
 
-    it("ne fabrique rien pour un projet sans identité", async () => {
+    it("makes up nothing for a project without an identity", async () => {
       files = {};
       await replay(identities.request(REPO, "clair"));
 
@@ -208,7 +208,7 @@ describe("lecture de l’identité d’un projet", () => {
       expect(urls()).toEqual([`${API}/contents/`]);
     });
 
-    it("n’emploie jamais la variante de l’autre fond", async () => {
+    it("never uses the other background's variant", async () => {
       files = { "symbole-clair.svg": SVG_LIGHT };
       await replay(identities.request(REPO, "sombre"));
 
@@ -216,7 +216,7 @@ describe("lecture de l’identité d’un projet", () => {
       expect(urls().some((u) => u.includes("/git/blobs/"))).toBe(false);
     });
 
-    it("efface l’identité avec l’accès qui l’a lue", async () => {
+    it("erases the identity with the access that read it", async () => {
       await replay(identities.request(REPO, "sombre"));
 
       tokens.erase();
@@ -225,8 +225,8 @@ describe("lecture de l’identité d’un projet", () => {
       }
       expect(identities.findSymbol(REPO, "sombre")).toBeNull();
 
-      // Rien ne reste sur le poste : une nouvelle visite sans accès n'a rien à
-      // montrer, et le dépôt privé ne répond pas au canal public.
+      // Nothing stays on the machine: a new visit without access has nothing to
+      // show, and the private repo does not answer the public channel.
       newVisit();
       await replay(identities.request(REPO, "sombre"), (r) =>
         github(r, r.request.url.startsWith(RAW) ? { status: 404 } : undefined),
@@ -234,7 +234,7 @@ describe("lecture de l’identité d’un projet", () => {
       expect(identities.findSymbol(REPO, "sombre")).toBeNull();
     });
 
-    it("efface l’identité quand l’accès est refusé", async () => {
+    it("erases the identity when access is refused", async () => {
       await replay(identities.request(REPO, "sombre"));
 
       newVisit();
@@ -246,7 +246,7 @@ describe("lecture de l’identité d’un projet", () => {
       expect(identities.findSymbol(REPO, "sombre")).toBeNull();
     });
 
-    it("garde le dernier état connu quand GitHub ne répond pas, sans rien bloquer", async () => {
+    it("keeps the last known state when GitHub does not respond, without blocking anything", async () => {
       await replay(identities.request(REPO, "sombre"));
 
       newVisit();
@@ -259,20 +259,20 @@ describe("lecture de l’identité d’un projet", () => {
     });
   });
 
-  describe("sans connexion", () => {
-    it("lit par le canal non décompté, au nom de la branche par défaut, en laissant le navigateur revalider", async () => {
+  describe("without sign-in", () => {
+    it("reads through the uncounted channel, by the default branch's name, letting the browser revalidate", async () => {
       await replay(identities.request(REPO, "sombre"));
 
       expect(identities.findSymbol(REPO, "sombre")).toBe(asDataUrl(SVG_DARK));
       expect(urls()).toEqual([`${RAW}/symbole-sombre.svg`]);
-      // raw n'expose pas sa marque au script et refuse la pré-requête qu'un
-      // `If-None-Match` posé à la main déclencherait : seule la revalidation du
-      // navigateur fait la requête conditionnelle.
+      // raw does not expose its tag to script and refuses the preflight that an
+      // `If-None-Match` set by hand would trigger: only the browser's revalidation
+      // makes the conditional request.
       expect(requests[0].request.cache).toBe("no-cache");
       expect(requests[0].request.headers.has("Authorization")).toBe(false);
     });
 
-    it("descend l’ordre des formats, puis la version sans suffixe", async () => {
+    it("goes down the order of formats, then the unsuffixed version", async () => {
       files = { "symbole.png": "png", "symbole-clair.svg": SVG_LIGHT };
       await replay(identities.request(REPO, "sombre"));
 
@@ -289,7 +289,7 @@ describe("lecture de l’identité d’un projet", () => {
       ]);
     });
 
-    it("n’emploie jamais la variante de l’autre fond", async () => {
+    it("never uses the other background's variant", async () => {
       files = { "symbole-clair.svg": SVG_LIGHT };
       await replay(identities.request(REPO, "sombre"));
 
@@ -297,7 +297,7 @@ describe("lecture de l’identité d’un projet", () => {
       expect(urls().some((u) => u.includes("clair"))).toBe(false);
     });
 
-    it("n’interroge pas l’API, dont le quota anonyme compte chaque réponse", async () => {
+    it("does not query the API, whose anonymous quota counts every response", async () => {
       await replay(identities.request(REPO, "clair"));
       expect(urls().some((u) => u.startsWith("https://api.github.com"))).toBe(
         false,

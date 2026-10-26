@@ -12,9 +12,9 @@ import { createAppRouter } from "../../router";
 import RulePage, { listNeighbors } from "./RulePage.vue";
 
 /**
- * Une règle située — RG-regle-situee.
+ * A rule in context — RG-regle-situee.
  *
- * Une règle s'atteint souvent sans passer par l'arborescence : par la recherche, par un impact. Ce qui est éprouvé ici, c'est que sa fiche dit alors de quoi elle fait partie, et ce qui l'entoure.
+ * A rule is often reached without going through the tree: through search, through an impact. What is tested here is that its page then says what it is part of, and what surrounds it.
  */
 
 function rule(id: string, features: string): string {
@@ -93,12 +93,12 @@ function links(el: Element | null): string[] {
   );
 }
 
-describe("Une règle située", () => {
+describe("A rule in context", () => {
   beforeEach(() => {
     http = provideHttpTesting();
   });
 
-  it("dit dans quel domaine et quelle fonctionnalité elle se range", async () => {
+  it("says which domain and which feature it belongs to", async () => {
     const el = await mountView("RG-delai");
 
     const thread = el.querySelector('nav[aria-label="Fil d’Ariane"]');
@@ -109,11 +109,11 @@ describe("Une règle située", () => {
     ]);
   });
 
-  it("nomme toutes ses fonctionnalités, et chaque domaine une fois", async () => {
+  it("names all its features, and each domain once", async () => {
     const el = await mountView("RG-limite");
 
     const thread = el.querySelector('nav[aria-label="Fil d’Ariane"]');
-    // Facturation porte les deux fonctionnalités : elle n'est pas répétée
+    // Facturation carries both features: it is not repeated
     expect(links(thread)).toEqual([
       "Fonctionnel",
       "Clients",
@@ -123,7 +123,7 @@ describe("Une règle située", () => {
     ]);
   });
 
-  it("porte la couleur du domaine à côté de son nom", async () => {
+  it("carries the domain colour next to its name", async () => {
     const el = await mountView("RG-delai");
 
     const domain = el.querySelector('nav[aria-label="Fil d’Ariane"] .domaine');
@@ -133,7 +133,7 @@ describe("Une règle située", () => {
     ).not.toBe("");
   });
 
-  it("propose les autres règles de chacune de ses fonctionnalités", async () => {
+  it("offers the other rules of each of its features", async () => {
     const el = await mountView("RG-limite");
 
     const blocks = [...el.querySelectorAll(".voisines section")];
@@ -142,25 +142,25 @@ describe("Une règle située", () => {
     ).toEqual(["Dans Relance des impayés", "Dans Litiges"]);
     expect(links(blocks[0])).toEqual(["RG-delai"]);
     expect(links(blocks[1])).toEqual(["RG-mediation"]);
-    // la règle courante figure à sa place, sans être un lien vers elle-même
+    // the current rule appears in its place, without being a link to itself
     const current = blocks[0].querySelector('[aria-current="page"]');
     expect(current?.textContent?.trim()).toBe("RG-limite");
   });
 
-  it("ne garde plus le seul retour vers le référentiel", async () => {
+  it("no longer keeps only the link back to the specification", async () => {
     const el = await mountView("RG-delai");
 
     expect(el.querySelector(".retour")).toBeNull();
   });
 });
 
-describe("Les voisines d’une règle", () => {
+describe("A rule's neighbours", () => {
   const ids = Array.from(
     { length: 20 },
     (_, i) => `RG-${String(i).padStart(2, "0")}`,
   );
 
-  it("les garde toutes quand elles tiennent", () => {
+  it("keeps them all when they fit", () => {
     expect(listNeighbors(["RG-a", "RG-b", "RG-c"], "RG-b", 8)).toEqual([
       "RG-a",
       "RG-b",
@@ -168,7 +168,7 @@ describe("Les voisines d’une règle", () => {
     ]);
   });
 
-  it("garde une fenêtre autour de la règle courante quand elles sont trop nombreuses", () => {
+  it("keeps a window around the current rule when there are too many", () => {
     const window = listNeighbors(ids, "RG-10", 8);
 
     expect(window.length).toBe(8);
@@ -176,7 +176,7 @@ describe("Les voisines d’une règle", () => {
     expect(window[0]).toBe("RG-07");
   });
 
-  it("se cale sur le début ou la fin de la liste", () => {
+  it("snaps to the start or end of the list", () => {
     expect(listNeighbors(ids, "RG-00", 8)[0]).toBe("RG-00");
     expect(listNeighbors(ids, "RG-19", 8).at(-1)).toBe("RG-19");
     expect(listNeighbors(ids, "RG-19", 8).length).toBe(8);

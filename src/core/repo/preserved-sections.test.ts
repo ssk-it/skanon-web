@@ -8,10 +8,10 @@ import {
 import { serializeScoping } from "./authoring.service";
 
 /**
- * Un cadrage porte ce que son auteur juge utile. Reconstruire le fichier à
- * partir des seules sections que l'éditeur présente les effacerait sans le
- * dire — c'est arrivé sur un cadrage réel, qui a perdu vingt-trois lignes de
- * questions ouvertes.
+ * A scoping carries what its author deems useful. Rebuilding the file from
+ * only the sections the editor presents would erase the others without a
+ * word — it happened on a real scoping, which lost twenty-three lines of
+ * open questions.
  */
 const KNOWN = KNOWN_SECTIONS;
 
@@ -33,26 +33,26 @@ Ce qu'on cherche.
 Une note libre.
 `;
 
-describe("sections qu’un cadrage porte en propre", () => {
-  it("rend celles que l’éditeur ne présente pas, titres compris", () => {
+describe("sections a scoping carries of its own", () => {
+  it("returns those the editor does not present, headings included", () => {
     const others = extractOtherSections(BODY, KNOWN);
     expect(others).toContain("## Questions ouvertes");
     expect(others).toContain("## Notes");
     expect(others).toContain("Qui peut déclarer");
   });
 
-  it("écarte celles que l’éditeur sait déjà écrire", () => {
+  it("leaves out those the editor already knows how to write", () => {
     const others = extractOtherSections(BODY, KNOWN);
     expect(others).not.toContain("## Objectif");
     expect(others).not.toContain("## Parcours utilisateur");
   });
 
-  it("rend une chaîne vide quand tout est connu", () => {
+  it("returns an empty string when everything is known", () => {
     expect(extractOtherSections("## Objectif\n\nX.\n", KNOWN)).toBe("");
   });
 
-  it("les conserve à la réécriture", () => {
-    // Le cas qui a échoué en vrai : réenregistrer sans y toucher.
+  it("keeps them on rewrite", () => {
+    // The case that failed for real: saving again without touching anything.
     const out = serializeScoping("2026-001", {
       title: "Un cadrage",
       domains: ["contrats"],
@@ -68,7 +68,7 @@ describe("sections qu’un cadrage porte en propre", () => {
     expect(extractSection(out, "Objectif")).toContain("cherche");
   });
 
-  it("n’écrit rien de superflu quand il n’y a pas de section en propre", () => {
+  it("writes nothing superfluous when there is no section of its own", () => {
     const out = serializeScoping("2026-001", {
       title: "Un cadrage",
       domains: [],
@@ -80,10 +80,10 @@ describe("sections qu’un cadrage porte en propre", () => {
     expect(out.trimEnd().endsWith("Y.")).toBe(true);
   });
 
-  it("reste stable d’un enregistrement à l’autre", () => {
-    // Le défaut trouvé en vrai : le fichier gagnait une ligne vide à chaque
-    // enregistrement, l'espace du séparateur s'ajoutant à celui que le bloc
-    // portait déjà. Réextraire ce qu'on vient d'écrire doit rendre l'identique.
+  it("stays stable from one save to the next", () => {
+    // The defect found for real: the file gained an empty line on every save,
+    // the separator's whitespace adding to the one the block already carried.
+    // Re-extracting what was just written must give back the same thing.
     const write = (others: string) =>
       serializeScoping("2026-001", {
         title: "Un cadrage",
@@ -99,19 +99,19 @@ describe("sections qu’un cadrage porte en propre", () => {
     expect(second).toBe(first);
   });
 
-  it("survit à un cadrage sans aucune section", () => {
+  it("survives a scoping with no section at all", () => {
     expect(extractOtherSections("", KNOWN)).toBe("");
     expect(extractOtherSections("Du texte sans titre.", KNOWN)).toBe("");
   });
 });
 
 /**
- * Les préserver ne suffisait pas : écrites et jamais montrées, elles étaient
- * perdues pour le lecteur. La fiche les rassemble sous « Divers », d'où le
- * découpage titre par titre — le titre d'origine dit de quoi la section parle.
+ * Preserving them was not enough: written and never shown, they were lost
+ * to the reader. The page gathers them under « Divers », hence the split
+ * heading by heading — the original heading says what the section is about.
  */
-describe("sections rassemblées sous « Divers »", () => {
-  it("rend chaque section libre avec son titre et son corps", () => {
+describe("sections gathered under « Divers »", () => {
+  it("returns each free section with its heading and its body", () => {
     const free = extractFreeSections(BODY, KNOWN);
 
     expect(free.map((s) => s.title)).toEqual(["Questions ouvertes", "Notes"]);
@@ -120,9 +120,10 @@ describe("sections rassemblées sous « Divers »", () => {
     expect(free[1].body).toBe("Une note libre.");
   });
 
-  it("garde les sous-sections de niveau 3 dans le corps qui les porte", () => {
-    // Le cas qui a motivé l'écran : une observation écrite en « ### » sous une
-    // section libre. Découper au niveau 3 l'aurait sortie de son contexte.
+  it("keeps level-3 subsections in the body that carries them", () => {
+    // The case that motivated the screen: an observation written as « ### »
+    // under a free section. Splitting at level 3 would have taken it out of
+    // its context.
     const body = `## Ce que la mesure a montré
 
 Le relevé.
@@ -138,14 +139,14 @@ Ce qu'elle dit.
     expect(section.body).toContain("Ce qu'elle dit.");
   });
 
-  it("ne rend rien quand tout est connu", () => {
+  it("returns nothing when everything is known", () => {
     expect(extractFreeSections("## Objectif\n\nX.\n", KNOWN)).toEqual([]);
     expect(extractFreeSections("", KNOWN)).toEqual([]);
   });
 
-  it("dit la même chose que le texte préservé à la réécriture", () => {
-    // Les deux sorties viennent du même découpage : si elles divergeaient, la
-    // fiche montrerait autre chose que ce que l'enregistrement conserve.
+  it("says the same thing as the text preserved on rewrite", () => {
+    // Both outputs come from the same split: if they diverged, the page would
+    // show something other than what the save keeps.
     const expected = extractFreeSections(BODY, KNOWN)
       .map((s) => `## ${s.title}\n\n${s.body}`)
       .join("\n\n");

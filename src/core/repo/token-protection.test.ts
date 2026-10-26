@@ -11,23 +11,23 @@ import { SpecificationStore } from "./specification.store";
 import { writeSettings } from "./config-writer";
 
 /**
- * Un projet règle s'il exige que le jeton qui l'ouvre soit gardé sous passkey (RG-protection-du-jeton-par-projet). Le réglage vit dans `ssk-canon.yml`, comme le mode d'accès.
+ * A project sets whether it requires the token that opens it to be kept under a passkey (RG-protection-du-jeton-par-projet). The setting lives in `ssk-canon.yml`, like the access mode.
  */
-describe("protection du jeton déclarée par le projet", () => {
-  it("propose la passkey quand rien n’est déclaré", () => {
-    // un projet qui ne règle rien fonctionne comme avant
+describe("token protection declared by the project", () => {
+  it("offers the passkey when nothing is declared", () => {
+    // a project that sets nothing works as before
     const { protection, anomaly } = parseTokenProtection(undefined);
     expect(protection).toBe("proposee");
     expect(anomaly).toBeNull();
   });
 
-  it("lit les deux valeurs connues", () => {
+  it("reads the two known values", () => {
     expect(parseTokenProtection("exigee").protection).toBe("exigee");
     expect(parseTokenProtection("proposee").protection).toBe("proposee");
   });
 
-  it("signale une valeur inconnue, et s’en tient à la proposition", () => {
-    // le taire laisserait croire au projet qu'il exige ce qu'il n'exige pas
+  it("reports an unknown value, and sticks to the proposal", () => {
+    // keeping quiet would let the project believe it requires what it does not
     const { protection, anomaly } = parseTokenProtection("obligatoire");
     expect(protection).toBe("proposee");
     expect(anomaly).toContain("obligatoire");
@@ -43,8 +43,8 @@ acces: jeton_personnel
 
 const BASE = { access: "jeton_personnel" as const, identity: null };
 
-describe("écriture de la protection du jeton", () => {
-  it("écrit l’exigence, et la relit", () => {
+describe("writing the token protection", () => {
+  it("writes the requirement, and reads it back", () => {
     const out = writeSettings(FILE, {
       ...BASE,
       tokenProtection: "exigee",
@@ -56,8 +56,8 @@ describe("écriture de la protection du jeton", () => {
     );
   });
 
-  it("retire le bloc quand le projet ne fait plus que proposer", () => {
-    // la valeur par défaut n'a pas à s'écrire : un fichier qui ne dit rien la vaut
+  it("removes the block when the project only proposes", () => {
+    // the default value need not be written: a file that says nothing amounts to it
     const withValue = writeSettings(FILE, {
       ...BASE,
       tokenProtection: "exigee",
@@ -72,13 +72,13 @@ describe("écriture de la protection du jeton", () => {
     expect(without).not.toContain("passkey");
   });
 
-  it("laisse le fichier tel quel quand le réglage n’est pas fourni", () => {
+  it("leaves the file as is when the setting is not provided", () => {
     const out = writeSettings(FILE, BASE);
     expect(out).not.toContain("protection_du_jeton");
   });
 });
 
-describe("le projet ouvert dit au jeton ce qu’il exige", () => {
+describe("the open project tells the token what it requires", () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -86,7 +86,7 @@ describe("le projet ouvert dit au jeton ce qu’il exige", () => {
     httpMock = provideHttpTesting();
   });
 
-  /** Répond au chargement d'un dépôt qui ne porte que sa configuration ; les autres requêtes — branches, demandes de fusion — restent sans réponse, ce qui ne gêne pas la lecture principale. */
+  /** Responds to the load of a repo that carries only its configuration; the other requests — branches, pull requests — stay unanswered, which does not hinder the main read. */
   async function respond(config: string): Promise<void> {
     await new Promise((r) => setTimeout(r, 0));
     httpMock
@@ -100,7 +100,7 @@ describe("le projet ouvert dit au jeton ce qu’il exige", () => {
     httpMock.expectOne((r) => r.url.endsWith("/ssk-canon.yml")).flush(config);
   }
 
-  it("lit l’exigence dans la configuration du projet", async () => {
+  it("reads the requirement in the project's configuration", async () => {
     const expected = inject(RepoLoader).loadSpecification({
       owner: "org",
       repo: "projet",
@@ -110,7 +110,7 @@ describe("le projet ouvert dit au jeton ce qu’il exige", () => {
     expect((await expected).settings.tokenProtection).toBe("exigee");
   });
 
-  it("la transmet au jeton dès que le projet est lu", async () => {
+  it("passes it to the token as soon as the project is read", async () => {
     const tokens = inject(TokenService);
     const loaded = inject(SpecificationStore).loadSpecification({
       owner: "org",

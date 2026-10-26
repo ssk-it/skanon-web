@@ -8,9 +8,9 @@ import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 
 /**
- * L'entrée dans ce qui décrit comment le produit est construit.
+ * The entry into what describes how the product is built.
  *
- * Les trois natures sont présentées séparément parce qu'on ne les consulte pas pour la même raison : le contexte pour comprendre l'ensemble, les composants pour savoir ce qui existe, les flux pour suivre un échange. Une liste unique obligerait à trier de l'œil à chaque visite.
+ * The three kinds are presented separately because they are not consulted for the same reason: the context to understand the whole, the components to know what exists, the flows to follow an exchange. A single list would force sorting by eye at each visit.
  */
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
@@ -20,18 +20,18 @@ const flows = computed(() => store.listArchitectureByKind("flux"));
 const decisions = computed(() => store.decisions());
 
 /**
- * Le premier document de contexte, s'il y en a un.
+ * The first context document, if there is one.
  *
- * Le modèle n'en impose pas l'unicité : un projet peut en écrire plusieurs sans que rien ne casse. En présenter un seul ici est un choix d'affichage, et les autres restent atteignables par leur page.
+ * The model does not require it to be unique: a project can write several without anything breaking. Presenting only one here is a display choice, and the others remain reachable through their page.
  */
 const context = computed(
   () => store.listArchitectureByKind("contexte")[0] ?? null,
 );
 
 /**
- * Vrai quand le projet ne décrit rien de son architecture.
+ * True when the project describes nothing of its architecture.
  *
- * Les quatre natures comptent ensemble : un projet qui n'aurait qu'une décision d'architecture décrit déjà quelque chose, et l'état explicatif lui dirait ce qu'il sait déjà.
+ * The four kinds count together: a project that had only an architecture decision already describes something, and the explanatory state would tell it what it already knows.
  */
 const empty = computed(
   () => store.architecture().length === 0 && store.decisions().length === 0,
@@ -47,7 +47,7 @@ const empty = computed(
         <h1>Comment le produit est construit</h1>
       </header>
 
-      <!-- L'entrée de la barre ne dépend pas du contenu : c'est donc ici que l'absence se traite. Une liste vide se lit aussi bien « ce projet ne décrit rien » que « le chargement a échoué », et c'est la seconde lecture qui reste. Dire ce que la vue accueillerait lève les deux. -->
+      <!-- The top-bar entry does not depend on the content: this is therefore where absence is handled. An empty list reads as much as "this project describes nothing" as "loading failed", and it is the second reading that sticks. Saying what the view would hold removes both. -->
       <section v-if="empty" class="vide-instruit">
         <h2>Ce projet ne décrit pas encore son architecture</h2>
         <p class="intro">Cette vue accueille quatre natures de documents :</p>
@@ -234,7 +234,7 @@ h1 {
   color: var(--mat-sys-primary);
 }
 
-/* La liste des natures passe sur deux lignes plutôt que de comprimer le terme qui la nomme. */
+/* The list of kinds wraps onto two lines rather than squeezing the term that names it. */
 @media (max-width: 560px) {
   .vide-instruit dl {
     grid-template-columns: 1fr;

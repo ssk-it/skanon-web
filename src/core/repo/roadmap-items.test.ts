@@ -14,13 +14,13 @@ import {
 } from "./roadmap-items.service";
 
 /**
- * Une piste est une issue du dépôt de référentiel étiquetée `piste` (cadrage
- * 2026-058). Elle n'entre jamais dans le référentiel : l'application la lit à
- * part, et seulement là où un lecteur la demande.
+ * A roadmap item is an issue of the specification repo labelled `piste`
+ * (scoping 2026-058). It never enters the specification: the application
+ * reads it separately, and only where a reader asks for it.
  *
- * Ce qui est éprouvé ici : la lecture des issues, les trois issues d'un appel
- * — des pistes, aucune, un droit manquant —, le rattachement par étiquettes,
- * l'horizon par jalon, et l'état « en cours » déduit des cadrages.
+ * What is tested here: reading issues, the three outcomes of a call —
+ * roadmap items, none, a missing right —, attachment by labels, horizon by
+ * milestone, and the « en cours » state derived from scopings.
  */
 const REPO = { owner: "org", repo: "projet" };
 const ISSUES_URL =
@@ -64,7 +64,7 @@ function scoping(
   return { id, status: status, links: links } as unknown as Scoping;
 }
 
-describe("lecture des pistes", () => {
+describe("reading roadmap items", () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
@@ -72,7 +72,7 @@ describe("lecture des pistes", () => {
     http = provideHttpTesting();
   });
 
-  it("lit les issues ouvertes étiquetées piste, sans les demandes de fusion", async () => {
+  it("reads open issues labelled piste, without pull requests", async () => {
     const service = inject(RoadmapItemsService);
     const pending = service.load(REPO);
     await settle();
@@ -92,7 +92,7 @@ describe("lecture des pistes", () => {
     );
   });
 
-  it("suit les pages tant qu'elles sont pleines", async () => {
+  it("follows pages as long as they are full", async () => {
     const service = inject(RoadmapItemsService);
     const pending = service.load(REPO);
     await settle();
@@ -108,7 +108,7 @@ describe("lecture des pistes", () => {
     expect(service.issues()).toHaveLength(101);
   });
 
-  it("ne relit pas les issues d'un projet déjà chargé", async () => {
+  it("does not re-read the issues of an already loaded project", async () => {
     const service = inject(RoadmapItemsService);
     const first = service.load(REPO);
     await settle();
@@ -121,9 +121,10 @@ describe("lecture des pistes", () => {
     expect(service.state()).toBe("pret");
   });
 
-  it("dit le droit manquant quand le jeton ne lit pas les issues", async () => {
-    // Un jeton à droits fins sans « Issues » : la plateforme répond 403 sans
-    // que le quota soit épuisé. Une section vide dirait « rien n'est envisagé ».
+  it("states the missing right when the token cannot read issues", async () => {
+    // A fine-grained token without « Issues »: the platform responds 403
+    // without the quota being exhausted. An empty section would say « rien
+    // n'est envisagé ».
     const service = inject(RoadmapItemsService);
     const pending = service.load(REPO);
     await settle();
@@ -140,7 +141,7 @@ describe("lecture des pistes", () => {
     expect(service.issues()).toEqual([]);
   });
 
-  it("distingue une panne d'un droit manquant", async () => {
+  it("tells an outage from a missing right", async () => {
     const service = inject(RoadmapItemsService);
     const pending = service.load(REPO);
     await settle();
@@ -153,24 +154,24 @@ describe("lecture des pistes", () => {
   });
 });
 
-describe("rattachement des pistes", () => {
+describe("attaching roadmap items", () => {
   const issues = [
     roadmapItem(1, ["domaine/cadrage"]),
     roadmapItem(2, ["fonctionnalite/recherche"]),
     roadmapItem(3, ["domaine/referentiel", "fonctionnalite/recherche"]),
   ];
 
-  it("retient les pistes d'un domaine par leur étiquette", () => {
+  it("keeps a domain's roadmap items by their label", () => {
     const views = linkedRoadmapItems(issues, "domains", "cadrage", [], REPO);
     expect(views.map((p) => p.number)).toEqual([1]);
   });
 
-  it("retient les pistes d'une fonctionnalité par leur étiquette", () => {
+  it("keeps a feature's roadmap items by their label", () => {
     const views = linkedRoadmapItems(issues, "features", "recherche", [], REPO);
     expect(views.map((p) => p.number)).toEqual([2, 3]);
   });
 
-  it("dit en cours une piste qu'un cadrage non livré cite", () => {
+  it("marks as in progress a roadmap item an undelivered scoping cites", () => {
     const scopings = [
       scoping("2026-071", "brouillon", [
         {
@@ -190,7 +191,7 @@ describe("rattachement des pistes", () => {
     expect(view.scopingsInProgress).toEqual(["2026-071"]);
   });
 
-  it("ne tient pas pour en cours une piste citée par un cadrage livré, ou par un autre lien", () => {
+  it("does not consider in progress a roadmap item cited by a delivered scoping, or by another link", () => {
     const scopings = [
       scoping("2026-060", "livree", [
         {
@@ -225,8 +226,8 @@ describe("rattachement des pistes", () => {
   });
 });
 
-describe("horizon des pistes", () => {
-  it("range par jalon, maintenant puis ensuite puis plus tard, les non classées en dernier", () => {
+describe("horizon of roadmap items", () => {
+  it("groups by milestone, now then next then later, unclassified last", () => {
     const groups = groupByHorizon([
       { ...roadmapItem(1, []), scopingsInProgress: [] },
       { ...roadmapItem(2, [], "Plus tard"), scopingsInProgress: [] },
@@ -245,7 +246,7 @@ describe("horizon des pistes", () => {
     ]);
   });
 
-  it("n'annonce aucun groupe vide", () => {
+  it("announces no empty group", () => {
     const groups = groupByHorizon([
       { ...roadmapItem(1, [], "ensuite"), scopingsInProgress: [] },
     ]);

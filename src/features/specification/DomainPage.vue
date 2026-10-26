@@ -122,7 +122,7 @@ function formatOtherDomains(ids: readonly string[]): string {
   width: 18px;
   height: 18px;
 }
-/* Le même repère que sur la carte du domaine : la couleur suit le domaine d'un écran à l'autre, sans quoi elle ne serait qu'un ornement de la page d'accueil. */
+/* The same marker as on the domain card: the colour follows the domain from one screen to the next, otherwise it would be a mere ornament of the home page. */
 .entete {
   border-left: 4px solid var(--pc-domaine);
   padding-left: 14px;
@@ -141,12 +141,12 @@ h1 {
   font-weight: 400;
   letter-spacing: -0.015em;
 }
-/* RG-mesure-de-lecture : le titre et sa description partagent la mesure ; les listes qui suivent gardent leur largeur. */
+/* RG-mesure-de-lecture: the title and its description share the measure; the lists that follow keep their width. */
 .entete {
   margin-bottom: 36px;
   max-width: var(--pc-mesure);
 }
-/* Deux listes se suivent : sans cet écart, le second titre collerait à la dernière ligne de la première et se lirait comme en faisant partie. */
+/* Two lists follow each other: without this gap, the second title would stick to the last line of the first and read as part of it. */
 .liste + .section {
   margin-top: 36px;
 }
@@ -179,7 +179,7 @@ h1 {
 .ligne:hover {
   background: var(--mat-sys-surface-container);
 }
-/* Prend toute la place libre : entre l'identifiant et le statut d'un cadrage, space-between centrerait sinon le titre dans la ligne. */
+/* Takes all the free space: between a scoping's identifier and status, space-between would otherwise centre the title in the row. */
 .principal {
   flex: 1;
   display: flex;

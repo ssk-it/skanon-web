@@ -2,18 +2,18 @@ import { Scoping, Decision, Specification } from "../model/model";
 import { displayIdentifier } from "./scoping-reference";
 
 /**
- * La recherche dans le référentiel — RG-index-recherche-client,
+ * Search in the specification — RG-index-recherche-client,
  * RG-recherche-perimetre, RG-recherche-en-cours-a-part.
  *
- * L'index est une fonction pure du référentiel en mémoire, cadrages lus sur les
- * branches compris : il ne reçoit rien d'autre, et ne peut donc coûter aucun
- * appel. Il se reconstruit quand le référentiel change — après une écriture, ou
- * quand les branches finissent d'arriver — au lieu d'être tenu à jour : un index
- * maintenu à côté serait une seconde source qui finirait par diverger
- * (2026-001, décision 01).
+ * The index is a pure function of the in-memory specification, scopings read
+ * on branches included: it receives nothing else, and so can cost no call. It
+ * is rebuilt when the specification changes — after a write, or when branches
+ * finish arriving — instead of being kept up to date: an index maintained
+ * alongside would be a second source that would end up diverging
+ * (2026-001, decision 01).
  */
 
-/** Les natures que la recherche distingue, dans l'ordre où elles s'affichent. */
+/** The kinds search distinguishes, in the order they are displayed. */
 export type ResultKind = "regle" | "decision" | "architecture" | "cadrage";
 
 export const RESULT_KINDS: readonly ResultKind[] = [
@@ -25,25 +25,25 @@ export const RESULT_KINDS: readonly ResultKind[] = [
 
 export interface SearchResult {
   readonly kind: ResultKind;
-  /** L'identifiant stocké — celui d'une décision de cadrage est préfixé du cadrage. */
+  /** The stored identifier — a scoping decision's is prefixed with the scoping's. */
   readonly id: string;
-  /** L'identifiant tel qu'il se donne à lire — RG-prefixe-projet. */
+  /** The identifier as it is given to read — RG-prefixe-projet. */
   readonly identifier: string;
-  /** Vide pour une règle ou un document, qui n'ont que leur identifiant et leur énoncé. */
+  /** Empty for a rule or a document, which have only their identifier and their statement. */
   readonly title: string;
   readonly excerpt: string;
-  /** Les segments de la vue, sous le dépôt ouvert — voir `LiensService.vers`. */
+  /** The view's segments, under the open repo — see `LinksService.to`. */
   readonly link: readonly string[];
-  /** L'ancre où l'élément se trouve dans sa vue, quand il n'en a pas une à lui. */
+  /** The anchor where the item sits in its view, when it has none of its own. */
   readonly anchor: string | null;
-  /** Vrai pour ce qui vit sur une branche, et n'appartient pas encore au référentiel. */
+  /** True for what lives on a branch, and does not yet belong to the specification. */
   readonly inProgress: boolean;
-  /** La demande de fusion d'un résultat en cours, quand elle est connue. */
+  /** The pull request of an in-progress result, when it is known. */
   readonly pullRequest: number | null;
 }
 
 interface IndexEntry extends Omit<SearchResult, "excerpt"> {
-  /** Le corps débarrassé de son balisage, d'où l'extrait est tiré. */
+  /** The body stripped of its markup, from which the excerpt is taken. */
   readonly body: string;
   readonly identifierKey: string;
   readonly titleKey: string;
@@ -55,32 +55,32 @@ export interface SearchIndex {
 }
 
 export interface SearchResults {
-  /** Ce que le référentiel porte, classé par pertinence. */
+  /** What the specification carries, ranked by relevance. */
   readonly specification: readonly SearchResult[];
-  /** Ce qui vit sur une branche, présenté à part — RG-cadrages-ouverts-visibles. */
+  /** What lives on a branch, presented apart — RG-cadrages-ouverts-visibles. */
   readonly inProgress: readonly SearchResult[];
 }
 
 const DIACRITIC_MARKS = /[̀-ͯ]/g;
 
 /**
- * Minuscules et sans accents, **à longueur égale**.
+ * Lowercase and without accents, **at equal length**.
  *
- * La correspondance est cherchée dans le texte normalisé, mais l'extrait est
- * découpé dans le texte d'origine : les deux doivent garder les mêmes positions,
- * ce qu'une normalisation de la chaîne entière ne garantit pas.
+ * The match is searched in the normalised text, but the excerpt is cut from
+ * the original text: both must keep the same positions, which normalising the
+ * whole string does not guarantee.
  */
 function normalize(text: string): string {
   let out = "";
   for (const c of text) {
     const n = c.normalize("NFD").replace(DIACRITIC_MARKS, "").toLowerCase();
-    // un caractère hors du plan de base occupe deux unités : on les rend toutes
+    // a character outside the basic plane takes two units: all of them are returned
     out += n.length === c.length ? n : (n + c).slice(0, c.length);
   }
   return out;
 }
 
-/** Le texte à lire, sans le balisage Markdown qui gênerait l'extrait. */
+/** The text to read, without the Markdown markup that would hinder the excerpt. */
 function toPlainText(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
@@ -122,10 +122,10 @@ function scopingBody(c: Scoping): string {
 }
 
 /**
- * Un cadrage est en cours tant qu'il vit sur sa branche.
+ * A scoping is in progress as long as it lives on its branch.
  *
- * La provenance le dit ; le statut le redit pour un cadrage construit sans
- * elle. L'un ou l'autre suffit à le tenir hors du référentiel.
+ * The provenance says so; the status says it again for a scoping built
+ * without one. Either is enough to keep it out of the specification.
  */
 function isInProgress(c: Scoping): boolean {
   return c.provenance !== undefined || c.status !== "livree";
@@ -205,8 +205,8 @@ export function buildSearchIndex(ref: Specification): SearchIndex {
         scopingBody(c),
       ),
     );
-    // Une décision de cadrage n'a pas de vue à elle : elle se lit dans son
-    // cadrage, à son ancre, et suit le sort du cadrage — en cours avec lui.
+    // A scoping decision has no view of its own: it is read in its scoping, at
+    // its anchor, and follows the scoping's fate — in progress with it.
     for (const d of c.decisions) {
       entries.push(
         entry(
@@ -229,7 +229,7 @@ export function buildSearchIndex(ref: Specification): SearchIndex {
   return { entries };
 }
 
-/** Avant et après la correspondance, en caractères : de quoi la situer. */
+/** Before and after the match, in characters: enough to place it. */
 const BEFORE = 50;
 const AFTER = 90;
 
@@ -241,7 +241,7 @@ function toExcerpt(e: IndexEntry, terms: readonly string[]): string {
 
   let begin = Math.max(0, position - BEFORE);
   let end = Math.min(e.body.length, position + AFTER);
-  // On coupe entre deux mots, jamais au milieu d'un.
+  // Cut between two words, never in the middle of one.
   if (begin > 0) begin = e.body.indexOf(" ", begin) + 1 || begin;
   if (end < e.body.length)
     end =
@@ -251,12 +251,12 @@ function toExcerpt(e: IndexEntry, terms: readonly string[]): string {
 }
 
 /**
- * Le poids d'une entrée pour une requête, ou 0 si un terme y manque.
+ * The weight of an entry for a query, or 0 if a term is missing from it.
  *
- * Chaque terme doit apparaître quelque part : une recherche à deux mots en
- * précise une à un mot, elle ne l'élargit pas. Un terme trouvé dans
- * l'identifiant pèse plus que dans le titre, qui pèse plus que dans le corps —
- * qui tape un identifiant sait ce qu'il cherche.
+ * Each term must appear somewhere: a two-word search narrows a one-word one,
+ * it does not widen it. A term found in the identifier weighs more than in the
+ * title, which weighs more than in the body — whoever types an identifier
+ * knows what they are looking for.
  */
 function score(e: IndexEntry, terms: readonly string[]): number {
   let total = 0;
@@ -276,7 +276,7 @@ export function findResults(index: SearchIndex, query: string): SearchResults {
   const found = index.entries
     .map((e) => ({ e, weight: score(e, terms) }))
     .filter((x) => x.weight > 0)
-    // le tri est stable : à poids égal, l'ordre de l'index est conservé
+    // the sort is stable: at equal weight, the index order is kept
     .sort((a, b) => b.weight - a.weight)
     .map(({ e }): SearchResult => {
       const { body, identifierKey, titleKey, bodyKey, ...result } = e;

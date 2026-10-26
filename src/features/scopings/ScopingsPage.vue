@@ -22,10 +22,10 @@ const filter = inject(ScopingFilter);
 const tokens = inject(TokenService);
 const dialog = inject(DialogService);
 
-/** L'ensemble du dépôt : une teinte se calcule par rapport aux autres. */
+/** The whole repo: a hue is computed relative to the others. */
 const domainIds = computed(() => store.domains().map((d) => d.id));
 
-/** Les cadrages que le filtre retient, dans l'ordre de la liste. */
+/** The scopings the filter keeps, in list order. */
 const kept = computed(() =>
   filterScopings(
     store.scopings(),
@@ -36,9 +36,9 @@ const kept = computed(() =>
 );
 
 /**
- * La liste découpée en blocs : le travail en cours, puis les trimestres.
+ * The list cut into blocks: work in progress, then the quarters.
  *
- * Recalculé quand les dates arrivent — elles sont chargées après la liste, si bien que les premiers rendus placent les cadrages sous « Date inconnue » avant qu'ils ne rejoignent leur trimestre.
+ * Recomputed when the dates arrive — they are loaded after the list, so the first renders place the scopings under « Date inconnue » before they join their quarter.
  */
 const groups = computed(() =>
   groupScopings(kept.value, (id) => store.creationDate(id)),
@@ -48,12 +48,12 @@ const inProgressKept = computed(
   () => kept.value.filter((c) => c.status !== "livree").length,
 );
 
-/** Sur toute la liste, non sur le filtre : les dates manquent ou non au dépôt. */
+/** Over the whole list, not the filter: the dates are missing or not for the repo. */
 const datesState = computed(() =>
   deliveredDatesState(store.scopings(), (id) => store.creationDate(id)),
 );
 
-// Le pipe `date` d'Angular en locale fr : les formats `'long'` et `'d MMM yyyy'`.
+// Angular's `date` pipe in the fr locale: the `'long'` and `'d MMM yyyy'` formats.
 const LONG_DATE = new Intl.DateTimeFormat("fr-FR", {
   dateStyle: "long",
   timeStyle: "long",
@@ -72,7 +72,7 @@ function formatShortDate(iso: string): string {
   return SHORT_DATE.format(new Date(iso));
 }
 
-/** « 2 décisions · 3 impacts · 1 pièce jointe », sans les compteurs à zéro. */
+/** « 2 décisions · 3 impacts · 1 pièce jointe », without the zero counters. */
 function formatCounts(c: Scoping): string {
   const plural = (n: number, one: string, several: string) =>
     `${n} ${n > 1 ? several : one}`;
@@ -89,7 +89,7 @@ function formatCounts(c: Scoping): string {
     .join(" · ");
 }
 
-/** Le même dialogue que la barre : la connexion lève la limite anonyme. */
+/** The same dialog as the top bar: signing in lifts the anonymous limit. */
 function openTokenDialog(): void {
   void import("../shared/TokenDialog.vue").then(
     async ({ default: TokenDialog }) => {
@@ -101,14 +101,14 @@ function openTokenDialog(): void {
   );
 }
 
-// Les dates viennent de l'historique Git, un appel par cadrage. On les demande à l'affichage de cette liste plutôt qu'au chargement du référentiel : la liste apparaît immédiatement, les dates la rejoignent.
+// The dates come from the Git history, one call per scoping. They are requested when this list is displayed rather than when the specification is loaded: the list appears immediately, the dates join it.
 watchEffect(() => {
   if (store.state() !== "pret") return;
   const ids = store.scopings().map((c) => c.id);
   void store.loadCreationDates(ids);
 });
 
-/** L'identifiant tel qu'il se donne à lire, préfixé si le projet en déclare un. */
+/** The identifier as it is shown, prefixed if the project declares one. */
 function show(id: string): string {
   return displayIdentifier(id, store.specification().project.prefix);
 }
@@ -145,7 +145,7 @@ function enterFilter(event: Event): void {
       </p>
     </header>
 
-    <!-- RG-liste-cadrages-filtrable : parcourir un ensemble, là où la palette de recherche mène à un élément. -->
+    <!-- RG-liste-cadrages-filtrable: browsing a set, where the search palette leads to one element. -->
     <div class="filtre" role="search" aria-label="Filtrer les cadrages">
       <label class="champ">
         <UiIcon name="filter_list" />
@@ -178,7 +178,7 @@ function enterFilter(event: Event): void {
       </div>
     </div>
 
-    <!-- Une fois, à part : un en-tête « Pas encore daté » sur toute la liste passait pour une catégorie de cadrages — RG-liste-cadrages-sobre. -->
+    <!-- Once, separately: a « Pas encore daté » header over the whole list passed for a category of scopings — RG-liste-cadrages-sobre. -->
     <p v-if="datesState === 'indisponibles'" class="note-dates" role="status">
       <UiIcon name="schedule" />
       <span>
@@ -227,7 +227,7 @@ function enterFilter(event: Event): void {
                 >
                   {{ formatShortDate(store.creationDate(c.id)!) }}
                 </span>
-                <!-- Nommés : une icône suivie d'un nombre se devine, et se devine mal — RG-liste-cadrages-sobre. -->
+                <!-- Named: an icon followed by a number is guessed, and guessed badly — RG-liste-cadrages-sobre. -->
                 <span
                   v-if="store.creationDate(c.id) && formatCounts(c)"
                   class="sep"
@@ -240,7 +240,7 @@ function enterFilter(event: Event): void {
                 >
               </span>
             </div>
-            <!-- Groupés dans une seule cellule : la grille en compte trois, et un quatrième enfant retomberait à la ligne. -->
+            <!-- Grouped in a single cell: the grid has three, and a fourth child would drop to the next line. -->
             <span class="etat">
               <span
                 v-if="c.provenance"
@@ -256,7 +256,7 @@ function enterFilter(event: Event): void {
                   }}{{ c.provenance.draft ? " · brouillon" : "" }}</span
                 >
               </span>
-              <!-- Répété sur chaque livré, le statut n'apprend rien : il ne s'affiche que là où il distingue la ligne de son groupe. -->
+              <!-- Repeated on every delivered one, the status teaches nothing: it is displayed only where it distinguishes the row from its group. -->
               <StatusChip v-if="c.status !== 'livree'" :status="c.status" />
             </span>
           </RouterLink>
@@ -353,14 +353,14 @@ h1 {
   gap: 3px;
   min-width: 0;
 }
-/* Entier, quitte à passer à la ligne : tronqué, un titre ne distingue plus deux cadrages voisins. */
+/* In full, even if it wraps: truncated, a title no longer distinguishes two neighbouring scopings. */
 .titre {
   font-size: 15px;
   line-height: 1.35;
 }
-/* Les domaines d'un cadrage, dans leur teinte : sur une liste où toutes les lignes se ressemblent, la couleur donne le sujet avant la lecture. Le nom reste écrit — la teinte le double, ne le remplace pas.
+/* A scoping's domains, in their hue: on a list where all rows look alike, colour gives the subject before reading. The name stays written — the hue doubles it, it does not replace it.
 
-   Sur la ligne de détail et non au-dessus : une ligne par cadrage rien que pour deux mots faisait grandir chaque entrée d'un cinquième, et c'est le nombre de cadrages visibles d'un coup d'œil qui fait la valeur de cette liste. */
+   On the detail line and not above: a line per scoping just for two words made each entry grow by a fifth, and it is the number of scopings visible at a glance that gives this list its value. */
 .detail {
   display: flex;
   align-items: center;
@@ -410,7 +410,7 @@ h1 {
   flex-wrap: wrap;
   gap: 6px;
 }
-/* RG-couleur-porteuse : la puce dit le domaine, le nom reste écrit. */
+/* RG-couleur-porteuse: the dot tells the domain, the name stays written. */
 .domaine {
   display: inline-flex;
   align-items: center;
@@ -464,7 +464,7 @@ h1 {
   cursor: pointer;
 }
 
-/* Lu par les technologies d'assistance, invisible à l'écran. Le texte reste dans le flux : « display: none » l'ôterait aussi aux lecteurs. */
+/* Read by assistive technologies, invisible on screen. The text stays in the flow: « display: none » would also take it away from screen readers. */
 .lecteur-ecran {
   position: absolute;
   width: 1px;
@@ -477,7 +477,7 @@ h1 {
   border: 0;
 }
 
-/* Le titre d'un trimestre, discret : il découpe la liste sans prétendre à l'attention que les cadrages eux-mêmes réclament. */
+/* A quarter's title, discreet: it divides the list without claiming the attention the scopings themselves demand. */
 .groupe {
   display: flex;
   align-items: center;
@@ -517,7 +517,7 @@ h1 {
 .sep {
   opacity: 0.6;
 }
-/* un brouillon sans impact n'a rien à compter : le dire vaut mieux qu'afficher un zéro */
+/* a draft without impacts has nothing to count: saying so is better than displaying a zero */
 .sans-impact {
   font-style: italic;
   opacity: 0.85;
@@ -527,7 +527,7 @@ h1 {
   margin: 0;
   color: var(--mat-sys-on-surface-variant);
 }
-/* Sur écran étroit, l'identifiant garde sa place, au-dessus du titre : c'est par lui qu'on cite un cadrage. */
+/* On a narrow screen, the identifier keeps its place, above the title: it is how a scoping is cited. */
 @media (max-width: 640px) {
   .ligne {
     grid-template-columns: minmax(0, 1fr) auto;

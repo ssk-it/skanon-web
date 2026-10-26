@@ -3,34 +3,34 @@ import { computed, nextTick, ref, useId } from "vue";
 import UiIcon from "./UiIcon.vue";
 import { Z_PANEL, placeBelow, useOverlay, type Position } from "./overlay";
 
-/** Une entrée du menu. */
+/** A menu entry. */
 export interface MenuAction {
   readonly label: string;
-  /** Le nom d'une icône Material Symbols, posée devant le libellé. */
+  /** The name of a Material Symbols icon, placed in front of the label. */
   readonly icon?: string;
   readonly disabled?: boolean;
   readonly action: () => void;
 }
 
 /**
- * Un menu d'actions : `mat-menu` et son `matMenuTriggerFor`.
+ * An action menu: `mat-menu` and its `matMenuTriggerFor`.
  *
- * Le déclencheur appartient à la vue — son apparence, son libellé, son état désactivé — et reçoit par l'emplacement `#declencheur` les attributs à poser sur lui :
+ * The trigger belongs to the view — its appearance, its label, its disabled state — and receives through the `#declencheur` slot the attributes to set on it:
  *
  * ```vue
  * <UiMenu :actions="[
- *   { libelle: 'Modifier', icone: 'edit', action: () => modifierLien(l) },
- *   { libelle: 'Supprimer', icone: 'link_off', action: () => supprimerLien(l) },
+ *   { label: 'Modifier', icon: 'edit', action: () => editLink(l) },
+ *   { label: 'Supprimer', icon: 'link_off', action: () => deleteLink(l) },
  * ]">
  *   <template #declencheur="{ attributs }">
  *     <button type="button" class="menu-lien" v-bind="attributs" aria-label="Actions sur le lien">
- *       <UiIcone nom="more_vert" />
+ *       <UiIcon name="more_vert" />
  *     </button>
  *   </template>
  * </UiMenu>
  * ```
  *
- * Comme chez Material : le panneau s'ouvre sous le déclencheur, aligné à sa gauche ; il se referme au clic dehors, à Échap et à Tab, et rend alors le focus au déclencheur. Au clavier, les flèches, Origine et Fin parcourent les entrées. Une entrée choisie referme le menu avant que son action ne s'exécute.
+ * As in Material: the panel opens below the trigger, aligned to its left; it closes on an outside click, on Escape and on Tab, and then gives focus back to the trigger. On the keyboard, the arrow keys, Home and End go through the entries. A chosen entry closes the menu before its action runs.
  */
 defineProps<{ actions: readonly MenuAction[] }>();
 

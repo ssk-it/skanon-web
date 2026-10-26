@@ -1,5 +1,5 @@
 <script lang="ts">
-/** Une option de la liste : sa valeur, et ce qui s'en affiche. */
+/** An option of the list: its value, and what is shown of it. */
 export interface SelectOption<V> {
   readonly value: V;
   readonly label: string;
@@ -13,21 +13,21 @@ import UiOptionList from "./UiOptionList.vue";
 import { placeBelow, useOverlay, type Position } from "./overlay";
 
 /**
- * Une liste de choix : `mat-form-field appearance="outline"` et son `mat-select`.
+ * A select: `mat-form-field appearance="outline"` and its `mat-select`.
  *
  * ```vue
  * <UiSelect
- *   v-model="portee"
- *   libelle="Ce jeton vaut pour"
+ *   v-model="scope"
+ *   label="Ce jeton vaut pour"
  *   :options="[
- *     { valeur: 'ssk-it', libelle: 'l’organisation ssk-it' },
- *     { valeur: '', libelle: 'tous les autres dépôts' },
+ *     { value: 'ssk-it', label: 'l’organisation ssk-it' },
+ *     { value: '', label: 'tous les autres dépôts' },
  *   ]"
- *   indice="Un jeton par organisation."
+ *   hint="Un jeton par organisation."
  * />
  * ```
  *
- * Les options sont des valeurs de tout type, comparées par `===`. Au clavier, comme chez Material : Entrée, Espace ou Alt+flèche ouvrent la liste ; les flèches, liste fermée, changent la valeur sans l'ouvrir ; Échap et Tab referment. `class` et `style` vont au cadre, le reste au déclencheur.
+ * Options are values of any type, compared with `===`. On the keyboard, as in Material: Enter, Space or Alt+arrow open the list; the arrow keys, list closed, change the value without opening it; Escape and Tab close it. `class` and `style` go to the frame, the rest to the trigger.
  */
 defineOptions({ inheritAttrs: false });
 
@@ -151,7 +151,7 @@ function onKey(e: KeyboardEvent): void {
       choose(active.value);
       break;
     case "Escape":
-      // La liste se referme seule : le dialogue qui la porte, lui, reste ouvert.
+      // The list closes on its own: the dialog holding it stays open.
       e.preventDefault();
       e.stopPropagation();
       close();

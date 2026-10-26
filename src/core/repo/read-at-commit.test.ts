@@ -7,13 +7,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RepoLoader } from "./repo-loader";
 
 /**
- * Après un enregistrement, la vue lecture montrait l'état d'avant pendant
- * plusieurs minutes : `raw` sert avec `max-age: 300`, et l'URL d'une branche ne
- * change pas quand son contenu change. Lire au SHA du commit — que l'appel
- * d'arborescence rend déjà — donne une URL neuve à chaque écriture, donc jamais
- * servie depuis un cache.
+ * After a save, the reading view showed the previous state for several
+ * minutes: `raw` serves with `max-age: 300`, and a branch's URL does not
+ * change when its content changes. Reading at the commit SHA — which the tree
+ * call already returns — gives a fresh URL on every write, so never served
+ * from a cache.
  */
-describe("lecture des contenus au commit", () => {
+describe("reading contents at the commit", () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -22,7 +22,7 @@ describe("lecture des contenus au commit", () => {
     httpMock = provideHttpTesting();
   });
 
-  it("demande le fichier au commit résolu, non au nom de la branche", async () => {
+  it("requests the file at the resolved commit, not by the branch name", async () => {
     const loader = inject(RepoLoader);
     const expected = loader.loadSpecification({
       owner: "org",
@@ -39,8 +39,8 @@ describe("lecture des contenus au commit", () => {
       tree: [{ path: "rules/RG-exemple.md", sha: "b10b", type: "blob" }],
     });
 
-    // Le chargement des contenus n'est lancé qu'une fois l'arborescence rendue :
-    // laisser tourner la file d'attente avant de réclamer la requête suivante.
+    // Loading contents starts only once the tree is returned: let the queue run
+    // before claiming the next request.
     await new Promise((r) => setTimeout(r, 0));
 
     const content = httpMock.expectOne(

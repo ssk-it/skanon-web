@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { matchTimeline, TimelineCommit } from "./timeline.service";
 
 /**
- * L'appariement cadrage ↔ commit est la seule logique de ce service qui ne soit
- * pas un appel réseau, et c'est celle qui décide de ce que le lecteur voit.
+ * Scoping ↔ commit matching is the only logic of this service that is not a
+ * network call, and it is the one that decides what the reader sees.
  *
- * Le cas qui compte est le référentiel rédigé après coup : plusieurs cadrages
- * décrivent des décisions antérieures au dépôt, et aucun commit ne leur
- * correspond. Les masquer prétendrait que la décision n'a pas eu lieu.
+ * The case that matters is the specification written after the fact: several
+ * scopings describe decisions predating the repo, and no commit matches
+ * them. Hiding them would claim the decision did not happen.
  */
 function commit(title: string, oid = "abc1234"): TimelineCommit {
   return {
@@ -21,8 +21,8 @@ function commit(title: string, oid = "abc1234"): TimelineCommit {
   };
 }
 
-describe("appariement d’une chronologie", () => {
-  it("rattache un cadrage au commit dont le message le cite", () => {
+describe("matching a timeline", () => {
+  it("attaches a scoping to the commit whose message cites it", () => {
     const entries = matchTimeline(
       ["2026-011"],
       [commit("Cadrage 2026-011 : distribution de l’automatisation")],
@@ -32,21 +32,21 @@ describe("appariement d’une chronologie", () => {
     expect(entries[0].commit?.login).toBe("sskorupski");
   });
 
-  it("conserve un cadrage sans commit, sans ses données Git", () => {
+  it("keeps a scoping without a commit, without its Git data", () => {
     const entries = matchTimeline(
       ["2026-001", "2026-011"],
       [commit("Cadrage 2026-011 : x")],
     );
 
     expect(entries.map((e) => e.scoping)).toEqual(["2026-001", "2026-011"]);
-    // le cadrage antérieur au dépôt reste visible, simplement sans date
+    // the scoping predating the repo stays visible, simply without a date
     expect(entries[0].commit).toBeNull();
     expect(entries[1].commit).not.toBeNull();
   });
 
-  it("n’attribue jamais deux fois le même commit", () => {
-    // un message citant deux cadrages daterait les deux du même commit, ce qui
-    // afficherait une date fausse sur l'un des deux
+  it("never assigns the same commit twice", () => {
+    // a message citing two scopings would date both from the same commit,
+    // which would display a wrong date on one of them
     const entries = matchTimeline(
       ["2026-001", "2026-002"],
       [commit("Cadrages 2026-001 et 2026-002 : socle", "aaa")],
@@ -56,7 +56,7 @@ describe("appariement d’une chronologie", () => {
     expect(entries[1].commit).toBeNull();
   });
 
-  it("ignore les commits qui ne citent aucun cadrage", () => {
+  it("ignores commits that cite no scoping", () => {
     const entries = matchTimeline(
       ["2026-011"],
       [commit("Corrige une coquille")],
@@ -65,7 +65,7 @@ describe("appariement d’une chronologie", () => {
     expect(entries[0].commit).toBeNull();
   });
 
-  it("retourne une entrée par cadrage même sans aucun commit", () => {
+  it("returns one entry per scoping even without any commit", () => {
     const entries = matchTimeline(["2026-001", "2026-002"], []);
 
     expect(entries.length).toBe(2);

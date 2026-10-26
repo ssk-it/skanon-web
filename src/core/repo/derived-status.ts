@@ -1,41 +1,41 @@
 /**
- * Le statut d'un cadrage, déduit de l'état du dépôt.
+ * A scoping's status, derived from the repo state.
  *
- * Rien n'est déclaré dans le fichier : un champ `statut:` serait une seconde
- * source pour un fait que la plateforme établit déjà, et le vérificateur de
- * l'Action le refuse. La déduction suit deux faits distincts :
+ * Nothing is declared in the file: a `statut:` field would be a second
+ * source for a fact the platform already establishes, and the Action's
+ * checker rejects it. The derivation follows two distinct facts:
  *
- * - **la branche principale établit la livraison.** Un cadrage qu'elle porte est
- *   livré, sans autre condition — c'est la règle que l'Action applique, et la
- *   seule qui vaille pour la propagation.
- * - **la demande de fusion porte le reste du cycle.** Un cadrage qui n'est pas
- *   encore livré vit sur sa branche, derrière une demande dont l'état dit où en
- *   est la relecture.
+ * - **the default branch establishes delivery.** A scoping it carries is
+ *   delivered, with no other condition — that is the rule the Action applies, and the
+ *   only one that holds for propagation.
+ * - **the pull request carries the rest of the lifecycle.** A scoping that is not
+ *   delivered yet lives on its branch, behind a pull request whose state says how far
+ *   the review has got.
  *
- * Ce module ne connaît ni GitHub ni Angular : il reçoit des faits et rend un
- * statut. C'est ce qui permet de le tester sans réseau, et ce qui garde la
- * règle à un seul endroit.
+ * This module knows neither GitHub nor Angular: it receives facts and returns a
+ * status. That is what allows testing it without a network, and what keeps the
+ * rule in a single place.
  */
 
 import { ScopingProvenance, ScopingStatus } from "../model/model";
 
 /**
- * Le statut qui découle de l'endroit où vit un cadrage.
+ * The status that follows from where a scoping lives.
  *
- * Un cadrage sans provenance vient de la branche principale : le chargeur ne
- * pose la provenance que sur ce qu'il lit depuis une branche de demande.
+ * A scoping without provenance comes from the default branch: the loader only
+ * sets provenance on what it reads from a pull request branch.
  *
- * Sans demande de fusion identifiée, un cadrage non livré est montré en
- * brouillon : c'est l'état le moins engageant, et le seul qu'on puisse affirmer
- * quand rien n'indique qu'une relecture a commencé.
+ * Without an identified pull request, an undelivered scoping is shown as a
+ * draft: it is the least committal state, and the only one that can be asserted
+ * when nothing indicates a review has started.
  */
 export function deriveStatus(provenance?: ScopingProvenance): ScopingStatus {
   if (!provenance) return "livree";
   if (provenance.draft) return "brouillon";
 
-  // Une demande approuvée vaut validation ; tout le reste — avis non rendu,
-  // changements demandés, appel en échec — reste en relecture. On ne déduit
-  // jamais une validation d'une absence d'information.
+  // An approved pull request means approval; everything else — no review given,
+  // changes requested, failed call — stays in review. An approval is never
+  // derived from an absence of information.
   if (provenance.approval === "APPROVED") return "validee";
 
   return "en_relecture";

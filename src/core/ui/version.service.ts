@@ -4,23 +4,23 @@ import { InjectionToken, inject, onDestroy } from "../injection";
 import { signal } from "../signals";
 
 /**
- * Où en est la version que cette fenêtre exécute.
+ * Where the version this window runs stands.
  *
- * `prete` : une version plus récente est téléchargée, et n'attend qu'un rechargement. `perdue` : le service worker ne peut plus servir la version en cours, et une vue chargée à la demande peut refuser de s'ouvrir.
+ * `prete`: a more recent version is downloaded, and only awaits a reload. `perdue`: the service worker can no longer serve the current version, and a view loaded on demand may refuse to open.
  */
 export type VersionState = "courante" | "prete" | "perdue";
 
-/** Une heure : la fenêtre qui ne quitte jamais l'écran doit aussi l'apprendre. */
+/** One hour: the window that never leaves the screen must learn it too. */
 export const CHECK_INTERVAL = 60 * 60 * 1000;
 
 /**
- * Le rechargement de la page, isolé pour que les tests puissent l'observer : celui de jsdom n'est ni remplaçable ni observable.
+ * The page reload, isolated so that tests can observe it: jsdom's is neither replaceable nor observable.
  */
 export const RELOAD_PAGE = new InjectionToken<() => void>("RECHARGER_PAGE", {
   factory: () => () => document.location.reload(),
 });
 
-/** Les vues où le rédacteur tient une saisie que le rechargement effacerait. */
+/** The views where the author holds an input that reloading would wipe. */
 const INPUT_VIEWS = [
   /^cadrages\/nouveau$/,
   /^cadrages\/[^/]+\/editer$/,
@@ -28,12 +28,12 @@ const INPUT_VIEWS = [
 ];
 
 /**
- * Vrai quand l'adresse désigne une page de saisie.
+ * True when the address designates an input page.
  *
- * Le bandeau s'en sert pour avertir, non pour décider : il ne sait pas si la saisie a changé, et n'a pas à le savoir pour prévenir qu'elle serait perdue.
+ * The banner uses it to warn, not to decide: it does not know whether the input has changed, and does not need to know it to warn that it would be lost.
  */
 export function isInputUrl(url: string): boolean {
-  // les deux premiers segments sont l'organisation et le dépôt, jamais une vue
+  // the first two segments are the organisation and the repo, never a view
   const view = (url.split(/[?#]/)[0] ?? "")
     .split("/")
     .filter(Boolean)
@@ -43,11 +43,11 @@ export function isInputUrl(url: string): boolean {
 }
 
 /**
- * La version de l'application — RG-nouvelle-version-proposee, RG-version-perdue-signalee.
+ * The application's version — RG-nouvelle-version-proposee, RG-version-perdue-signalee.
  *
- * Le service worker télécharge une nouvelle version de lui-même, mais ne la cherche qu'au chargement d'une page, et ne la sert qu'au suivant. Une fenêtre de l'application installée, jamais rechargée, n'en saurait donc rien : ce service le lui demande, et dit ce qu'il a trouvé. Il le demande à l'annonceur de la plateforme (`plateforme/ports.ts`) : le service worker sur le web, le cœur natif sur le bureau, qui dit pourquoi il n'annonce rien.
+ * The service worker downloads a new version by itself, but only looks for it when a page loads, and only serves it on the next one. A window of the installed application, never reloaded, would therefore know nothing of it: this service asks for it, and says what it found. It asks the platform's announcer (`platform/ports.ts`): the service worker on the web, the native core on the desktop, which says why it announces nothing.
  *
- * Il ne recharge ni ne relance jamais de lui-même. Un rechargement efface la saisie en cours et l'accès obtenu par une identité vérifiée : seul le rédacteur sait s'il peut se le permettre maintenant (2026-049, décision 01).
+ * It never reloads or relaunches by itself. A reload wipes the input in progress and the access obtained through a verified identity: only the author knows whether they can afford it now (2026-049, decision 01).
  */
 export class VersionService {
   private readonly announcer = inject(PLATFORM).version;
@@ -55,10 +55,10 @@ export class VersionService {
 
   readonly state = signal<VersionState>("courante");
 
-  /** Pourquoi aucune version n'est annoncée, telle que l'annonceur la nomme ; le livrable qui la connaît la formule. `null` quand la dernière vérification a abouti, et toujours sur le web. */
+  /** Why no version is announced, as the announcer names it; the deliverable that knows it words it. `null` when the last check succeeded, and always on the web. */
   readonly cause = signal<NoVersionCause | null>(null);
 
-  /** Vrai quand passer à la version prête relance l'application : le bandeau dit « relancer » plutôt que « recharger ». */
+  /** True when moving to the ready version relaunches the application: the banner says « relancer » rather than « recharger ». */
   readonly relaunches = this.announcer.relaunches;
 
   constructor() {
@@ -70,11 +70,11 @@ export class VersionService {
 
     const stop = this.announcer.listen((announcement) => {
       if (announcement === "perdue") this.state.set("perdue");
-      // une version perdue reste le message : c'est elle qu'il faut expliquer
+      // a lost version remains the message: it is the one that needs explaining
       else if (this.state() === "courante") this.state.set("prete");
     });
 
-    // Au premier plan pour la fenêtre retrouvée après une nuit, chaque heure pour celle qui ne quitte jamais l'écran (2026-049, décision 02).
+    // In the foreground for the window found again after a night, every hour for the one that never leaves the screen (2026-049, decision 02).
     const inForeground = () => {
       if (document.visibilityState === "visible") void this.checkVersion();
     };
@@ -90,24 +90,24 @@ export class VersionService {
   }
 
   /**
-   * Demande s'il existe une version plus récente.
+   * Asks whether a more recent version exists.
    *
-   * La réponse arrive par l'annonce, non par le résultat. Un échec — hors ligne, le plus souvent — n'est pas une erreur à montrer : la vérification suivante reprendra.
+   * The answer arrives through the announcement, not through the result. A failure — offline, most often — is not an error to show: the next check will take over.
    */
   async checkVersion(): Promise<void> {
     try {
       await this.announcer.check();
     } catch {
-      // rien à dire : voir ci-dessus
+      // nothing to say: see above
     }
   }
 
   /**
-   * Passe à la version publiée, sur la même adresse.
+   * Moves to the published version, on the same address.
    *
-   * Une version perdue n'a rien à activer : seule la version publiée peut encore être servie, et le rechargement y mène. Une activation qui échoue ne retient pas le rechargement : le bouton ne reste pas sans effet, et la vérification suivante retrouvera la version prête.
+   * A lost version has nothing to activate: only the published version can still be served, and reloading leads to it. An activation that fails does not hold back the reload: the button does not stay without effect, and the next check will find the ready version again.
    *
-   * Sur le bureau, l'activation installe la version et relance l'application : il n'y a rien à recharger. Une installation qui échoue se dit, et la version reste prête.
+   * On the desktop, activation installs the version and relaunches the application: there is nothing to reload. An installation that fails is reported, and the version stays ready.
    */
   async reloadVersion(): Promise<void> {
     if (this.relaunches) {
@@ -118,7 +118,7 @@ export class VersionService {
       try {
         await this.announcer.activate();
       } catch {
-        // voir ci-dessus
+        // see above
       }
     }
     this.reloadPage();

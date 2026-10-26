@@ -15,9 +15,9 @@ import { createAppRouter } from "../../router";
 import SpecificationPage from "./SpecificationPage.vue";
 
 /**
- * La page d'entrée du référentiel — RG-vue-ensemble-fonctionnelle.
+ * The specification's entry page — RG-vue-ensemble-fonctionnelle.
  *
- * Ce qui est éprouvé ici, c'est qu'elle montre ce qui bouge avant ce qui est, les cadrages en cours à part, et qu'une fonctionnalité s'atteint sans passer par la fiche de son domaine.
+ * What is tested here is that it shows what is moving before what is, the scopings in progress separately, and that a feature is reached without going through its domain's page.
  */
 
 function scoping(
@@ -131,7 +131,7 @@ async function mountView(scopings: Scoping[]): Promise<HTMLElement> {
   const store = inject(SpecificationStore);
   store.specification.set(specification(scopings));
   store.state.set("pret");
-  // Le dépôt de l'adresse est celui déjà ouvert, et le store est prêt : le garde ne recharge rien.
+  // The address's repo is the one already open, and the store is ready: the guard reloads nothing.
   const router = createAppRouter(createMemoryHistory());
   await router.push("/org/depot/referentiel");
   await router.isReady();
@@ -146,14 +146,14 @@ function ids(el: Element | null): string[] {
   );
 }
 
-describe("La vue d’ensemble du référentiel", () => {
+describe("The specification overview", () => {
   beforeEach(() => {
     provideHttpTesting();
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
-  describe("ce qui bouge", () => {
-    it("montre les trois derniers cadrages livrés, par identifiant", async () => {
+  describe("what is moving", () => {
+    it("shows the last three delivered scopings, by identifier", async () => {
       const el = await mountView([...DELIVERED, IN_PROGRESS]);
 
       expect(ids(el.querySelector(".livres"))).toEqual([
@@ -163,7 +163,7 @@ describe("La vue d’ensemble du référentiel", () => {
       ]);
     });
 
-    it("montre les cadrages en cours à part, marqués de leur demande de fusion", async () => {
+    it("shows the scopings in progress separately, marked with their pull request", async () => {
       const el = await mountView([...DELIVERED, IN_PROGRESS]);
 
       const inProgress = el.querySelector(".en-cours");
@@ -172,7 +172,7 @@ describe("La vue d’ensemble du référentiel", () => {
       expect(ids(el.querySelector(".livres"))).not.toContain("2026-005");
     });
 
-    it("garde l’emplacement des en cours, et dit ce qu’il accueillerait", async () => {
+    it("keeps the slot for in-progress ones, and says what it would hold", async () => {
       const el = await mountView(DELIVERED);
 
       const inProgress = el.querySelector(".en-cours");
@@ -185,7 +185,7 @@ describe("La vue d’ensemble du référentiel", () => {
       ).not.toBeNull();
     });
 
-    it("précède les domaines", async () => {
+    it("comes before the domains", async () => {
       const el = await mountView(DELIVERED);
 
       const moves = el.querySelector(".bouge")!;
@@ -197,8 +197,8 @@ describe("La vue d’ensemble du référentiel", () => {
     });
   });
 
-  describe("les domaines", () => {
-    it("listent leurs fonctionnalités et leur nombre de règles", async () => {
+  describe("the domains", () => {
+    it("list their features and their number of rules", async () => {
       const el = await mountView(DELIVERED);
 
       const billing = [...el.querySelectorAll(".carte")].find((c) =>
@@ -220,7 +220,7 @@ describe("La vue d’ensemble du référentiel", () => {
       ).not.toBeNull();
     });
 
-    it("mènent à leur fiche par leur nom, qui porte leur couleur", async () => {
+    it("lead to their page by their name, which carries their colour", async () => {
       const el = await mountView(DELIVERED);
 
       const name = el.querySelector<HTMLAnchorElement>(".carte h2 a")!;

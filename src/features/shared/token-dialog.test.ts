@@ -5,7 +5,7 @@ import { inject, resetInjection } from "../../core/injection";
 import TokenDialog from "./TokenDialog.vue";
 
 /**
- * La connexion à GitHub, en mode jeton personnel : l'aide à la création se lit au moment de la saisie — RG-secret-conserve-localement.
+ * Sign-in to GitHub, in personal token mode: the creation help is read at the moment of input — RG-secret-conserve-localement.
  */
 describe("TokenDialog", () => {
   beforeEach(() => {
@@ -26,13 +26,13 @@ describe("TokenDialog", () => {
       .findAll("details.guide")
       .find((d) => d.find("summary").text() === "Comment créer un jeton ?")!;
 
-  it("déplie la façon de créer un jeton tant qu’aucun accès n’est en place", async () => {
+  it("expands how to create a token as long as no access is in place", async () => {
     const view = mount(TokenDialog);
     await flushPromises();
     expect(guide(view).attributes("open")).toBeDefined();
   });
 
-  it("la garde repliée pour qui a déjà un jeton, de quelque portée", async () => {
+  it("keeps it collapsed for those who already have a token, of whatever scope", async () => {
     inject(TokenService).setForScope(
       "wayne-corp",
       "ghp_abcdefghijklmnopqrst1234",
@@ -44,9 +44,9 @@ describe("TokenDialog", () => {
 });
 
 /**
- * Le jeton protégé par une passkey dès sa saisie, dans la version web — RG-secret-conserve-localement, RG-protection-du-jeton-par-projet. Les états du service sont simulés : ce sont les textes et les gestes du dialogue qui comptent ici.
+ * The token protected by a passkey as soon as it is entered, in the web version — RG-secret-conserve-localement, RG-protection-du-jeton-par-projet. The service's states are simulated: what matters here is the dialog's texts and gestures.
  */
-describe("TokenDialog et la passkey", () => {
+describe("TokenDialog and the passkey", () => {
   const TOKEN = "ghp_abcdefghijklmnopqrst1234";
   let tokens: TokenService;
 
@@ -74,7 +74,7 @@ describe("TokenDialog et la passkey", () => {
   const protectCheckbox = (view: ReturnType<typeof mount>) =>
     view.find(".protection input[type=checkbox]");
 
-  it("propose de protéger le jeton par une passkey, et le protège à l’enregistrement", async () => {
+  it("offers to protect the token with a passkey, and protects it on save", async () => {
     const setProtected = vi
       .spyOn(tokens, "setProtected")
       .mockResolvedValue("scelle");
@@ -87,7 +87,7 @@ describe("TokenDialog et la passkey", () => {
     expect(setProtected).toHaveBeenCalledWith(expect.any(String), TOKEN);
   });
 
-  it("garde le jeton en clair quand la protection est décochée", async () => {
+  it("keeps the token in clear when protection is unchecked", async () => {
     const setProtected = vi.spyOn(tokens, "setProtected");
     const setForScope = vi.spyOn(tokens, "setForScope");
     const view = await mountView();
@@ -97,7 +97,7 @@ describe("TokenDialog et la passkey", () => {
     expect(setForScope).toHaveBeenCalled();
   });
 
-  it("ne laisse pas le choix sur un projet qui exige la passkey", async () => {
+  it("leaves no choice on a project that requires the passkey", async () => {
     vi.spyOn(tokens, "protectionRequired").mockReturnValue(true);
     const setProtected = vi
       .spyOn(tokens, "setProtected")
@@ -109,21 +109,21 @@ describe("TokenDialog et la passkey", () => {
     expect(setProtected).toHaveBeenCalled();
   });
 
-  it("dit qu’un navigateur qui ne sait pas protéger le jeton le gardera en clair", async () => {
+  it("says a browser that cannot protect the token will keep it in clear", async () => {
     vi.spyOn(tokens, "canProtect").mockResolvedValue(false);
     const view = await mountView();
     expect(protectCheckbox(view).exists()).toBe(false);
     expect(view.find(".protection").text()).toContain("en clair");
   });
 
-  it("dit qu’un tel navigateur ne gardera que pour l’onglet le jeton d’un projet qui l’exige", async () => {
+  it("says such a browser will keep a requiring project's token only for the tab", async () => {
     vi.spyOn(tokens, "canProtect").mockResolvedValue(false);
     vi.spyOn(tokens, "protectionRequired").mockReturnValue(true);
     const view = await mountView();
     expect(view.find(".protection").text()).toContain("pour cet onglet");
   });
 
-  it("demande d’abord de déverrouiller des jetons scellés", async () => {
+  it("first asks to unlock sealed tokens", async () => {
     vi.spyOn(tokens, "locked").mockReturnValue(true);
     vi.spyOn(tokens, "form").mockReturnValue("scelle");
     const unlock = vi.spyOn(tokens, "unlock").mockResolvedValue("ouvert");
@@ -138,7 +138,7 @@ describe("TokenDialog et la passkey", () => {
     expect(view.emitted("close")).toEqual([[true]]);
   });
 
-  it("scelle d’office un jeton saisi quand les jetons sont déjà protégés", async () => {
+  it("seals an entered token by default when tokens are already protected", async () => {
     vi.spyOn(tokens, "form").mockReturnValue("scelle");
     const setForScope = vi.spyOn(tokens, "setForScope");
     const view = await mountView();
@@ -150,16 +150,16 @@ describe("TokenDialog et la passkey", () => {
     expect(setForScope).toHaveBeenCalled();
   });
 
-  it("ne parle pas de passkey sur le bureau, dont le coffre du système suffit", async () => {
+  it("does not mention a passkey on the desktop, where the system keychain suffices", async () => {
     vi.spyOn(tokens, "form").mockReturnValue("systeme");
     vi.spyOn(tokens, "canProtect").mockResolvedValue(false);
     const view = await mountView();
     expect(view.find(".protection").exists()).toBe(false);
   });
 
-  it("range Issues en lecture parmi les droits, pour consulter comme pour rédiger", async () => {
-    // Sans lui, la roadmap ne s'affiche pas : découvrir le droit après coup
-    // obligerait à recréer le jeton (cadrage 2026-058, RG-pistes-a-part).
+  it("lists Issues read among the permissions, for reading as for authoring", async () => {
+    // Without it, the roadmap does not display: discovering the permission afterwards
+    // would force recreating the token (scoping 2026-058, RG-pistes-a-part).
     const view = mount(TokenDialog);
     await flushPromises();
     const line = view

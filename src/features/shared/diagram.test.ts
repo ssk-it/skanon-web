@@ -2,28 +2,28 @@ import { describe, expect, it } from "vitest";
 import { extractDiagrams, diagramMarker } from "./diagram";
 
 /**
- * Le repérage des diagrammes dans du Markdown — RG-diagrammes-rendus.
+ * Detecting diagrams in Markdown — RG-diagrammes-rendus.
  *
- * Le rendu lui-même est asynchrone et dépend du moteur ; ce qui est éprouvé ici est ce qui décide **si** le moteur sera chargé. Se tromper dans un sens fait payer 500 Ko à une page qui n'a aucun diagramme ; dans l'autre, laisse un diagramme en texte brut sans que rien ne le signale.
+ * The rendering itself is asynchronous and depends on the engine; what is tested here is what decides **whether** the engine will be loaded. Getting it wrong one way makes a page with no diagram pay 500 KB; the other way, leaves a diagram as raw text with nothing signalling it.
  */
-describe("repérage des diagrammes", () => {
-  it("ne trouve rien dans un Markdown ordinaire", () => {
+describe("diagram detection", () => {
+  it("finds nothing in ordinary Markdown", () => {
     const html =
       '<p>Un texte.</p><pre><code class="language-java">int a;</code></pre>';
     expect(extractDiagrams(html)).toEqual([]);
   });
 
-  it("trouve un bloc mermaid et le remplace par un marqueur", () => {
+  it("finds a mermaid block and replaces it with a marker", () => {
     const html =
       '<pre><code class="language-mermaid">flowchart LR\n  A --&gt; B</code></pre>';
     const found = extractDiagrams(html);
 
     expect(found.length).toBe(1);
-    // Le texte est rendu à sa forme d'origine : `marked` a échappé les chevrons, que le moteur de diagramme attend intacts.
+    // The text is restored to its original form: `marked` escaped the angle brackets, which the diagram engine expects intact.
     expect(found[0]!.source).toBe("flowchart LR\n  A --> B");
   });
 
-  it("distingue plusieurs diagrammes d’une même page", () => {
+  it("distinguishes several diagrams on the same page", () => {
     const html =
       '<pre><code class="language-mermaid">flowchart LR</code></pre>' +
       "<p>Entre les deux.</p>" +
@@ -34,18 +34,18 @@ describe("repérage des diagrammes", () => {
       "flowchart LR",
       "sequenceDiagram",
     ]);
-    // Deux marqueurs distincts : rendre le second dans le premier emplacement afficherait un diagramme à la place d'un autre, sans erreur visible.
+    // Two distinct markers: rendering the second into the first slot would display one diagram in place of another, with no visible error.
     expect(found[0]!.id).not.toBe(found[1]!.id);
   });
 
-  it("laisse dans le HTML un emplacement pour chaque diagramme", () => {
+  it("leaves a slot in the HTML for each diagram", () => {
     const html =
       '<pre><code class="language-mermaid">flowchart LR</code></pre>';
     const found = extractDiagrams(html);
     const expected = diagramMarker(found[0]!.id);
 
     expect(found[0]!.html).toContain(expected);
-    // La source ne doit plus figurer dans le HTML rendu : un diagramme affiché à la fois en image et en texte double la section.
+    // The source must no longer appear in the rendered HTML: a diagram displayed both as an image and as text doubles the section.
     expect(found[0]!.html).not.toContain("flowchart LR");
   });
 });

@@ -1,11 +1,11 @@
 import { InjectionToken, inject } from "../injection";
 
 /**
- * Le client HTTP du cœur, sur `fetch`.
+ * The core's HTTP client, on `fetch`.
  *
- * Il reprend la forme de celui d'Angular dans ce que SSK Canon en employait — en-têtes immuables, réponse complète, erreur pour tout statut hors de 2xx, 304 compris —, à ceci près qu'il rend des promesses : aucun appelant n'utilisait les flux autrement qu'en en prenant la première valeur.
+ * It takes the shape of Angular's in what SSK Canon used of it — immutable headers, full response, error for any status outside 2xx, 304 included —, except that it returns promises: no caller used the streams other than by taking their first value.
  *
- * Le transport est un jeton (`HTTP_BACKEND`) : `fetch` dans l'application, une doublure dans les tests (`http-testing.ts`).
+ * The transport is a token (`HTTP_BACKEND`): `fetch` in the application, a fake in tests (`http-testing.ts`).
  */
 
 export class HttpHeaders {
@@ -24,7 +24,7 @@ export class HttpHeaders {
     this.values = values;
   }
 
-  /** Rend un nouvel objet : celui-ci ne change pas. */
+  /** Returns a new object: this one does not change. */
   set(name: string, value: string): HttpHeaders {
     const copied = new Map(this.values);
     copied.set(name.toLowerCase(), value);
@@ -80,7 +80,7 @@ export class HttpResponse<T> {
   }
 }
 
-/** Un statut hors de 2xx, ou l'absence de réponse (`status` à 0). `error` porte le corps lu. */
+/** A status outside 2xx, or the absence of a response (`status` at 0). `error` carries the body read. */
 export class HttpErrorResponse extends Error {
   constructor(
     readonly status: number,
@@ -97,7 +97,7 @@ export class HttpErrorResponse extends Error {
   }
 }
 
-/** Le transport : rend la réponse quel que soit son statut, et ne lève qu'en l'absence de réponse. */
+/** The transport: returns the response whatever its status, and only throws when there is no response. */
 export interface HttpBackend {
   handle(query: HttpRequest): Promise<HttpResponse<unknown>>;
 }
@@ -157,7 +157,7 @@ async function readBody(
   try {
     return JSON.parse(text);
   } catch {
-    // Un corps d'erreur n'est pas toujours du JSON : le garder tel quel plutôt que de perdre la cause.
+    // An error body is not always JSON: keep it as is rather than lose the cause.
     return text;
   }
 }

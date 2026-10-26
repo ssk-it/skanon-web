@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * Le cadre commun aux champs du kit — `UiChamp`, `UiSelect`, `UiAutocompletion` : le contour à encoche de `mat-form-field appearance="outline"`, son libellé flottant, et la ligne d'indication en dessous. Interne au kit : une vue emploie l'un des trois champs, jamais le cadre seul.
+ * The frame shared by the kit's fields — `UiTextField`, `UiSelect`, `UiAutocomplete`: the notched outline of `mat-form-field appearance="outline"`, its floating label, and the hint line below. Internal to the kit: a view uses one of the three fields, never the frame alone.
  *
- * L'encoche est un `<fieldset>` dont la `<legend>` porte le libellé, invisible : sa largeur ouvre le contour exactement là où le libellé flotte, quelle que soit sa longueur.
+ * The notch is a `<fieldset>` whose `<legend>` carries the label, invisible: its width opens the outline exactly where the label floats, whatever its length.
  *
- * Comme chez Material, la ligne d'indication ne réserve que 16 px, et une indication longue déborde sur ce qui suit : d'où la marge de 10 px sous chaque champ, que `styles.scss` de SSK Canon posait sur `.mat-mdc-form-field`.
+ * As in Material, the hint line reserves only 16 px, and a long hint overflows onto what follows: hence the 10 px margin under each field, which SSK Canon's `styles.scss` set on `.mat-mdc-form-field`.
  */
 defineProps<{
   label?: string;
-  /** L'identifiant du contrôle, pour que le libellé le désigne. */
+  /** The control's id, so that the label designates it. */
   controlId: string;
   floating: boolean;
   focus: boolean;
@@ -68,7 +68,7 @@ defineEmits<{ activate: [] }>();
   font-family: Roboto, sans-serif;
 }
 
-/* Un champ n'a pas à pousser ce qui suit sa dernière ligne, dans un dialogue. */
+/* A field has no need to push what follows its last line, in a dialog. */
 .ui-dialogue__contenu .ui-champ:not(:has(~ .ui-champ)) {
   margin-bottom: 0;
 }
@@ -223,7 +223,7 @@ defineEmits<{ activate: [] }>();
   color: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
 }
 
-/* Le contrôle lui-même : un `<input>` ou un `<textarea>` de `UiChamp`, le déclencheur de `UiSelect`. */
+/* The control itself: an `<input>` or a `<textarea>` of `UiTextField`, the trigger of `UiSelect`. */
 .ui-champ__saisie {
   display: block;
   width: 100%;

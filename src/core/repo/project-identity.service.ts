@@ -18,7 +18,7 @@ import {
   listSymbolCandidates,
 } from "./identity-names";
 
-/** Ce qui se montre pour un dépôt sur un fond, et sous quel effacement il a été lu. */
+/** What is shown for a repo on a background, and under which erasure it was read. */
 interface PublishedSymbol {
   readonly source: string | null;
   readonly private: boolean;
@@ -26,18 +26,17 @@ interface PublishedSymbol {
 }
 
 /**
- * Le symbole de chaque projet proposé, lu pour qu'on le reconnaisse avant de
- * l'ouvrir. Voir RG-lecture-identite et RG-identite-affichee.
+ * The symbol of each proposed project, read so that it is recognised before
+ * being opened. See RG-lecture-identite and RG-identite-affichee.
  *
- * L'image se rend en adresse `data:`, montrée par un `<img>`, jamais insérée
- * dans le document : un SVG peut porter du script, et quiconque écrit dans un
- * référentiel pourrait alors lire les jetons. Une adresse `blob:` n'aurait pas
- * suffi : ouverte seule — « ouvrir l'image dans un nouvel onglet » —, elle
- * s'exécute sous l'origine de l'application, là où une adresse `data:` n'a
- * aucune origine.
+ * The image is rendered as a `data:` address, shown by an `<img>`, never
+ * inserted into the document: an SVG can carry script, and anyone who writes
+ * to a specification could then read the tokens. A `blob:` address would not
+ * have been enough: opened on its own — « open image in new tab » — it runs
+ * under the application's origin, whereas a `data:` address has no origin.
  *
- * Une identité absente, refusée ou illisible ne lève jamais : la vue montre
- * son repli, et rien d'autre ne dépend de cette lecture.
+ * An absent, refused or unreadable identity never throws: the view shows its
+ * fallback, and nothing else depends on this read.
  */
 export class ProjectIdentityService {
   private readonly github = inject(GithubClient);
@@ -50,21 +49,21 @@ export class ProjectIdentityService {
   private readonly rereads = signal(0);
 
   /**
-   * Change quand ce qui a été lu doit l'être de nouveau : un retour à
-   * l'accueil, ou un accès retiré. Les vues le lisent pour redemander.
+   * Changes when what was read must be read again: a return to the home page,
+   * or a withdrawn access. Views read it to ask again.
    */
   readonly generation = computed(() => this.rereads() + this.cache.erasures());
 
   private readonly reads = new Map<string, Promise<void>>();
   private readGeneration = -1;
-  /** Les lectures d'un même dépôt se suivent : elles réécrivent le même enregistrement. */
+  /** Reads of the same repo follow one another: they rewrite the same record. */
   private readonly files = new Map<string, Promise<void>>();
 
   /**
-   * Le symbole d'un dépôt sur un fond, en adresse `data:`, ou `null`.
+   * The symbol of a repo on a background, as a `data:` address, or `null`.
    *
-   * Celui d'un dépôt privé lu avant qu'un accès soit retiré cesse aussitôt de
-   * se montrer, sans attendre qu'on le relise (RG-contenus-prives-au-repos).
+   * That of a private repo read before an access was withdrawn stops showing
+   * at once, without waiting to be read again (RG-contenus-prives-au-repos).
    */
   findSymbol(repoRef: RepoRef, variant: IdentityVariant): string | null {
     const published = this.published().get(key(repoRef, variant));
@@ -75,10 +74,10 @@ export class ProjectIdentityService {
   }
 
   /**
-   * Lit le symbole d'un dépôt sur un fond, une fois par génération.
+   * Reads the symbol of a repo on a background, once per generation.
    *
-   * Ce que le poste détient se montre d'abord, puis la lecture le confirme ou
-   * le remplace : l'accueil n'attend pas le réseau pour se dessiner.
+   * What the machine holds is shown first, then the read confirms or replaces
+   * it: the home page does not wait for the network to draw itself.
    */
   request(repoRef: RepoRef, variant: IdentityVariant): Promise<void> {
     return untracked(() => {
@@ -97,7 +96,7 @@ export class ProjectIdentityService {
     });
   }
 
-  /** Redemande toutes les identités, sous condition — au retour sur l'accueil. */
+  /** Asks again for all identities, conditionally — on returning to the home page. */
   reread(): void {
     this.rereads.update((n) => n + 1);
   }
@@ -131,8 +130,8 @@ export class ProjectIdentityService {
         this.tokens.valueFor(repoRef) !== null
           ? await this.readViaApi(repoRef, variant, known)
           : await this.readViaRaw(repoRef, variant, known);
-      // Un accès retiré pendant la lecture : ce qu'elle a obtenu sous lui ne
-      // doit pas lui survivre.
+      // An access withdrawn during the read: what the read obtained under it must
+      // not outlive it.
       if (this.cache.erasures() !== erasures) return;
       await this.cache.saveIdentity(repoRef, next, {
         persist: this.isPersistable(next.private),
@@ -150,17 +149,17 @@ export class ProjectIdentityService {
         for (const v of VARIANTES_IDENTITE)
           this.publish(repoRef, v, null, false, erasures);
       }
-      // Sinon — réseau coupé, quota épuisé — le dernier état connu reste
-      // affiché : une identité périmée ne fait prendre aucun projet pour un autre.
+      // Otherwise — network down, quota exhausted — the last known state stays
+      // displayed: an outdated identity makes no project pass for another.
     }
   }
 
   /**
-   * Sous l'accès du dépôt : la racine sous condition, puis le répertoire et
-   * l'image, chacun désigné par son empreinte et donc jamais relu.
+   * Under the repo's access: the root conditionally, then the directory and
+   * the image, each designated by its fingerprint and so never read again.
    *
-   * Une fois l'identité connue, la visite suivante ne coûte qu'une réponse
-   * « inchangée », que la plateforme ne décompte pas sous un accès.
+   * Once the identity is known, the next visit costs only a « not modified »
+   * response, which the platform does not count under an access.
    */
   private async readViaApi(
     repoRef: RepoRef,
@@ -195,8 +194,8 @@ export class ProjectIdentityService {
 
     const old = Object.values(previous?.symbols ?? {});
     const symbols: Partial<Record<IdentityVariant, KnownSymbol | null>> = {};
-    // L'autre fond ne se garde que s'il désigne encore le même fichier : un
-    // symbole remplacé dans le dépôt doit l'être aussi à l'écran.
+    // The other background is kept only if it still designates the same file: a
+    // symbol replaced in the repo must be replaced on screen too.
     for (const v of VARIANTES_IDENTITE) {
       const s = previous?.symbols[v];
       if (
@@ -219,15 +218,15 @@ export class ProjectIdentityService {
           ),
         });
 
-    // Rien ne dit, à ce stade, si le dépôt est public : tout ce qu'un accès a
-    // lu est traité comme privé. En effacer trop ne coûte qu'un
-    // téléchargement ; en garder trop survivrait à l'accès.
+    // Nothing says, at this stage, whether the repo is public: everything an
+    // access has read is treated as private. Erasing too much costs only a
+    // download; keeping too much would outlive the access.
     return { channel: "api", etag, directory, files, symbols, private: true };
   }
 
   /**
-   * Sans accès : chaque nom candidat, dans l'ordre, par le canal non décompté.
-   * Le premier qui répond l'emporte.
+   * Without access: each candidate name, in order, through the uncounted channel.
+   * The first one to answer wins.
    */
   private async readViaRaw(
     repoRef: RepoRef,
@@ -271,13 +270,13 @@ export class ProjectIdentityService {
     );
   }
 
-  /** Comme les contenus : sous un accès temporaire, rien ne survit à l'onglet. */
+  /** Like contents: under a temporary access, nothing outlives the tab. */
   private isPersistable(isPrivate: boolean): boolean {
     return !isPrivate || this.tokens.source() !== "identite_tierce";
   }
 }
 
-/** Le dépôt est hors de portée de l'accès présenté — non une panne. */
+/** The repo is out of the presented access's scope — not an outage. */
 function isDenial(e: unknown): boolean {
   return (
     e instanceof GithubError &&
@@ -297,8 +296,8 @@ function key(repoRef: RepoRef, variant: IdentityVariant): string {
 function toDataUrl(bytes: ArrayBuffer, path: string): string {
   const raw = new Uint8Array(bytes);
   let binary = "";
-  // Par tranches : `String.fromCharCode` sur cent kilo-octets d'un coup
-  // dépasserait la pile d'arguments de certains moteurs.
+  // In slices: `String.fromCharCode` on a hundred kilobytes at once would
+  // exceed the argument stack of some engines.
   for (let i = 0; i < raw.length; i += 0x8000) {
     binary += String.fromCharCode(...raw.subarray(i, i + 0x8000));
   }

@@ -4,7 +4,7 @@ import { HttpClient, HttpErrorResponse, HttpHeaders } from "./http";
 import { provideHttpTesting } from "./http-testing";
 
 describe("HttpClient", () => {
-  it("émet la requête au moment de l'appel, avec ses en-têtes", async () => {
+  it("emits the request at call time, with its headers", async () => {
     const http = provideHttpTesting();
     const pending = inject(HttpClient).get<{ sha: string }>(
       "https://api.github.com/x",
@@ -23,7 +23,7 @@ describe("HttpClient", () => {
     expect(response.headers.get("etag")).toBe('"e1"');
   });
 
-  it("lève pour un statut hors de 2xx, 304 compris, en gardant le corps et les en-têtes", async () => {
+  it("throws for a status outside 2xx, 304 included, keeping the body and the headers", async () => {
     const http = provideHttpTesting();
     const pending = inject(HttpClient).get("https://api.github.com/y");
     http
@@ -37,7 +37,7 @@ describe("HttpClient", () => {
     ).toBe("59");
   });
 
-  it("distingue l'absence de réponse d'un refus", async () => {
+  it("tells the absence of a response from a refusal", async () => {
     const http = provideHttpTesting();
     const pending = inject(HttpClient).get(
       "https://raw.githubusercontent.com/z",
@@ -51,7 +51,7 @@ describe("HttpClient", () => {
     expect(error.error).toBeInstanceOf(ProgressEvent);
   });
 
-  it("encode un corps d'objet en JSON", async () => {
+  it("encodes an object body as JSON", async () => {
     const http = provideHttpTesting();
     void inject(HttpClient).post("https://api.github.com/graphql", {
       query: "{}",

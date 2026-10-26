@@ -41,17 +41,17 @@ import UiIcon from "../../ui/UiIcon.vue";
 import UiSelect from "../../ui/UiSelect.vue";
 
 /**
- * Reprise d'un cadrage ouvert.
+ * Resuming an open scoping.
  *
- * Le cadrage est chargé depuis sa propre branche, où le travail en cours se trouve, et non depuis la branche principale qui ne le connaît pas encore.
+ * The scoping is loaded from its own branch, where the work in progress lives, and not from the main branch, which does not know it yet.
  *
- * Le statut n'est volontairement pas modifiable ici : faire avancer un cadrage dans son cycle est une décision, pas une saisie, et mérite son propre parcours.
+ * The status is deliberately not editable here: moving a scoping through its cycle is a decision, not data entry, and deserves its own journey.
  */
 
 const OPERATIONS: ImpactOperation[] = ["cree", "modifie", "abroge", "touche"];
 
 /**
- * Les natures qu'un impact peut viser, dans l'ordre où on les cherche à la relecture d'un fichier. Le même que dans le chargeur et le vérificateur.
+ * The kinds an impact can target, in the order they are looked up when re-reading a file. The same as in the loader and the checker.
  */
 const IMPACT_KINDS = ["regle", "adr", "architecture"] as const;
 
@@ -61,17 +61,17 @@ const KIND_LABEL: Record<TargetKind, string> = {
   architecture: "Document",
 };
 
-/** Opérations dont la propagation tire une écriture, donc un énoncé obligatoire. */
+/** Operations from which propagation derives a write, hence a mandatory statement. */
 const WITH_STATEMENT = new Set<ImpactOperation>(["cree", "modifie"]);
 
-/** Une décision en cours d'édition, et sa provenance dans le dépôt. */
+/** A decision being edited, and its provenance in the repo. */
 interface DecisionInput extends EditableDecision {
-  /** Chemin du fichier existant, `null` pour une décision nouvelle. */
+  /** Path of the existing file, `null` for a new decision. */
   readonly file: string | null;
   readonly sha: string | undefined;
-  /** L'identifiant, qui donne son nom au fichier et ne se renomme jamais. */
+  /** The identifier, which names the file and is never renamed. */
   readonly id: string;
-  /** Le texte tel qu'il est dans le dépôt, pour ne réécrire que ce qui change. */
+  /** The text as it is in the repo, so as to rewrite only what changes. */
   readonly savedText?: string;
 }
 
@@ -84,16 +84,16 @@ const authoring = inject(AuthoringService);
 const verification = inject(VerificationService);
 
 /**
- * Le référentiel de la branche éditée, quand elle en a un.
+ * The specification of the edited branch, when it has one.
  *
- * Sert à vérifier ce qu'on écrit : un cadrage crée souvent le domaine et les règles qu'il déclare, absents de la branche principale. Les vérifier contre celle-ci les signalerait comme inconnus.
+ * Used to check what is written: a scoping often creates the domain and the rules it declares, absent from the main branch. Checking them against the latter would flag them as unknown.
  */
 const context = ref<Specification | null>(null);
 
 /**
- * Les décisions du cadrage, telles qu'on les édite.
+ * The scoping's decisions, as they are edited.
  *
- * Chacune garde le nom de son fichier et le SHA d'où elle vient : le premier ne se renomme jamais — un fichier déplacé perd son historique — et le second est le contrôle de concurrence de la plateforme.
+ * Each keeps the name of its file and the SHA it comes from: the first is never renamed — a moved file loses its history — and the second is the platform's concurrency control.
  */
 const decisions = ref<readonly DecisionInput[]>([]);
 const deletedDecisions = ref<readonly string[]>([]);
@@ -104,7 +104,7 @@ const decisionStatusOptions = DECISION_STATUSES.map((s) => ({
 }));
 
 function addDecision(): void {
-  // Numérotée dans l'ordre d'apparition : c'est ce qui ordonne les fichiers, et l'ordre où les questions se sont posées se relit ainsi.
+  // Numbered in order of appearance: that is what orders the files, and the order in which the questions arose can thus be read back.
   const next = String(decisions.value.length + 1).padStart(2, "0");
   decisions.value = [
     ...decisions.value,
@@ -130,7 +130,7 @@ function updateDecision(i: number, fields: Partial<DecisionInput>): void {
 
 function removeDecision(i: number): void {
   const target = decisions.value[i];
-  // Un fichier déjà enregistré doit être retiré du dépôt, non seulement de l'écran : sans cela, il réapparaîtrait au rechargement.
+  // An already saved file must be removed from the repo, not only from the screen: otherwise it would reappear on reload.
   if (target?.file) {
     deletedDecisions.value = [...deletedDecisions.value, target.file];
   }
@@ -151,7 +151,7 @@ function updateOption(
   const d = decisions.value[i];
   const options = d.options.map((o, n) => (n === j ? { ...o, ...fields } : o));
 
-  // Renommer l'option retenue doit la garder retenue : sans cela, corriger une faute de frappe déferait le choix sans rien dire.
+  // Renaming the chosen option must keep it chosen: otherwise, fixing a typo would silently undo the choice.
   const previousValue = d.options[j]?.id.trim();
   const chosen =
     fields.id !== undefined && previousValue && d.chosenOption === previousValue
@@ -170,7 +170,7 @@ function removeOption(i: number, j: number): void {
   });
 }
 
-/** Désigne l'option retenue, ou la libère si elle l'était déjà. */
+/** Marks the option as chosen, or releases it if it already was. */
 function toggleChosen(i: number, idOption: string): void {
   const own = idOption.trim();
   if (!own) return;
@@ -184,16 +184,16 @@ function isChosen(d: DecisionInput, idOption: string): boolean {
   return idOption.trim() === d.chosenOption;
 }
 
-/** La branche principale, pour dire si le cadrage vit ailleurs. */
+/** The main branch, to tell whether the scoping lives elsewhere. */
 const mainBranch = ref("");
 
-/** Les sections que l'éditeur ne présente pas, conservées telles quelles. */
+/** The sections the editor does not present, kept as they are. */
 const unknownSections = ref("");
 
 /**
- * Les liens externes, conservés tels qu'ils étaient.
+ * External links, kept as they were.
  *
- * L'éditeur ne les présente pas — ils se saisissent depuis la fiche — mais la sérialisation reconstruit tout le frontmatter : ne pas les relire les effacerait au premier enregistrement.
+ * The editor does not present them — they are entered from the scoping page — but serialisation rebuilds the whole frontmatter: not reading them back would erase them on the first save.
  */
 const carriedLinks = ref<readonly LienPorte[]>([]);
 
@@ -215,9 +215,9 @@ const journey = ref("");
 const impacts = ref<ImpactInput[]>([]);
 
 /**
- * Le statut tel que le dépôt l'établit — RG-statuts-cadrage.
+ * The status as the repo establishes it — RG-statuts-cadrage.
  *
- * Lu sur le cadrage que le store a déduit de sa demande de fusion, et non dans le fichier, qui ne le porte plus. Il suit le store quand les branches finissent d'arriver ; une bascule réussie l'emporte jusqu'à la relecture suivante.
+ * Read on the scoping the store derived from its pull request, and not in the file, which no longer carries it. It follows the store when the branches finish arriving; a successful toggle prevails until the next re-read.
  */
 const status = linkedSignal<ScopingStatus>(
   () => store.findScoping(id.value)?.status ?? "brouillon",
@@ -233,11 +233,11 @@ const error = ref<string | null>(null);
 const saved = ref(false);
 
 /**
- * Statuts vers lesquels ce cadrage peut aller.
+ * Statuses this scoping can move to.
  *
- * Vides si le cadrage ne vit pas sur sa propre branche : son statut décrit alors ce qui est déjà dans le référentiel, et le changer sans passer par une demande de fusion contournerait la vérification.
+ * Empty if the scoping does not live on its own branch: its status then describes what is already in the specification, and changing it without going through a pull request would bypass the check.
  *
- * « Sa propre branche » se reconnaît à ce qu'elle n'est pas la principale, et non à son nom — voir RG-branche-par-cadrage. Le test portait sur le préfixe « cadrage/ », que pas une branche réelle ne porte : toutes suivent « cadrage-<id> », et les boutons étaient donc absents partout.
+ * "Its own branch" is recognised by not being the main one, and not by its name — see RG-branche-par-cadrage. The test used to look for the « cadrage/ » prefix, which no real branch carries: they all follow « cadrage-<id> », and the buttons were therefore missing everywhere.
  */
 const transitions = computed(() =>
   authoring.possibleTransitions(
@@ -256,9 +256,9 @@ function enteredDomains(): string[] {
 }
 
 /**
- * Ce qui empêcherait la livraison, tel que la vérification finale le dira.
+ * What would block delivery, as the final check will report it.
  *
- * Les règles viennent du même module que l'Action exécute avant chaque livraison : ce qui est signalé ici est exactement ce qui bloquerait là-bas, sans qu'aucune règle n'existe en double.
+ * The rules come from the same module the Action runs before each delivery: what is flagged here is exactly what would block there, with no rule existing twice.
  */
 const problems = computed(() => {
   const missing = [
@@ -269,7 +269,7 @@ const problems = computed(() => {
     .filter(([, v]) => !v.trim())
     .map(([name]) => `Il manque ${name}.`);
 
-  // Les impacts sans règle désignée sont écartés avant la vérification : elle les rapporterait sous un identifiant vide, illisible pour le rédacteur.
+  // Impacts with no designated rule are set aside before the check: it would report them under an empty identifier, unreadable for the author.
   const designated = impacts.value.filter((i) => i.target.trim());
   const withoutRule = impacts.value.length - designated.length;
 
@@ -289,7 +289,7 @@ const problems = computed(() => {
           .map((i) => [i.target.trim(), i.statement.trim()]),
       ),
     },
-    // Le référentiel de la branche éditée : c'est là que vivent le domaine et les règles que ce cadrage crée.
+    // The specification of the edited branch: that is where the domain and rules this scoping creates live.
     context.value ?? undefined,
   );
 
@@ -302,14 +302,14 @@ const problems = computed(() => {
   ];
 });
 
-/** Le cadrage déjà porté par le formulaire, pour ne pas le relire pour rien. */
+/** The scoping already held by the form, so as not to re-read it for nothing. */
 let loadId: string | null = null;
 
 watch(
   [id, () => store.state()],
   ([currentId, state]) => {
     if (state !== "pret") return;
-    // La surveillance porte sur l'état du magasin : sans ce garde, tout rechargement du référentiel — celui qui suit un enregistrement, comme le bouton de la barre — relirait le cadrage et écraserait la saisie en cours.
+    // The watcher is on the store's state: without this guard, any reload of the specification — the one that follows a save, like the top-bar button — would re-read the scoping and overwrite the input in progress.
     if (loadId === currentId) return;
     loadId = currentId;
     void load(currentId);
@@ -338,9 +338,9 @@ function updateImpact(index: number, field: Partial<ImpactInput>): void {
 }
 
 /**
- * Fait passer le cadrage à un autre statut.
+ * Moves the scoping to another status.
  *
- * Rien n'est tenté tant que le cadrage n'est pas cohérent : un statut avancé sur un cadrage que la vérification refuserait ne ferait que déplacer le problème plus près de la livraison.
+ * Nothing is attempted while the scoping is not consistent: an advanced status on a scoping the check would reject would only move the problem closer to delivery.
  */
 async function goToward(to: ScopingStatus): Promise<void> {
   if (
@@ -355,9 +355,9 @@ async function goToward(to: ScopingStatus): Promise<void> {
   error.value = null;
   toggleFailed.value = false;
   try {
-    // Rien n'est écrit dans le fichier : le statut vit sur la demande de fusion, et c'est elle que la bascule change. La source reste donc valide, contrairement à ce qui se passait quand le statut y était écrit.
+    // Nothing is written in the file: the status lives on the pull request, and that is what the toggle changes. The source therefore stays valid, unlike what happened when the status was written there.
     const result = await authoring.changeStatus(id.value, to);
-    // La demande porte le statut : si elle n'a pas basculé, rien n'a changé.
+    // The pull request carries the status: if it did not toggle, nothing changed.
     if (!result.toggleFailed) status.set(to);
     toggleFailed.value = result.toggleFailed;
   } catch (e) {
@@ -388,7 +388,7 @@ async function load(loadedId: string): Promise<void> {
     context.value = readAt.context;
     mainBranch.value = readAt.mainBranch;
 
-    // Depuis la branche du cadrage : une décision écrite en même temps que lui n'existe nulle part ailleurs.
+    // From the scoping's branch: a decision written at the same time as it exists nowhere else.
     try {
       const read = await authoring.loadDecisions(
         loadedId,
@@ -401,18 +401,18 @@ async function load(loadedId: string): Promise<void> {
           file: l.file,
           sha: l.sha,
           id: idDecision,
-          // Ce que produirait une réécriture à l'identique : le comparer évite d'enregistrer une décision que personne n'a touchée.
+          // What an identical rewrite would produce: comparing against it avoids saving a decision nobody touched.
           savedText: serializeDecision(idDecision, l.decision),
         };
       });
     } catch {
-      // Ne pas empêcher d'éditer le cadrage : les décisions rejoindront l'écran au prochain chargement.
+      // Do not prevent editing the scoping: the decisions will reach the screen on the next load.
       decisions.value = [];
     }
     title.value = String(data["titre"] ?? "");
     domains.value = ((data["domaines"] as string[]) ?? []).join(", ");
     goal.value = extractSection(parse.body, "Objectif");
-    // Ce que l'éditeur ne sait pas présenter doit lui survivre : sans cela, réenregistrer effacerait des sections que quelqu'un a écrites.
+    // What the editor cannot present must survive it: otherwise, saving again would erase sections someone wrote.
     unknownSections.value = extractOtherSections(parse.body, KNOWN_SECTIONS);
     journey.value = extractSection(parse.body, "Parcours utilisateur");
     carriedLinks.value = (
@@ -439,7 +439,7 @@ async function load(loadedId: string): Promise<void> {
         };
       });
   } catch (e) {
-    // Oublier ce qui a échoué : un rechargement du référentiel doit pouvoir retenter la lecture, sinon l'écran reste en erreur jusqu'à la navigation.
+    // Forget what failed: a reload of the specification must be able to retry the read, otherwise the screen stays in error until navigation.
     loadId = null;
     loadError.value =
       e instanceof GithubError || e instanceof Error
@@ -472,10 +472,10 @@ async function save(): Promise<void> {
       },
       context.value ?? undefined,
     );
-    // Le SHA rendu par l'écriture est celui sur lequel la suivante se fonde : l'appliquer évite un rechargement, et la course qu'il introduisait.
+    // The SHA returned by the write is the one the next write builds on: applying it avoids a reload, and the race it introduced.
     source.value = after;
 
-    // Les décisions après le cadrage : elles vivent dans son répertoire, qui doit exister. Une par enregistrement, le SHA rendu servant au suivant. Seules celles qui ont changé : réécrire les autres produirait des enregistrements sans objet et toucherait des fichiers que personne n'a modifiés, ce qui rend l'historique illisible.
+    // The decisions after the scoping: they live in its directory, which must exist. One per commit, the returned SHA serving the next one. Only those that changed: rewriting the others would produce pointless commits and touch files nobody modified, which makes the history unreadable.
     const written: DecisionInput[] = [];
     for (const d of decisions.value) {
       const idDecision = d.id.trim();
@@ -510,7 +510,7 @@ async function save(): Promise<void> {
 
     saved.value = true;
 
-    // La vue lecture n'affiche que ce que le magasin porte : sans ce rechargement, revenir au cadrage montrerait l'état d'avant l'enregistrement jusqu'à ce que quelqu'un recharge à la main. Les contenus étant lus au commit, ce qui revient est bien ce qu'on vient d'écrire.
+    // The read view shows only what the store holds: without this reload, going back to the scoping would show the state before the save until someone reloads by hand. Contents being read at the commit, what comes back is indeed what was just written.
     void store.loadSpecification();
   } catch (e) {
     error.value =
@@ -532,7 +532,7 @@ async function save(): Promise<void> {
     <header class="entete">
       <p class="type">Reprendre un cadrage</p>
       <h1>{{ id }}</h1>
-      <!-- Toujours sa branche : un cadrage que la principale porte est livré, et ne se charge pas ici (RG-cadrage-livre-immuable). -->
+      <!-- Always its branch: a scoping the main branch holds is delivered, and is not loaded here (RG-cadrage-livre-immuable). -->
       <p v-if="source" class="sous-titre">
         Chargé depuis <code>{{ source.branch }}</code
         >. Les écritures y restent jusqu’à la livraison.
@@ -956,7 +956,7 @@ h1 {
   .regle {
     flex: 1 1 auto;
   }
-  /* Assez large pour que le plus long libellé tienne sans être tronqué. */
+  /* Wide enough for the longest label to fit without being truncated. */
   .operation {
     flex: 0 0 170px;
   }
@@ -980,7 +980,7 @@ h1 {
   }
 }
 
-/* Une option : la marque de sélection, les champs, le retrait. Alignés sur une ligne, la marque en tête parce que c'est ce qu'on cherche du regard quand on veut savoir ce qui a été retenu. */
+/* An option: the selection mark, the fields, the removal. Aligned on one line, the mark first because it is what the eye looks for when wanting to know what was chosen. */
 .option {
   display: flex;
   align-items: flex-start;
@@ -1004,7 +1004,7 @@ h1 {
   gap: 10px;
   align-items: start;
 }
-/* La marque de sélection : un bouton, non une case, parce qu'une seule option est retenue et qu'on peut aussi n'en retenir aucune. */
+/* The selection mark: a button, not a checkbox, because only one option is chosen and one may also choose none. */
 .marque {
   margin-top: 8px;
   border: none;

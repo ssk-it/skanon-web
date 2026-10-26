@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { OPERATION_LABEL, type ImpactOperation } from "../../core/model/model";
 
 /**
- * L'opération d'un impact. `touche` se distingue visuellement des trois autres : c'est la seule qui n'écrit rien, et cette différence compte à la relecture.
+ * An impact's operation. `touche` is visually distinct from the other three: it is the only one that writes nothing, and that difference matters during review.
  */
 const props = defineProps<{ operation: ImpactOperation }>();
 

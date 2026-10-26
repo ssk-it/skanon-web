@@ -7,15 +7,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RepoLoader } from "./repo-loader";
 
 /**
- * Le référentiel porte, depuis le cadrage 2026-038, ce qui décrit comment le
- * produit est construit : décisions d'architecture et documents d'architecture.
+ * Since scoping 2026-038, the specification carries what describes how the
+ * product is built: architecture decisions and architecture documents.
  *
- * Ce qui est éprouvé ici est le chargement — la seule étape où une nature
- * inconnue disparaît sans bruit. Un fichier rangé dans un répertoire que le
- * chargeur ignore n'est pas signalé comme anomalie : il n'existe simplement
- * pas, et rien dans l'application ne dit qu'il a été écarté.
+ * What is exercised here is loading — the only step where an unknown kind
+ * disappears silently. A file stored in a directory that the loader ignores
+ * is not reported as an anomaly: it simply does not exist, and nothing in
+ * the application says it was set aside.
  */
-describe("chargement des cibles d’architecture", () => {
+describe("loading of architecture targets", () => {
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -24,7 +24,7 @@ describe("chargement des cibles d’architecture", () => {
     httpMock = provideHttpTesting();
   });
 
-  /** Répond à l'arborescence puis au contenu de chaque fichier annoncé. */
+  /** Answers with the tree, then with the content of each announced file. */
   async function serve(files: readonly { path: string; content: string }[]) {
     const tree = httpMock.expectOne(
       "https://api.github.com/repos/org/projet/git/trees/main?recursive=1",
@@ -39,8 +39,8 @@ describe("chargement des cibles d’architecture", () => {
       })),
     });
 
-    // Le chargement des contenus n'est lancé qu'une fois l'arborescence rendue :
-    // laisser tourner la file d'attente avant de réclamer les requêtes suivantes.
+    // Content loading only starts once the tree has been returned:
+    // let the queue run before claiming the next requests.
     await new Promise((r) => setTimeout(r, 0));
 
     for (const f of files) {
@@ -52,7 +52,7 @@ describe("chargement des cibles d’architecture", () => {
     }
   }
 
-  it("charge une décision d’architecture", async () => {
+  it("loads an architecture decision", async () => {
     const loader = inject(RepoLoader);
     const expected = loader.loadSpecification({
       owner: "org",
@@ -75,7 +75,7 @@ describe("chargement des cibles d’architecture", () => {
     expect(adr?.createdBy).toBe("2026-038");
   });
 
-  it("charge un document d’architecture avec sa nature et ses composants", async () => {
+  it("loads an architecture document with its kind and its components", async () => {
     const loader = inject(RepoLoader);
     const expected = loader.loadSpecification({
       owner: "org",
@@ -98,7 +98,7 @@ describe("chargement des cibles d’architecture", () => {
     expect(flows?.components).toEqual(["api", "stockage"]);
   });
 
-  it("rend calculable la relation d’un composant vers les flux qui le touchent", async () => {
+  it("makes computable the relation from a component to the flows that touch it", async () => {
     const loader = inject(RepoLoader);
     const expected = loader.loadSpecification({
       owner: "org",
@@ -125,14 +125,14 @@ describe("chargement des cibles d’architecture", () => {
     ]);
 
     const specification = await expected;
-    // La relation ne se tient pas à la main : elle se lit des documents eux-mêmes.
+    // The relation is not maintained by hand: it is read from the documents themselves.
     const touching = [...specification.architecture.values()].filter((d) =>
       d.components.includes("CMP-api"),
     );
     expect(touching.map((d) => d.id)).toEqual(["FLX-export"]);
   });
 
-  it("lit un impact visant une décision ou un document d’architecture", async () => {
+  it("reads an impact targeting an architecture decision or document", async () => {
     const loader = inject(RepoLoader);
     const expected = loader.loadSpecification({
       owner: "org",
@@ -151,8 +151,8 @@ describe("chargement des cibles d’architecture", () => {
     const specification = await expected;
     const impacts = specification.scopings.get("2026-001")?.impacts ?? [];
     expect(impacts.length).toBe(3);
-    // Chaque impact sait ce qu'il vise : sans cela, l'application afficherait
-    // trois lignes indiscernables, toutes présentées comme des règles.
+    // Each impact knows what it targets: without that, the application would show
+    // three indistinguishable lines, all presented as rules.
     expect(impacts.map((i) => i.target)).toEqual([
       "ADR-stockage",
       "FLX-export",

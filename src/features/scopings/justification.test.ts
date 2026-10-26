@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { extractJustification } from "./justification";
 
 describe("extractJustification", () => {
-  it("rend le texte qui suit le marqueur", () => {
+  it("returns the text following the marker", () => {
     const body = `**Retenue.** Distinguer les trois situations, chacune déductible
 de ce qui est connu.
 
@@ -12,24 +12,24 @@ de ce qui est connu.
     );
   });
 
-  it("s'arrête à l'argumentaire même sans ligne vide", () => {
+  it("stops at the argument even without a blank line", () => {
     const body = `**Retenue.** Le choix tient en une phrase.
 **Pour** — un argument qui ne doit pas remonter.`;
     expect(extractJustification(body)).toBe("Le choix tient en une phrase.");
   });
 
-  // Le marqueur est une convention de rédaction, pas une garantie du format :
-  // sans lui, mieux vaut ne rien afficher qu'un texte pris au hasard.
-  it("rend une chaîne vide quand le marqueur manque", () => {
+  // The marker is an authoring convention, not a guarantee of the format:
+  // without it, better to display nothing than a text picked at random.
+  it("returns an empty string when the marker is missing", () => {
     expect(extractJustification("Une option décrite sans marqueur.")).toBe("");
   });
 
-  it("retire le balisage inline", () => {
+  it("removes inline markup", () => {
     const body = "**Retenue.** Un **gras**, un `code` et un [lien](http://x).";
     expect(extractJustification(body)).toBe("Un gras, un code et un lien.");
   });
 
-  it("accepte le marqueur sans point", () => {
+  it("accepts the marker without a period", () => {
     expect(extractJustification("**Retenue** Le texte.")).toBe("Le texte.");
   });
 });

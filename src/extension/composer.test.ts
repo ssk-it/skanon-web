@@ -15,10 +15,10 @@ function action(id: string, rank?: number): ToolbarAction {
 }
 
 /**
- * La composition des extensions d'un livrable — ADR-extensions-commerciales. Une composition fausse échoue ici, au premier test, et non chez l'utilisateur.
+ * The composition of a deliverable's extensions — ADR-extensions-commerciales. A wrong composition fails here, at the first test, and not at the user's.
  */
-describe("composer", () => {
-  it("ne compose rien sans extension : c'est la composition des tests", () => {
+describe("compose", () => {
+  it("composes nothing without an extension: it is the tests' composition", () => {
     expect(inject(COMPOSITION)).toEqual(compose([]));
     expect(compose([])).toEqual({
       toolbarActions: [],
@@ -28,7 +28,7 @@ describe("composer", () => {
     });
   });
 
-  it("rassemble les apports de chaque extension, point par point", () => {
+  it("gathers each extension's contributions, point by point", () => {
     const a: Extension = {
       id: "a",
       shell: {
@@ -62,7 +62,7 @@ describe("composer", () => {
     });
   });
 
-  it("range les apports d'un point par rang, puis dans l'ordre de composition", () => {
+  it("orders a point's contributions by rank, then in composition order", () => {
     const composition = compose([
       {
         id: "a",
@@ -77,11 +77,11 @@ describe("composer", () => {
     ]);
   });
 
-  it("refuse deux extensions de même identifiant", () => {
+  it("refuses two extensions with the same identifier", () => {
     expect(() => compose([{ id: "a" }, { id: "a" }])).toThrow(/a/);
   });
 
-  it("refuse deux apports de même identifiant sur un point", () => {
+  it("refuses two contributions with the same identifier on a point", () => {
     expect(() =>
       compose([
         { id: "a", shell: { toolbarActions: [action("x")] } },
@@ -90,7 +90,7 @@ describe("composer", () => {
     ).toThrow(/x/);
   });
 
-  it("refuse deux hébergeurs : un livrable n'est servi que par un", () => {
+  it("refuses two hosts: a deliverable is served by only one", () => {
     expect(() =>
       compose([
         { id: "a", pages: { legalNotice: { host: "Un." } } },

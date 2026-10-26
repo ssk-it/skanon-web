@@ -16,13 +16,13 @@ import FeaturePage from "./FeaturePage.vue";
 import RoadmapItemsSection from "./RoadmapItemsSection.vue";
 
 /**
- * La section « À venir » d'un domaine ou d'une fonctionnalité —
- * RG-pistes-a-part (cadrage 2026-058).
+ * The « À venir » section of a domain or a feature —
+ * RG-pistes-a-part (scoping 2026-058).
  *
- * Ce qui est éprouvé : qu'elle reste repliée et à part de l'effectif, qu'elle
- * range ses pistes par horizon sous un libellé qui dit que rien n'est décidé,
- * qu'une piste en cours mène à son cadrage, et que le vide comme le droit
- * manquant se disent au lieu de se taire.
+ * What is tested: that it stays collapsed and apart from what is in effect, that
+ * it arranges its roadmap items by horizon under a label saying nothing is decided,
+ * that a roadmap item in progress leads to its scoping, and that emptiness as
+ * well as a missing permission are stated instead of kept quiet.
  */
 const ISSUES_URL =
   "https://api.github.com/repos/org/depot/issues?labels=piste&state=open&per_page=100&page=1";
@@ -107,13 +107,13 @@ async function mountSection(
   return view;
 }
 
-describe("La section « À venir »", () => {
+describe("The « À venir » section", () => {
   beforeEach(() => {
     http = provideHttpTesting();
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
-  it("se présente repliée, avec le nombre de pistes", async () => {
+  it("shows collapsed, with the number of roadmap items", async () => {
     const view = await mountSection((r) =>
       r.flush([
         issue(12, ["domaine/cadrage"], "ensuite"),
@@ -129,7 +129,7 @@ describe("La section « À venir »", () => {
     expect(view.find(".piste").exists()).toBe(false);
   });
 
-  it("dépliée, range les pistes par horizon et dit que rien n'y est décidé", async () => {
+  it("expanded, arranges roadmap items by horizon and says nothing is decided there", async () => {
     const view = await mountSection((r) =>
       r.flush([
         issue(13, ["domaine/cadrage"], null),
@@ -148,7 +148,7 @@ describe("La section « À venir »", () => {
     ]);
   });
 
-  it("mène une piste en cours au cadrage qui la traite", async () => {
+  it("leads a roadmap item in progress to the scoping handling it", async () => {
     const view = await mountSection((r) =>
       r.flush([issue(12, ["domaine/cadrage"], "ensuite")]),
     );
@@ -159,7 +159,7 @@ describe("La section « À venir »", () => {
     expect(scoping.attributes("href")).toBe("/org/depot/cadrages/2026-071");
   });
 
-  it("sans piste, dit ce qu'elle accueillerait", async () => {
+  it("without roadmap items, says what it would hold", async () => {
     const view = await mountSection((r) => r.flush([]));
     await view.get("button.bascule").trigger("click");
 
@@ -167,7 +167,7 @@ describe("La section « À venir »", () => {
     expect(view.text()).toContain("domaine/cadrage");
   });
 
-  it("nomme le droit manquant quand le jeton ne lit pas les issues", async () => {
+  it("names the missing permission when the token cannot read issues", async () => {
     const view = await mountSection((r) =>
       r.flush({ message: "Resource not accessible" }, { status: 403 }),
     );
@@ -178,13 +178,13 @@ describe("La section « À venir »", () => {
   });
 });
 
-describe("La place de la section", () => {
+describe("The place of the section", () => {
   beforeEach(() => {
     http = provideHttpTesting();
     inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
-  it("vient en dernier dans un domaine", async () => {
+  it("comes last in a domain", async () => {
     const router = await prepare();
     await router.push("/org/depot/referentiel/domaine/cadrage");
     const view = mount(DomainPage, { global: { plugins: [router] } });
@@ -194,7 +194,7 @@ describe("La place de la section", () => {
     expect(sections.at(-1)?.classes()).toContain("pistes");
   });
 
-  it("vient en dernier dans une fonctionnalité", async () => {
+  it("comes last in a feature", async () => {
     const router = await prepare();
     await router.push("/org/depot/referentiel/fonctionnalite/redaction");
     const view = mount(FeaturePage, { global: { plugins: [router] } });

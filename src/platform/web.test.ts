@@ -9,7 +9,7 @@ import {
 } from "./web";
 
 /**
- * Un service worker et son conteneur simulés : jsdom n'en a pas. Seul ce que l'annonceur lit y figure — l'état d'un worker, l'inscription et ses trois places, les événements du conteneur.
+ * A simulated service worker and its container: jsdom has none. Only what the announcer reads is there — a worker's state, the registration and its three slots, the container's events.
  */
 class FakeWorker extends EventTarget {
   readonly postMessage = vi.fn();
@@ -48,12 +48,12 @@ async function create(container: FakeContainer) {
   return { announcer: announcer, announcements: announcements };
 }
 
-describe("AnnonceurDuServiceWorker", () => {
-  it("n’est pas actif sans service worker", () => {
+describe("ServiceWorkerAnnouncer", () => {
+  it("is not active without a service worker", () => {
     expect(new ServiceWorkerAnnouncer(undefined).active).toBe(false);
   });
 
-  it("inscrit le service worker de Skanon sur toute l’application", async () => {
+  it("registers Skanon's service worker over the whole application", async () => {
     const container = new FakeContainer();
     await create(container);
     expect(container.register).toHaveBeenCalledWith("/sw.js", {
@@ -62,7 +62,7 @@ describe("AnnonceurDuServiceWorker", () => {
     });
   });
 
-  it("n’annonce pas la première installation", async () => {
+  it("does not announce the first installation", async () => {
     const container = new FakeContainer();
     container.registration.installing = new FakeWorker("installing");
     const { announcements: announcements } = await create(container);
@@ -71,7 +71,7 @@ describe("AnnonceurDuServiceWorker", () => {
     expect(announcements).toEqual([]);
   });
 
-  it("annonce une version déjà en attente au chargement", async () => {
+  it("announces a version already waiting at load", async () => {
     const container = new FakeContainer();
     container.controller = new FakeWorker("activated");
     container.registration.waiting = new FakeWorker("installed");
@@ -79,8 +79,8 @@ describe("AnnonceurDuServiceWorker", () => {
     expect(announcements).toEqual(["prete"]);
   });
 
-  it("n’annonce une version trouvée qu’une fois installée", async () => {
-    // une version détectée n'est pas encore téléchargée : recharger servirait encore l'ancienne
+  it("announces a found version only once installed", async () => {
+    // a detected version is not downloaded yet: reloading would still serve the old one
     const container = new FakeContainer();
     container.controller = new FakeWorker("activated");
     const { announcements: announcements } = await create(container);
@@ -94,8 +94,8 @@ describe("AnnonceurDuServiceWorker", () => {
     expect(announcements).toEqual(["prete"]);
   });
 
-  it("ne propose rien sous le service worker de l’ancienne application", async () => {
-    // la relève : Skanon s'installe à la place de SSK Canon, ce n'est pas une nouvelle version de Skanon
+  it("offers nothing under the former application's service worker", async () => {
+    // the handover: Skanon installs itself in place of SSK Canon, it is not a new version of Skanon
     const container = new FakeContainer();
     container.controller = new FakeWorker(
       "activated",
@@ -106,7 +106,7 @@ describe("AnnonceurDuServiceWorker", () => {
     expect(announcements).toEqual([]);
   });
 
-  it("rejoue une annonce faite avant qu’on l’écoute", async () => {
+  it("replays an announcement made before anyone listens", async () => {
     const container = new FakeContainer();
     container.controller = new FakeWorker("activated");
     container.registration.waiting = new FakeWorker("installed");
@@ -117,7 +117,7 @@ describe("AnnonceurDuServiceWorker", () => {
     expect(late).toEqual(["prete"]);
   });
 
-  it("annonce une version perdue quand le service worker le dit", async () => {
+  it("announces a lost version when the service worker says so", async () => {
     const container = new FakeContainer();
     const { announcements: announcements } = await create(container);
 
@@ -127,21 +127,21 @@ describe("AnnonceurDuServiceWorker", () => {
     expect(announcements).toEqual(["perdue"]);
   });
 
-  it("ignore les autres messages", async () => {
+  it("ignores other messages", async () => {
     const container = new FakeContainer();
     const { announcements: announcements } = await create(container);
     container.dispatchEvent(new MessageEvent("message", { data: "bonjour" }));
     expect(announcements).toEqual([]);
   });
 
-  it("vérifie en demandant la mise à jour de l’inscription", async () => {
+  it("checks by asking for the registration's update", async () => {
     const container = new FakeContainer();
     const { announcer: announcer } = await create(container);
     await announcer.check();
     expect(container.registration.update).toHaveBeenCalledOnce();
   });
 
-  it("active la version en attente, et attend qu’elle serve", async () => {
+  it("activates the waiting version, and waits for it to serve", async () => {
     const container = new FakeContainer();
     container.controller = new FakeWorker("activated");
     const waiting = new FakeWorker("installed");
@@ -161,7 +161,7 @@ describe("AnnonceurDuServiceWorker", () => {
     expect(finished).toBe(true);
   });
 
-  it("ne retient pas le rechargement si le changement ne vient pas", async () => {
+  it("does not hold back the reload if the change does not come", async () => {
     const container = new FakeContainer();
     container.registration.waiting = new FakeWorker("installed");
     const { announcer: announcer } = await create(container);
@@ -176,9 +176,9 @@ describe("AnnonceurDuServiceWorker", () => {
   });
 });
 
-describe("la version web", () => {
-  // Le site se redéploie à chaque fusion, sans étiquette (docs/deploiement.md) : c'est le commit construit qui la désigne.
-  it("est le commit inscrit au build", async () => {
+describe("the web version", () => {
+  // The site is redeployed on every merge, without a tag (its deployment lives in the private repository): the built commit is what designates it.
+  it("is the commit recorded at build", async () => {
     const version = await createWebPlatform().loadVersion();
     expect(version).toBe(import.meta.env.VITE_VERSION);
     expect(version).toMatch(/^([0-9a-f]{7}|développement)$/);

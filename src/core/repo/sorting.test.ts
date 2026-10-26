@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { LIFECYCLE_ORDER, HISTORY_ORDER, ScopingStatus } from "../model/model";
 
 /**
- * Deux ordres coexistent, et ce n'est pas une incohérence.
+ * Two orders coexist, and it is not an inconsistency.
  *
- * La liste des cadrages suit le cycle de vie — brouillon d'abord — parce qu'on
- * y cherche ce qui demande de l'attention. La chronologie d'une règle suit
- * l'ordre inverse, parce qu'on y remonte depuis l'état actuel.
+ * The list of scopings follows the lifecycle — drafts first — because one
+ * looks there for what needs attention. A rule's timeline follows the reverse
+ * order, because one goes back from the current state.
  */
 function sort(
   entries: Array<{ id: string; status: ScopingStatus }>,
@@ -22,8 +22,8 @@ function sort(
     .map((e) => e.id);
 }
 
-describe("ordre de la liste des cadrages", () => {
-  it("place les brouillons devant et les livrés en dernier", () => {
+describe("order of the scoping list", () => {
+  it("puts drafts first and delivered ones last", () => {
     const order = sort(
       [
         { id: "2026-001", status: "livree" },
@@ -37,7 +37,7 @@ describe("ordre de la liste des cadrages", () => {
     expect(order).toEqual(["2026-005", "2026-004", "2026-003", "2026-001"]);
   });
 
-  it("place le plus récent en tête à statut égal", () => {
+  it("puts the most recent first at equal status", () => {
     const order = sort(
       [
         { id: "2026-008", status: "livree" },
@@ -47,11 +47,11 @@ describe("ordre de la liste des cadrages", () => {
       LIFECYCLE_ORDER,
       false,
     );
-    // la séquence sur trois chiffres rend la comparaison textuelle correcte
+    // the three-digit sequence makes the textual comparison correct
     expect(order).toEqual(["2026-010", "2026-008", "2026-002"]);
   });
 
-  it("respecte le passage d’une année à l’autre", () => {
+  it("respects the passage from one year to the next", () => {
     const order = sort(
       [
         { id: "2026-012", status: "livree" },
@@ -64,8 +64,8 @@ describe("ordre de la liste des cadrages", () => {
   });
 });
 
-describe("ordre de la chronologie d’une règle", () => {
-  it("place les livrés en tête, du plus récent au plus ancien", () => {
+describe("order of a rule's timeline", () => {
+  it("puts delivered ones first, from most recent to oldest", () => {
     const order = sort(
       [
         { id: "2026-002", status: "livree" },
@@ -75,11 +75,11 @@ describe("ordre de la chronologie d’une règle", () => {
       HISTORY_ORDER,
       false,
     );
-    // on part de l'état actuel pour remonter vers l'origine de la règle
+    // we start from the current state and go back to the rule's origin
     expect(order).toEqual(["2026-006", "2026-002", "2026-009"]);
   });
 
-  it("est bien l’inverse du cycle de vie sur les statuts", () => {
+  it("is indeed the reverse of the lifecycle on statuses", () => {
     const statuses: ScopingStatus[] = [
       "brouillon",
       "en_relecture",

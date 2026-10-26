@@ -18,9 +18,9 @@ import { createAppRouter } from "../../router";
 import EditScopingPage from "./EditScopingPage.vue";
 
 /**
- * Le statut dans l'éditeur — RG-statuts-cadrage et RG-bascule-de-statut.
+ * The status in the editor — RG-statuts-cadrage and RG-bascule-de-statut.
  *
- * Le statut ne s'écrit plus dans le fichier : il se lit sur la demande de fusion. L'éditeur le lisait encore dans un champ `statut:` que plus aucun cadrage ne porte, et montrait donc « Brouillon » quoi qu'il en soit — avec, en face, une bascule vers la relecture même pour un cadrage déjà relu.
+ * The status is no longer written in the file: it is read on the pull request. The editor still read it from a `statut:` field that no scoping carries any more, and therefore showed « Brouillon » regardless — with, opposite, a toggle to review even for an already reviewed scoping.
  */
 
 const CONTENT = `---
@@ -75,7 +75,7 @@ function specification(scopings: Scoping[]): Specification {
   };
 }
 
-describe("Le statut dans l’éditeur", () => {
+describe("The status in the editor", () => {
   async function mountView(scopings: Scoping[]): Promise<VueWrapper> {
     provideHttpTesting();
     provide(AuthoringService, {
@@ -119,21 +119,21 @@ describe("Le statut dans l’éditeur", () => {
     );
   }
 
-  it("montre le statut que porte la demande de fusion", async () => {
+  it("shows the status the pull request carries", async () => {
     const el = await stable(await mountView([scoping("en_relecture")]));
 
     expect(displayedStatus(el)).toBe("En relecture");
     expect(toggles(el)).toEqual(["Brouillon"]);
   });
 
-  it("ne propose jamais « Validée », et laisse reprendre un cadrage validé", async () => {
+  it("never offers « Validée », and lets an approved scoping be resumed", async () => {
     const el = await stable(await mountView([scoping("validee")]));
 
     expect(displayedStatus(el)).toBe("Validée");
     expect(toggles(el)).toEqual(["Brouillon"]);
   });
 
-  it("suit le statut quand les branches finissent d’arriver", async () => {
+  it("follows the status when the branches finish arriving", async () => {
     const f = await mountView([]);
     let el = await stable(f);
     expect(displayedStatus(el)).toBe("Brouillon");

@@ -2,28 +2,28 @@
 import { computed, ref, watch } from "vue";
 
 /**
- * L'avatar de l'organisation (ou du compte) qui porte un dépôt.
+ * The avatar of the organisation (or account) that owns a repo.
  *
- * Servi par `avatars.githubusercontent.com`, qui n'est décompté d'aucun quota d'API : l'identité visuelle d'un dépôt ne coûte donc pas une des soixante requêtes horaires. `?s=` demande la taille juste, le CDN se chargeant du redimensionnement.
+ * Served by `avatars.githubusercontent.com`, which counts against no API quota: a repo's visual identity therefore does not cost one of the sixty hourly requests. `?s=` requests the right size, the CDN taking care of the resizing.
  *
- * Un avatar qui n'arrive pas — compte supprimé, réseau coupé, bloqueur — ne doit rien casser : le repli est une pastille portant l'initiale, de la même taille, pour que la liste ne se décale pas.
+ * An avatar that does not arrive — deleted account, network down, blocker — must break nothing: the fallback is a badge bearing the initial, of the same size, so that the list does not shift.
  */
 const props = withDefaults(
   defineProps<{
     owner: string;
-    /** Côté demandé au CDN, en pixels d'affichage. */
+    /** Side requested from the CDN, in display pixels. */
     size?: number;
   }>(),
   { size: 18 },
 );
 
 const url = computed(() => {
-  // Demander le double sur un écran dense coûte peu et évite un avatar flou ; au-delà de 3 le gain n'est plus visible.
+  // Requesting double on a dense screen costs little and avoids a blurry avatar; beyond 3 the gain is no longer visible.
   const side = Math.round(props.size * Math.min(devicePixelRatio || 1, 3));
   return `https://avatars.githubusercontent.com/${encodeURIComponent(props.owner)}?s=${side}`;
 });
 
-// L'échec appartient à une URL, pas au composant : changer de dépôt doit redonner sa chance à l'image plutôt que garder le repli du précédent.
+// Failure belongs to a URL, not to the component: switching repos must give the image another chance rather than keep the previous one's fallback.
 const failed = ref(false);
 watch(url, () => (failed.value = false));
 

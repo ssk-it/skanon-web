@@ -3,9 +3,9 @@ import { nextTick, ref, watch } from "vue";
 import { Z_PANEL, type Position } from "./overlay";
 
 /**
- * La liste d'options commune à `UiSelect` et `UiAutocompletion` : le panneau de `mat-select` et de `mat-autocomplete`, téléporté dans `body`. Interne au kit.
+ * The option list shared by `UiSelect` and `UiAutocomplete`: the panel of `mat-select` and `mat-autocomplete`, teleported into `body`. Internal to the kit.
  *
- * Le focus reste sur le contrôle qui l'a ouverte : l'option active se désigne par `aria-activedescendant`, et la souris choisit sans voler le focus (`mousedown.prevent`).
+ * Focus stays on the control that opened it: the active option is designated through `aria-activedescendant`, and the mouse chooses without stealing focus (`mousedown.prevent`).
  */
 const props = defineProps<{
   id: string;
@@ -25,7 +25,7 @@ const emit = defineEmits<{
 
 const list = ref<HTMLUListElement | null>(null);
 
-/** L'option active reste visible quand les flèches la font sortir du panneau. */
+/** The active option stays visible when the arrow keys move it out of the panel. */
 watch(
   () => props.active,
   async (i) => {

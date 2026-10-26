@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * Une icône de la police Material Symbols Outlined, embarquée par `main.ts`.
+ * An icon from the Material Symbols Outlined font, embedded by `main.ts`.
  *
- * `<UiIcone nom="search" />` rend `<span class="material-symbols-outlined">search</span>` : la ligature de la police fait du nom l'image. La boîte est celle de `mat-icon` — 24 px de côté (`src/styles.css`) ; une vue qui la veut plus petite redéfinit `font-size`, `width` et `height` sur `.material-symbols-outlined`, comme elle le faisait sur `mat-icon`.
+ * `<UiIcon name="search" />` renders `<span class="material-symbols-outlined">search</span>`: the font's ligature turns the name into the image. The box is `mat-icon`'s — 24 px square (`src/styles.css`); a view that wants it smaller redefines `font-size`, `width` and `height` on `.material-symbols-outlined`, as it did on `mat-icon`.
  *
- * Décorative, comme `mat-icon` : `aria-hidden` d'office. Un bouton qui n'a qu'une icône porte son nom par `aria-label`.
+ * Decorative, like `mat-icon`: `aria-hidden` by default. A button with only an icon carries its name through `aria-label`.
  */
 defineProps<{ name: string }>();
 </script>

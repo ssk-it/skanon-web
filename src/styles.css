@@ -1,9 +1,9 @@
 /*
- * Les jetons de style de Skanon, repris de `styles.scss` de SSK Canon.
+ * Skanon's style tokens, taken from SSK Canon's `styles.scss`.
  *
- * Les couleurs `--mat-sys-*` sont celles que Material 3 calcule pour la palette de SSK Canon — primaire `azure`, tertiaire `orange` —, relevées une à une dans le thème compilé par `mat.theme` (Angular Material 22). Seules y figurent celles que les vues et le kit emploient : les styles des composants portés les citent sous le même nom, et se copient tels quels.
+ * The `--mat-sys-*` colours are those Material 3 computes for SSK Canon's palette — primary `azure`, tertiary `orange` —, read one by one in the theme compiled by `mat.theme` (Angular Material 22). Only those the views and the kit use appear: the styles of ported components cite them under the same name, and are copied as is.
  *
- * Le thème sombre s'applique à deux sélecteurs : le système qui le demande, et le choix explicite qui l'impose (`data-theme`, posé par `ThemeService`). Le CSS n'a pas de mixin : le bloc est écrit deux fois, et `src/styles.test.ts` vérifie que les deux copies ne divergent pas.
+ * The dark theme applies to two selectors: the system that asks for it, and the explicit choice that imposes it (`data-theme`, set by `ThemeService`). CSS has no mixin: the block is written twice, and `src/styles.test.ts` checks that the two copies do not diverge.
  */
 
 :root {
@@ -37,10 +37,10 @@
     0px 1px 8px 0px rgba(0, 0, 0, 0.12);
 }
 
-/* Tokens propres au produit, en complément du thème Material. Les statuts et les opérations d'impact portent de l'information : leur couleur est sémantique, pas décorative. */
+/* Product-specific tokens, complementing the Material theme. Statuses and impact operations carry information: their colour is semantic, not decorative. */
 :root {
   --pc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* La mesure de lecture — RG-mesure-de-lecture : environ soixante-quinze caractères par ligne au corps du texte. Elle borne une colonne entière, titre compris, jamais le texte seul : voir la règle .md plus bas. */
+  /* The reading measure — RG-mesure-de-lecture: about seventy-five characters per line at body text size. It bounds a whole column, title included, never the text alone: see the .md rule further down. */
   --pc-mesure: 35rem;
 
   --pc-statut-brouillon: #5f6b7a;
@@ -71,7 +71,7 @@
   --pc-abroge-texte: #a03028;
 }
 
-/* Teintes de domaine : seules les clartés changent d'un thème à l'autre, la teinte elle-même étant calculée depuis le slug. En clair, une couleur soutenue sur un fond très pâle ; en sombre, l'inverse — une couleur claire sur un fond sourd, faute de quoi elle vibrerait. */
+/* Domain hues: only the lightnesses change from one theme to the other, the hue itself being computed from the slug. In light mode, a strong colour on a very pale background; in dark mode, the reverse — a light colour on a muted background, otherwise it would vibrate. */
 :root {
   --pc-domaine-l: 0.55;
   --pc-domaine-c: 0.13;
@@ -79,7 +79,7 @@
   --pc-domaine-bg-c: 0.03;
 }
 
-/* Thème sombre — première copie : le système le demande, et aucun choix n'impose le clair. */
+/* Dark theme — first copy: the system asks for it, and no choice imposes light. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="clair"]) {
     --mat-sys-primary: #abc7ff;
@@ -130,7 +130,7 @@
     --pc-abroge-bord: #5e2a25;
     --pc-abroge-texte: #ef8b81;
 
-    /* Sur fond sombre, la même teinte doit être plus claire et moins saturée pour garder son contraste sans éblouir. */
+    /* On a dark background, the same hue must be lighter and less saturated to keep its contrast without dazzling. */
     --pc-domaine-l: 0.78;
     --pc-domaine-c: 0.11;
     --pc-domaine-bg-l: 0.26;
@@ -138,7 +138,7 @@
   }
 }
 
-/* Thème sombre — seconde copie : le choix explicite gagne, y compris contre un système réglé en clair. */
+/* Dark theme — second copy: the explicit choice wins, including against a system set to light. */
 :root[data-theme="sombre"] {
   color-scheme: dark;
   --mat-sys-primary: #abc7ff;
@@ -189,7 +189,7 @@
   --pc-abroge-bord: #5e2a25;
   --pc-abroge-texte: #ef8b81;
 
-  /* Sur fond sombre, la même teinte doit être plus claire et moins saturée pour garder son contraste sans éblouir. */
+  /* On a dark background, the same hue must be lighter and less saturated to keep its contrast without dazzling. */
   --pc-domaine-l: 0.78;
   --pc-domaine-c: 0.11;
   --pc-domaine-bg-l: 0.26;
@@ -200,7 +200,7 @@
   color-scheme: light;
 }
 
-/* La police des icônes. `UiIcone` rend un `<span class="material-symbols-outlined">` : sans cette règle, il hériterait de la police du texte et afficherait le nom du symbole en toutes lettres. La boîte est celle de `mat-icon`, 24 px de côté. */
+/* The icon font. `UiIcon` renders a `<span class="material-symbols-outlined">`: without this rule, it would inherit the text font and show the symbol's name in full. The box is that of `mat-icon`, 24 px square. */
 .material-symbols-outlined {
   font-family: "Material Symbols Outlined", sans-serif;
   font-weight: normal;
@@ -233,7 +233,7 @@ body {
   margin: 0;
 }
 
-/* Une colonne, pour que la barre du bas reste au pied de l'écran quand la page est courte. */
+/* A column, so that the bottom bar stays at the foot of the screen when the page is short. */
 #app {
   display: flex;
   flex-direction: column;
@@ -246,7 +246,7 @@ body {
   color: var(--mat-sys-on-surface);
 }
 
-/* Rendu du Markdown des fiches. La mesure est celle du conteneur, jamais une largeur posée sur le texte : une borne en `ch` replie les paragraphes à mi-page sous un titre qui, lui, prend toute la largeur, et ce déséquilibre se lit comme du texte haché. C'est donc la colonne de chaque fiche qui est bornée, par `--pc-mesure`, titre compris (RG-mesure-de-lecture). Les diagrammes le sont avec elle, et s'agrandissent au clic. */
+/* Rendering of the pages' Markdown. The measure is the container's, never a width set on the text: a bound in `ch` wraps paragraphs at mid-page under a title that, for its part, takes the full width, and that imbalance reads like choppy text. So it is each page's column that is bounded, by `--pc-mesure`, title included (RG-mesure-de-lecture). Diagrams are bounded with it, and enlarge on click. */
 .md {
   line-height: 1.65;
 
@@ -340,7 +340,7 @@ body {
   }
 }
 
-/* Un diagramme agrandi, par-dessus la page. Global plutôt que porté par le composant : l'élément est ajouté au `body`, hors de la portée des styles d'un composant. */
+/* An enlarged diagram, over the page. Global rather than carried by the component: the element is added to the `body`, out of reach of a component's styles. */
 .pc-diagramme-agrandi {
   position: fixed;
   inset: 0;
@@ -363,14 +363,14 @@ body {
   background: var(--mat-sys-surface);
   cursor: default;
 
-  /* Une largeur explicite, parce que le SVG porte `width="100%"` : dans un conteneur dimensionné par son contenu, ce pourcentage se résout à zéro et le diagramme s'affiche sans jamais être visible. */
+  /* An explicit width, because the SVG carries `width="100%"`: in a container sized by its content, that percentage resolves to zero and the diagram is displayed without ever being visible. */
   width: min(92vw, 1400px);
   display: flex;
   align-items: center;
   justify-content: center;
 
   svg {
-    /* Le moteur pose aussi `max-width` sur le SVG : sans cela, le diagramme resterait à la largeur qui le rendait illisible. */
+    /* The engine also sets `max-width` on the SVG: without this, the diagram would stay at the width that made it unreadable. */
     max-width: none !important;
     width: 100%;
     height: auto;

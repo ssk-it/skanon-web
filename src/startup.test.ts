@@ -6,10 +6,10 @@ import { PLATFORM } from "./platform/platform-token";
 import { createWebPlatform } from "./platform/web";
 
 /**
- * Ce que la racine de composition d'un livrable remet au démarrage : sa plateforme et ses extensions (ADR-extensions-commerciales). L'interface commune ne choisit ni l'une ni les autres.
+ * What a deliverable's composition root hands over at startup: its platform and its extensions (ADR-extensions-commerciales). The shared interface chooses neither.
  */
-describe("fournirLaRacine", () => {
-  it("fournit la plateforme et la composition des extensions reçues", () => {
+describe("provideRoot", () => {
+  it("provides the platform and the composition of the received extensions", () => {
     const platform = createWebPlatform();
     provideRoot({
       platform,
@@ -21,7 +21,7 @@ describe("fournirLaRacine", () => {
     expect(inject(COMPOSITION).legalNotice.host).toBe("Un hébergeur.");
   });
 
-  it("refuse une composition fausse avant tout démarrage", () => {
+  it("refuses a wrong composition before any startup", () => {
     expect(() =>
       provideRoot({
         platform: createWebPlatform(),

@@ -1,17 +1,17 @@
 /**
- * Extrait la justification d'une option retenue : le texte introduit par
- * « **Retenue.** » en tête de son corps.
+ * Extracts the justification of a chosen option: the text introduced by
+ * « **Retenue.** » at the head of its body.
  *
- * Ce marqueur est une convention de rédaction, pas une garantie du format —
- * rien dans le parsing ne l'impose. L'extraction rend donc une chaîne vide
- * quand il manque, et l'appelant n'affiche rien plutôt qu'un texte pris au
- * hasard : mieux vaut une ligne absente qu'un « Pour — … » présenté comme la
- * raison du choix.
+ * This marker is an authoring convention, not a guarantee of the format —
+ * nothing in the parsing enforces it. The extraction therefore returns an empty
+ * string when it is missing, and the caller displays nothing rather than a text
+ * picked at random: better a missing line than a « Pour — … » presented as the
+ * reason for the choice.
  *
- * Le résultat est du texte nu, sur une ligne. Le panneau récapitulatif le pose
- * dans un espace étroit où le Markdown rendu — gras, listes, paragraphes —
- * pèserait plus qu'il n'apporterait ; le corps complet reste lisible dans la
- * fiche, à sa place.
+ * The result is plain text, on one line. The summary panel places it in a
+ * narrow space where rendered Markdown — bold, lists, paragraphs — would weigh
+ * more than it would bring; the full body stays readable on the scoping page,
+ * in its place.
  */
 export function extractJustification(body: string): string {
   const marker = /\*\*Retenue\.?\*\*\s*/;
@@ -20,15 +20,15 @@ export function extractJustification(body: string): string {
 
   const after = body.slice(departure).replace(marker, "");
 
-  // S'arrêter au premier argument : « Pour » et « Contre » pèsent le choix,
-  // ils ne l'énoncent pas.
+  // Stop at the first argument: « Pour » and « Contre » weigh the choice,
+  // they do not state it.
   const end = after.search(/\n\s*\n|\*\*(?:Pour|Contre)\b/);
   const raw = end === -1 ? after : after.slice(0, end);
 
   return normalizeText(raw);
 }
 
-/** Replie les retours à la ligne du Markdown et retire le balisage inline. */
+/** Folds Markdown line breaks and removes inline markup. */
 function normalizeText(raw: string): string {
   return raw
     .replace(/\*\*(.+?)\*\*/g, "$1")

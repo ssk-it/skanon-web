@@ -4,7 +4,7 @@ import vue from "eslint-plugin-vue";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-// Les seuils et leur raison : docs/clean-code.md, section « Ce que l'outillage fait respecter ». Ils sont bloquants : un avertissement que l'on peut fusionner malgré tout devient du bruit.
+// The thresholds and their reason: docs/clean-code.md, section "What the tooling enforces". They are blocking: a warning that can be merged anyway becomes noise.
 export default tseslint.config(
   {
     ignores: ["dist/", "dist-web/", "node_modules/"],
@@ -20,7 +20,7 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser } },
     rules: {
       "no-console": "error",
-      // Omettre un champ par décomposition (`const { corps, ...reste } = x`) est l'idiome du code hérité de SSK Canon pour retirer une clé sans muter : le reste est ce qui sert.
+      // Omitting a field by destructuring (`const { body, ...rest } = x`) is the idiom of the code inherited from SSK Canon for removing a key without mutating: the rest is what is used.
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
@@ -32,7 +32,7 @@ export default tseslint.config(
     },
   },
   {
-    // Les tests remplacent le stockage du navigateur par un dictionnaire, et affirment ce qu'ils viennent de vérifier : deux formes que les règles proscrivent à raison dans le code livré.
+    // Tests replace the browser storage with a dictionary, and assert what they have just checked: two forms the rules rightly forbid in shipped code.
     files: ["src/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-dynamic-delete": "off",
@@ -40,7 +40,7 @@ export default tseslint.config(
     },
   },
   {
-    // Les service workers de la version web (`tools/pwa/pwa.ts`) : leur portée globale est celle d'un worker, non d'une page.
+    // The service workers of the web version (`tools/pwa/pwa.ts`): their global scope is a worker's, not a page's.
     files: ["tools/pwa/*.js"],
     languageOptions: { globals: { ...globals.serviceworker } },
   },

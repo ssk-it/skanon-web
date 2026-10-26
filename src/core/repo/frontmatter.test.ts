@@ -7,7 +7,7 @@ import {
   extractSubsections,
 } from "./frontmatter";
 
-/** Lit un fichier dont on sait le frontmatter valide. */
+/** Reads a file whose frontmatter is known to be valid. */
 function read(text: string) {
   const r = splitFrontmatter(text);
   if (!r || isUnreadable(r)) throw new Error("frontmatter attendu valide");
@@ -15,10 +15,10 @@ function read(text: string) {
 }
 
 /**
- * Ces tests portent sur le format lui-même, pas sur du code d'infrastructure.
- * Le parseur existe en double — ici et dans `actions/src/parse.mjs` — et le
- * risque de divergence est identifié : ces cas sont ceux qui doivent se
- * comporter à l'identique des deux côtés.
+ * These tests are about the format itself, not about infrastructure code.
+ * The parser exists twice — here and in `actions/src/parse.mjs` — and the
+ * risk of divergence is identified: these cases are the ones that must
+ * behave identically on both sides.
  */
 describe("frontmatter", () => {
   const FILE = `---
@@ -43,54 +43,54 @@ Second énoncé, sur
 plusieurs lignes.
 `;
 
-  it("sépare le frontmatter du corps", () => {
+  it("separates the frontmatter from the body", () => {
     const r = read(FILE);
     expect(r.data["id"]).toBe("RG-exemple");
     expect(r.data["fonctionnalites"]).toEqual(["une", "deux"]);
     expect(r.body.startsWith("\n## Objectif")).toBe(true);
   });
 
-  it("retourne null sans frontmatter", () => {
+  it("returns null without frontmatter", () => {
     expect(splitFrontmatter("# Juste du markdown")).toBeNull();
   });
 
-  it("signale un YAML invalide plutôt que de le confondre avec une absence", () => {
-    // « absent » et « illisible » demandent deux corrections différentes, et
-    // seule la seconde peut dire où corriger
+  it("flags invalid YAML rather than confusing it with an absence", () => {
+    // "absent" and "unreadable" call for two different fixes, and
+    // only the second can say where to fix
     const r = splitFrontmatter("---\nid: [non fermé\n---\ncorps");
     expect(r).not.toBeNull();
     expect(isUnreadable(r)).toBe(true);
   });
 
-  it("situe la ligne fautive dans le fichier, pas dans le bloc", () => {
+  it("locates the faulty line in the file, not in the block", () => {
     const r = splitFrontmatter(
       "---\nid: x\ntitre: Un titre : deux-points\n---\ncorps",
     );
     expect(isUnreadable(r) && r.error).toContain("ligne 3");
   });
 
-  it("dit quoi faire d’un « : » non quoté, la faute la plus fréquente", () => {
+  it("says what to do about an unquoted « : », the most frequent fault", () => {
     const r = splitFrontmatter(
       "---\ntitre: Choisir : ceci ou cela\n---\ncorps",
     );
     expect(isUnreadable(r) && r.error).toContain("apostrophes");
   });
 
-  it("accepte les fins de ligne Windows", () => {
+  it("accepts Windows line endings", () => {
     expect(read("---\r\nid: x\r\n---\r\ncorps").data["id"]).toBe("x");
   });
 
-  it("extrait une section de niveau 2", () => {
+  it("extracts a level-2 section", () => {
     const { body } = read(FILE);
     expect(extractSection(body, "Objectif")).toBe("Le texte de l'objectif.");
   });
 
-  it("retourne une chaîne vide pour une section absente", () => {
+  it("returns an empty string for a missing section", () => {
     const { body } = read(FILE);
     expect(extractSection(body, "Parcours utilisateur")).toBe("");
   });
 
-  it("extrait les énoncés par identifiant de règle", () => {
+  it("extracts the statements by rule identifier", () => {
     const { body } = read(FILE);
     const e = extractStatements(body);
     expect([...e.keys()]).toEqual(["RG-premiere", "RG-seconde"]);
@@ -98,13 +98,13 @@ plusieurs lignes.
     expect(e.get("RG-seconde")).toBe("Second énoncé, sur\nplusieurs lignes.");
   });
 
-  it("gère un accent dans le titre de section", () => {
-    // « Énoncés » porte un accent : l'échappement de la regex doit tenir
+  it("handles an accent in the section heading", () => {
+    // « Énoncés » carries an accent: the regex escaping must hold
     const e = extractStatements("## Énoncés\n\n### RG-x\n\nTexte.\n");
     expect(e.get("RG-x")).toBe("Texte.");
   });
 
-  it("ne confond pas une section suivante avec un énoncé", () => {
+  it("does not confuse a following section with a statement", () => {
     const body =
       "## Énoncés\n\n### RG-a\n\nA.\n\n## Autre section\n\nPas un énoncé.\n";
     const e = extractStatements(body);
@@ -112,7 +112,7 @@ plusieurs lignes.
     expect(e.get("RG-a")).toBe("A.");
   });
 
-  it("découpe les options d’une décision", () => {
+  it("splits the options of a decision", () => {
     const body =
       "## Options\n\n### option-a\n\nPour A.\n\n### option-b\n\nPour B.\n";
     const o = extractSubsections(body, "Options");

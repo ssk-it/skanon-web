@@ -1,43 +1,43 @@
-# Code propre
+# Clean code
 
-Ce document gouverne l'intérieur d'une unité. Les frontières entre couches vivent dans [pratiques.md](pratiques.md#les-couches), le nommage dans [conventions.md](conventions.md).
+This document governs the inside of a unit. The boundaries between layers live in [practices.md](practices.md#layers), naming in [conventions.md](conventions.md).
 
-## Lisibilité
+## Readability
 
-**Un nom dit l'intention, et porte son unité.** `delaiSecondes`, `quotaRestant` ; jamais `tmp`, `data2`. Une valeur littérale qui décide de quelque chose se nomme : les deux files de `GithubClient` ne s'écrivent pas `new RateLimiter(6)` sans le commentaire qui dit pourquoi six.
+**A name states the intent, and carries its unit.** `delaySeconds`, `quotaRemaining`; never `tmp`, `data2`. A literal value that decides something is named: the two queues of `GithubClient` are not written `new RateLimiter(6)` without the comment that says why six.
 
-**Un effet de bord se voit depuis l'appel.** Le verbe le dit : `load` lit, `save` écrit, `find` rend `null`, `get` lève ([conventions.md](conventions.md#méthodes-et-fonctions)). Un `findCadrage` qui créerait le dossier absent est le défaut le plus coûteux, parce que personne ne relit le corps d'un accesseur.
+**A side effect is visible from the call.** The verb says it: `load` reads, `save` writes, `find` returns `null`, `get` throws ([conventions.md](conventions.md#methods-and-functions)). A `findScoping` that created the missing folder is the costliest defect, because nobody rereads the body of an accessor.
 
-**Pas de drapeau booléen.** `ouvrir(true)` ne dit rien sur le site d'appel. Deux fonctions, ou une valeur nommée — `CoffreDeJetons` a trois méthodes plutôt qu'une `ecrire(jetons, effacer?)`.
+**No boolean flag.** `open(true)` says nothing at the call site. Two functions, or a named value — `TokenVault` has three methods rather than one `write(tokens, erase?)`.
 
-**Sortir tôt plutôt qu'imbriquer.** `CoffreDuSysteme.saveJetons` traite le cas vide en tête, puis écrit.
+**Return early rather than nest.** The system vault's `saveTokens` handles the empty case first, then writes.
 
-## Conception
+## Design
 
-**Une seule raison de changer.** `plateforme/web.ts` change quand le navigateur change ; `core/` quand le produit change. Un service qui ferait les deux — lire un dépôt et ranger un jeton dans le stockage local — se découpe.
+**One reason to change.** `platform/web.ts` changes when the browser changes; `core/` when the product changes. A service that did both — reading a repo and putting a token in local storage — gets split.
 
-**Dépendre d'une abstraction.** Un service demande `inject(HttpClient)`, jamais `fetch` : c'est ce qui permet à un test de répondre par la doublure, et à la cible de changer de transport sans réécrire le service.
+**Depend on an abstraction.** A service asks for `inject(HttpClient)`, never `fetch`: that is what lets a test answer through the fake, and the target change transport without rewriting the service.
 
-**Ne pas généraliser avant le troisième cas.** Hors de la frontière avec le système, où le second cas — la doublure — existe dès le premier jour.
+**Do not generalise before the third case.** Except at the boundary with the system, where the second case — the fake — exists from day one.
 
 ## Refactoring
 
-**Le changement de forme ne se mêle jamais au changement de comportement.** Deux commits : d'abord la forme, tests inchangés ; puis le comportement. Le signe qu'on a mélangé : il a fallu changer un test dans un commit qui ne prétendait rien changer.
+**A change of form is never mixed with a change of behaviour.** Two commits: first the form, tests unchanged; then the behaviour. The sign that they were mixed: a test had to change in a commit that claimed to change nothing.
 
-**Le portage depuis SSK Canon est un changement de forme.** Un service porté garde ses tests, traduits sans en changer les attentes ; un défaut découvert en chemin se corrige dans un commit à part, qui le dit.
+**Porting from SSK Canon is a change of form.** A ported service keeps its tests, translated without changing their expectations; a defect found on the way is fixed in a separate commit, which says so.
 
-**La dette se nomme** par un commentaire `// Dette :` qui dit la raison et ce qui la lèvera.
+**Debt is named** by a `// Debt:` comment that states the reason and what will lift it.
 
-## Ce que l'outillage fait respecter
+## What the tooling enforces
 
-La configuration fait foi : `eslint.config.js` et `tsconfig.json`. Tout avertissement est bloquant en CI.
+The configuration is authoritative: `eslint.config.js` and `tsconfig.json`. Every warning blocks in CI.
 
-| Règle                                                        | Outil      | Pourquoi                                                 |
-| ------------------------------------------------------------ | ---------- | -------------------------------------------------------- |
-| Jeu `strict` de typescript-eslint, `flat/recommended` de Vue | ESLint     | Les pièges connus du langage et des gabarits             |
-| `no-console`                                                 | ESLint     | Une trace oubliée finit dans la console de l'utilisateur |
-| `strict`, `noUnusedLocals`, `noUnusedParameters`             | TypeScript | Le reste d'un chantier interrompu                        |
+| Rule                                                   | Tool       | Why                                              |
+| ------------------------------------------------------ | ---------- | ------------------------------------------------ |
+| typescript-eslint `strict` set, Vue `flat/recommended` | ESLint     | The known traps of the language and of templates |
+| `no-console`                                           | ESLint     | A forgotten trace ends up in the user's console  |
+| `strict`, `noUnusedLocals`, `noUnusedParameters`       | TypeScript | The leftovers of interrupted work                |
 
-Les seuils de complexité de l'interface — `complexity`, `max-depth`, `max-params` — se poseront sur le code porté, juste au-dessus de ce qu'il fait déjà, puis se resserreront. Aucun n'est configuré aujourd'hui.
+The interface's complexity thresholds — `complexity`, `max-depth`, `max-params` — will be set on the ported code, just above what it already does, then tightened. None is configured today.
 
-Toute exception porte sa raison sur la ligne qui la déclare.
+Every exception carries its reason on the line that declares it.

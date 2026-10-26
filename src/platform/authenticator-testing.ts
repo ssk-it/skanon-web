@@ -1,14 +1,14 @@
 import type { Authenticator, CreatedPasskey } from "./web-sealing";
 
 /**
- * Un authentificateur simulé : jsdom n'a pas WebAuthn. Comme une vraie passkey PRF, il rend pour une passkey et un sel donnés toujours les mêmes 32 octets, et d'autres pour une autre passkey.
+ * A simulated authenticator: jsdom has no WebAuthn. Like a real PRF passkey, for a given passkey and salt it always returns the same 32 bytes, and different ones for another passkey.
  */
 export class FakeAuthenticator implements Authenticator {
   possible = true;
-  /** Ce que la prochaine création rendra : la sortie dès la création, plus tard, ou jamais. */
+  /** What the next creation will return: the output at creation, later, or never. */
   prfAtCreation: "rendue" | "differee" | "absente" = "rendue";
   cancel = false;
-  /** Fait rendre la sortie d'une autre passkey, comme un trousseau qui aurait changé. */
+  /** Makes it return another passkey's output, like a keychain that has changed. */
   substitute = false;
   readonly secrets = new Map<string, Uint8Array>();
   creations = 0;

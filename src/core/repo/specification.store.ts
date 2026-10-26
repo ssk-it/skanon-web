@@ -41,8 +41,8 @@ const EMPTY: Specification = {
 };
 
 /**
- * L'état de l'application : le référentiel chargé, et les vues croisées que les
- * fichiers seuls ne donnent pas.
+ * The application's state: the loaded specification, and the cross views that
+ * files alone do not give.
  */
 export class SpecificationStore {
   private readonly loader = inject(RepoLoader);
@@ -54,14 +54,14 @@ export class SpecificationStore {
   readonly state = signal<LoadState>("vide");
 
   /**
-   * Présent quand le référentiel affiché est le dernier lu, le dépôt n'ayant pas
-   * répondu. Voir RG-dernier-etat-connu.
+   * Present when the displayed specification is the last one read, the repo
+   * having not responded. See RG-dernier-etat-connu.
    */
   readonly unconfirmed = signal<UnconfirmedState | null>(null);
 
   constructor() {
-    // Le réseau revenu, l'état se relit de lui-même : la marque n'a pas à
-    // attendre que le lecteur pense à recharger.
+    // Once the network is back, the state is read again by itself: the mark
+    // need not wait for the reader to think of reloading.
     if (typeof window !== "undefined") {
       window.addEventListener("online", () => {
         if (this.unconfirmed()) void this.loadSpecification();
@@ -71,11 +71,11 @@ export class SpecificationStore {
   readonly error = signal<string | null>(null);
 
   /**
-   * Vrai tant que les cadrages en cours se lisent sur leurs branches.
+   * True as long as scopings in progress are being read on their branches.
    *
-   * Leur lecture suit celle du référentiel, sans la bloquer : une vue qui les
-   * présente doit pouvoir dire qu'ils arrivent, plutôt que de laisser croire
-   * qu'il n'y en a aucun.
+   * Their read follows that of the specification, without blocking it: a view
+   * presenting them must be able to say they are coming, rather than let one
+   * believe there are none.
    */
   readonly loadingBranches = signal(false);
   readonly progression = signal<{ loadedCount: number; total: number } | null>(
@@ -85,7 +85,7 @@ export class SpecificationStore {
 
   readonly repoRef = this.config.repoRef;
 
-  // --- vues dérivées ---
+  // --- derived views ---
 
   readonly domains = computed(() =>
     [...this.specification().domains.values()].sort((a, b) =>
@@ -118,12 +118,12 @@ export class SpecificationStore {
   );
 
   /**
-   * Triés selon le cycle de vie, puis par identifiant décroissant.
+   * Sorted by lifecycle, then by descending identifier.
    *
-   * Brouillon d'abord, livrée en dernier : ce qui demande de l'attention passe
-   * devant ce qui fait déjà référence. À statut égal, le plus récent en tête —
-   * l'identifiant portant l'année et la séquence, il donne cet ordre sans
-   * qu'aucune date soit nécessaire, et reste stable là où un titre se reformule.
+   * Draft first, delivered last: what needs attention comes ahead of what is
+   * already a reference. At equal status, the most recent first — the
+   * identifier carrying the year and the sequence, it gives that order without
+   * any date being needed, and stays stable where a title gets reworded.
    */
   readonly scopings = computed(() =>
     [...this.specification().scopings.values()].sort((a, b) => {
@@ -132,17 +132,17 @@ export class SpecificationStore {
     }),
   );
 
-  /** Vrai si le dépôt existe mais ne porte encore aucun enregistrement. */
+  /** True if the repo exists but carries no record yet. */
   readonly emptyRepo = signal(false);
 
   /**
-   * Vrai si le dépôt est resté introuvable sous un jeton personnel.
+   * True if the repo remained not found under a personal token.
    *
-   * La plateforme répond ainsi, sans autre motif, à un jeton qui ne couvre pas
-   * le dépôt — le cas courant d'un jeton restreint à une sélection de dépôts.
-   * Il se répare dans les réglages du jeton, que l'écran d'erreur désigne alors.
-   * Pas sous un accès temporaire : celui-là ne se règle pas dans ses jetons,
-   * mais dans l'installation de l'application inscrite.
+   * The platform responds this way, with no other reason, to a token that does
+   * not cover the repo — the common case of a token restricted to a selection
+   * of repos. It is fixed in the token's settings, which the error screen then
+   * points to. Not under a temporary access: that one is not set in one's
+   * tokens, but in the installation of the registered application.
    */
   readonly tokenWithoutAccess = signal(false);
 
@@ -150,7 +150,7 @@ export class SpecificationStore {
     this.rules().filter((r) => r.status === "actif"),
   );
 
-  /** Les natures de lien que la saisie propose. Voir `unionTagsLiens`. */
+  /** The link kinds the input offers. See `unionLinkTags`. */
   readonly linkTags = computed(() =>
     unionLinkTags(
       this.specification().settings.linkTags,
@@ -158,12 +158,12 @@ export class SpecificationStore {
     ),
   );
 
-  /** Compte les cadrages non livrés — ce sur quoi on travaille en ce moment. */
+  /** Counts undelivered scopings — what is being worked on right now. */
   readonly scopingsInProgress = computed(() =>
     this.scopings().filter((c) => c.status !== "livree"),
   );
 
-  // --- accès unitaires ---
+  // --- single accessors ---
 
   findDomain(id: string) {
     return this.specification().domains.get(id) ?? null;
@@ -181,34 +181,34 @@ export class SpecificationStore {
     return this.specification().scopings.get(id) ?? null;
   }
 
-  // --- vues croisées : ce qui justifie l'outil ---
+  // --- cross views: what justifies the tool ---
 
-  /** Fonctionnalités rattachées à un domaine. */
+  /** Features attached to a domain. */
   listFeaturesByDomain(domainId: string) {
     return this.features().filter((f) => f.domains.includes(domainId));
   }
 
-  /** Règles rattachées à une fonctionnalité. */
+  /** Rules attached to a feature. */
   listRulesByFeature(featureId: string) {
     return this.rules().filter((r) => r.features.includes(featureId));
   }
 
   /**
-   * Cadrages rattachés à un domaine, dans l'ordre du cycle de vie.
+   * Scopings attached to a domain, in lifecycle order.
    *
-   * Le rattachement est celui que le cadrage déclare, non un lien reconstruit
-   * depuis ses impacts : un cadrage peut ne toucher aucune règle — décrire une
-   * architecture, par exemple — et concerner le domaine tout de même. Le
-   * déduire des impacts le ferait disparaître de la fiche du domaine qu'il
-   * documente, et rien ne signalerait l'absence.
+   * The attachment is the one the scoping declares, not a link rebuilt from
+   * its impacts: a scoping may touch no rule — describe an architecture, for
+   * example — and concern the domain all the same. Deriving it from impacts
+   * would make it disappear from the page of the domain it documents, and
+   * nothing would report the absence.
    */
   listScopingsByDomain(domainId: string) {
     return this.scopings().filter((c) => c.domains.includes(domainId));
   }
 
   /**
-   * Cadrages ayant déclaré un impact sur une règle, avec l'opération.
-   * C'est la remontée règle → décision, la promesse du produit.
+   * Scopings that declared an impact on a rule, with the operation.
+   * This is the rule → decision trace, the product's promise.
    */
   listScopingsImpactingRule(
     ruleId: string,
@@ -222,14 +222,14 @@ export class SpecificationStore {
   }
 
   /**
-   * Flux qui touchent un composant.
+   * Flows that touch a component.
    *
-   * Se calcule des documents eux-mêmes, jamais d'une liste tenue sur le
-   * composant : celle-ci serait fausse au premier flux ajouté, et son
-   * inexactitude ne se verrait pas — un composant n'a pas l'air incomplet.
+   * Computed from the documents themselves, never from a list kept on the
+   * component: that list would be wrong at the first added flow, and its
+   * inaccuracy would not show — a component does not look incomplete.
    *
-   * Restreint aux flux : un document de contexte cite lui aussi des composants,
-   * mais il les cite tous, et il noierait la vue qu'on est venu consulter.
+   * Restricted to flows: a context document cites components too, but it
+   * cites them all, and would drown the view one came to consult.
    */
   listFlowsByComponent(componentId: string) {
     return this.architecture().filter(
@@ -237,17 +237,17 @@ export class SpecificationStore {
     );
   }
 
-  /** Documents d'architecture d'une nature donnée. */
+  /** Architecture documents of a given kind. */
   listArchitectureByKind(kind: DocumentKind) {
     return this.architecture().filter((d) => d.kind === kind);
   }
 
   /**
-   * Cadrages ayant déclaré un impact sur une cible, quelle que soit sa nature.
+   * Scopings that declared an impact on a target, whatever its kind.
    *
-   * `nature` lève l'ambiguïté quand un même identifiant désigne une règle et
-   * une cible d'architecture : rien ne l'interdit, et c'est la nature qui les
-   * sépare, pas le nom.
+   * `kind` removes the ambiguity when the same identifier designates a rule and
+   * an architecture target: nothing forbids it, and it is the kind that tells
+   * them apart, not the name.
    */
   listScopingsImpactingTarget(
     targetId: string,
@@ -271,7 +271,7 @@ export class SpecificationStore {
     return this.specification().architecture.get(id) ?? null;
   }
 
-  /** Domaines auxquels une règle appartient, via ses fonctionnalités. */
+  /** Domains a rule belongs to, through its features. */
   listDomainsByRule(rule: Rule): string[] {
     const ids = new Set<string>();
     for (const featId of rule.features) {
@@ -282,25 +282,25 @@ export class SpecificationStore {
   }
 
   /**
-   * Cibles impactées par un cadrage, résolues, dans l'ordre de déclaration.
+   * Targets impacted by a scoping, resolved, in declaration order.
    *
-   * L'énoncé se retrouve par l'identifiant visé, quelle que soit la nature :
-   * lire `regle` laisserait sans énoncé tout impact d'architecture, dont ce
-   * champ est vide. L'énoncé existerait dans le cadrage sans être affiché nulle
-   * part — un défaut que rien ne signale, puisqu'une section absente ne se
-   * remarque pas.
+   * The statement is found through the targeted identifier, whatever the kind:
+   * reading `rule` would leave every architecture impact, whose field is empty,
+   * without a statement. The statement would exist in the scoping without being
+   * displayed anywhere — a defect nothing reports, since an absent section goes
+   * unnoticed.
    */
   listTargetsByScoping(scoping: Scoping) {
     return scoping.impacts.map((i) => ({
       impact: i,
-      /** La cible telle que le référentiel la porte, ou `null` si elle n'existe pas encore. */
+      /** The target as the specification carries it, or `null` if it does not exist yet. */
       target: this.findTarget(i),
-      /** Énoncé porté par ce cadrage — peut différer de l'énoncé courant. */
+      /** Statement carried by this scoping — may differ from the current statement. */
       statement: scoping.statements.get(i.target) ?? null,
     }));
   }
 
-  /** Ce qu'un impact vise, cherché dans la collection que sa nature désigne. */
+  /** What an impact targets, looked up in the collection its kind designates. */
   findTarget(
     impact: Impact,
   ): Rule | ArchitectureDecision | ArchitectureDocument | null {
@@ -314,17 +314,17 @@ export class SpecificationStore {
     }
   }
 
-  // --- dates de création, dérivées de l'historique Git ---
+  // --- creation dates, derived from Git history ---
 
   /**
-   * Dates de création par identifiant de cadrage.
+   * Creation dates by scoping identifier.
    *
-   * Chargées à la demande, jamais au chargement du référentiel : un appel par
-   * cadrage ferait payer à chaque visite un coût proportionnel au nombre de
-   * cadrages, sur un quota de soixante pour un lecteur non connecté.
+   * Loaded on demand, never when the specification loads: one call per
+   * scoping would make every visit pay a cost proportional to the number of
+   * scopings, on a quota of sixty for a reader not signed in.
    *
-   * Une entrée à `null` signifie « demandée mais indisponible » et ne sera pas
-   * redemandée ; une entrée absente signifie « pas encore demandée ».
+   * A `null` entry means « requested but unavailable » and will not be
+   * requested again; an absent entry means « not requested yet ».
    */
   private readonly dates = signal<ReadonlyMap<string, string | null>>(
     new Map(),
@@ -336,8 +336,8 @@ export class SpecificationStore {
   }
 
   /**
-   * Demande la date de création d'un cadrage si elle n'est pas déjà connue.
-   * Sans effet si elle l'est, ou si une demande est en vol.
+   * Requests a scoping's creation date if it is not already known.
+   * No effect if it is, or if a request is in flight.
    */
   async loadCreationDate(scopingId: string): Promise<void> {
     if (this.dates().has(scopingId) || this.inProgressForDate.has(scopingId))
@@ -354,17 +354,17 @@ export class SpecificationStore {
     }
   }
 
-  /** Demande les dates de plusieurs cadrages, en parallèle borné par le client. */
+  /** Requests the dates of several scopings, in parallel bounded by the client. */
   async loadCreationDates(ids: readonly string[]): Promise<void> {
     await Promise.all(ids.map((id) => this.loadCreationDate(id)));
   }
 
-  // --- chargement ---
+  // --- loading ---
 
-  /** Chargement en cours, s'il y en a un. Permet de l'attendre. */
+  /** Load in progress, if there is one. Allows waiting for it. */
   private pending: Promise<void> | null = null;
 
-  /** Attend la fin du chargement en cours, s'il y en a un. */
+  /** Waits for the end of the load in progress, if there is one. */
   async waitReady(): Promise<void> {
     await this.pending;
   }
@@ -375,12 +375,12 @@ export class SpecificationStore {
   }
 
   /**
-   * Ajoute au référentiel les cadrages portés par les demandes de fusion.
+   * Adds to the specification the scopings carried by pull requests.
    *
-   * Chaque branche est lue comme un référentiel entier, puis seuls ses cadrages
-   * sont retenus : la lecture n'est ainsi écrite qu'une fois, et une branche qui
-   * modifie aussi des règles ne trouble pas l'état courant, qui reste celui de
-   * la branche principale.
+   * Each branch is read as a whole specification, then only its scopings are
+   * kept: the read is thus written only once, and a branch that also modifies
+   * rules does not disturb the current state, which stays that of the main
+   * branch.
    */
   private async loadScopingsOnBranches(
     repoRef: RepoRef,
@@ -404,14 +404,14 @@ export class SpecificationStore {
     try {
       requests = await this.github.listOpenPullRequests(repoRef);
     } catch {
-      // Sans la liste des branches ouvertes, on ne sait pas ce que le cache
-      // doit garder : mieux vaut ne rien retirer.
+      // Without the list of open branches, we do not know what the cache must
+      // keep: better to remove nothing.
       return;
     }
 
-    // Les branches de cadrage sans demande de fusion : un cadrage commencé n'en
-    // a pas encore, et ne lire que les demandes le rendrait invisible avant sa
-    // première relecture (RG-cadrages-en-cours-visibles).
+    // Scoping branches without a pull request: a scoping just started has none
+    // yet, and reading only pull requests would make it invisible before its
+    // first review (RG-cadrages-en-cours-visibles).
     const byPullRequest = new Set(requests.map((d) => d.branch));
     const withoutPullRequest = (
       await this.github.listScopingBranches(repoRef)
@@ -438,12 +438,12 @@ export class SpecificationStore {
                 draft: request.draft,
                 approval: request.approval,
               }
-            : // Sans demande de fusion, le cadrage est en brouillon.
+            : // Without a pull request, the scoping is a draft.
               { branch, draft: true };
           const scopings = [...onBranch.specification.scopings.values()].map(
             (c) =>
-              // Le chargeur rend « livree » faute de savoir d'où il lit ; c'est
-              // ici qu'on le sait, et la provenance qui tranche.
+              // The loader returns « livree » for lack of knowing where it reads from;
+              // it is here that this is known, and the provenance that decides.
               ({ ...c, provenance, status: deriveStatus(provenance) }),
           );
           return {
@@ -452,8 +452,8 @@ export class SpecificationStore {
             fingerprints: onBranch.fingerprints,
           };
         } catch {
-          // Une branche illisible ne doit pas emporter les autres ni le
-          // référentiel : elle est simplement absente de la liste.
+          // An unreadable branch must not take down the others nor the
+          // specification: it is simply absent from the list.
           return {
             branch: branch,
             scopings: [],
@@ -463,15 +463,15 @@ export class SpecificationStore {
       }),
     );
 
-    // Une autre lecture a pu commencer entre-temps, sur ce dépôt ou un autre :
-    // ce qui suit ne vaut que pour celle qui a lancé ces branches.
+    // Another read may have started in the meantime, on this repo or another:
+    // what follows only holds for the one that started these branches.
     if (read !== this.reads) return;
 
     const current = this.specification();
     const merged = new Map(current.scopings);
     for (const c of batches.flatMap((l) => l.scopings)) {
-      // La branche principale fait foi : un cadrage qu'elle porte déjà est
-      // livré, et sa version de branche n'apporterait rien.
+      // The main branch is authoritative: a scoping it already carries is
+      // delivered, and its branch version would add nothing.
       if (!merged.has(c.id)) merged.set(c.id, c);
     }
 
@@ -479,8 +479,8 @@ export class SpecificationStore {
       this.specification.set({ ...current, scopings: merged });
     }
 
-    // Une branche dont tous les cadrages sont déjà livrés n'apporte rien au
-    // référentiel ; elle survit peut-être à une fusion, et se signale alors.
+    // A branch whose scopings are all already delivered adds nothing to the
+    // specification; it may outlive a merge, and is then reported.
     const withoutScopingInProgress = batches
       .filter(
         (l) =>
@@ -490,9 +490,9 @@ export class SpecificationStore {
       .map((l) => l.branch);
     await this.flagStaleBranches(repoRef, withoutScopingInProgress, read);
 
-    // Le cache suit le référentiel en vigueur : la branche principale et les
-    // branches ouvertes. Une branche illisible voit ce qu'elle a en propre
-    // retiré, et le redemande au chargement suivant (2026-043, décision 04).
+    // The cache follows the specification in force: the main branch and the
+    // open branches. An unreadable branch has what it holds of its own
+    // removed, and requests it again on the next load (2026-043, decision 04).
     const fingerprints = new Set(mainFingerprints);
     for (const l of batches)
       for (const e of l.fingerprints) fingerprints.add(e);
@@ -504,14 +504,14 @@ export class SpecificationStore {
   }
 
   /**
-   * Signale sur chaque cadrage livré les branches qui le portent encore
+   * Reports on each delivered scoping the branches that still carry it
    * (RG-branches-survivantes-signalees).
    *
-   * Une branche hérite de tous les cadrages livrés avant elle : c'est ce
-   * qu'elle a ajouté ou modifié depuis son départ qui dit quel cadrage est le
-   * sien, non son nom. Une branche fusionnée par un commit de fusion n'a plus
-   * rien en propre, et n'est donc pas signalée. Une comparaison qui échoue ne
-   * signale rien : le signalement informe, il n'est pas indispensable.
+   * A branch inherits every scoping delivered before it: it is what it has
+   * added or modified since it started that says which scoping is its own, not
+   * its name. A branch merged by a merge commit has nothing of its own left,
+   * and is therefore not reported. A comparison that fails reports nothing:
+   * the report informs, it is not essential.
    */
   private async flagStaleBranches(
     repoRef: RepoRef,
@@ -551,15 +551,15 @@ export class SpecificationStore {
     const scopings = new Map(current.scopings);
     for (const [id, stale] of byScoping) {
       const c = scopings.get(id);
-      // Seul un cadrage livré a des branches survivantes : celle d'un cadrage
-      // en cours est sa branche, tout simplement.
+      // Only a delivered scoping has stale branches: that of a scoping in
+      // progress is simply its branch.
       if (!c || c.provenance) continue;
       scopings.set(id, { ...c, staleBranches: stale.sort() });
     }
     this.specification.set({ ...current, scopings });
   }
 
-  /** Compte les lectures lancées, pour qu'une lecture dépassée n'agisse plus. */
+  /** Counts the reads started, so that a superseded read no longer acts. */
   private reads = 0;
 
   private async runLoad(repoRef?: RepoRef): Promise<void> {
@@ -567,10 +567,10 @@ export class SpecificationStore {
     if (repoRef) this.config.saveRepo(repoRef);
     const target = this.config.repoRef();
 
-    // Avant toute lecture : c'est ce qui décide quel jeton sera présenté. Un
-    // rédacteur travaillant sur plusieurs organisations en a un par
-    // organisation, et présenter celui d'une autre produirait « introuvable »
-    // sur un dépôt bien réel.
+    // Before any read: this is what decides which token will be presented. An
+    // author working across several organisations has one per organisation,
+    // and presenting another's would produce « introuvable » on a very real
+    // repo.
     this.tokens.targetRepo(target);
 
     this.state.set("chargement");
@@ -581,7 +581,7 @@ export class SpecificationStore {
     this.emptyRepo.set(false);
     this.tokenWithoutAccess.set(false);
     this.progression.set(null);
-    // les dates appartiennent au dépôt qu'on quitte
+    // the dates belong to the repo being left
     this.dates.set(new Map());
 
     try {
@@ -592,16 +592,16 @@ export class SpecificationStore {
         lastKnownState: true,
       });
       this.specification.set(result.specification);
-      // Dès la lecture du projet : un jeton qu'il exige protégé ne doit pas rester en clair le temps d'un autre geste (RG-protection-du-jeton-par-projet).
+      // As soon as the project is read: a token it requires protected must not stay in clear for the time of another action (RG-protection-du-jeton-par-projet).
       this.tokens.requireProtection(
         result.specification.settings.tokenProtection,
       );
       this.state.set("pret");
 
       if (result.unconfirmed) {
-        // Un état non confirmé se lit, ne s'écrit pas. Les branches ne sont pas
-        // lues : le dépôt qui n'a pas répondu pour la principale ne répondra
-        // pas davantage pour elles.
+        // An unconfirmed state is read, not written. Branches are not read: the
+        // repo that did not respond for the main branch will not respond for them
+        // either.
         this.unconfirmed.set(result.unconfirmed);
         this.github.writeSuspended.set(
           "Le dépôt ne répond pas : l’état affiché est le dernier lu, et rien ne " +
@@ -610,14 +610,14 @@ export class SpecificationStore {
         return;
       }
 
-      // Les cadrages en cours vivent sur les branches de leurs demandes de
-      // fusion, jamais sur la principale : sans cette lecture, l'outil ne
-      // montrerait que les cadrages terminés. Après coup et sans bloquer — le
-      // référentiel est déjà consultable, et ceci ne fait que le compléter.
+      // Scopings in progress live on the branches of their pull requests, never
+      // on the main one: without this read, the tool would only show finished
+      // scopings. Afterwards and without blocking — the specification is already
+      // readable, and this only completes it.
       void this.loadScopingsOnBranches(target, result.fingerprints, read);
-      // Mémorisé après coup, non à la demande : un dépôt qu'on n'a pas su
-      // charger n'a rien à faire dans la liste des projets ouverts. Cela couvre
-      // aussi celui d'ouverture, que personne n'a « changé ».
+      // Remembered afterwards, not on request: a repo that could not be loaded
+      // has no place in the list of open projects. This also covers the startup
+      // one, which nobody « changed ».
       this.config.rememberOpened(target);
     } catch (e) {
       this.specification.set(EMPTY);
@@ -626,8 +626,8 @@ export class SpecificationStore {
           ? e.message
           : "Le chargement du dépôt a échoué.",
       );
-      // Distingué des autres échecs : celui-ci se répare, et l'application sait
-      // comment. Voir AmorcageService.
+      // Distinguished from other failures: this one can be fixed, and the
+      // application knows how. See BootstrapService.
       this.emptyRepo.set(e instanceof GithubError && e.status === 409);
       this.tokenWithoutAccess.set(
         e instanceof GithubError &&
@@ -642,16 +642,17 @@ export class SpecificationStore {
 }
 
 /**
- * Les natures de lien à proposer : celles du projet, puis celles employées.
+ * The link kinds to offer: the project's, then those in use.
  *
- * La nature étant libre à la saisie, une valeur inventée une fois doit revenir
- * d'elle-même dans la liste, sans quoi chacun la retaperait — et « ticket-jira »
- * finirait par côtoyer « ticket_jira » sans que rien ne les rapproche. L'ordre
- * garde en tête ce que le projet a déclaré : ce sont ses natures de référence,
- * et les reléguer parmi les valeurs de circonstance les rendrait indistinctes.
+ * The kind being free at input, a value invented once must come back by
+ * itself in the list, otherwise everyone would retype it — and « ticket-jira »
+ * would end up next to « ticket_jira » with nothing bringing them together.
+ * The order keeps first what the project declared: those are its reference
+ * kinds, and relegating them among incidental values would make them
+ * indistinct.
  *
- * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
- * l'éprouver ne doit pas demander de construire un store.
+ * A free function rather than a method: it depends on no injection, and
+ * testing it must not require building a store.
  */
 export function unionLinkTags(
   declared: readonly string[],

@@ -2,13 +2,13 @@
 import { computed } from "vue";
 
 /**
- * L'indicateur d'attente circulaire : `mat-spinner`, indéterminé.
+ * The circular wait indicator: `mat-spinner`, indeterminate.
  *
  * ```vue
- * <UiSpinner :diametre="16" />
+ * <UiSpinner :diameter="16" />
  * ```
  *
- * Les proportions sont celles de Material : un trait du dixième du diamètre, sur un cercle de rayon `(diamètre − 10) / 2` dans une boîte de `diamètre − 10 + trait`.
+ * The proportions are Material's: a stroke a tenth of the diameter, on a circle of radius `(diameter − 10) / 2` in a box of `diameter − 10 + stroke`.
  */
 const props = withDefaults(defineProps<{ diameter?: number }>(), {
   diameter: 48,

@@ -1,11 +1,11 @@
-name: Contrôles
+name: Checks
 
 on:
   pull_request:
   push:
     branches: [main]
 
-# Runners de GitHub, et non les Mac de ssk-it comme ailleurs dans l'organisation : le dépôt est public, et une demande de fusion venue d'un fork exécute son code sur le runner. Un runner neuf à chaque job ne garde rien de ce qu'un tiers y a fait.
+# GitHub's runners, and not ssk-it's Macs as elsewhere in the organisation: the repo is public, and a pull request from a fork runs its code on the runner. A fresh runner for each job keeps nothing of what a third party did on it.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,12 +16,12 @@ permissions:
 
 jobs:
   interface:
-    name: Interface (types, lint, format, tests, build web)
+    name: Interface (types, lint, format, tests, web build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      # Lit la version dans `packageManager`.
+      # Reads the version from `packageManager`.
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
@@ -29,13 +29,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Installer les dépendances
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Types
         run: pnpm typecheck
 
-      # Pas de --fix : la CI constate, elle ne corrige pas.
+      # No --fix: CI observes, it does not correct.
       - name: Lint
         run: pnpm lint
 
@@ -45,11 +45,11 @@ jobs:
       - name: Tests
         run: pnpm test
 
-      - name: Build de la version web
+      - name: Build the web version
         run: pnpm exec vite build --mode web
 
   navigateur:
-    name: Navigateur (WebKit sans tête)
+    name: Browser (headless WebKit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -61,11 +61,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Installer les dépendances
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Installer WebKit et ses dépendances
+      - name: Install WebKit and its dependencies
         run: pnpm exec playwright install --with-deps webkit
 
-      - name: Tests du navigateur
+      - name: Browser tests
         run: pnpm test:browser

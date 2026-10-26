@@ -11,15 +11,15 @@ import { GithubClient, GithubError } from "../github/github-client";
 import { TokenService } from "../github/token.service";
 
 /**
- * Chaque ouverture relisait tout : l'arborescence, puis chaque fichier, puis
- * chaque branche de cadrage, relue en entier. Sur un dépôt privé, chaque
- * fichier est un appel décompté — mesuré sur `ssk-canon`, environ huit cent
- * trente par ouverture. Voir le cadrage 2026-043.
+ * Each opening re-read everything: the tree, then each file, then
+ * each scoping branch, re-read in full. On a private repo, each
+ * file is a counted call — measured on `ssk-canon`, about eight hundred
+ * and thirty per opening. See scoping 2026-043.
  *
- * Chaque cas joue plusieurs visites sur le même stockage : `nouvelleVisite`
- * reconstruit l'application, sans la mémoire de l'onglet précédent.
+ * Each case plays several visits on the same storage: `newVisit`
+ * rebuilds the application, without the previous tab's memory.
  */
-describe("cache des contenus au chargement", () => {
+describe("content cache on loading", () => {
   const REPO = { owner: "org", repo: "projet" };
   const API = "https://api.github.com/repos/org/projet";
   const RAW = "https://raw.githubusercontent.com/org/projet";
@@ -51,7 +51,7 @@ describe("cache des contenus au chargement", () => {
     );
   }
 
-  /** Laisse tourner les files d'attente et le stockage avant la suite. */
+  /** Lets the queues and storage run before going on. */
   async function waitFor(): Promise<void> {
     for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
   }
@@ -68,7 +68,7 @@ describe("cache des contenus au chargement", () => {
     factory = new IDBFactory();
   });
 
-  it("ne redemande pas, à la visite suivante, un fichier que le poste détient", async () => {
+  it("does not request again, on the next visit, a file the machine holds", async () => {
     let loader = newVisit();
     let read = readAll(loader);
     tree("c1", { "rules/RG-a.md": "a1", "rules/RG-b.md": "b1" });
@@ -77,7 +77,7 @@ describe("cache des contenus au chargement", () => {
     http.expectOne(`${RAW}/c1/rules/RG-b.md`).flush(RULE("RG-b"));
     await read;
 
-    // Un commit plus tard, seule RG-b a changé.
+    // One commit later, only RG-b has changed.
     loader = newVisit();
     read = readAll(loader);
     tree("c2", { "rules/RG-a.md": "a1", "rules/RG-b.md": "b2" });
@@ -93,7 +93,7 @@ describe("cache des contenus au chargement", () => {
     http.verify();
   });
 
-  it("partage le cache entre la branche principale et une branche de cadrage", async () => {
+  it("shares the cache between the default branch and a scoping branch", async () => {
     const loader = newVisit();
     const main = readAll(loader);
     tree("c1", { "rules/RG-a.md": "a1" });
@@ -112,7 +112,7 @@ describe("cache des contenus au chargement", () => {
       "cadrage-2026-001",
     );
     await waitFor();
-    // Seul ce que la branche a en propre est demandé.
+    // Only what the branch has of its own is requested.
     http
       .expectOne(`${RAW}/c9/cadrages/2026-001/cadrage.md`)
       .flush("---\nid: 2026-001\ntitre: Un cadrage\n---\n");
@@ -122,11 +122,11 @@ describe("cache des contenus au chargement", () => {
     http.verify();
   });
 
-  it("demande l’arborescence sous condition quand l’utilisateur est connecté", async () => {
+  it("requests the tree conditionally when the user is signed in", async () => {
     let loader = newVisit();
     inject(TokenService).set("ghp_jetonDeTestSuffisammentLong");
     let read = readAll(loader);
-    // Connecté, l'état connu est consulté avant que l'arborescence parte.
+    // Signed in, the known state is consulted before the tree request goes out.
     await waitFor();
     tree("c1", { "rules/RG-a.md": "a1" });
     await waitFor();
@@ -139,7 +139,7 @@ describe("cache des contenus au chargement", () => {
     await waitFor();
     const conditional = http.expectOne(`${API}/git/trees/HEAD?recursive=1`);
     expect(conditional.request.headers.get("If-None-Match")).toBe('"c1"');
-    // Inchangée : la plateforme ne décompte rien, et rien d'autre n'est demandé.
+    // Unchanged: the platform counts nothing, and nothing else is requested.
     conditional.flush(null, { status: 304, statusText: "Not Modified" });
     const result = await read;
 
@@ -148,7 +148,7 @@ describe("cache des contenus au chargement", () => {
     http.verify();
   });
 
-  it("ne pose pas de condition sans connexion, où elle serait décomptée quand même", async () => {
+  it("sets no condition when signed out, where it would be counted anyway", async () => {
     let loader = newVisit();
     let read = readAll(loader);
     tree("c1", { "rules/RG-a.md": "a1" });
@@ -170,7 +170,7 @@ describe("cache des contenus au chargement", () => {
     http.verify();
   });
 
-  it("montre le dernier état lu, daté et marqué, quand le dépôt ne répond pas", async () => {
+  it("shows the last read state, dated and marked, when the repo does not answer", async () => {
     let loader = newVisit();
     let read = readAll(loader);
     tree("c1", { "rules/RG-a.md": "a1" });
@@ -192,7 +192,7 @@ describe("cache des contenus au chargement", () => {
     http.verify();
   });
 
-  it("échoue plutôt que de fonder une lecture faite pour écrire sur un état non confirmé", async () => {
+  it("fails rather than base a read made for writing on an unconfirmed state", async () => {
     let loader = newVisit();
     const read = readAll(loader);
     tree("c1", { "rules/RG-a.md": "a1" });
@@ -209,7 +209,7 @@ describe("cache des contenus au chargement", () => {
     await expect(failure).rejects.toBeInstanceOf(GithubError);
   });
 
-  it("efface ce qu’il détient d’un dépôt dont la plateforme refuse l’accès", async () => {
+  it("erases what it holds of a repo the platform refuses access to", async () => {
     let loader = newVisit();
     let read = readAll(loader);
     tree("c1", { "rules/RG-a.md": "a1" });
@@ -228,7 +228,7 @@ describe("cache des contenus au chargement", () => {
       );
     await expect(read).rejects.toBeInstanceOf(GithubError);
 
-    // Ni dernier état connu, ni contenu : tout est redemandé.
+    // Neither last known state nor content: everything is requested again.
     loader = newVisit();
     read = readAll(loader);
     await waitFor();
@@ -246,7 +246,7 @@ describe("cache des contenus au chargement", () => {
     http.verify();
   });
 
-  it("ne garde pas au-delà de l’onglet un dépôt privé lu sous un accès temporaire", async () => {
+  it("does not keep beyond the tab a private repo read under a temporary access", async () => {
     const readPrivate = async () => {
       const loader = newVisit();
       inject(TokenService).setAccess({
@@ -256,7 +256,7 @@ describe("cache des contenus au chargement", () => {
         identity: { identifier: "u", name: "U", email: null },
       });
       inject(GithubClient).useApiForContents(true);
-      // Enveloppé : rendre la promesse elle-même la ferait attendre ici.
+      // Wrapped: returning the promise itself would make it wait here.
       const inProgress = { read: readAll(loader) };
       await waitFor();
       return inProgress;
@@ -269,7 +269,7 @@ describe("cache des contenus au chargement", () => {
     await read;
 
     ({ read: read } = await readPrivate());
-    // Ni état connu, donc pas de condition ; ni contenu, donc redemandé.
+    // No known state, hence no condition; no content, hence requested again.
     const query = http.expectOne(`${API}/git/trees/HEAD?recursive=1`);
     expect(query.request.headers.has("If-None-Match")).toBe(false);
     query.flush({

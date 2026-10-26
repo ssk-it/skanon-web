@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * La barre de progression : `mat-progress-bar`.
+ * The progress bar: `mat-progress-bar`.
  *
  * ```vue
- * <UiBarreProgression />                 <!-- indéterminée -->
- * <UiBarreProgression :valeur="42" />    <!-- déterminée, en pour cent -->
+ * <UiProgressBar />                 <!-- indeterminate -->
+ * <UiProgressBar :value="42" />     <!-- determinate, in percent -->
  * ```
  *
- * Sans `valeur`, elle est indéterminée : l'avancement n'est pas connu, seule l'activité l'est.
+ * Without `value`, it is indeterminate: progress is not known, only activity is.
  */
 defineProps<{ value?: number | null }>();
 </script>

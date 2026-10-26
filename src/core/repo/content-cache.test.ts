@@ -6,10 +6,10 @@ import { ContentCache, KnownState, INDEXEDDB_FACTORY } from "./content-cache";
 /**
  * RG-contenus-par-empreinte, RG-contenus-prives-au-repos.
  *
- * Chaque cas ouvre deux instances sur le même stockage : la seconde joue la
- * visite suivante, qui n'a plus la mémoire de l'onglet.
+ * Each case opens two instances on the same storage: the second plays the
+ * next visit, which no longer has the tab's memory.
  */
-describe("cache des contenus", () => {
+describe("content cache", () => {
   const PUBLIC = { owner: "Org", repo: "Public" };
   const PRIVATE = { owner: "org", repo: "prive" };
   const ELSEWHERE = { owner: "autre", repo: "prive" };
@@ -37,8 +37,8 @@ describe("cache des contenus", () => {
     factory = new IDBFactory();
   });
 
-  // Les enregistrements de la version 2 portaient des champs aux noms français (`depot`, `contenu`, `prive`) : relus sous les nouveaux noms, ils rendraient des champs absents. Un cache se reconstruit ; on repart de zéro.
-  it("repart d'un cache vide sur un poste passé par la version 2", async () => {
+  // Version 2 records carried fields with French names (`depot`, `contenu`, `prive`): read back under the new names, they would return missing fields. A cache can be rebuilt; start from scratch.
+  it("starts from an empty cache on a machine that went through version 2", async () => {
     await new Promise<void>((resolve, reject) => {
       const request = factory!.open("ssk-canon.cache", 2);
       request.onupgradeneeded = () => {
@@ -74,7 +74,7 @@ describe("cache des contenus", () => {
     expect(await newVisit().loadContent(PUBLIC, "a1")).toBe("un énoncé");
   });
 
-  it("resservit un contenu à la visite suivante, sous son empreinte", async () => {
+  it("serves a content again on the next visit, under its fingerprint", async () => {
     await newVisit().saveContent(PUBLIC, "a1", "un énoncé", {
       private: false,
       persist: true,
@@ -85,7 +85,7 @@ describe("cache des contenus", () => {
     expect(await next.loadContent(PUBLIC, "b2")).toBeNull();
   });
 
-  it("ne confond pas deux dépôts, quelle que soit la casse du nom", async () => {
+  it("does not confuse two repos, whatever the case of the name", async () => {
     const cache = newVisit();
     await cache.saveContent(PUBLIC, "a1", "public", {
       private: false,
@@ -98,7 +98,7 @@ describe("cache des contenus", () => {
     expect(await newVisit().loadContent(PRIVATE, "a1")).toBeNull();
   });
 
-  it("garde en mémoire seulement ce qui ne doit pas survivre à la session", async () => {
+  it("keeps in memory only what must not outlive the session", async () => {
     const cache = newVisit();
     await cache.saveContent(PRIVATE, "a1", "secret", {
       private: true,
@@ -109,7 +109,7 @@ describe("cache des contenus", () => {
     expect(await newVisit().loadContent(PRIVATE, "a1")).toBeNull();
   });
 
-  it("conserve le dernier état lu de chaque branche", async () => {
+  it("keeps the last read state of each branch", async () => {
     await newVisit().saveState(PUBLIC, "HEAD", state(false), {
       persist: true,
     });
@@ -120,7 +120,7 @@ describe("cache des contenus", () => {
     expect(await newVisit().loadState(PUBLIC, "cadrage-2026-001")).toBeNull();
   });
 
-  it("retire ce qu’aucune arborescence lue ne cite plus, et les branches fermées", async () => {
+  it("removes what no read tree cites any more, and closed branches", async () => {
     const cache = newVisit();
     for (const sha of ["a1", "b2", "c3"]) {
       await cache.saveContent(PUBLIC, sha, sha, {
@@ -148,7 +148,7 @@ describe("cache des contenus", () => {
     }
   });
 
-  it("efface les dépôts privés qu’un accès retiré couvrait, et eux seuls", async () => {
+  it("erases the private repos a removed access covered, and only them", async () => {
     const cache = newVisit();
     await cache.saveContent(PUBLIC, "a1", "public", {
       private: false,
@@ -176,7 +176,7 @@ describe("cache des contenus", () => {
     }
   });
 
-  it("efface tout un dépôt quand la plateforme en refuse l’accès", async () => {
+  it("erases a whole repo when the platform refuses access to it", async () => {
     const cache = newVisit();
     await cache.saveContent(PRIVATE, "a1", "privé", {
       private: true,
@@ -190,7 +190,7 @@ describe("cache des contenus", () => {
     expect(await newVisit().loadState(PRIVATE, "HEAD")).toBeNull();
   });
 
-  it("fonctionne sans stockage, le temps de l’onglet", async () => {
+  it("works without storage, for the lifetime of the tab", async () => {
     factory = null;
     const cache = newVisit();
     await cache.saveContent(PUBLIC, "a1", "mémoire", {
