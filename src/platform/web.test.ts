@@ -39,7 +39,7 @@ class FakeContainer extends EventTarget {
 }
 
 async function create(container: FakeContainer) {
-  const announcer = new ServiceWorkerAnnouncer(
+  const announcer = ServiceWorkerAnnouncer.register(
     container as unknown as ServiceWorkerContainer,
   );
   const announcements: VersionAnnouncement[] = [];
@@ -50,7 +50,7 @@ async function create(container: FakeContainer) {
 
 describe("ServiceWorkerAnnouncer", () => {
   it("is not active without a service worker", () => {
-    expect(new ServiceWorkerAnnouncer(undefined).active).toBe(false);
+    expect(ServiceWorkerAnnouncer.register(undefined).active).toBe(false);
   });
 
   it("registers Skanon's service worker over the whole application", async () => {

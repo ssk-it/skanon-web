@@ -1,4 +1,5 @@
 import { inject } from "../injection";
+import { trimTrailing } from "../text";
 import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { SpecificationStore } from "./specification.store";
 import { RepoLoader } from "./repo-loader";
@@ -330,7 +331,9 @@ export function serializeScoping(id: string, c: EditableScoping): string {
     "",
   ]);
 
-  return (
+  // A single final blank line: without that the file gains one at each
+  // save, and the difference ends up showing in history.
+  return `${trimTrailing(
     [
       "---",
       `id: ${id}`,
@@ -358,12 +361,9 @@ export function serializeScoping(id: string, c: EditableScoping): string {
       // would require remembering their order, whereas preserving them is enough to
       // lose nothing.
       ...(c.unknownSections?.trim() ? [c.unknownSections.trim(), ""] : []),
-    ]
-      .join("\n")
-      // A single final blank line: without that the file gains one at each
-      // save, and the difference ends up showing in history.
-      .replace(/\n+$/, "\n")
-  );
+    ].join("\n"),
+    "\n",
+  )}\n`;
 }
 
 /**

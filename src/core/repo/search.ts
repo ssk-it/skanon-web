@@ -84,7 +84,7 @@ function normalize(text: string): string {
 function toPlainText(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/!?\[([^[\]]*)\]\([^)]*\)/g, "$1")
     .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
     .replace(/\*\*|__|`/g, "")
     .replace(/\s+/g, " ")

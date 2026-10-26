@@ -121,7 +121,7 @@ export function extractFreeSections(
   const set = new Set(known.map(normalized));
 
   const sections: MiscSection[] = [];
-  const re = /^##[ \t]+(.+?)[ \t]*$([\s\S]*?)(?=^##[ \t]|$(?![\s\S]))/gm;
+  const re = /^##[ \t]+(.+)$([\s\S]*?)(?=^##[ \t]|$(?![\s\S]))/gm;
   for (const m of body.matchAll(re)) {
     if (!set.has(normalized(m[1]))) {
       sections.push({ title: m[1].trim(), body: m[2].trim() });
@@ -175,7 +175,7 @@ export function extractSubsections(
   const out = new Map<string, string>();
   if (!section) return out;
 
-  const re = /^###[ \t]+(.+?)[ \t]*$([\s\S]*?)(?=^###[ \t]|$(?![\s\S]))/gm;
+  const re = /^###[ \t]+(.+)$([\s\S]*?)(?=^###[ \t]|$(?![\s\S]))/gm;
   for (const m of section.matchAll(re)) out.set(m[1].trim(), m[2].trim());
   return out;
 }

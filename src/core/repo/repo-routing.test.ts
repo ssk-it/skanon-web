@@ -56,7 +56,7 @@ describe("Addressing by repo", () => {
 
     // Fifty-eight reads on every view change would be paid for by the quota:
     // the repo has not changed, there is nothing to read again.
-    httpMock.expectNone((r) => r.url.includes("/git/trees/"));
+    expect(httpMock.match((r) => r.url.includes("/git/trees/"))).toEqual([]);
   });
 
   it("prefixes internal links with the open repo", () => {
