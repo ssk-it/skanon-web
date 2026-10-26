@@ -8,9 +8,9 @@ export interface SelectOption<V> {
 
 <script setup lang="ts" generic="T">
 import { computed, nextTick, ref, useId } from "vue";
-import UiFieldFrame from "./UiCadreChamp.vue";
-import UiOptionList from "./UiListeOptions.vue";
-import { placeBelow, useOverlay, type Position } from "./superposition";
+import UiFieldFrame from "./UiFieldFrame.vue";
+import UiOptionList from "./UiOptionList.vue";
+import { placeBelow, useOverlay, type Position } from "./overlay";
 
 /**
  * Une liste de choix : `mat-form-field appearance="outline"` et son `mat-select`.

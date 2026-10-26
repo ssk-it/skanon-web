@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId } from "vue";
-import UiIcon from "./UiIcone.vue";
-import {
-  Z_PANEL,
-  placeBelow,
-  useOverlay,
-  type Position,
-} from "./superposition";
+import UiIcon from "./UiIcon.vue";
+import { Z_PANEL, placeBelow, useOverlay, type Position } from "./overlay";
 
 /** Une entrée du menu. */
 export interface MenuAction {

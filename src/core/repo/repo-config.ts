@@ -1,4 +1,4 @@
-import { signal } from "../signaux";
+import { signal } from "../signals";
 import { RepoRef } from "../github/github-client";
 
 const KEY = "ssk-canon.depot";

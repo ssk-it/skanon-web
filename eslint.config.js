@@ -40,12 +40,12 @@ export default tseslint.config(
     },
   },
   {
-    // Les service workers de la version web (`outils/pwa/pwa.ts`) : leur portée globale est celle d'un worker, non d'une page.
-    files: ["outils/pwa/*.js"],
+    // Les service workers de la version web (`tools/pwa/pwa.ts`) : leur portée globale est celle d'un worker, non d'une page.
+    files: ["tools/pwa/*.js"],
     languageOptions: { globals: { ...globals.serviceworker } },
   },
   {
-    files: ["outils/**/*.mjs", "outils/**/*.ts", "*.config.*"],
+    files: ["tools/**/*.mjs", "tools/**/*.ts", "*.config.*"],
     languageOptions: { globals: { ...globals.node } },
     rules: { "no-console": "off" },
   },

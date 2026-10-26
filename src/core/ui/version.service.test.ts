@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PLATFORM } from "../../plateforme/jeton";
-import type {
-  VersionAnnouncement,
-  NoVersionCause,
-} from "../../plateforme/ports";
-import { createWebPlatform } from "../../plateforme/web";
+import { PLATFORM } from "../../platform/platform-token";
+import type { VersionAnnouncement, NoVersionCause } from "../../platform/ports";
+import { createWebPlatform } from "../../platform/web";
 import { inject, provide, resetInjection } from "../injection";
 import {
   CHECK_INTERVAL,

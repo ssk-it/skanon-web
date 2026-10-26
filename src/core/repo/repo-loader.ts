@@ -7,7 +7,7 @@ import {
   TreeEntry,
 } from "../github/github-client";
 import { TokenService } from "../github/token.service";
-import { ContentCache, KnownState } from "./contenus-cache";
+import { ContentCache, KnownState } from "./content-cache";
 import {
   splitFrontmatter,
   isUnreadable,

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createMemoryHistory } from "vue-router";
 import App from "./App.vue";
-import { signal } from "./core/signaux";
+import { signal } from "./core/signals";
 import { COMPOSITION, compose } from "./extension/composer";
 import { TokenService } from "./core/github/token.service";
 import {
@@ -11,12 +11,12 @@ import {
   type HttpTestingController,
 } from "./core/http/http-testing";
 import { inject, provide } from "./core/injection";
-import { SpecificationStore } from "./core/repo/referentiel.store";
+import { SpecificationStore } from "./core/repo/specification.store";
 import { RELOAD_PAGE } from "./core/ui/version.service";
-import { PLATFORM } from "./plateforme/jeton";
-import type { VersionAnnouncement } from "./plateforme/ports";
-import { createWebPlatform } from "./plateforme/web";
-import { createAppRouter } from "./routeur";
+import { PLATFORM } from "./platform/platform-token";
+import type { VersionAnnouncement } from "./platform/ports";
+import { createWebPlatform } from "./platform/web";
+import { createAppRouter } from "./router";
 
 /**
  * Le chargement est déclenché par le garde de route, non par la barre : c'est l'adresse qui dit quel dépôt ouvrir. Ces cas visent donc le store, appelé comme le garde l'appelle.

@@ -4,7 +4,7 @@ import vue from "@vitejs/plugin-vue";
 import { playwright } from "@vitest/browser-playwright";
 import { execFileSync } from "node:child_process";
 import process from "node:process";
-import { pwa } from "./outils/pwa/pwa";
+import { pwa } from "./tools/pwa/pwa";
 
 /**
  * Le commit construit, que la barre du bas affiche comme version du site. Celui de GitHub Actions d'abord, qui désigne ce qu'on a demandé de déployer ; sinon celui de la copie de travail. Une construction hors d'un dépôt n'a pas de version à dire, et ne doit pas échouer pour autant.
@@ -54,7 +54,7 @@ export default defineConfig({
           name: "jsdom",
           environment: "jsdom",
           include: ["src/**/*.test.ts"],
-          exclude: ["src/**/*.navigateur.test.ts"],
+          exclude: ["src/**/*.browser.test.ts"],
           setupFiles: ["src/test-setup.ts"],
           // Le premier test d'un fichier paie l'import à froid de ce qu'il monte — une page, ses routes, parfois Mermaid —, et la suite tourne en parallèle : sous cette charge, ce premier import dépassait les 5 s par défaut (constaté une fois sur dix). Un test lent pour une autre raison reste borné.
           testTimeout: 15_000,
@@ -66,8 +66,8 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          name: "navigateur",
-          include: ["src/**/*.navigateur.test.ts"],
+          name: "browser",
+          include: ["src/**/*.browser.test.ts"],
           api: { strictPort: false },
           browser: {
             enabled: true,

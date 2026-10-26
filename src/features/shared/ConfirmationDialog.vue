@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import UiButton from "../../ui/UiBouton.vue";
-import UiDialog from "../../ui/UiDialogue.vue";
+import UiButton from "../../ui/UiButton.vue";
+import UiDialog from "../../ui/UiDialog.vue";
 
 /** Ce que l'écran demande, et sous quel libellé il l'engage. */
 export interface ConfirmationRequest {
