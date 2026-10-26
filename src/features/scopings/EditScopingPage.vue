@@ -295,7 +295,7 @@ const problems = computed(() => {
           .map((i) => [i.target.trim(), i.statement.trim()]),
       ),
     },
-    // The specification of the edited branch: that is where the domain and rules this scoping creates live. Its errors keep the checker's wording, the same as the pull request's check.
+    // The specification of the edited branch: that is where the domain and rules this scoping creates live. Its errors are the checker's, the same anomalies as the pull request's check, said by the library in the displayed language.
     context.value ?? undefined,
   );
 

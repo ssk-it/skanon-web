@@ -2,6 +2,7 @@ import {
   HttpTestingController,
   provideHttpTesting,
 } from "../http/http-testing";
+import { LocaleService } from "../i18n/locale.service";
 import { inject, resetInjection } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RepoLoader } from "./repo-loader";
@@ -70,6 +71,16 @@ describe("paths under declared names", () => {
     expect(read.dossiers.regles).toBe("rules");
     expect(anomalies.length).toBe(1);
     expect(anomalies[0]).toContain("dossiers.regles");
+  });
+
+  // RG-anomalies-codees: the library words the fault, in the displayed language.
+  it("says a faulty entry in the displayed language", () => {
+    const config = { dossiers: { regles: "docs/regles" } };
+    expect(resolveNames(config).anomalies[0]).toContain("est retenu");
+    inject(LocaleService).choice.set("en");
+    const [english] = resolveNames(config).anomalies;
+    expect(english).toContain("dossiers.regles");
+    expect(english).not.toContain("retenu");
   });
 });
 
