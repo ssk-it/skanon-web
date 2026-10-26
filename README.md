@@ -1,5 +1,15 @@
 # Skanon
 
+[![Technical debt](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=sqale_index)](https://sonarcloud.io/summary/overall?id=ssk-it_skanon-web)
+
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=vulnerabilities)](https://sonarcloud.io/project/issues?id=ssk-it_skanon-web&types=VULNERABILITY) [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=bugs)](https://sonarcloud.io/project/issues?id=ssk-it_skanon-web&types=BUG) [![Code smells](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=code_smells)](https://sonarcloud.io/project/issues?id=ssk-it_skanon-web&types=CODE_SMELL)
+
+[![Lines of code](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=ncloc)](https://sonarcloud.io/component_measures?id=ssk-it_skanon-web&metric=ncloc) [![Duplicated lines](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=duplicated_lines_density)](https://sonarcloud.io/component_measures?id=ssk-it_skanon-web&metric=duplicated_lines_density)
+
+[![Maintainability](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=sqale_rating)](https://sonarcloud.io/summary/overall?id=ssk-it_skanon-web) [![Reliability](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=reliability_rating)](https://sonarcloud.io/summary/overall?id=ssk-it_skanon-web) [![Security](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=security_rating)](https://sonarcloud.io/summary/overall?id=ssk-it_skanon-web)
+
+[![Quality gate](https://sonarcloud.io/api/project_badges/measure?project=ssk-it_skanon-web&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ssk-it_skanon-web) [![Checks](https://github.com/ssk-it/skanon-web/actions/workflows/controles.yml/badge.svg?branch=main)](https://github.com/ssk-it/skanon-web/actions/workflows/controles.yml)
+
 **Every business rule of your product, with the decision that made it so.**
 
 Six months after a feature ships, someone asks why it behaves the way it does. The Trello card said it in two lines, the pull request shows how it was coded, and the discussion that settled the matter took place in a meeting nobody wrote up. Skanon is where that answer stays: a specification of the product, written with the client, that keeps for each rule the reasons it was given.
