@@ -39,9 +39,10 @@ describe("« Mentions légales » page", () => {
     const router = createAppRouter(createMemoryHistory());
     await router.push("/mentions-legales");
     expect(router.currentRoute.value.path).toBe("/mentions-legales");
-    expect(router.currentRoute.value.meta["title"]).toBe(
-      "Mentions légales — Skanon",
-    );
+    expect(router.currentRoute.value.meta["heading"]).toEqual({
+      fr: "Mentions légales",
+      en: "Legal notice",
+    });
   });
 
   it("names the publisher and its identifiers", async () => {

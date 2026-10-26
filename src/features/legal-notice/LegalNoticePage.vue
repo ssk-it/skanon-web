@@ -86,7 +86,8 @@ const legalNotice = computed(() => {
       </p>
       <p>
         {{ t().seeHelp }}
-        <RouterLink to="/aide">{{ t().help }}</RouterLink>.
+        <RouterLink to="/aide">{{ t().help }}</RouterLink
+        >.
       </p>
     </section>
   </article>

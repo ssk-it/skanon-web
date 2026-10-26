@@ -4,6 +4,7 @@ import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { inject, provide } from "../../core/injection";
 import { TokenService } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { COMPOSITION, compose } from "../../extension/composer";
 import type { Extension } from "../../extension/extension";
 import { PLATFORM } from "../../platform/platform-token";
@@ -94,9 +95,13 @@ describe("« Fonctionnement de Skanon » page", () => {
         id: "factice",
         pages: {
           help: {
-            jetons: ["Phrase apportée aux jetons."],
-            cache: ["Phrase apportée au cache."],
-            communications: ["Hôte apporté."],
+            jetons: [
+              { fr: "Phrase apportée aux jetons.", en: "Phrase for tokens." },
+            ],
+            cache: [
+              { fr: "Phrase apportée au cache.", en: "Phrase for cache." },
+            ],
+            communications: [{ fr: "Hôte apporté.", en: "Brought host." }],
           },
         },
       },
@@ -108,11 +113,89 @@ describe("« Fonctionnement de Skanon » page", () => {
 
   it("places the brought host before what no deliverable contacts", async () => {
     const text = await mountView("web", [
-      { id: "factice", pages: { help: { communications: ["Hôte apporté."] } } },
+      {
+        id: "factice",
+        pages: {
+          help: {
+            communications: [{ fr: "Hôte apporté.", en: "Brought host." }],
+          },
+        },
+      },
     ]);
     expect(text.indexOf("Hôte apporté.")).toBeGreaterThan(-1);
     expect(text.indexOf("Hôte apporté.")).toBeLessThan(
       text.indexOf("Aucune mesure d’audience"),
     );
+  });
+
+  // RG-aide-fidele, RG-textes-traduits: the statement holds in each language, the deliverable's phrases included.
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("covers the four topics, in English only", async () => {
+      const text = await mountView("web");
+      for (const title of [
+        "How Skanon works",
+        "Tokens",
+        "Caching",
+        "Project discovery",
+        "External communications",
+      ])
+        expect(text).toContain(title);
+      for (const title of [
+        "Fonctionnement de Skanon",
+        "Jetons",
+        "Mise en cache",
+      ])
+        expect(text).not.toContain(title);
+    });
+
+    it("says, in the browser, that the token is kept there in clear, and names the hosts", async () => {
+      const text = await mountView("web");
+      expect(text).toContain("kept in this browser, in clear");
+      expect(text).toContain("A project may require this protection");
+      for (const host of [
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "avatars.githubusercontent.com",
+      ])
+        expect(text).toContain(host);
+    });
+
+    it("says of sealed tokens that the browser keeps only their ciphertext", async () => {
+      vi.spyOn(inject(TokenService), "form").mockReturnValue("scelle");
+      const text = await mountView("web");
+      expect(text).toContain("keeps only their ciphertext");
+      expect(text).toContain("under the same key as the tokens");
+    });
+
+    it("says, on the desktop, that the token is in the system keychain", async () => {
+      const text = await mountView("bureau");
+      expect(text).toContain("stored in the system vault");
+      expect(text).not.toContain("kept in this browser");
+    });
+
+    it("renders the deliverable's phrases in English", async () => {
+      const text = await mountView("web", [
+        {
+          id: "factice",
+          pages: {
+            help: {
+              jetons: [
+                { fr: "Phrase apportée aux jetons.", en: "Phrase for tokens." },
+              ],
+              cache: [
+                { fr: "Phrase apportée au cache.", en: "Phrase for cache." },
+              ],
+              communications: [{ fr: "Hôte apporté.", en: "Brought host." }],
+            },
+          },
+        },
+      ]);
+      expect(text).toContain("Phrase for tokens.");
+      expect(text).toContain("Phrase for cache.");
+      expect(text).toContain("Brought host.");
+      expect(text).not.toContain("Hôte apporté.");
+    });
   });
 });
