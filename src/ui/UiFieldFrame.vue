@@ -250,6 +250,10 @@ defineEmits<{ activate: [] }>();
 .ui-champ--desactive .ui-champ__saisie {
   color: color-mix(in srgb, var(--mat-sys-on-surface) 38%, transparent);
 }
+/* The secret of a `UiTextField secret`: discs, as in a password field, without being one. */
+.ui-champ__saisie--secret {
+  -webkit-text-security: disc;
+}
 .ui-champ__saisie::placeholder {
   color: var(--mat-sys-on-surface-variant);
   opacity: 0;
