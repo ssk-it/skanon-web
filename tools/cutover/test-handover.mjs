@@ -77,7 +77,9 @@ function trouver(chemin) {
 }
 
 const serveur = createServer((req, res) => {
-  const chemin = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  const chemin = decodeURIComponent(
+    new URL(req.url, "http://localhost").pathname,
+  );
   let fichier = trouver(chemin === "/" ? "/index.html" : chemin);
   // The hosting of a client-routed application serves `index.html` for an address that does not designate a file.
   if (!fichier && !extname(chemin)) fichier = trouver("/index.html");
