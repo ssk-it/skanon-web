@@ -97,3 +97,5 @@ A public repo can be read without signing in. A personal GitHub token — read-o
 ## Licence
 
 This repo is published as source-available, under the [Functional Source License 1.1, ALv2 Future License](LICENSE.md) (FSL-1.1-ALv2): anyone may read, modify and use it, except to build a competing product or service. Each version becomes Apache-2.0 two years after its release.
+
+Contributions are welcome under a [contributor licence agreement](CLA.md): [CONTRIBUTING.md](CONTRIBUTING.md) says why, and how to sign.
