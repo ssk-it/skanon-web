@@ -51,8 +51,12 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["lcov", "text-summary"],
-      include: ["src/**", "tools/cla/**"],
-      exclude: ["src/**/*.test.ts", "tools/**/*.test.mjs"],
+      include: ["src/**", "tools/cla/**", "tools/pwa/pwa.ts"],
+      exclude: [
+        "src/**/*.test.ts",
+        "tools/**/*.test.mjs",
+        "tools/**/*.test.ts",
+      ],
     },
     projects: [
       {
@@ -68,14 +72,14 @@ export default defineConfig({
         },
       },
       /**
-       * The repo's own tooling, which runs under Node in its workflows — the CLA check (`tools/cla/`).
+       * The repo's own tooling, which runs under Node: the CLA check of its workflows (`tools/cla/`), and the plugin that builds the installable web version (`tools/pwa/pwa.ts`).
        */
       {
         extends: true,
         test: {
           name: "tools",
           environment: "node",
-          include: ["tools/**/*.test.mjs"],
+          include: ["tools/**/*.test.mjs", "tools/**/*.test.ts"],
         },
       },
       /**
