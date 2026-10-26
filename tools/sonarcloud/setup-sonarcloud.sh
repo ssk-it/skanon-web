@@ -32,7 +32,7 @@ say() { echo "  · $*"; }
 confirm() {
     local answer
     read -r -p "  → $* [y/N] " answer
-    [ "${answer}" = "y" ] || [ "${answer}" = "Y" ]
+    [[ "${answer}" = "y" ]] || [[ "${answer}" = "Y" ]]
 }
 
 for tool in curl jq gh; do
@@ -44,7 +44,7 @@ gh auth status >/dev/null 2>&1 || ko "gh is not authenticated: gh auth login"
 
 read -r -s -p "  SonarCloud token (My Account → Security): " TOKEN
 echo
-[ -n "${TOKEN}" ] || ko "empty token"
+[[ -n "${TOKEN}" ]] || ko "empty token"
 
 # The token goes to curl through a configuration file read on a descriptor, never as an
 # argument: an argument shows in the process list. A quote or a backslash is escaped, or it
@@ -64,7 +64,7 @@ body() { sed '$d' <<< "$1"; }
 code() { tail -n1 <<< "$1"; }
 
 R="$(call GET "/authentication/validate")"
-[ "$(code "${R}")" = 200 ] && [ "$(body "${R}" | jq -r .valid)" = true ] \
+[[ "$(code "${R}")" = 200 ]] && [[ "$(body "${R}" | jq -r .valid)" = true ]] \
     || ko "SonarCloud refuses this token"
 ok "token accepted by SonarCloud"
 echo
@@ -73,7 +73,7 @@ echo
 
 echo "1. Automatic analysis of ${PROJECT}"
 R="$(call GET "/autoscan/eligibility?autoEnable=false&projectKey=${PROJECT}")"
-[ "$(code "${R}")" = 200 ] \
+[[ "$(code "${R}")" = 200 ]] \
     || ko "automatic analysis unreadable (HTTP $(code "${R}")): does the token administer ${PROJECT}?"
 STATE="$(body "${R}" | jq -r '.isAutoscanEnabled // .autoscanEnabled // .enabled // "unknown"')"
 case "${STATE}" in
