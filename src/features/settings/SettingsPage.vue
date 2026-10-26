@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from "vue";
 import { GithubError } from "../../core/github/github-client";
+import { LocaleService, useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   GUARANTEES,
@@ -23,6 +24,7 @@ import UiTextField from "../../ui/UiTextField.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import CodeBlock from "../shared/CodeBlock.vue";
 import ViewState from "../shared/ViewState.vue";
+import { settingsMessages } from "./settings.messages";
 
 /**
  * Project settings.
@@ -45,14 +47,14 @@ const IMPLEMENTED_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>([
 const store = inject(SpecificationStore);
 const settings = inject(SettingsService);
 const automation = inject(AutomationService);
+const locale = inject(LocaleService);
+const t = useMessages(settingsMessages);
 
 const modes = MODES;
-const modeLabel = (m: AccessMode) => ACCESS_MODE_LABEL[m];
-const guarantees = (m: AccessMode) => GUARANTEES[m];
-const implemented = (m: AccessMode) => IMPLEMENTED_MODES.has(m);
+const modeLabel = (m: AccessMode) => ACCESS_MODE_LABEL[locale.language()][m];
 /** The model's values are technical: what the user reads is not. */
-const scopeLabel = (m: AccessMode) =>
-  GUARANTEES[m].scope === "chemin" ? "chemin" : "dépôt";
+const guarantees = (m: AccessMode) => t().guarantees(GUARANTEES[m]);
+const implemented = (m: AccessMode) => IMPLEMENTED_MODES.has(m);
 
 const access = ref<AccessMode>("jeton_personnel");
 /** What the project requires of the personal token in the web version (RG-protection-du-jeton-par-projet). */
@@ -73,7 +75,8 @@ const incompleteIdentity = computed(
 );
 
 const sending = ref(false);
-const error = ref<string | null>(null);
+/** A failure's own message, or `null` for the page's generic one — read at display time, so that it follows a language switch. */
+const error = ref<{ message: string | null } | null>(null);
 const proposed = ref<{ pullRequest: number; url: string } | null>(null);
 
 /** What is loaded, to know whether the input departs from it. */
@@ -133,7 +136,7 @@ async function copy(text: string, what: string): Promise<void> {
 }
 
 const installation = ref(false);
-const automationError = ref<string | null>(null);
+const automationError = ref<{ message: string | null } | null>(null);
 
 /**
  * Installs the missing workflows.
@@ -147,10 +150,7 @@ async function installAutomation(): Promise<void> {
   try {
     await automation.install();
   } catch (e) {
-    automationError.value =
-      e instanceof Error
-        ? e.message
-        : "L’automatisation n’a pas pu être installée.";
+    automationError.value = { message: e instanceof Error ? e.message : null };
   } finally {
     installation.value = false;
   }
@@ -209,10 +209,10 @@ async function proposeSettings(): Promise<void> {
     proposed.value = p;
     initial.value = fingerprint();
   } catch (e) {
-    error.value =
-      e instanceof GithubError || e instanceof Error
-        ? e.message
-        : "Les réglages n’ont pas pu être proposés.";
+    error.value = {
+      message:
+        e instanceof GithubError || e instanceof Error ? e.message : null,
+    };
   } finally {
     sending.value = false;
   }
@@ -230,21 +230,13 @@ function fingerprint(): string {
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
       <header class="entete">
-        <h1>Réglages du projet</h1>
-        <p class="sous-titre">
-          Ce que l’application s’autorise à faire sur ce projet. Ces réglages
-          vivent dans le dépôt et valent pour tous ceux qui y travaillent.
-        </p>
+        <h1>{{ t().title }}</h1>
+        <p class="sous-titre">{{ t().subtitle }}</p>
       </header>
 
       <section class="bloc">
-        <h2 class="section">Mode d’accès</h2>
-        <p class="explication">
-          Comment les rédacteurs obtiennent l’accès au dépôt. Les modes
-          s’empilent : chacun lève un obstacle que le précédent laissait.
-          Changer de mode ne demande de reprendre ni le référentiel ni les
-          cadrages.
-        </p>
+        <h2 class="section">{{ t().accessMode }}</h2>
+        <p class="explication">{{ t().accessModeHelp }}</p>
 
         <div class="modes">
           <label
@@ -264,32 +256,19 @@ function fingerprint(): string {
             <span class="mode-corps">
               <span class="mode-tete">
                 <strong>{{ modeLabel(m) }}</strong>
-                <span v-if="!implemented(m)" class="a-venir"
-                  >pas encore réalisé</span
-                >
+                <span v-if="!implemented(m)" class="a-venir">{{
+                  t().notYetAvailable
+                }}</span>
               </span>
-              <span class="mode-garanties">
-                Autorisation jusqu’au {{ scopeLabel(m) }} · auteur
-                {{ guarantees(m).authorVerified ? "vérifié" : "déclaré" }} ·
-                {{
-                  guarantees(m).accountRequired
-                    ? "compte GitHub requis"
-                    : "aucun compte GitHub requis"
-                }}
-              </span>
+              <span class="mode-garanties">{{ guarantees(m) }}</span>
             </span>
           </label>
         </div>
 
         <!-- RG-protection-du-jeton-par-projet, RG-garanties-annoncees: each way of keeping the token says what it protects and what it leaves exposed, and the requirement does not pass itself off as GitHub's. -->
         <div v-if="access === 'jeton_personnel'" class="protection-du-jeton">
-          <h3 class="sous-section">Protection du jeton dans la version web</h3>
-          <p class="explication">
-            Sur le bureau, le jeton est toujours gardé dans le coffre du
-            système. Dans la version web, ce projet peut exiger qu’il soit
-            protégé par une passkey : Touch ID, ou le code de l’appareil,
-            l’ouvre alors dans chaque onglet.
-          </p>
+          <h3 class="sous-section">{{ t().tokenProtection }}</h3>
+          <p class="explication">{{ t().tokenProtectionHelp }}</p>
 
           <div class="modes">
             <label class="mode">
@@ -302,11 +281,10 @@ function fingerprint(): string {
                 @change="proposed = null"
               />
               <span class="mode-corps">
-                <span class="mode-tete"><strong>Proposée</strong></span>
-                <span class="mode-garanties">
-                  Chaque rédacteur choisit. Sans passkey, son jeton reste en
-                  clair dans son navigateur.
-                </span>
+                <span class="mode-tete"
+                  ><strong>{{ t().offered }}</strong></span
+                >
+                <span class="mode-garanties">{{ t().offeredHelp }}</span>
               </span>
             </label>
             <label class="mode">
@@ -319,167 +297,125 @@ function fingerprint(): string {
                 @change="proposed = null"
               />
               <span class="mode-corps">
-                <span class="mode-tete"><strong>Exigée</strong></span>
-                <span class="mode-garanties">
-                  Un jeton qui ouvre ce projet n’est jamais gardé en clair :
-                  sans passkey, il ne vaut que pour l’onglet.
-                </span>
+                <span class="mode-tete"
+                  ><strong>{{ t().required }}</strong></span
+                >
+                <span class="mode-garanties">{{ t().requiredHelp }}</span>
               </span>
             </label>
           </div>
 
           <dl class="formes">
-            <dt>En clair, dans le navigateur</dt>
-            <dd>
-              Un programme qui lit le profil du navigateur, une sauvegarde du
-              disque ou quelqu’un devant la session ouverte lisent le jeton.
-            </dd>
-            <dt>Sous passkey, dans le navigateur</dt>
-            <dd>
-              Ils ne trouvent qu’un chiffré, que seuls Touch ID ou le code de
-              l’appareil ouvrent. Un script ou une extension sur la page lit
-              toujours le jeton tant que l’onglet est déverrouillé.
-            </dd>
-            <dt>Dans le coffre du système, sur le bureau</dt>
-            <dd>
-              Le jeton est hors du profil du navigateur, et le coffre ne le
-              remet qu’à Skanon.
-            </dd>
-            <dt>Pour la session seulement</dt>
-            <dd>
-              Avec une identité tierce, ou sans passkey sur un projet qui
-              l’exige : rien ne reste sur le poste, et il faut se reconnecter,
-              ou ressaisir le jeton, à chaque ouverture.
-            </dd>
+            <template v-for="f of t().forms" :key="f.term">
+              <dt>{{ f.term }}</dt>
+              <dd>{{ f.description }}</dd>
+            </template>
           </dl>
 
-          <p class="explication">
-            Dans tous les cas, le jeton passe en clair dans l’application à
-            chaque requête vers GitHub. Ce qui le protège vraiment, c’est sa
-            portée — les dépôts et les droits qu’il ouvre —, sa durée de vie, et
-            sa révocation le jour où il n’a plus lieu d’être.
-          </p>
-          <p class="explication">
-            L’exigence est celle de Skanon, non de GitHub : un rédacteur peut se
-            servir du même jeton dans un autre outil. Ce que GitHub sait
-            imposer, c’est l’approbation des jetons par l’organisation, leur
-            portée et leur durée de vie maximale.
-          </p>
+          <p class="explication">{{ t().tokenInClear }}</p>
+          <p class="explication">{{ t().skanonRequirement }}</p>
         </div>
 
         <div v-if="access === 'identite_tierce'" class="identite">
-          <p class="explication">
-            Où les identités sont vérifiées. Rien de secret ici : ce sont les
-            valeurs que porte toute application s’exécutant dans un navigateur.
-          </p>
+          <p class="explication">{{ t().identityHelp }}</p>
 
           <UiTextField
             v-model="issuer"
-            libelle="Émetteur d’identité"
+            :label="t().issuer"
             name="emetteur"
             :disabled="sending"
-            placeholder="https://identite.exemple.fr/realms/mon-projet"
-            indice="Racine du domaine, jusqu’au projet inclus."
+            :placeholder="t().issuerPlaceholder"
+            :hint="t().issuerHint"
           />
 
           <UiTextField
             v-model="client"
-            label="Identifiant du client"
+            :label="t().client"
             name="client"
             :disabled="sending"
-            placeholder="mon-application"
-            hint="Client public déclaré chez cet émetteur, sans secret."
+            :placeholder="t().clientPlaceholder"
+            :hint="t().clientHint"
           />
 
           <UiTextField
             v-model="exchange"
-            libelle="Adresse de l’échange"
+            :label="t().exchange"
             name="echange"
             :disabled="sending"
-            placeholder="https://echange.exemple.fr"
-            indice="Composant qui échange une identité contre un accès."
+            :placeholder="t().exchangePlaceholder"
+            :hint="t().exchangeHint"
           />
 
           <p v-if="incompleteIdentity" class="manque">
-            Ce mode demande les trois valeurs. Sans elles, personne ne pourra se
-            connecter.
+            {{ t().incompleteIdentity }}
           </p>
         </div>
       </section>
 
       <section v-if="automation.installed() === false" class="bloc">
-        <h2 class="section">Automatisation</h2>
-        <p class="explication">
-          Ce dépôt n’a pas ses workflows. Rien ne vérifie donc qu’un cadrage est
-          cohérent avant sa livraison, et les règles ne sont pas mises à jour
-          quand il est livré — le référentiel cesse d’être la projection des
-          cadrages livrés.
-        </p>
+        <h2 class="section">{{ t().automation }}</h2>
+        <p class="explication">{{ t().automationHelp }}</p>
         <p v-if="automationError" class="erreur">
           <UiIcon name="error_outline" />
-          <span>{{ automationError }}</span>
+          <span>{{ automationError.message ?? t().automationFailed }}</span>
         </p>
         <UiButton
           variant="filled"
           :disabled="installation"
           @click="installAutomation()"
         >
-          {{ installation ? "Installation…" : "Installer l’automatisation" }}
+          {{ installation ? t().installing : t().installAutomation }}
         </UiButton>
       </section>
 
       <section class="bloc">
         <div class="section-tete">
-          <h2 class="section">Dépôts de code</h2>
+          <h2 class="section">{{ t().codeRepos }}</h2>
           <UiButton
             variant="icon"
             class="aide-bouton"
             :aria-expanded="repoHelp"
-            aria-label="Ce que ce réglage écrit"
+            :aria-label="t().whatThisWrites"
             @click="repoHelp = !repoHelp"
           >
             <UiIcon name="help_outline" />
           </UiButton>
         </div>
-        <p class="explication">
-          Les dépôts que ce projet réalise. Le lien est déclaré ici, du côté qui
-          a autorité : c’est ce qui permet de rédiger un cadrage depuis un dépôt
-          de code sans rien y configurer.
-        </p>
+        <p class="explication">{{ t().codeReposHelp }}</p>
 
         <div v-if="repoHelp" class="infobulle" role="note">
-          <p>Ce réglage écrit dans <code>ssk-canon.yml</code> :</p>
+          <p>
+            {{ t().writesTo.before }} <code>ssk-canon.yml</code
+            >{{ t().writesTo.after }}
+          </p>
           <CodeBlock :text="codeReposPreview" language="yaml" />
         </div>
 
-        <p v-if="!codeRepos.length" class="vide">
-          Aucun dépôt déclaré. Un dépôt de code qui invoque le skill de cadrage
-          ne se rattache alors à rien.
-        </p>
+        <p v-if="!codeRepos.length" class="vide">{{ t().noCodeRepo }}</p>
 
         <div v-for="(d, i) of codeRepos" :key="i" class="depot-ligne">
           <UiTextField
             class="depot-repo"
             :model-value="d.repo"
-            label="Dépôt"
+            :label="t().repo"
             :name="'repo' + i"
-            placeholder="organisation/depot"
+            :placeholder="t().repoPlaceholder"
             :disabled="sending"
             @update:model-value="updateCodeRepo(i, { repo: $event })"
           >
             <template v-if="isMalformedRepo(d.repo)" #indice>
-              <span class="ui-champ__indice alerte"
-                >Attendu : organisation/depot</span
-              >
+              <span class="ui-champ__indice alerte">{{
+                t().repoExpected
+              }}</span>
             </template>
           </UiTextField>
 
           <UiTextField
             class="depot-role"
             :model-value="d.role"
-            label="Ce qu’il porte"
+            :label="t().role"
             :name="'role' + i"
-            placeholder="Application web"
+            :placeholder="t().rolePlaceholder"
             :disabled="sending"
             @update:model-value="updateCodeRepo(i, { role: $event })"
           />
@@ -487,7 +423,7 @@ function fingerprint(): string {
           <UiButton
             variant="icon"
             :disabled="sending"
-            aria-label="Retirer ce dépôt"
+            :aria-label="t().removeRepo"
             @click="removeCodeRepo(i)"
           >
             <UiIcon name="close" />
@@ -495,53 +431,47 @@ function fingerprint(): string {
         </div>
 
         <UiButton :disabled="sending" @click="addCodeRepo()">
-          <UiIcon name="add" /> Ajouter un dépôt
+          <UiIcon name="add" /> {{ t().addRepo }}
         </UiButton>
       </section>
 
       <section class="bloc">
-        <h2 class="section">Rédiger depuis un dépôt de code</h2>
-        <p class="explication">
-          Un skill permet de rédiger un cadrage sans quitter le dépôt de code
-          sur lequel on travaille. Il trouve seul le référentiel du projet, à
-          condition que celui-ci déclare ses dépôts de code — voir plus bas.
-        </p>
+        <h2 class="section">{{ t().fromCodeRepo }}</h2>
+        <p class="explication">{{ t().fromCodeRepoHelp }}</p>
 
-        <p class="etape">1. L’installer, une fois par machine :</p>
+        <p class="etape">{{ t().installStep }}</p>
         <CodeBlock :text="skillCommand" language="bash" />
         <UiButton @click="copy(skillCommand, 'commande')">
           <UiIcon :name="copied === 'commande' ? 'check' : 'content_copy'" />
-          {{ copied === "commande" ? "Copié" : "Copier" }}
+          {{ copied === "commande" ? t().copied : t().copy }}
         </UiButton>
 
         <p class="etape">
-          2. Dire où les référentiels sont clonés, dans
-          <code>~/.claude/cadrage-canon.json</code> :
+          {{ t().configStep.before }}
+          <code>~/.claude/cadrage-canon.json</code>{{ t().configStep.after }}
         </p>
         <CodeBlock :text="configSkill" language="json" />
         <UiButton @click="copy(configSkill, 'config')">
           <UiIcon :name="copied === 'config' ? 'check' : 'content_copy'" />
-          {{ copied === "config" ? "Copié" : "Copier" }}
+          {{ copied === "config" ? t().copied : t().copy }}
         </UiButton>
 
-        <p class="explication">
-          Rien n’est à configurer dans les dépôts de code : le skill reconnaît
-          celui d’où on l’invoque, et cherche le projet qui le déclare — d’où le
-          réglage ci-dessus.
-        </p>
+        <p class="explication">{{ t().nothingInCodeRepos }}</p>
       </section>
 
       <p v-if="error" class="erreur">
-        <UiIcon name="error_outline" /> <span>{{ error }}</span>
+        <UiIcon name="error_outline" />
+        <span>{{ error.message ?? t().settingsFailed }}</span>
       </p>
 
       <p v-if="proposed" class="succes">
         <UiIcon name="check_circle" />
         <span>
-          Réglages proposés dans la
-          <ExternalLink :href="proposed.url"
-            >demande #{{ proposed.pullRequest }}</ExternalLink
-          >. Ils prendront effet à sa fusion.
+          {{ t().proposed.before }}
+          <ExternalLink :href="proposed.url">{{
+            t().proposed.link(proposed.pullRequest)
+          }}</ExternalLink
+          >{{ t().proposed.after }}
         </span>
       </p>
 
@@ -551,13 +481,12 @@ function fingerprint(): string {
           :disabled="sending || !modified || incompleteIdentity"
           @click="proposeSettings()"
         >
-          {{ sending ? "Envoi…" : "Proposer ces réglages" }}
+          {{ sending ? t().sending : t().propose }}
         </UiButton>
       </div>
 
       <p class="note">
-        Les réglages sont modifiés par une demande de fusion, comme tout ce qui
-        vit dans le dépôt. Rien ne change tant qu’elle n’est pas fusionnée.
+        {{ t().note }}
       </p>
     </template>
   </div>

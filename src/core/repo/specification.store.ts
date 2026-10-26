@@ -4,6 +4,7 @@ import { UnconfirmedState, RepoLoader } from "./repo-loader";
 import { ContentCache } from "./content-cache";
 import { deriveStatus } from "./derived-status";
 import { RepoConfig } from "./repo-config";
+import { repoText } from "./repo.messages";
 import { TokenService } from "../github/token.service";
 import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import {
@@ -603,10 +604,7 @@ export class SpecificationStore {
         // repo that did not respond for the main branch will not respond for them
         // either.
         this.unconfirmed.set(result.unconfirmed);
-        this.github.writeSuspended.set(
-          "Le dépôt ne répond pas : l’état affiché est le dernier lu, et rien ne " +
-            "peut s’y enregistrer avant qu’il ait été relu.",
-        );
+        this.github.writeSuspended.set(repoText().repoNotAnswering);
         return;
       }
 
@@ -622,9 +620,7 @@ export class SpecificationStore {
     } catch (e) {
       this.specification.set(EMPTY);
       this.error.set(
-        e instanceof GithubError
-          ? e.message
-          : "Le chargement du dépôt a échoué.",
+        e instanceof GithubError ? e.message : repoText().loadFailed,
       );
       // Distinguished from other failures: this one can be fixed, and the
       // application knows how. See BootstrapService.

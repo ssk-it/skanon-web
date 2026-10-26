@@ -1,61 +1,44 @@
 <script setup lang="ts">
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { PLATFORM } from "../../platform/platform-token";
-import ExternalLink from "../../ui/ExternalLink.vue";
 import UiIcon from "../../ui/UiIcon.vue";
+import RichText from "./RichText.vue";
+import { tokenHelpMessages } from "./token-help.messages";
 
 const onDesktop = inject(PLATFORM).target === "bureau";
+const t = useMessages(tokenHelpMessages);
 
 /**
  * How to create a GitHub access token.
  *
  * This content lives in the application rather than in a file of the repo: it is read at the precise moment one needs it, by someone who will not go looking for documentation elsewhere.
  *
- * `pasteWhere` says where to paste the created token: « ici » in sign-in, elsewhere where the help is read without an input field.
+ * `pasteWhere` says where to paste the created token: « ici » in sign-in, by default, elsewhere where the help is read without an input field. The caller gives it in the displayed language.
  */
-withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
+defineProps<{ pasteWhere?: string }>();
 </script>
 
 <template>
   <section class="aide-jeton aide">
-    <h3>Créer un jeton</h3>
+    <h3>{{ t().title }}</h3>
 
     <ol class="etapes">
-      <li>
-        Ouvrir
-        <ExternalLink
-          href="https://github.com/settings/personal-access-tokens/new"
-          >la page de création d’un jeton <UiIcon name="open_in_new"
-        /></ExternalLink>
-        sur GitHub.
-      </li>
-      <li>
-        Donner un nom qui rappelle son usage — « Skanon » — et une date
-        d’expiration. Un jeton qui n’expire jamais est un jeton qu’on oublie.
-      </li>
-      <li>
-        Sous <strong>Repository access</strong>, choisir les dépôts à consulter.
-        Se limiter à ceux-là plutôt que d’accorder l’accès à tout le compte.
-      </li>
-      <li>
-        Sous <strong>Permissions → Repository permissions</strong>, accorder ce
-        que l’usage demande — voir le tableau ci-dessous.
-      </li>
-      <li>
-        Créer le jeton, le copier, et le coller {{ pasteWhere }}. GitHub ne
-        l’affichera plus.
+      <li v-for="(step, i) in t().steps(pasteWhere ?? t().here)" :key="i">
+        <RichText :parts="step" />
       </li>
     </ol>
 
     <table class="permissions">
       <thead>
         <tr>
-          <th>Permission</th>
-          <th>Pour consulter</th>
-          <th>Pour rédiger</th>
+          <th>{{ t().permission }}</th>
+          <th>{{ t().toRead }}</th>
+          <th>{{ t().toWrite }}</th>
         </tr>
       </thead>
       <tbody>
+        <!-- GitHub's permission names and levels, as its page shows them. -->
         <tr>
           <td><strong>Contents</strong></td>
           <td>Read-only</td>
@@ -78,18 +61,10 @@ withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
       <UiIcon name="help_outline" />
       <div>
         <p>
-          <strong>Pourquoi écrire demande les deux.</strong> Rédiger un cadrage
-          crée une branche et y dépose un fichier — deux écritures dans le
-          dépôt, que <strong>Contents</strong> autorise. La demande de fusion ne
-          vient qu’ensuite, et c’est <strong>Pull requests</strong> qui l’ouvre.
-          La première écrit dans le dépôt, la seconde demande à fusionner ce qui
-          a été écrit.
+          <strong>{{ t().whyBothTitle }}</strong
+          ><RichText :parts="t().whyBoth" />
         </p>
-        <p>
-          Rien n’entre pour autant dans la branche principale sans contrôle : la
-          protection du dépôt exige que la vérification d’intégrité soit passée.
-          Un jeton d’écriture ouvre un cadrage, il ne le livre pas seul.
-        </p>
+        <p>{{ t().noUncheckedMerge }}</p>
       </div>
     </div>
 
@@ -97,10 +72,8 @@ withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
       <UiIcon name="help_outline" />
       <div>
         <p>
-          <strong>Pourquoi lire les issues.</strong> La roadmap d’un projet — ce
-          qu’on envisage pour un domaine ou une fonctionnalité — vit dans les
-          issues de son dépôt. Sans <strong>Issues</strong> en lecture, elle ne
-          s’affiche pas ; l’accorder dès la création évite de recréer le jeton.
+          <strong>{{ t().whyIssuesTitle }}</strong
+          ><RichText :parts="t().whyIssues" />
         </p>
       </div>
     </div>
@@ -109,18 +82,10 @@ withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
       <UiIcon name="shield" />
       <div>
         <p>
-          <strong>N’accorder que ce dont on a besoin.</strong> Un jeton est
-          conservé
-          {{ onDesktop ? "dans le coffre du système" : "par votre navigateur" }}
-          : toute personne ayant accès à cette session peut le récupérer. En
-          lecture seule, le pire qu’il permette est de lire ce que vous pouviez
-          déjà lire.
+          <strong>{{ t().leastTitle }}</strong
+          >{{ t().least(onDesktop) }}
         </p>
-        <p>
-          Pour consulter, s’en tenir à la lecture. N’accorder l’écriture que si
-          vous rédigez, et la limiter aux dépôts concernés — un jeton d’écriture
-          sur tout le compte fait courir un risque sans rapport avec l’usage.
-        </p>
+        <p>{{ t().readOnly }}</p>
       </div>
     </div>
 
@@ -128,26 +93,14 @@ withDefaults(defineProps<{ pasteWhere?: string }>(), { pasteWhere: "ici" });
       <UiIcon name="help_outline" />
       <div>
         <p>
-          <strong>Un dépôt public a-t-il besoin d’un jeton ?</strong> Non pour
-          le consulter. Mais sans jeton, GitHub limite l’application à 60
-          requêtes par heure et par adresse — partagées avec tout autre usage
-          depuis la même connexion. Un jeton porte cette limite à 5 000.
+          <strong>{{ t().publicTitle }}</strong
+          >{{ t().public }}
         </p>
-        <p>
-          Une exception : GitHub refuse <strong>l’historique</strong> à toute
-          requête anonyme, même sur un dépôt public. Les cadrages restent
-          lisibles sans jeton ; leurs dates et leurs auteurs n’apparaissent
-          qu’une fois connecté.
-        </p>
+        <p><RichText :parts="t().history" /></p>
       </div>
     </div>
 
-    <p class="revoquer">
-      Un jeton se révoque à tout moment depuis
-      <ExternalLink href="https://github.com/settings/tokens"
-        >les réglages GitHub <UiIcon name="open_in_new" /></ExternalLink
-      >. Le révoquer suffit : rien à faire ici.
-    </p>
+    <p class="revoquer"><RichText :parts="t().revoke" /></p>
   </section>
 </template>
 
@@ -171,27 +124,27 @@ h3 {
   line-height: 1.55;
   color: var(--mat-sys-on-surface-variant);
 }
-.etapes strong {
+/* The phrases are drawn by `RichText`: their strong words and links are reached through it. */
+.etapes :deep(strong) {
   color: var(--mat-sys-on-surface);
   font-weight: 600;
 }
 .etapes li::marker {
   color: var(--mat-sys-outline);
 }
-a {
+.aide-jeton :deep(a) {
   color: var(--mat-sys-primary);
   text-decoration: none;
   white-space: nowrap;
-
-  &:hover {
-    text-decoration: underline;
-  }
-  .material-symbols-outlined {
-    font-size: 13px;
-    width: 13px;
-    height: 13px;
-    vertical-align: -1px;
-  }
+}
+.aide-jeton :deep(a:hover) {
+  text-decoration: underline;
+}
+.aide-jeton :deep(a .material-symbols-outlined) {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  vertical-align: -1px;
 }
 .permissions {
   width: 100%;
@@ -246,6 +199,9 @@ a {
     height: 19px;
     color: var(--mat-sys-on-surface-variant);
   }
+}
+.note :deep(strong) {
+  color: var(--mat-sys-on-surface);
 }
 .revoquer {
   margin: 16px 0 0;

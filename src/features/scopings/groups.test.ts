@@ -51,6 +51,7 @@ describe("groups of the scopings list", () => {
     const groups = groupScopings(
       [scoping("2026-005", "brouillon"), scoping("2026-004", "livree")],
       dates({ "2026-004": "2026-09-01T10:00:00Z" }),
+      "fr",
     );
     expect(groups.map((g) => g.key)).toEqual(["en-cours", "2026-T3"]);
     expect(groups[0].scopings.map((c) => c.id)).toEqual(["2026-005"]);
@@ -64,6 +65,7 @@ describe("groups of the scopings list", () => {
         b: "2026-07-15T10:00:00Z",
         c: "2026-04-02T10:00:00Z",
       }),
+      "fr",
     );
     expect(groups.map((g) => g.key)).toEqual(["2026-T3", "2026-T2"]);
     expect(groups[0].scopings.map((c) => c.id)).toEqual(["a", "b"]);
@@ -75,6 +77,7 @@ describe("groups of the scopings list", () => {
     const groups = groupScopings(
       [scoping("a", "livree"), scoping("b", "livree")],
       dates({ a: "2026-09-01T10:00:00Z" }),
+      "fr",
     );
     expect(groups.map((g) => g.key)).toEqual(["2026-T3", "sans-date"]);
     expect(groups[1].scopings.map((c) => c.id)).toEqual(["b"]);
@@ -84,6 +87,7 @@ describe("groups of the scopings list", () => {
     const groups = groupScopings(
       [scoping("a", "livree")],
       dates({ a: "2026-09-01T10:00:00Z" }),
+      "fr",
     );
     expect(groups.map((g) => g.key)).toEqual(["2026-T3"]);
   });
@@ -93,8 +97,37 @@ describe("groups of the scopings list", () => {
     const groups = groupScopings(
       [scoping("a", "livree")],
       dates({ a: "2026-02-01T10:00:00Z" }),
+      "fr",
     );
     expect(groups[0].label).toBe("1ᵉʳ trimestre 2026");
+  });
+});
+
+describe("groups of the scopings list, in English", () => {
+  it("labels the groups and quarters in English", () => {
+    const groups = groupScopings(
+      [
+        scoping("b", "brouillon"),
+        scoping("a", "livree"),
+        scoping("c", "livree"),
+      ],
+      dates({ a: "2026-02-01T10:00:00Z", c: null }),
+      "en",
+    );
+    expect(groups.map((g) => g.label)).toEqual([
+      "In progress",
+      "Q1 2026",
+      "Not dated yet",
+    ]);
+  });
+
+  it("gathers undated delivered ones under « Delivered »", () => {
+    const groups = groupScopings(
+      [scoping("a", "livree")],
+      dates({ a: null }),
+      "en",
+    );
+    expect(groups[0].label).toBe("Delivered");
   });
 });
 
@@ -109,6 +142,7 @@ describe("delivered without any date", () => {
         scoping("c", "livree"),
       ],
       dates({ a: null, c: undefined }),
+      "fr",
     );
     expect(groups.map((g) => g.key)).toEqual(["en-cours", "livres"]);
     expect(groups[1].label).toBe("Livrés");

@@ -3,6 +3,7 @@ import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { inject } from "../injection";
 import { Scoping } from "../model/model";
 import { signal } from "../signals";
+import { repoText } from "./repo.messages";
 
 /**
  * A roadmap item: what is envisaged for the product, carried by an issue of
@@ -179,7 +180,7 @@ export class RoadmapItemsService {
         return;
       }
       this.error.set(
-        e instanceof Error ? e.message : "Les pistes n'ont pas pu être lues.",
+        e instanceof Error ? e.message : repoText().roadmapItemsFailed,
       );
       this.state.set("erreur");
       // An error is not kept: the next view will retry.

@@ -13,7 +13,7 @@ import {
   LINK_TAG_LABEL,
   DEFAULT_LINK_TAGS,
 } from "../model/model";
-import { normalizeTag } from "./link-tag";
+import { normalizeTag, tagFromInput } from "./link-tag";
 import { unionLinkTags } from "./specification.store";
 import { Scoping } from "../model/model";
 
@@ -160,7 +160,8 @@ describe("link kinds declared by the project", () => {
   // (scoping 2026-058, RG-piste-etat-deduit).
   it("offers the piste kind by default, with its label", () => {
     expect(DEFAULT_LINK_TAGS).toContain("piste");
-    expect(LINK_TAG_LABEL["piste"]).toBe("Piste");
+    expect(LINK_TAG_LABEL.fr["piste"]).toBe("Piste");
+    expect(LINK_TAG_LABEL.en["piste"]).toBe("Roadmap item");
   });
 
   // Without a fallback, entering a link would offer no choice.
@@ -191,9 +192,28 @@ describe("normalisation of an entered kind", () => {
    * different from the one chosen, and nothing would flag it at input.
    */
   it("brings each label back to the kind it designates", () => {
-    for (const [tag, label] of Object.entries(LINK_TAG_LABEL)) {
+    for (const [tag, label] of Object.entries(LINK_TAG_LABEL.fr)) {
       expect(normalizeTag(label)).toBe(tag);
     }
+  });
+
+  // RG-nature-lien-normalisee: a known kind's label is recognised in the displayed language before any reduction; the key never derives from a translated label.
+  it("recognises a label in the displayed language, and writes its key", () => {
+    for (const language of ["fr", "en"] as const)
+      for (const [tag, label] of Object.entries(LINK_TAG_LABEL[language]))
+        expect(tagFromInput(label, LINK_TAG_LABEL[language])).toBe(tag);
+    expect(tagFromInput("Trello card", LINK_TAG_LABEL.en)).toBe("carte_trello");
+    expect(tagFromInput("  trello-CARD ", LINK_TAG_LABEL.en)).toBe(
+      "carte_trello",
+    );
+  });
+
+  it("reduces what is not a known label, as before", () => {
+    expect(tagFromInput("Ticket Jira", LINK_TAG_LABEL.en)).toBe("ticket_jira");
+    expect(tagFromInput("carte_trello", LINK_TAG_LABEL.en)).toBe(
+      "carte_trello",
+    );
+    expect(tagFromInput("!?", LINK_TAG_LABEL.en)).toBe("");
   });
 
   it("folds case, accents and separators", () => {

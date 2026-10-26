@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
+import { OPERATION_LABEL } from "../../core/model/model";
 import { LinksService } from "../../core/repo/links.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
+import { architectureMessages } from "./architecture.messages";
 
 /**
  * An architecture decision, and the scopings that produced it.
@@ -16,6 +19,8 @@ import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 const route = useRoute();
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
+const locale = inject(LocaleService);
+const t = locale.messages(architectureMessages);
 
 const id = computed(() => String(route.params["id"]));
 const decision = computed(() => store.findArchitectureDecision(id.value));
@@ -29,20 +34,20 @@ const scopings = computed(() =>
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="decision">
       <RouterLink class="retour" :to="links.path('architecture')">
-        <UiIcon name="arrow_back" /> Architecture
+        <UiIcon name="arrow_back" /> {{ t().back }}
       </RouterLink>
 
       <header class="entete">
-        <p class="type">Décision d’architecture</p>
+        <p class="type">{{ t().decisionKind }}</p>
         <h1>{{ decision.id }}</h1>
         <p v-if="decision.status === 'abroge'" class="abroge">
-          Cette décision ne s’applique plus.
+          {{ t().decisionRepealed }}
         </p>
       </header>
 
       <RenderedMarkdown class="md" :text="decision.statement" />
 
-      <h2 class="section">Cadrages</h2>
+      <h2 class="section">{{ t().scopings }}</h2>
       <div class="liste">
         <RouterLink
           v-for="c in scopings"
@@ -51,14 +56,16 @@ const scopings = computed(() =>
           :to="links.path('cadrages', c.scoping.id)"
         >
           <span class="nom">{{ c.scoping.id }}</span>
-          <span class="compte">{{ c.operation }}</span>
+          <span class="compte">{{
+            OPERATION_LABEL[locale.language()][c.operation]
+          }}</span>
         </RouterLink>
         <p v-if="!scopings.length" class="vide">
-          Aucun cadrage ne la déclare — voir la vérification d’intégrité.
+          {{ t().decisionUndeclared }}
         </p>
       </div>
     </template>
-    <p v-else class="vide">Décision introuvable : {{ id }}</p>
+    <p v-else class="vide">{{ t().decisionNotFound(id) }}</p>
   </div>
 </template>
 

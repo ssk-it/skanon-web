@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   OPERATION_LABEL,
@@ -39,6 +40,7 @@ import UiButton from "../../ui/UiButton.vue";
 import UiTextField from "../../ui/UiTextField.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import UiSelect from "../../ui/UiSelect.vue";
+import { editScopingMessages } from "./edit-scoping.messages";
 
 /**
  * Resuming an open scoping.
@@ -54,12 +56,6 @@ const OPERATIONS: ImpactOperation[] = ["cree", "modifie", "abroge", "touche"];
  * The kinds an impact can target, in the order they are looked up when re-reading a file. The same as in the loader and the checker.
  */
 const IMPACT_KINDS = ["regle", "adr", "architecture"] as const;
-
-const KIND_LABEL: Record<TargetKind, string> = {
-  regle: "Règle",
-  adr: "Décision",
-  architecture: "Document",
-};
 
 /** Operations from which propagation derives a write, hence a mandatory statement. */
 const WITH_STATEMENT = new Set<ImpactOperation>(["cree", "modifie"]);
@@ -82,6 +78,8 @@ const store = inject(SpecificationStore);
 const links = inject(LinksService);
 const authoring = inject(AuthoringService);
 const verification = inject(VerificationService);
+const locale = inject(LocaleService);
+const t = locale.messages(editScopingMessages);
 
 /**
  * The specification of the edited branch, when it has one.
@@ -98,10 +96,12 @@ const context = ref<Specification | null>(null);
 const decisions = ref<readonly DecisionInput[]>([]);
 const deletedDecisions = ref<readonly string[]>([]);
 
-const decisionStatusOptions = DECISION_STATUSES.map((s) => ({
-  value: s,
-  label: DECISION_STATUS_LABEL[s],
-}));
+const decisionStatusOptions = computed(() =>
+  DECISION_STATUSES.map((s) => ({
+    value: s,
+    label: DECISION_STATUS_LABEL[locale.language()][s],
+  })),
+);
 
 function addDecision(): void {
   // Numbered in order of appearance: that is what orders the files, and the order in which the questions arose can thus be read back.
@@ -197,15 +197,19 @@ const unknownSections = ref("");
  */
 const carriedLinks = ref<readonly LienPorte[]>([]);
 
-const kindOptions = IMPACT_KINDS.map((n) => ({
-  value: n as TargetKind,
-  label: KIND_LABEL[n],
-}));
-const operationOptions = OPERATIONS.map((op) => ({
-  value: op,
-  label: OPERATION_LABEL[op],
-}));
-const kindLabel = (n: TargetKind) => KIND_LABEL[n];
+const kindOptions = computed(() =>
+  IMPACT_KINDS.map((n) => ({
+    value: n as TargetKind,
+    label: t().kindLabel[n],
+  })),
+);
+const operationOptions = computed(() =>
+  OPERATIONS.map((op) => ({
+    value: op,
+    label: OPERATION_LABEL[locale.language()][op],
+  })),
+);
+const kindLabel = (n: TargetKind) => t().kindLabel[n];
 const requiresStatement = (op: ImpactOperation) => WITH_STATEMENT.has(op);
 
 const title = ref("");
@@ -246,7 +250,8 @@ const transitions = computed(() =>
   ),
 );
 
-const statusLabel = (s: ScopingStatus) => SCOPING_STATUS_LABEL[s];
+const statusLabel = (s: ScopingStatus) =>
+  SCOPING_STATUS_LABEL[locale.language()][s];
 
 function enteredDomains(): string[] {
   return domains.value
@@ -261,13 +266,14 @@ function enteredDomains(): string[] {
  * The rules come from the same module the Action runs before each delivery: what is flagged here is exactly what would block there, with no rule existing twice.
  */
 const problems = computed(() => {
+  const m = t();
   const missing = [
-    ["un titre", title.value],
-    ["un objectif", goal.value],
-    ["un parcours", journey.value],
+    [m.missingTitle, title.value],
+    [m.missingGoal, goal.value],
+    [m.missingJourney, journey.value],
   ]
     .filter(([, v]) => !v.trim())
-    .map(([name]) => `Il manque ${name}.`);
+    .map(([problem]) => problem);
 
   // Impacts with no designated rule are set aside before the check: it would report them under an empty identifier, unreadable for the author.
   const designated = impacts.value.filter((i) => i.target.trim());
@@ -289,15 +295,13 @@ const problems = computed(() => {
           .map((i) => [i.target.trim(), i.statement.trim()]),
       ),
     },
-    // The specification of the edited branch: that is where the domain and rules this scoping creates live.
+    // The specification of the edited branch: that is where the domain and rules this scoping creates live. Its errors keep the checker's wording, the same as the pull request's check.
     context.value ?? undefined,
   );
 
   return [
     ...missing,
-    ...(withoutRule
-      ? [`${withoutRule} impact(s) ne désignent aucune règle.`]
-      : []),
+    ...(withoutRule ? [m.withoutRule(withoutRule)] : []),
     ...errors,
   ];
 });
@@ -364,7 +368,7 @@ async function goToward(to: ScopingStatus): Promise<void> {
     error.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
-        : "Le changement de statut a échoué.";
+        : t().statusFailed;
   } finally {
     transition.value = false;
   }
@@ -378,7 +382,7 @@ async function load(loadedId: string): Promise<void> {
     if (id.value !== loadedId) return;
 
     const parse = splitFrontmatter(readAt.content);
-    if (!parse) throw new Error("Ce cadrage n’a pas de frontmatter.");
+    if (!parse) throw new Error(t().noFrontmatter);
     if (isUnreadable(parse)) throw new Error(parse.error);
 
     const data = parse.data as Record<string, unknown>;
@@ -444,7 +448,7 @@ async function load(loadedId: string): Promise<void> {
     loadError.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
-        : "Le cadrage n’a pas pu être chargé.";
+        : t().loadFailed;
   } finally {
     loading.value = false;
   }
@@ -516,7 +520,7 @@ async function save(): Promise<void> {
     error.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
-        : "L’enregistrement a échoué.";
+        : t().saveFailed;
   } finally {
     sending.value = false;
   }
@@ -526,23 +530,23 @@ async function save(): Promise<void> {
 <template>
   <div class="editer-cadrage-page">
     <RouterLink class="retour" :to="links.path('cadrages')">
-      <UiIcon name="arrow_back" /> Cadrages
+      <UiIcon name="arrow_back" /> {{ t().back }}
     </RouterLink>
 
     <header class="entete">
-      <p class="type">Reprendre un cadrage</p>
+      <p class="type">{{ t().type }}</p>
       <h1>{{ id }}</h1>
       <!-- Always its branch: a scoping the main branch holds is delivered, and is not loaded here (RG-cadrage-livre-immuable). -->
       <p v-if="source" class="sous-titre">
-        Chargé depuis <code>{{ source.branch }}</code
-        >. Les écritures y restent jusqu’à la livraison.
+        {{ t().loadedFromBefore }} <code>{{ source.branch }}</code
+        >{{ t().loadedFromAfter }}
       </p>
     </header>
 
     <template v-if="!loading && !loadError && transitions.length">
       <section class="cycle">
         <div class="cycle-etat">
-          <span class="cycle-libelle">Statut</span>
+          <span class="cycle-libelle">{{ t().status }}</span>
           <strong>{{ statusLabel(status()) }}</strong>
         </div>
         <div class="cycle-actions">
@@ -558,37 +562,36 @@ async function save(): Promise<void> {
         </div>
       </section>
       <p v-if="problems.length" class="cycle-bloque">
-        Le cadrage doit être cohérent avant de changer de statut.
+        {{ t().mustBeConsistent }}
       </p>
       <p v-if="toggleFailed" class="cycle-bloque">
-        La demande de fusion n’a pas basculé : le statut n’a pas changé.
-        Réessayer, ou basculer la demande sur la plateforme.
+        {{ t().toggleFailed }}
       </p>
     </template>
 
-    <p v-if="loading" class="attente">Chargement du cadrage…</p>
+    <p v-if="loading" class="attente">{{ t().loading }}</p>
     <p v-else-if="loadError" class="erreur">
       <UiIcon name="error_outline" /> <span>{{ loadError }}</span>
     </p>
     <form v-else class="formulaire" @submit.prevent="save()">
       <UiTextField
         v-model="title"
-        label="Titre"
+        :label="t().title"
         name="titre"
         :disabled="sending"
       />
 
       <UiTextField
         v-model="domains"
-        label="Domaines"
+        :label="t().domains"
         name="domaines"
-        hint="Séparés par des virgules."
+        :hint="t().domainsHint"
         :disabled="sending"
       />
 
       <UiTextField
         v-model="goal"
-        label="Objectif"
+        :label="t().goal"
         multiline
         :rows="5"
         name="objectif"
@@ -597,7 +600,7 @@ async function save(): Promise<void> {
 
       <UiTextField
         v-model="journey"
-        label="Parcours utilisateur"
+        :label="t().journey"
         multiline
         :rows="5"
         name="parcours"
@@ -606,23 +609,20 @@ async function save(): Promise<void> {
 
       <section class="impacts">
         <div class="impacts-tete">
-          <h2 class="section">Impacts sur les règles</h2>
+          <h2 class="section">{{ t().impactsOnRules }}</h2>
           <UiButton :disabled="sending" @click="addImpact()">
-            <UiIcon name="add" /> Ajouter
+            <UiIcon name="add" /> {{ t().add }}
           </UiButton>
         </div>
 
-        <p v-if="!impacts.length" class="vide">
-          Aucun impact déclaré. Un cadrage peut n’en porter aucun tant qu’il n’a
-          pas conclu ce qu’il change.
-        </p>
+        <p v-if="!impacts.length" class="vide">{{ t().noImpact }}</p>
 
         <div v-for="(i, index) of impacts" :key="index" class="impact">
           <div class="impact-tete">
             <UiSelect
               class="nature"
               :model-value="i.kind ?? 'regle'"
-              label="Nature"
+              :label="t().kind"
               :options="kindOptions"
               :name="'nature' + index"
               :disabled="sending"
@@ -641,7 +641,7 @@ async function save(): Promise<void> {
             <UiSelect
               class="operation"
               :model-value="i.operation"
-              label="Opération"
+              :label="t().operation"
               :options="operationOptions"
               :name="'op' + index"
               :disabled="sending"
@@ -651,7 +651,7 @@ async function save(): Promise<void> {
             <UiButton
               variant="icon"
               :disabled="sending"
-              aria-label="Retirer cet impact"
+              :aria-label="t().removeImpact"
               @click="removeImpact(index)"
             >
               <UiIcon name="close" />
@@ -662,11 +662,11 @@ async function save(): Promise<void> {
             v-if="requiresStatement(i.operation)"
             class="enonce"
             :model-value="i.statement"
-            label="Énoncé de la règle"
+            :label="t().statement"
             multiline
             :rows="4"
             :name="'enonce' + index"
-            hint="Le texte de la règle après ce cadrage. C’est lui que la propagation écrira au référentiel."
+            :hint="t().statementHint"
             :disabled="sending"
             @update:model-value="updateImpact(index, { statement: $event })"
           />
@@ -675,23 +675,20 @@ async function save(): Promise<void> {
 
       <section class="impacts">
         <div class="impacts-tete">
-          <h2 class="section">Décisions</h2>
+          <h2 class="section">{{ t().decisions }}</h2>
           <UiButton :disabled="sending" @click="addDecision()">
-            <UiIcon name="add" /> Ajouter
+            <UiIcon name="add" /> {{ t().add }}
           </UiButton>
         </div>
 
-        <p v-if="!decisions.length" class="vide">
-          Aucune décision. Ce qui a le plus de valeur six mois plus tard, ce
-          sont les options écartées et le motif qui a tranché.
-        </p>
+        <p v-if="!decisions.length" class="vide">{{ t().noDecision }}</p>
 
         <div v-for="(d, iD) of decisions" :key="iD" class="impact decision">
           <div class="impact-tete">
             <UiTextField
               class="regle"
               :model-value="d.title"
-              label="La question posée"
+              :label="t().question"
               :name="'dtitre' + iD"
               :disabled="sending"
               @update:model-value="updateDecision(iD, { title: $event })"
@@ -700,7 +697,7 @@ async function save(): Promise<void> {
             <UiSelect
               class="operation"
               :model-value="d.status"
-              label="Statut"
+              :label="t().status"
               :options="decisionStatusOptions"
               :name="'dstatut' + iD"
               :disabled="sending"
@@ -710,7 +707,7 @@ async function save(): Promise<void> {
             <UiButton
               variant="icon"
               :disabled="sending"
-              aria-label="Retirer cette décision"
+              :aria-label="t().removeDecision"
               @click="removeDecision(iD)"
             >
               <UiIcon name="close" />
@@ -720,7 +717,7 @@ async function save(): Promise<void> {
           <UiTextField
             class="enonce"
             :model-value="d.description"
-            label="Ce qui rendait la question ouverte"
+            :label="t().openBecause"
             multiline
             :rows="3"
             :name="'ddesc' + iD"
@@ -729,9 +726,9 @@ async function save(): Promise<void> {
           />
 
           <div class="options-tete">
-            <h3>Options</h3>
+            <h3>{{ t().options }}</h3>
             <UiButton :disabled="sending" @click="addOption(iD)">
-              <UiIcon name="add" /> Option
+              <UiIcon name="add" /> {{ t().option }}
             </UiButton>
           </div>
 
@@ -746,11 +743,7 @@ async function save(): Promise<void> {
               class="marque"
               :disabled="sending || !o.id.trim()"
               :aria-pressed="isChosen(d, o.id)"
-              :title="
-                isChosen(d, o.id)
-                  ? 'Option retenue — cliquer pour ne plus la retenir'
-                  : 'Désigner comme retenue'
-              "
+              :title="isChosen(d, o.id) ? t().unchoose : t().choose"
               @click="toggleChosen(iD, o.id)"
             >
               <UiIcon
@@ -765,16 +758,16 @@ async function save(): Promise<void> {
             <div class="option-champs">
               <UiTextField
                 :model-value="o.id"
-                label="Nom de l’option"
+                :label="t().optionName"
                 :name="'oid' + iD + '-' + iO"
-                hint="En minuscules, avec des tirets — il ne se renomme plus."
+                :hint="t().optionNameHint"
                 :disabled="sending"
                 @update:model-value="updateOption(iD, iO, { id: $event })"
               />
 
               <UiTextField
                 :model-value="o.body"
-                label="Ce qu’elle propose, pour et contre"
+                :label="t().optionBody"
                 multiline
                 :rows="3"
                 :name="'ocorps' + iD + '-' + iO"
@@ -786,7 +779,7 @@ async function save(): Promise<void> {
             <UiButton
               variant="icon"
               :disabled="sending"
-              aria-label="Retirer cette option"
+              :aria-label="t().removeOption"
               @click="removeOption(iD, iO)"
             >
               <UiIcon name="close" />
@@ -796,11 +789,11 @@ async function save(): Promise<void> {
           <UiTextField
             class="enonce"
             :model-value="d.decision"
-            label="Ce qui a tranché"
+            :label="t().settledBy"
             multiline
             :rows="3"
             :name="'dtranche' + iD"
-            hint="Le critère qui a fait pencher, non la liste des avantages."
+            :hint="t().settledByHint"
             :disabled="sending"
             @update:model-value="updateDecision(iD, { decision: $event })"
           />
@@ -817,17 +810,17 @@ async function save(): Promise<void> {
 
       <p v-if="saved" class="succes">
         <UiIcon name="check_circle" />
-        <span>Cadrage enregistré sur sa branche.</span>
+        <span>{{ t().saved }}</span>
       </p>
 
       <div class="actions">
-        <UiButton :to="links.path('cadrages')">Fermer</UiButton>
+        <UiButton :to="links.path('cadrages')">{{ t().close }}</UiButton>
         <UiButton
           variant="filled"
           type="submit"
           :disabled="sending || problems.length > 0"
         >
-          {{ sending ? "Enregistrement…" : "Enregistrer" }}
+          {{ sending ? t().saving : t().save }}
         </UiButton>
       </div>
     </form>

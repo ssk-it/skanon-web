@@ -2,6 +2,7 @@
 import { computed, watchEffect } from "vue";
 import { RouterLink } from "vue-router";
 import { TokenService } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import type { Scoping } from "../../core/model/model";
 import { LinksService } from "../../core/repo/links.service";
@@ -15,12 +16,15 @@ import ViewState from "../shared/ViewState.vue";
 import StatusChip from "../shared/StatusChip.vue";
 import { ScopingFilter } from "./scoping-filter";
 import { deliveredDatesState, filterScopings, groupScopings } from "./groups";
+import { scopingsPageMessages } from "./scopings-page.messages";
 
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
 const filter = inject(ScopingFilter);
 const tokens = inject(TokenService);
 const dialog = inject(DialogService);
+const locale = inject(LocaleService);
+const t = locale.messages(scopingsPageMessages);
 
 /** The whole repo: a hue is computed relative to the others. */
 const domainIds = computed(() => store.domains().map((d) => d.id));
@@ -41,7 +45,7 @@ const kept = computed(() =>
  * Recomputed when the dates arrive — they are loaded after the list, so the first renders place the scopings under « Date inconnue » before they join their quarter.
  */
 const groups = computed(() =>
-  groupScopings(kept.value, (id) => store.creationDate(id)),
+  groupScopings(kept.value, (id) => store.creationDate(id), locale.language()),
 );
 
 const inProgressKept = computed(
@@ -53,37 +57,37 @@ const datesState = computed(() =>
   deliveredDatesState(store.scopings(), (id) => store.creationDate(id)),
 );
 
-// Angular's `date` pipe in the fr locale: the `'long'` and `'d MMM yyyy'` formats.
-const LONG_DATE = new Intl.DateTimeFormat("fr-FR", {
-  dateStyle: "long",
-  timeStyle: "long",
-});
-const SHORT_DATE = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+// Angular's `date` pipe: the `'long'` and `'d MMM yyyy'` formats, in the displayed language.
+const longDate = computed(
+  () =>
+    new Intl.DateTimeFormat(locale.formatLocale(), {
+      dateStyle: "long",
+      timeStyle: "long",
+    }),
+);
+const shortDate = computed(
+  () =>
+    new Intl.DateTimeFormat(locale.formatLocale(), {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+);
 
 function formatLongDate(iso: string): string {
-  return LONG_DATE.format(new Date(iso));
+  return longDate.value.format(new Date(iso));
 }
 
 function formatShortDate(iso: string): string {
-  return SHORT_DATE.format(new Date(iso));
+  return shortDate.value.format(new Date(iso));
 }
 
 /** « 2 décisions · 3 impacts · 1 pièce jointe », without the zero counters. */
 function formatCounts(c: Scoping): string {
-  const plural = (n: number, one: string, several: string) =>
-    `${n} ${n > 1 ? several : one}`;
   return [
-    c.decisions.length
-      ? plural(c.decisions.length, "décision", "décisions")
-      : "",
-    c.impacts.length ? plural(c.impacts.length, "impact", "impacts") : "",
-    c.attachments.length
-      ? plural(c.attachments.length, "pièce jointe", "pièces jointes")
-      : "",
+    c.decisions.length ? t().decisions(c.decisions.length) : "",
+    c.impacts.length ? t().impacts(c.impacts.length) : "",
+    c.attachments.length ? t().attachments(c.attachments.length) : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -123,37 +127,35 @@ function enterFilter(event: Event): void {
   <template v-else>
     <header class="entete">
       <div class="titre-ligne">
-        <h1>Cadrages</h1>
-        <UiButton variant="filled" :to="links.path('cadrages', 'nouveau')"
-          >Nouveau cadrage</UiButton
-        >
+        <h1>{{ t().title }}</h1>
+        <UiButton variant="filled" :to="links.path('cadrages', 'nouveau')">{{
+          t().newScoping
+        }}</UiButton>
       </div>
-      <p class="sous-titre">
-        Les unités de changement. Chacune porte un objectif, les décisions qui
-        l’ont façonnée, et ses impacts sur les règles de gestion.
-      </p>
+      <p class="sous-titre">{{ t().subtitle }}</p>
       <p class="compte">
-        <template v-if="filter.active()">
-          {{ kept.length }}
-          {{ kept.length > 1 ? "cadrages" : "cadrage" }} sur
-          {{ store.scopings().length }} · {{ inProgressKept }} en cours
-        </template>
-        <template v-else>
-          {{ store.scopings().length }} cadrages ·
-          {{ store.scopingsInProgress().length }} en cours
-        </template>
+        <template v-if="filter.active()">{{
+          t().filteredCount(
+            kept.length,
+            store.scopings().length,
+            inProgressKept,
+          )
+        }}</template>
+        <template v-else>{{
+          t().count(store.scopings().length, store.scopingsInProgress().length)
+        }}</template>
       </p>
     </header>
 
     <!-- RG-liste-cadrages-filtrable: browsing a set, where the search palette leads to one element. -->
-    <div class="filtre" role="search" aria-label="Filtrer les cadrages">
+    <div class="filtre" role="search" :aria-label="t().filterLabel">
       <label class="champ">
         <UiIcon name="filter_list" />
-        <span class="lecteur-ecran">Filtrer par identifiant ou titre</span>
+        <span class="lecteur-ecran">{{ t().filterField }}</span>
         <input
           type="text"
           autocomplete="off"
-          placeholder="Filtrer par identifiant ou titre"
+          :placeholder="t().filterField"
           :value="filter.text()"
           @input="enterFilter"
         />
@@ -162,7 +164,7 @@ function enterFilter(event: Event): void {
         v-if="store.domains().length > 1"
         class="domaines"
         role="group"
-        aria-label="Domaines"
+        :aria-label="t().domains"
       >
         <button
           v-for="d in store.domains()"
@@ -182,13 +184,13 @@ function enterFilter(event: Event): void {
     <p v-if="datesState === 'indisponibles'" class="note-dates" role="status">
       <UiIcon name="schedule" />
       <span>
-        Les dates de création n’ont pas pu être lues.
+        {{ t().datesUnread }}
         <template v-if="!tokens.present()">
-          GitHub limite les requêtes anonymes :
+          {{ t().anonymousLimitBefore }}
           <button type="button" class="lien" @click="openTokenDialog()">
-            Se connecter
+            {{ t().signIn }}
           </button>
-          lève cette limite.
+          {{ t().anonymousLimitAfter }}
         </template>
       </span>
     </p>
@@ -222,7 +224,7 @@ function enterFilter(event: Event): void {
                   v-if="store.creationDate(c.id)"
                   class="date"
                   :title="
-                    'Créé le ' + formatLongDate(store.creationDate(c.id)!)
+                    t().createdOn(formatLongDate(store.creationDate(c.id)!))
                   "
                 >
                   {{ formatShortDate(store.creationDate(c.id)!) }}
@@ -235,9 +237,9 @@ function enterFilter(event: Event): void {
                   >·</span
                 >
                 <span class="compteurs">{{ formatCounts(c) }}</span>
-                <span v-if="!c.impacts.length" class="sans-impact"
-                  >aucun impact déclaré</span
-                >
+                <span v-if="!c.impacts.length" class="sans-impact">{{
+                  t().noImpact
+                }}</span>
               </span>
             </div>
             <!-- Grouped in a single cell: the grid has three, and a fourth child would drop to the next line. -->
@@ -245,7 +247,7 @@ function enterFilter(event: Event): void {
               <span
                 v-if="c.provenance"
                 class="branche"
-                :title="'Sur la branche ' + c.provenance.branch"
+                :title="t().onBranch(c.provenance.branch)"
               >
                 <UiIcon name="call_split" />
                 <span
@@ -253,7 +255,7 @@ function enterFilter(event: Event): void {
                     c.provenance.pullRequest
                       ? "#" + c.provenance.pullRequest
                       : c.provenance.branch
-                  }}{{ c.provenance.draft ? " · brouillon" : "" }}</span
+                  }}{{ c.provenance.draft ? t().draft : "" }}</span
                 >
               </span>
               <!-- Repeated on every delivered one, the status teaches nothing: it is displayed only where it distinguishes the row from its group. -->
@@ -263,12 +265,12 @@ function enterFilter(event: Event): void {
         </template>
       </template>
       <p v-else-if="filter.active()" class="vide">
-        Aucun cadrage ne correspond à ce filtre.
+        {{ t().noMatch }}
         <button type="button" class="lien" @click="filter.clear()">
-          Effacer le filtre
+          {{ t().clearFilter }}
         </button>
       </p>
-      <p v-else class="vide">Ce dépôt ne contient aucun cadrage.</p>
+      <p v-else class="vide">{{ t().empty }}</p>
     </div>
   </template>
 </template>

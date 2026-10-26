@@ -1,8 +1,9 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
@@ -214,5 +215,60 @@ describe("The search palette", () => {
       "/org/depot/cadrages/2026-006#decision-01-canal",
     );
     expect(f.emitted("close")).toHaveLength(1);
+  });
+
+  // RG-textes-traduits: the palette speaks the reader's language; identifiers and the found content stay as written.
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("says what it searches, in English", async () => {
+      const el = (await mountView()).element as HTMLElement;
+
+      const field = el.querySelector("input")!;
+      expect(field.getAttribute("placeholder")).toBe(
+        "Search a rule, a decision, a scoping…",
+      );
+      expect(field.getAttribute("aria-label")).toBe("Search the specification");
+      expect(el.querySelector(".aide")?.textContent).toContain(
+        "Searches the full text of rules, decisions, architecture and scopings",
+      );
+      expect(el.querySelector(".pied")?.textContent).toContain("browse");
+      expect(el.textContent).not.toContain("Cherche");
+    });
+
+    it("titles its groups in English", async () => {
+      const el = await typeText(await mountView(), "quota");
+
+      expect(groupTitles(el)).toEqual([
+        "Business rules",
+        "Decisions",
+        "Scopings",
+        "In progress",
+      ]);
+      expect(el.querySelector(".groupe.en-cours")?.textContent).toContain(
+        "On their branch: not yet in the specification.",
+      );
+      // the found content is the user's, and stays as written
+      expect(el.textContent).toContain(
+        "Charger un dépôt sans épuiser le quota",
+      );
+    });
+
+    it("says that no result matches, in English", async () => {
+      const el = await typeText(await mountView(), "introuvable");
+
+      expect(el.querySelector(".vide")?.textContent).toContain(
+        "No results for “introuvable”.",
+      );
+    });
+
+    it("warns that its results hold for today, in English", async () => {
+      const el = (await mountView({ onPastState: true }))
+        .element as HTMLElement;
+
+      expect(el.querySelector(".etat-courant")?.textContent).toContain(
+        "today’s specification",
+      );
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { LocaleService } from "../i18n/locale.service";
 import { inject } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory, type Router } from "vue-router";
@@ -144,5 +145,26 @@ describe("Page title", () => {
 
     expect(title.getTitle()).toContain("Ouvrir un projet");
     expect(title.getTitle()).toContain("Skanon");
+  });
+
+  // RG-langue-choisie: the route's heading is in the displayed language; the project and the items keep their own names.
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("names the route in English", async () => {
+      await router.push("/ssk-it/exemple-cadrage/referentiel");
+      expect(title.getTitle()).toBe(
+        "Specification — ssk-it/exemple-cadrage — Skanon",
+      );
+      await router.push("/mentions-legales");
+      expect(title.getTitle()).toBe("Legal notice — Skanon");
+    });
+
+    it("follows a language switch without navigating", async () => {
+      await router.push("/aide");
+      expect(title.getTitle()).toBe("How Skanon works — Skanon");
+      inject(LocaleService).choice.set("fr");
+      expect(title.getTitle()).toBe("Fonctionnement — Skanon");
+    });
   });
 });

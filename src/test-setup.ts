@@ -16,3 +16,9 @@ afterEach(() => {
 
 // jsdom lays nothing out and does not implement `scrollTo`, which the router's scrolling calls on every navigation (`src/router.ts`): without this fake, every routed page test writes it to the console.
 window.scrollTo = () => {};
+
+// jsdom's browser speaks English: the existing tests read the interface in French, as its authors wrote it, and English cases ask for it (RG-langue-choisie).
+Object.defineProperty(navigator, "languages", {
+  value: ["fr-FR"],
+  configurable: true,
+});

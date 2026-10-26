@@ -1,5 +1,7 @@
+import type { Language } from "../../core/i18n/language";
 import type { Scoping } from "../../core/model/model";
 import { displayIdentifier } from "../../core/repo/scoping-reference";
+import { groupsMessages } from "./groups.messages";
 
 /**
  * A block of the list: the scopings in progress, or a delivery quarter.
@@ -26,10 +28,9 @@ export function quarterOf(iso: string): string {
   return `${d.getUTCFullYear()}-T${Math.floor(d.getUTCMonth() / 3) + 1}`;
 }
 
-function quarterLabel(key: string): string {
+function quarterLabel(key: string, language: Language): string {
   const [year, t] = key.split("-T");
-  // « 1ᵉʳ » and not « 1ᵉ »: the first is the only one not following the rule.
-  return `${t}${t === "1" ? "ᵉʳ" : "ᵉ"} trimestre ${year}`;
+  return groupsMessages[language].quarter(t, year);
 }
 
 /**
@@ -46,17 +47,22 @@ function quarterLabel(key: string): string {
  * Dates arrive after the list, one Git call per scoping. A scoping whose date
  * is still missing joins a « sans date » group at the end of the list rather
  * than disappearing: better to show it misplaced than not at all.
+ *
+ * The labels are in the displayed language; the keys are not, since they
+ * identify a group across a language switch.
  */
 export function groupScopings(
   scopings: readonly Scoping[],
   dateOf: (id: string) => string | null | undefined,
+  language: Language,
 ): readonly ScopingGroup[] {
+  const t = groupsMessages[language];
   const inProgress = scopings.filter((c) => c.status !== "livree");
   const delivered = scopings.filter((c) => c.status === "livree");
 
   const groups: ScopingGroup[] = [];
   if (inProgress.length) {
-    groups.push({ key: "en-cours", label: "En cours", scopings: inProgress });
+    groups.push({ key: "en-cours", label: t.inProgress, scopings: inProgress });
   }
 
   // A Map keeps insertion order: since delivered ones already arrive from most
@@ -81,12 +87,12 @@ export function groupScopings(
   // `deliveredDatesState`.
   if (!byQuarter.size) {
     if (undated.length)
-      groups.push({ key: "livres", label: "Livrés", scopings: undated });
+      groups.push({ key: "livres", label: t.delivered, scopings: undated });
     return groups;
   }
 
   for (const [key, members] of byQuarter) {
-    groups.push({ key, label: quarterLabel(key), scopings: members });
+    groups.push({ key, label: quarterLabel(key, language), scopings: members });
   }
   if (undated.length) {
     // « Pas encore daté » and not « Date inconnue »: the common case is not
@@ -95,7 +101,7 @@ export function groupScopings(
     // arrive, resolves itself on the next load.
     groups.push({
       key: "sans-date",
-      label: "Pas encore daté",
+      label: t.undated,
       scopings: undated,
     });
   }

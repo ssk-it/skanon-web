@@ -5,6 +5,7 @@ import {
   provideHttpTesting,
   type HttpTestingController,
 } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import ViewState from "./ViewState.vue";
@@ -104,5 +105,31 @@ describe("repo not found under a token", () => {
     expect(
       render().querySelector('a[href*="personal-access-tokens"]'),
     ).toBeNull();
+  });
+
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("says the repo could not be loaded, and how to give the token access", async () => {
+      tokens.set("github_pat_jetonDeTestSuffisammentLong");
+      await loadNotFound();
+
+      const text = render().textContent ?? "";
+      expect(text).toContain("The repo could not be loaded");
+      expect(text).toContain("Give the token access to ssk-it/prive");
+      expect(text).toContain("the access tokens page");
+      expect(text).toContain("Try again");
+      for (const french of ["n’a pas pu être chargé", "Réessayer", "Ouvrir"])
+        expect(text).not.toContain(french);
+    });
+
+    it("guides a classic token in English", async () => {
+      tokens.set("ghp_jetonDeTestSuffisammentLong");
+      await loadNotFound();
+
+      const text = render().textContent ?? "";
+      expect(text).toContain("The saved token is a classic token");
+      expect(text).toContain("Save another token");
+    });
   });
 });

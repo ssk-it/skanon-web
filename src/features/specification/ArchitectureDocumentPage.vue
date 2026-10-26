@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
+import { OPERATION_LABEL, type DocumentKind } from "../../core/model/model";
 import { LinksService } from "../../core/repo/links.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
-
-const KIND_LABEL: Record<string, string> = {
-  component: "Composant",
-  flows: "Flux",
-  context: "Contexte",
-};
+import { architectureMessages } from "./architecture.messages";
 
 /**
  * An architecture document, and what is attached to it.
@@ -22,6 +19,8 @@ const KIND_LABEL: Record<string, string> = {
 const route = useRoute();
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
+const locale = inject(LocaleService);
+const t = locale.messages(architectureMessages);
 
 const id = computed(() => String(route.params["id"]));
 const document = computed(() => store.findArchitectureDocument(id.value));
@@ -30,8 +29,8 @@ const scopings = computed(() =>
   store.listScopingsImpactingTarget(id.value, "architecture"),
 );
 
-function label(kind: string): string {
-  return KIND_LABEL[kind] ?? kind;
+function label(kind: DocumentKind): string {
+  return t().documentKind[kind] ?? kind;
 }
 </script>
 
@@ -40,21 +39,21 @@ function label(kind: string): string {
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="document">
       <RouterLink class="retour" :to="links.path('architecture')">
-        <UiIcon name="arrow_back" /> Architecture
+        <UiIcon name="arrow_back" /> {{ t().back }}
       </RouterLink>
 
       <header class="entete">
         <p class="type">{{ label(document.kind) }}</p>
         <h1>{{ document.id }}</h1>
         <p v-if="document.status === 'abroge'" class="abroge">
-          Ce document ne s’applique plus.
+          {{ t().documentRepealed }}
         </p>
       </header>
 
       <RenderedMarkdown class="md" :text="document.statement" />
 
       <template v-if="document.components.length">
-        <h2 class="section">Composants reliés</h2>
+        <h2 class="section">{{ t().connectedComponents }}</h2>
         <div class="liste">
           <RouterLink
             v-for="c in document.components"
@@ -63,15 +62,15 @@ function label(kind: string): string {
             :to="links.path('architecture', 'document', c)"
           >
             <span class="nom">{{ c }}</span>
-            <span v-if="!store.findArchitectureDocument(c)" class="compte"
-              >non décrit</span
-            >
+            <span v-if="!store.findArchitectureDocument(c)" class="compte">{{
+              t().notDescribed
+            }}</span>
           </RouterLink>
         </div>
       </template>
 
       <template v-if="touchingFlows.length">
-        <h2 class="section">Flux qui le touchent</h2>
+        <h2 class="section">{{ t().touchingFlows }}</h2>
         <div class="liste">
           <RouterLink
             v-for="f in touchingFlows"
@@ -84,7 +83,7 @@ function label(kind: string): string {
         </div>
       </template>
 
-      <h2 class="section">Cadrages</h2>
+      <h2 class="section">{{ t().scopings }}</h2>
       <div class="liste">
         <RouterLink
           v-for="c in scopings"
@@ -93,14 +92,16 @@ function label(kind: string): string {
           :to="links.path('cadrages', c.scoping.id)"
         >
           <span class="nom">{{ c.scoping.id }}</span>
-          <span class="compte">{{ c.operation }}</span>
+          <span class="compte">{{
+            OPERATION_LABEL[locale.language()][c.operation]
+          }}</span>
         </RouterLink>
         <p v-if="!scopings.length" class="vide">
-          Aucun cadrage ne le déclare — voir la vérification d’intégrité.
+          {{ t().documentUndeclared }}
         </p>
       </div>
     </template>
-    <p v-else class="vide">Document introuvable : {{ id }}</p>
+    <p v-else class="vide">{{ t().documentNotFound(id) }}</p>
   </div>
 </template>
 

@@ -6,6 +6,7 @@ import {
   provideHttpTesting,
   settle,
 } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { DEFAULT_LINK_TAGS, type Scoping } from "../../core/model/model";
 import { SpecificationStore } from "../../core/repo/specification.store";
@@ -202,5 +203,87 @@ describe("The place of the section", () => {
 
     const sections = view.findAll("h2, .pistes");
     expect(sections.at(-1)?.classes()).toContain("pistes");
+  });
+});
+
+describe("in English", () => {
+  beforeEach(() => {
+    http = provideHttpTesting();
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
+    inject(LocaleService).choice.set("en");
+  });
+
+  it("titles the section and its horizons in English", async () => {
+    const view = await mountSection((r) =>
+      r.flush([
+        issue(13, ["domaine/cadrage"], null),
+        issue(12, ["domaine/cadrage"], "ensuite"),
+      ]),
+    );
+    await view.get("button.bascule").trigger("click");
+
+    expect(view.get("button.bascule").text()).toContain("Upcoming");
+    expect(view.text()).toContain("nothing is decided");
+    expect(view.findAll(".horizon").map((h) => h.text())).toEqual([
+      "Next",
+      "Unclassified",
+    ]);
+    expect(view.get(".piste a.cadrage").text()).toContain("in progress");
+    expect(view.text()).not.toContain("À venir");
+  });
+
+  it("says in English what it would hold", async () => {
+    const view = await mountSection((r) => r.flush([]));
+    await view.get("button.bascule").trigger("click");
+
+    expect(view.text()).toContain("No roadmap item for this domain");
+    // The labels and milestones are read from the repo: they stay as written.
+    expect(view.text()).toContain("domaine/cadrage");
+    expect(view.text()).toContain("« maintenant »");
+  });
+
+  it("names the missing permission in English", async () => {
+    const view = await mountSection((r) =>
+      r.flush({ message: "Resource not accessible" }, { status: 403 }),
+    );
+    await view.get("button.bascule").trigger("click");
+
+    expect(view.text()).toContain("The token cannot read");
+    expect(view.text()).toContain("Issues");
+  });
+
+  it("titles a domain page in English", async () => {
+    const router = await prepare();
+    await router.push("/org/depot/referentiel/domaine/cadrage");
+    const view = mount(DomainPage, { global: { plugins: [router] } });
+    await flushPromises();
+
+    expect(view.text()).toContain("Specification");
+    expect(view.text()).toContain("Domain");
+    expect(view.text()).toContain("Features");
+    expect(view.text()).toContain("0 rules");
+    expect(view.text()).toContain("Scopings");
+    expect(view.text()).not.toContain("Fonctionnalités");
+  });
+
+  it("titles a feature page in English", async () => {
+    const router = await prepare();
+    await router.push("/org/depot/referentiel/fonctionnalite/redaction");
+    const view = mount(FeaturePage, { global: { plugins: [router] } });
+    await flushPromises();
+
+    expect(view.text()).toContain("Feature");
+    expect(view.text()).toContain("Business rules");
+    expect(view.text()).toContain("No rule attached to this feature.");
+    expect(view.text()).not.toContain("Règles de gestion");
+  });
+
+  it("says in English that a domain does not exist", async () => {
+    const router = await prepare();
+    await router.push("/org/depot/referentiel/domaine/inconnu");
+    const view = mount(DomainPage, { global: { plugins: [router] } });
+    await flushPromises();
+
+    expect(view.text()).toContain("Domain not found: inconnu");
   });
 });

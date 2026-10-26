@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { GithubClient } from "../../core/github/github-client";
 import { IdentityService } from "../../core/github/identity.service";
 import { TokenService, repoKeys } from "../../core/github/token.service";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { PLATFORM } from "../../platform/platform-token";
 import { GUARANTEES, ACCESS_MODE_LABEL } from "../../core/model/model";
@@ -17,6 +18,8 @@ import UiSelect from "../../ui/UiSelect.vue";
 
 // Where the token lives is not the same depending on the target (INV-8): the text says so, without promising more than what each one does.
 const onDesktop = inject(PLATFORM).target === "bureau";
+import RichText from "./RichText.vue";
+import { tokenDialogMessages } from "./token-dialog.messages";
 import TokenHelp from "./TokenHelp.vue";
 
 /**
@@ -30,10 +33,14 @@ const tokens = inject(TokenService);
 const store = inject(SpecificationStore);
 const identity = inject(IdentityService);
 const config = inject(RepoConfig);
+const locale = inject(LocaleService);
+const t = locale.messages(tokenDialogMessages);
 
 /** The project's access mode, and what it guarantees. */
 const mode = computed(() => store.specification().settings.access);
-const modeLabel = computed(() => ACCESS_MODE_LABEL[mode.value]);
+const modeLabel = computed(
+  () => ACCESS_MODE_LABEL[locale.language()][mode.value],
+);
 const guarantees = computed(() => GUARANTEES[mode.value]);
 const viaThirdPartyIdentity = computed(() => mode.value === "identite_tierce");
 const who = computed(() => tokens.identity());
@@ -70,13 +77,13 @@ const protection = computed(() => {
 const whereKept = computed(() => {
   switch (tokens.form()) {
     case "systeme":
-      return "dans le coffre du système";
+      return t().keptInKeychain;
     case "scelle":
-      return "dans ce navigateur, sous une passkey";
+      return t().keptSealed;
     case "session":
-      return "pour cet onglet seulement";
+      return t().keptForTab;
     default:
-      return "dans ce navigateur";
+      return t().keptInBrowser;
   }
 });
 
@@ -102,10 +109,10 @@ const scope = ref(repoKeys(config.repoRef()).organization);
 const scopeOptions = computed(() => [
   {
     value: organizationKey.value,
-    label: `l’organisation ${organizationKey.value}`,
+    label: t().scopeOrganization(organizationKey.value),
   },
-  { value: repoKey.value, label: `ce dépôt seul — ${repoKey.value}` },
-  { value: "", label: "tous les autres dépôts" },
+  { value: repoKey.value, label: t().scopeRepoOnly(repoKey.value) },
+  { value: "", label: t().scopeOthers },
 ]);
 
 const verifying = ref(false);
@@ -141,14 +148,14 @@ async function check(): Promise<void> {
     verification.value = {
       ok: true,
       message: covers
-        ? `${repos.length} dépôt(s), dont celui qui est ouvert.`
-        : `${repos.length} dépôt(s) — mais pas celui qui est ouvert.`,
+        ? t().coversOpen(repos.length)
+        : t().missesOpen(repos.length),
       repos,
     };
   } catch (e) {
     verification.value = {
       ok: false,
-      message: e instanceof Error ? e.message : "Ce jeton n’a pas été accepté.",
+      message: e instanceof Error ? e.message : t().notAccepted,
       repos: [],
     };
   } finally {
@@ -203,95 +210,68 @@ function signOut(): void {
 <template>
   <UiDialog
     class="token-dialog"
-    :title="viaThirdPartyIdentity ? 'Connexion' : 'Connexion à GitHub'"
+    :title="viaThirdPartyIdentity ? t().signIn : t().signInGithub"
   >
-    <p v-if="!viaThirdPartyIdentity" class="aide">
-      Sans connexion, GitHub limite l’application à 60 requêtes par heure et par
-      adresse. Un jeton personnel porte cette limite à 5 000, donne accès aux
-      dépôts privés, et débloque l’historique des règles — dates, auteurs et
-      pull requests, que GitHub refuse aux requêtes anonymes.
-    </p>
+    <p v-if="!viaThirdPartyIdentity" class="aide">{{ t().whyToken }}</p>
 
     <!-- RG-garanties-annoncees: a mode that would suggest a protection it does not offer would be worse than its absence. -->
     <div class="garanties">
-      <p class="mode">
-        Ce projet emploie le mode <strong>{{ modeLabel }}</strong
-        >.
-      </p>
+      <p class="mode"><RichText :parts="t().mode(modeLabel)" /></p>
       <ul>
         <li>
-          <template v-if="guarantees.scope === 'chemin'">
-            L’autorisation descend jusqu’au <strong>chemin</strong> : un
-            rédacteur n’écrit que là où le projet l’y autorise.
-          </template>
-          <template v-else>
-            L’autorisation s’arrête au <strong>dépôt</strong> : un rédacteur
-            autorisé peut écrire partout dans ce projet.
-          </template>
+          <RichText
+            :parts="
+              guarantees.scope === 'chemin' ? t().scopePath : t().scopeRepo
+            "
+          />
         </li>
         <li>
-          <template v-if="guarantees.authorVerified">
-            L’auteur d’un enregistrement est <strong>vérifié</strong> depuis
-            l’identité connectée.
-          </template>
-          <template v-else>
-            L’auteur d’un enregistrement est <strong>déclaré</strong> par
-            l’application, non vérifié à la source.
-          </template>
+          <RichText
+            :parts="
+              guarantees.authorVerified
+                ? t().authorVerified
+                : t().authorDeclared
+            "
+          />
         </li>
         <!-- RG-contenus-prives-au-repos: what the cache leaves on the machine is said, without claiming protection. -->
         <li>
-          <template v-if="viaThirdPartyIdentity">
-            Les contenus d’un dépôt privé restent dans cet onglet le temps de la
-            session, comme l’accès qui les a lus.
-          </template>
-          <template v-else-if="tokens.form() === 'scelle'">
-            Les contenus d’un dépôt privé sont
-            <strong>scellés comme le jeton</strong>, et effacés quand il est
-            oublié.
-          </template>
-          <template v-else>
-            Les contenus d’un dépôt privé sont
-            <strong>conservés en clair</strong>
-            {{
-              onDesktop
-                ? "par l’application"
-                : "par ce navigateur, comme le jeton,"
-            }}
-            et effacés quand le jeton est oublié.
-          </template>
+          <template v-if="viaThirdPartyIdentity">{{
+            t().privateInTab
+          }}</template>
+          <RichText
+            v-else
+            :parts="
+              tokens.form() === 'scelle'
+                ? t().privateSealed
+                : t().privateClear(onDesktop)
+            "
+          />
         </li>
       </ul>
     </div>
 
     <div v-if="!viaThirdPartyIdentity" class="conseil">
       <UiIcon name="lock" />
-      <p>
-        Un jeton en <strong>lecture seule</strong> suffit pour consulter.
-        Rédiger un cadrage demande l’écriture — voir le tableau des permissions.
-        Le jeton est conservé {{ whereKept }}, et n’est envoyé qu’à GitHub.
-      </p>
+      <p><RichText :parts="t().readOnlyAdvice(whereKept)" /></p>
     </div>
 
     <div v-if="viaThirdPartyIdentity" class="identite">
       <template v-if="who">
         <p class="connecte">
-          Connecté en tant que <strong>{{ who.name }}</strong>
+          {{ t().signedInAs }}<strong>{{ who.name }}</strong>
           <span v-if="who.email" class="courriel">{{ who.email }}</span>
         </p>
         <p class="portee">
-          Projets accessibles :
-          {{ (tokens.repos() ?? []).join(", ") || "aucun" }}
+          {{ t().accessibleProjects }}
+          {{ (tokens.repos() ?? []).join(", ") || t().noProject }}
         </p>
-        <UiButton variant="outlined" @click="signOut()"
-          >Se déconnecter</UiButton
-        >
+        <UiButton variant="outlined" @click="signOut()">{{
+          t().signOut
+        }}</UiButton>
       </template>
       <template v-else>
-        <p class="invite">
-          Ce projet fait vérifier les identités auprès de son propre
-          fournisseur. Aucun compte GitHub n’est nécessaire.
-        </p>
+        <p class="invite">{{ t().ownProvider }}</p>
         <p v-if="identity.error()" class="echec">
           <UiIcon name="error_outline" /> <span>{{ identity.error() }}</span>
         </p>
@@ -300,39 +280,33 @@ function signOut(): void {
           :disabled="identity.inProgress()"
           @click="signIn()"
         >
-          {{ identity.inProgress() ? "Connexion…" : "Se connecter" }}
+          {{ identity.inProgress() ? t().signingIn : t().doSignIn }}
         </UiButton>
       </template>
     </div>
     <div v-else-if="protection === 'verrouille'" class="protection verrou">
-      <p>
-        Vos jetons sont protégés par une passkey. Déverrouillez-les pour vous en
-        servir, en ajouter ou en retirer un.
-      </p>
+      <p>{{ t().locked }}</p>
       <p v-if="tokens.passkeyFailure() === 'illisible'" class="echec">
         <UiIcon name="error_outline" />
-        <span
-          >La passkey ne les ouvre plus : oubliez-les, puis saisissez de nouveau
-          votre jeton.</span
-        >
+        <span>{{ t().passkeyUnreadable }}</span>
       </p>
       <div class="gestes">
-        <UiButton variant="filled" @click="unlock()">Déverrouiller</UiButton>
-        <UiButton @click="signOut()">Oublier ces jetons</UiButton>
+        <UiButton variant="filled" @click="unlock()">{{ t().unlock }}</UiButton>
+        <UiButton @click="signOut()">{{ t().forgetTokens }}</UiButton>
       </div>
     </div>
     <template v-else>
       <UiTextField
         :model-value="input"
         class="champ"
-        label="Jeton d’accès personnel"
+        :label="t().tokenLabel"
         type="password"
         placeholder="ghp_…"
         autocomplete="off"
         spellcheck="false"
         data-focus-initial
         :error="error"
-        :hint="`Envoyé à GitHub seul, et conservé ${whereKept}.`"
+        :hint="t().tokenHint(whereKept)"
         @update:model-value="changeInput"
         @keyup.enter="validate()"
       />
@@ -340,41 +314,25 @@ function signOut(): void {
       <UiSelect
         v-model="scope"
         class="champ"
-        label="Ce jeton vaut pour"
+        :label="t().scopeLabel"
         :options="scopeOptions"
-        hint="Un jeton par organisation : celui d’une autre ne s’en trouve pas écrasé."
+        :hint="t().scopeHint"
       />
 
       <!-- RG-secret-conserve-localement: the passkey protects the token at rest, not in the page; the text promises no more. -->
       <div v-if="protection !== 'aucune'" class="protection">
         <template v-if="protection === 'proposee'">
-          <UiCheckbox v-model="protect">
-            Protéger ce jeton par une passkey
-          </UiCheckbox>
-          <p class="option-aide">
-            Touch ID, ou le code de l’appareil, l’ouvrira dans chaque onglet.
-            Seul son chiffré reste dans ce navigateur : un programme qui lit le
-            profil ne le trouve pas. Un script sur la page, onglet déverrouillé,
-            le lirait toujours.
-          </p>
+          <UiCheckbox v-model="protect">{{ t().protect }}</UiCheckbox>
+          <p class="option-aide">{{ t().protectHelp }}</p>
         </template>
         <p v-else-if="protection === 'exigee'">
-          Ce projet exige que le jeton soit protégé par une passkey : Touch ID,
-          ou le code de l’appareil, vous sera demandé à l’enregistrement, puis
-          dans chaque onglet.
+          {{ t().protectionRequired }}
         </p>
-        <p v-else-if="protection === 'scelle'">
-          Vos jetons sont protégés par une passkey : celui-ci le sera aussi.
-        </p>
+        <p v-else-if="protection === 'scelle'">{{ t().protectionSealed }}</p>
         <p v-else-if="protection === 'impossible-exigee'">
-          Ce projet exige une passkey, que ce navigateur ne sait pas créer : le
-          jeton ne sera gardé que pour cet onglet. L’application de bureau, ou
-          un navigateur récent, le garderont d’une ouverture à l’autre.
+          {{ t().protectionImpossibleRequired }}
         </p>
-        <p v-else>
-          Ce navigateur ne sait pas protéger le jeton par une passkey : il le
-          gardera en clair.
-        </p>
+        <p v-else>{{ t().protectionImpossible }}</p>
       </div>
 
       <div
@@ -393,7 +351,7 @@ function signOut(): void {
             </li>
           </ul>
           <p v-if="verification.repos.length > 8" class="reste">
-            … et {{ verification.repos.length - 8 }} autres
+            {{ t().others(verification.repos.length - 8) }}
           </p>
         </template>
       </div>
@@ -404,24 +362,24 @@ function signOut(): void {
         :disabled="verifying"
         @click="check()"
       >
-        {{ verifying ? "Vérification…" : "Vérifier ce que le jeton ouvre" }}
+        {{ verifying ? t().verifying : t().verify }}
       </UiButton>
 
       <!-- Expanded as long as nothing is saved: that is the moment one needs it. -->
       <details class="guide" :open="tokens.noAccess()">
-        <summary>Comment créer un jeton ?</summary>
+        <summary>{{ t().howToCreate }}</summary>
         <TokenHelp />
       </details>
 
       <details v-if="tokens.scopes().length" class="guide">
-        <summary>Jetons enregistrés ({{ tokens.scopes().length }})</summary>
+        <summary>{{ t().savedTokens(tokens.scopes().length) }}</summary>
         <ul class="portees">
           <li v-for="p in tokens.scopes()" :key="p.key">
             <span class="cle">{{ p.key }}</span>
             <span class="fin">…{{ p.token.slice(-4) }}</span>
             <UiButton
               variant="icon"
-              aria-label="Retirer ce jeton"
+              :aria-label="t().removeToken"
               @click="forget(p.key)"
             >
               <UiIcon name="close" />
@@ -430,28 +388,21 @@ function signOut(): void {
         </ul>
       </details>
 
-      <UiCheckbox v-model="viaApi" class="option">
-        Charger les contenus par l’API
-      </UiCheckbox>
-      <p class="option-aide">
-        Un appel compté par fichier, là où le canal par défaut n’en compte
-        aucun. Les fichiers sont lus au commit dans les deux cas : ce qui vient
-        d’être poussé apparaît au prochain chargement. Un dépôt privé passe par
-        l’API de lui-même.
-      </p>
+      <UiCheckbox v-model="viaApi" class="option">{{ t().viaApi }}</UiCheckbox>
+      <p class="option-aide">{{ t().viaApiHelp }}</p>
     </template>
 
     <template #actions>
-      <UiButton v-if="tokens.present()" class="deco" @click="signOut()"
-        >Se déconnecter</UiButton
-      >
+      <UiButton v-if="tokens.present()" class="deco" @click="signOut()">{{
+        t().signOut
+      }}</UiButton>
       <span class="espace"></span>
-      <UiButton @click="emit('close')">Annuler</UiButton>
+      <UiButton @click="emit('close')">{{ t().cancel }}</UiButton>
       <UiButton
         variant="filled"
         :disabled="protecting || protection === 'verrouille'"
         @click="validate()"
-        >{{ protecting ? "Protection…" : "Enregistrer" }}</UiButton
+        >{{ protecting ? t().protecting : t().save }}</UiButton
       >
     </template>
   </UiDialog>

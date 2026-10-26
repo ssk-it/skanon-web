@@ -6,6 +6,7 @@ import {
   provideHttpTesting,
   type HttpTestingController,
 } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
@@ -269,6 +270,56 @@ describe("The scopings list", () => {
 
       inject(RepoConfig).saveRepo({ owner: "org", repo: "autre" });
       expect(lines(await mountView()).length).toBe(3);
+    });
+  });
+
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("titles the page, its counts and its groups in English", async () => {
+      const f = await mountView();
+      const text = el(f).textContent ?? "";
+
+      expect(el(f).querySelector("h1")?.textContent).toBe("Scopings");
+      expect(text).toContain("New scoping");
+      expect(text).toContain("3 scopings · 1 in progress");
+      expect(text).toContain("2 decisions · 3 impacts");
+      expect(text).toContain("1 decision · 1 impact");
+      expect(
+        [...el(f).querySelectorAll(".groupe")].map((g) =>
+          g.firstChild?.textContent?.trim(),
+        ),
+      ).toEqual(["In progress", "Delivered"]);
+      for (const french of ["Nouveau cadrage", "en cours", "Livrés"])
+        expect(text).not.toContain(french);
+    });
+
+    it("names the filter field and its empty result in English", async () => {
+      const f = await mountView();
+      expect(
+        el(f).querySelector<HTMLInputElement>(".filtre input")!.placeholder,
+      ).toBe("Filter by identifier or title");
+      expect(el(f).querySelector(".filtre")!.getAttribute("aria-label")).toBe(
+        "Filter scopings",
+      );
+
+      await typeText(f, "introuvable");
+      expect(el(f).querySelector(".compte")?.textContent).toContain(
+        "0 scopings of 3",
+      );
+      expect(el(f).querySelector(".vide")?.textContent).toContain(
+        "No scoping matches this filter.",
+      );
+    });
+
+    it("says in English that the dates could not be read", async () => {
+      const f = await mountView();
+      await denyDates();
+      await flushPromises();
+
+      const note = el(f).querySelector(".note-dates")?.textContent ?? "";
+      expect(note).toContain("Creation dates could not be read.");
+      expect(note).toContain("Sign in");
     });
   });
 });

@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
@@ -227,6 +228,26 @@ describe("The specification overview", () => {
       expect(name.getAttribute("href")).toMatch(/\/referentiel\/domaine\//);
       expect(name.closest(".carte")!.getAttribute("style")).toContain(
         "--pc-domaine",
+      );
+    });
+  });
+
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("titles the page and its panels in English", async () => {
+      const el = await mountView(DELIVERED);
+      const text = el.textContent ?? "";
+
+      expect(text).toContain("Functional specification");
+      expect(text).toContain("2 domains · 2 features · 3 active rules");
+      expect(text).toContain("Recently delivered");
+      expect(text).toContain("No scoping is under discussion");
+      expect(text).toContain("also Clients");
+      expect(text).not.toContain("Référentiel fonctionnel");
+      expect(text).not.toContain("En cours");
+      expect(el.querySelector(".bouge")?.getAttribute("aria-label")).toBe(
+        "What is moving",
       );
     });
   });

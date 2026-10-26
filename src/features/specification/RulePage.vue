@@ -19,19 +19,13 @@ export function listNeighbors(
   const begin = Math.min(Math.max(0, i - 3), ids.length - max);
   return ids.slice(begin, begin + max);
 }
-
-/** Angular's `date: 'd MMM y'`, in the French locale. */
-const DATE_FORMAT = new Intl.DateTimeFormat("fr-FR", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
 </script>
 
 <script setup lang="ts">
 import { computed, ref, watchEffect } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   HISTORY_ORDER,
@@ -51,11 +45,24 @@ import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import OperationChip from "../shared/OperationChip.vue";
 import StatusChip from "../shared/StatusChip.vue";
+import { rulePageMessages } from "./rule-page.messages";
 
 const route = useRoute();
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
 const timeline = inject(TimelineService);
+const locale = inject(LocaleService);
+const t = locale.messages(rulePageMessages);
+
+/** Angular's `date: 'd MMM y'`, in the displayed language's locale. */
+const dateFormat = computed(
+  () =>
+    new Intl.DateTimeFormat(locale.formatLocale(), {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+);
 
 const id = computed(() => String(route.params["id"]));
 const rule = computed(() => store.findRule(id.value));
@@ -115,6 +122,11 @@ const gitLoading = ref(false);
  * Why the history is missing, if it is. Displayed rather than kept quiet: without a token, GitHub refuses any GraphQL request even on a public repo, and the reader must know that the view is incomplete and how to complete it.
  */
 const gitError = ref<string | null>(null);
+/** The history failed for a reason GitHub did not name. */
+const gitUnavailable = ref(false);
+const gitProblem = computed(() =>
+  gitUnavailable.value ? t().historyUnavailable : gitError.value,
+);
 
 /**
  * Git data enrich the timeline, they do not found it.
@@ -153,22 +165,18 @@ function labelWithoutCommit(
   status: ScopingStatus,
   operation: ImpactOperation,
 ): string {
-  if (status !== "livree") return "pas encore livré";
-  if (operation === "touche") return "sans écriture";
-  return "antérieur au dépôt";
+  if (status !== "livree") return t().notDeliveredYet;
+  if (operation === "touche") return t().withoutWriting;
+  return t().predatesRepo;
 }
 
 function reasonWithoutCommit(
   status: ScopingStatus,
   operation: ImpactOperation,
 ): string {
-  if (status !== "livree") {
-    return "Ce cadrage n’a pas encore été livré : il n’a donc pas modifié le référentiel.";
-  }
-  if (operation === "touche") {
-    return "Un impact « touche » ne modifie pas le texte de la règle : aucun commit ne lui correspond.";
-  }
-  return "Aucun commit de ce dépôt ne correspond à ce cadrage — il décrit une décision antérieure.";
+  if (status !== "livree") return t().notDeliveredYetReason;
+  if (operation === "touche") return t().withoutWritingReason;
+  return t().predatesRepoReason;
 }
 
 /** Link to the pull request on github.com, in the current repo. */
@@ -178,23 +186,24 @@ function pullRequestLink(number: number): string {
 }
 
 function formatDate(date: string): string {
-  return DATE_FORMAT.format(new Date(date));
+  return dateFormat.value.format(new Date(date));
 }
 
 async function loadHistory(ruleId: string): Promise<void> {
   commits.value = [];
   gitError.value = null;
+  gitUnavailable.value = false;
   gitLoading.value = true;
   try {
     const read = await timeline.loadRuleHistory(store.repoRef(), ruleId);
     // the rule may have changed during the call: do not overwrite with stale data
     if (id.value === ruleId) commits.value = read;
   } catch (e) {
-    const message =
-      e instanceof GithubError
-        ? e.message
-        : "L’historique Git n’a pas pu être chargé.";
-    if (id.value === ruleId) gitError.value = message;
+    if (id.value === ruleId) {
+      // A failure GitHub did not name is kept as a flag, not a phrase: its message then follows a language switch.
+      if (e instanceof GithubError) gitError.value = e.message;
+      else gitUnavailable.value = true;
+    }
   } finally {
     if (id.value === ruleId) gitLoading.value = false;
   }
@@ -206,10 +215,12 @@ async function loadHistory(ruleId: string): Promise<void> {
     <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="rule">
       <!-- RG-regle-situee: a rule is often reached through search or through an impact, without going through the tree. The breadcrumb then says what it is part of; it replaces the lone link back to the specification. -->
-      <nav class="fil" aria-label="Fil d’Ariane">
+      <nav class="fil" :aria-label="t().breadcrumb">
         <ol>
           <li>
-            <RouterLink :to="links.path('referentiel')">Fonctionnel</RouterLink>
+            <RouterLink :to="links.path('referentiel')">{{
+              t().functional
+            }}</RouterLink>
           </li>
           <li v-if="domains.length">
             <template v-for="(d, n) in domains" :key="d.id">
@@ -235,39 +246,33 @@ async function loadHistory(ruleId: string): Promise<void> {
       </nav>
 
       <header class="entete">
-        <p class="type">Règle de gestion</p>
+        <p class="type">{{ t().kind }}</p>
         <h1>{{ rule.id }}</h1>
 
         <div v-if="rule.status === 'abroge'" class="meta">
-          <span class="marque-abrogee">abrogée</span>
+          <span class="marque-abrogee">{{ t().repealed }}</span>
         </div>
       </header>
 
       <div v-if="rule.status === 'abroge'" class="bandeau-abrogee">
         <UiIcon name="block" />
-        <p>
-          Cette règle ne s’applique plus. Elle reste consultable parce que les
-          cadrages qui l’ont créée puis abrogée expliquent pourquoi.
-        </p>
+        <p>{{ t().repealedBanner }}</p>
       </div>
 
       <div class="disposition">
         <div class="principal">
           <section class="bloc">
-            <h2 class="section">Énoncé courant</h2>
+            <h2 class="section">{{ t().currentStatement }}</h2>
             <RenderedMarkdown class="enonce md" :text="rule.statement" />
           </section>
 
           <section class="bloc">
-            <h2 class="section">Histoire de cette règle</h2>
+            <h2 class="section">{{ t().history }}</h2>
             <template v-if="history.length">
-              <p class="intro">
-                Les cadrages qui l’ont touchée, du plus récent au plus ancien.
-                Chacun porte la décision qui explique son état.
-              </p>
-              <p v-if="gitError" class="git-absent">
+              <p class="intro">{{ t().historyIntro }}</p>
+              <p v-if="gitProblem" class="git-absent">
                 <UiIcon name="info" />
-                <span>{{ gitError }}</span>
+                <span>{{ gitProblem }}</span>
               </p>
               <ol class="chrono">
                 <li v-for="i in history" :key="i.scoping.id">
@@ -302,7 +307,7 @@ async function loadHistory(ruleId: string): Promise<void> {
                         </template>
                       </span>
                       <span
-                        v-else-if="!gitLoading && !gitError"
+                        v-else-if="!gitLoading && !gitProblem"
                         class="git-vide"
                         :title="
                           reasonWithoutCommit(i.scoping.status, i.operation)
@@ -313,14 +318,13 @@ async function loadHistory(ruleId: string): Promise<void> {
                       >
                     </div>
                     <details v-if="i.statement" class="enonce-alors">
-                      <summary>Énoncé porté par ce cadrage</summary>
+                      <summary>{{ t().statementThen }}</summary>
                       <RenderedMarkdown class="md" :text="i.statement" />
                       <p
                         v-if="i.statement.trim() !== rule.statement.trim()"
                         class="avertissement"
                       >
-                        Cet énoncé diffère de l’énoncé courant : il reflète la
-                        règle telle qu’elle était à la livraison de ce cadrage.
+                        {{ t().statementDiffers }}
                       </p>
                     </details>
                   </div>
@@ -328,8 +332,7 @@ async function loadHistory(ruleId: string): Promise<void> {
               </ol>
             </template>
             <p v-else class="vide">
-              Aucun cadrage ne déclare d’impact sur cette règle. C’est une
-              anomalie : toute règle devrait résulter d’un cadrage.
+              {{ t().noImpact }}
             </p>
           </section>
         </div>
@@ -337,10 +340,10 @@ async function loadHistory(ruleId: string): Promise<void> {
         <aside
           v-if="neighbors.length"
           class="voisines"
-          aria-label="Règles voisines"
+          :aria-label="t().neighbors"
         >
           <section v-for="b in neighbors" :key="b.id">
-            <h2 class="section">Dans {{ b.name }}</h2>
+            <h2 class="section">{{ t().inFeature(b.name) }}</h2>
             <ul>
               <li v-for="v in b.ids" :key="v">
                 <span
@@ -360,13 +363,13 @@ async function loadHistory(ruleId: string): Promise<void> {
               v-if="b.total > b.ids.length"
               class="toutes"
               :to="links.path('referentiel', 'fonctionnalite', b.id)"
-              >Les {{ b.total }} règles de la fonctionnalité</RouterLink
+              >{{ t().allRules(b.total) }}</RouterLink
             >
           </section>
         </aside>
       </div>
     </template>
-    <p v-else class="vide">Règle introuvable : {{ id }}</p>
+    <p v-else class="vide">{{ t().notFound(id) }}</p>
   </div>
 </template>
 

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import type { RepoRef } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   KnownReposService,
@@ -18,6 +19,7 @@ import TokenHelp from "../shared/TokenHelp.vue";
 import OrganizationAvatar from "../shared/OrganizationAvatar.vue";
 import { openSignIn } from "../shared/open-sign-in";
 import ProjectSymbol from "../shared/ProjectSymbol.vue";
+import { homeMessages } from "./home.messages";
 
 /**
  * The application's threshold: choose the project before entering it.
@@ -28,9 +30,12 @@ const known = inject(KnownReposService);
 const tokens = inject(TokenService);
 const config = inject(RepoConfig);
 const router = useRouter();
+const t = useMessages(homeMessages);
 
 const input = ref("");
-const error = ref<string | null>(null);
+// The flag, not the message: the message follows a language switch.
+const invalidRepo = ref(false);
+const error = computed(() => (invalidRepo.value ? t().invalidRepo : null));
 
 const framedRepos = computed(() =>
   groupReposByOrganization(known.repos().filter((d) => d.framed || d.recent)),
@@ -67,7 +72,7 @@ function signIn(): void {
 function validateRepo(): void {
   const repoRef = RepoConfig.parseRepo(input.value);
   if (!repoRef) {
-    error.value = "Format attendu : organisation/depot";
+    invalidRepo.value = true;
     return;
   }
   open(repoRef);
@@ -77,11 +82,8 @@ function validateRepo(): void {
 <template>
   <div class="accueil-page">
     <header class="entete">
-      <h1>Ouvrir un projet</h1>
-      <p class="sous-titre">
-        Chaque projet a son dépôt, et chaque dépôt son référentiel. Choisissez
-        celui sur lequel travailler.
-      </p>
+      <h1>{{ t().title }}</h1>
+      <p class="sous-titre">{{ t().subtitle }}</p>
     </header>
 
     <div v-if="framedRepos.length" class="cadres groupes">
@@ -106,13 +108,13 @@ function validateRepo(): void {
               <span class="nom" :title="d.repoRef.repo">{{
                 d.repoRef.repo
               }}</span>
-              <span v-if="d.recent" class="marque">déjà ouvert</span>
+              <span v-if="d.recent" class="marque">{{ t().openedBefore }}</span>
             </button>
             <UiButton
               v-if="d.recent"
               class="oublier"
               variant="icon"
-              aria-label="Retirer de la liste"
+              :aria-label="t().removeFromList"
               @click="forget(d.repoRef)"
             >
               <UiIcon name="close" />
@@ -124,7 +126,7 @@ function validateRepo(): void {
 
     <p v-if="known.inProgress()" class="attente">
       <UiSpinner :diameter="16" />
-      <span>Recherche des dépôts autorisés…</span>
+      <span>{{ t().searchingRepos }}</span>
     </p>
 
     <p v-if="known.error()" class="echec">
@@ -132,7 +134,7 @@ function validateRepo(): void {
     </p>
 
     <details v-if="others.length" class="autres">
-      <summary>Autres dépôts autorisés ({{ otherCount }})</summary>
+      <summary>{{ t().otherRepos(otherCount) }}</summary>
       <div class="groupes">
         <section
           v-for="g of others"
@@ -156,40 +158,31 @@ function validateRepo(): void {
           </ul>
         </section>
       </div>
-      <p class="aide">
-        Ceux-ci ne portent pas encore de référentiel. En ouvrir un propose de
-        l’amorcer.
-      </p>
+      <p class="aide">{{ t().otherReposHelp }}</p>
     </details>
 
     <form class="saisie" @submit.prevent="validateRepo()">
       <UiTextField
         v-model="input"
-        label="Ou saisir un dépôt"
+        :label="t().repoField"
         name="depot"
-        placeholder="organisation/depot"
+        :placeholder="t().repoPlaceholder"
         autocomplete="off"
         :error="error"
-        hint="Un nom court, ou une URL GitHub complète"
+        :hint="t().repoHint"
       />
-      <UiButton variant="filled" type="submit">Ouvrir</UiButton>
+      <UiButton variant="filled" type="submit">{{ t().open }}</UiButton>
     </form>
 
     <!-- RG-connexion-optionnelle, RG-modes-acces: the help offers itself, below the list, without posing as a prerequisite — a public repo is read without a token, and a project under third-party identity asks for none. -->
     <section v-if="tokens.noAccess()" class="connexion">
-      <h2>Connexion à GitHub, facultative</h2>
-      <p class="aide">
-        Les dépôts publics se lisent sans connexion. Un jeton personnel ouvre
-        vos dépôts privés, dit lesquels vous sont autorisés, et porte la limite
-        de GitHub de 60 à 5 000 requêtes par heure. Un projet qui fait vérifier
-        les identités auprès de son propre fournisseur n’en demande aucun : sa
-        connexion se propose une fois le projet ouvert.
-      </p>
+      <h2>{{ t().signInTitle }}</h2>
+      <p class="aide">{{ t().signInHelp }}</p>
       <UiButton variant="outlined" @click="signIn()">
         <UiIcon name="key" />
-        Saisir un jeton
+        {{ t().enterToken }}
       </UiButton>
-      <TokenHelp paste-where="par « Saisir un jeton », ci-dessus" />
+      <TokenHelp :paste-where="t().pasteWhere" />
     </section>
   </div>
 </template>

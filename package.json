@@ -15,6 +15,8 @@
     "./platform/web-vault": "./src/platform/web-vault.ts",
     "./injection": "./src/core/injection.ts",
     "./signals": "./src/core/signals.ts",
+    "./i18n": "./src/core/i18n/language.ts",
+    "./i18n/locale": "./src/core/i18n/locale.service.ts",
     "./services/version": "./src/core/ui/version.service.ts",
     "./version-causes": "./src/features/shared/version-causes.ts",
     "./ui/*.vue": "./src/ui/*.vue",

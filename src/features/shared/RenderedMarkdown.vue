@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import DOMPurify from "dompurify";
 import { onMounted, ref, watch } from "vue";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { ThemeService } from "../../core/ui/theme.service";
 import { extractDiagrams, themeMermaid } from "./diagram";
 import { renderMarkdownSync } from "./markdown";
+import { renderedMarkdownMessages } from "./rendered-markdown.messages";
 
 /**
  * Displays Markdown, drawing the diagrams it contains.
@@ -18,13 +20,15 @@ import { renderMarkdownSync } from "./markdown";
 const props = defineProps<{ text?: string | null }>();
 
 const theme = inject(ThemeService);
+const t = inject(LocaleService).messages(renderedMarkdownMessages);
 const host = ref<HTMLElement | null>(null);
 
 onMounted(() => {
-  // The theme is tracked here, not read inside `render`: a toggle redraws the diagrams. A theme read only at render time would leave the diagrams already displayed in the old one.
+  // The theme is tracked here, not read inside `render`: a toggle redraws the diagrams. A theme read only at render time would leave the diagrams already displayed in the old one. The language likewise, for what the diagrams say around themselves.
   watch(
-    [() => props.text, () => theme.effective()],
-    ([value, effective]) => void render(value ?? "", effective),
+    [() => props.text, () => theme.effective(), t],
+    ([value, effective, messages]) =>
+      void render(value ?? "", effective, messages),
     { immediate: true },
   );
 });
@@ -32,6 +36,7 @@ onMounted(() => {
 async function render(
   text: string,
   effective: "clair" | "sombre",
+  messages: RenderedMarkdownMessages,
 ): Promise<void> {
   const element = host.value;
   if (!element) return;
@@ -61,15 +66,17 @@ async function render(
       target.innerHTML = DOMPurify.sanitize(svg, {
         USE_PROFILES: { svg: true, svgFilters: true },
       });
-      makeEnlargeable(target as HTMLElement);
+      makeEnlargeable(target as HTMLElement, messages);
     } catch (e) {
-      target.outerHTML = errorMessage(e);
+      target.outerHTML = errorMessage(e, messages);
     }
   }
 }
 </script>
 
 <script lang="ts">
+type RenderedMarkdownMessages = (typeof renderedMarkdownMessages)["fr"];
+
 /**
  * The engine, loaded once and shared.
  *
@@ -110,11 +117,14 @@ async function loadEngine(effective: "clair" | "sombre") {
  *
  * A hover and a button role rather than an icon: the click target is the whole diagram, and nothing would signal better that it is clickable than a cursor that changes over it.
  */
-function makeEnlargeable(target: HTMLElement): void {
+function makeEnlargeable(
+  target: HTMLElement,
+  messages: RenderedMarkdownMessages,
+): void {
   target.classList.add("pc-diagramme-cliquable");
   target.setAttribute("role", "button");
   target.setAttribute("tabindex", "0");
-  target.setAttribute("title", "Agrandir le diagramme");
+  target.setAttribute("title", messages.enlarge);
 
   const open = () => enlarge(target.innerHTML);
   target.addEventListener("click", open);
@@ -159,13 +169,13 @@ function enlarge(sanitizedSvg: string): void {
  *
  * At the place where it was to appear, and without taking the page down with it: a diagram illustrates a point, it does not carry it.
  */
-function errorMessage(e: unknown): string {
+function errorMessage(e: unknown, messages: RenderedMarkdownMessages): string {
   const cause = e instanceof Error ? e.message : String(e);
   const own = DOMPurify.sanitize(cause, {
     ALLOWED_TAGS: [],
     ALLOWED_ATTR: [],
   });
-  return `<div class="pc-diagramme-erreur">Ce diagramme n’a pas pu être dessiné : <code>${own}</code></div>`;
+  return `<div class="pc-diagramme-erreur">${messages.notDrawn} <code>${own}</code></div>`;
 }
 </script>
 

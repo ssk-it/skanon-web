@@ -5,6 +5,7 @@ import { GithubClient } from "../github/github-client";
 import { SpecificationStore } from "./specification.store";
 import { RepoConfig } from "./repo-config";
 import { AuthoringService, listToggles } from "./authoring.service";
+import { LocaleService } from "../i18n/locale.service";
 
 /**
  * Status toggles — RG-bascule-de-statut, scoping 2026-045.
@@ -106,5 +107,18 @@ reflet_demande_fusion: true
     expect(store.state()).toBe("pret");
     expect(store.specification().project.name).toBe("Essai");
     expect(store.specification().anomalies).toEqual([]);
+  });
+});
+
+describe("A status the application cannot request, in English", () => {
+  it("is refused with the English label of the status", async () => {
+    resetInjection();
+    inject(LocaleService).choice.set("en");
+
+    await expect(
+      inject(AuthoringService).changeStatus("2026-001", "validee"),
+    ).rejects.toThrow(
+      "“Approved” cannot be requested from the application: this status comes from the review on the platform.",
+    );
   });
 });
