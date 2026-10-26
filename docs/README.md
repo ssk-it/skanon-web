@@ -8,6 +8,7 @@
 4. [clean-code.md](clean-code.md) — how the inside of a unit is written, and what the tooling enforces.
 5. [conventions.md](conventions.md) — naming, language, comments, commits.
 6. [glossary.md](glossary.md) — each domain term, as the format writes it and as the code names it.
+7. [deployment.md](deployment.md) — deploying the web version, and its protected environment.
 
 ## By task
 
@@ -22,9 +23,10 @@
 | Name a domain concept                   | [glossary.md](glossary.md)                                              |
 | Contribute from outside, sign the CLA   | [CONTRIBUTING.md](../CONTRIBUTING.md)                                   |
 | Change the CLA check                    | [development.md](development.md#the-cla-check)                          |
+| Deploy the web version                  | [deployment.md](deployment.md)                                          |
 
 ## What is not here
 
 - **Product decisions**: the SSK Canon specification, [ssk-it/ssk-canon](https://github.com/ssk-it/ssk-canon), described in its own format. Consult it through the `consulter-referentiel` skill before any functional change. Skanon is the product there: the delivered scoping [ssk-canon#2026-051](https://ssk-canon.s3-website.fr-par.scw.cloud/ssk-it/ssk-canon/cadrages/2026-051) makes it the application that replaces ssk-canon-pwa, under the single name Skanon (`ADR-application-de-bureau`).
-- **The desktop application**: its native core, its adapter, its extensions, its publishing and its deployment live in a private repo, which consumes this repo as a pinned package (ADR-extensions-commerciales). Deployment of the web version happens there too, for now.
+- **The desktop application**: its native core, its adapter, its extensions and its publishing live in a private repo, which consumes this repo as a pinned package (ADR-extensions-commerciales). The web version is deployed from here: [deployment.md](deployment.md).
 - **Reading the format**: the [`@ssk-it/canon-check`](https://github.com/ssk-it/ssk-canon-action) library, shared by the application and the automation (`INV-7`).
