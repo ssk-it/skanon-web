@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { LocaleService } from "../../core/i18n/locale.service";
+import { inject } from "../../core/injection";
 import {
   SCOPING_STATUS_LABEL,
   type ScopingStatus,
@@ -10,7 +12,10 @@ import {
  */
 const props = defineProps<{ status: ScopingStatus }>();
 
-const label = computed(() => SCOPING_STATUS_LABEL[props.status]);
+const locale = inject(LocaleService);
+const label = computed(
+  () => SCOPING_STATUS_LABEL[locale.language()][props.status],
+);
 </script>
 
 <template>

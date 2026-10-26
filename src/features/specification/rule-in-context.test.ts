@@ -6,6 +6,7 @@ import {
   settle,
   type HttpTestingController,
 } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import { createAppRouter } from "../../router";
@@ -180,5 +181,37 @@ describe("A rule's neighbours", () => {
     expect(listNeighbors(ids, "RG-00", 8)[0]).toBe("RG-00");
     expect(listNeighbors(ids, "RG-19", 8).at(-1)).toBe("RG-19");
     expect(listNeighbors(ids, "RG-19", 8).length).toBe(8);
+  });
+});
+
+describe("A rule in English", () => {
+  beforeEach(() => {
+    http = provideHttpTesting();
+    inject(LocaleService).choice.set("en");
+  });
+
+  it("titles its page, its breadcrumb and its neighbours in English", async () => {
+    const el = await mountView("RG-limite");
+    const text = el.textContent ?? "";
+
+    const thread = el.querySelector('nav[aria-label="Breadcrumb"]');
+    expect(links(thread)[0]).toBe("Functional");
+    expect(text).toContain("Business rule");
+    expect(text).toContain("Current statement");
+    expect(text).toContain("History of this rule");
+    expect(text).toContain("No scoping declares an impact on this rule.");
+    expect(el.querySelector(".voisines")?.getAttribute("aria-label")).toBe(
+      "Neighbouring rules",
+    );
+    expect(el.querySelector(".voisines h2")?.textContent?.trim()).toBe(
+      "In Relance des impayés",
+    );
+    expect(text).not.toContain("Énoncé courant");
+  });
+
+  it("says in English that a rule does not exist", async () => {
+    const el = await mountView("RG-inconnue");
+
+    expect(el.textContent).toContain("Rule not found: RG-inconnue");
   });
 });

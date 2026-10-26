@@ -1,4 +1,5 @@
 <script lang="ts">
+import type { Language } from "../../core/i18n/language";
 import {
   OPERATION_LABEL,
   LINK_TAG_LABEL,
@@ -8,12 +9,14 @@ import {
   type ImpactOperation,
   type Option,
 } from "../../core/model/model";
+import { scopingPageMessages } from "./scoping-page.messages";
 
-const PARTICIPLES: ReadonlyArray<[ImpactOperation, string, string]> = [
-  ["cree", "créée", "créées"],
-  ["modifie", "modifiée", "modifiées"],
-  ["abroge", "abrogée", "abrogées"],
-  ["touche", "touchée", "touchées"],
+/** The order of the count: what changes most first. */
+const OPERATIONS: readonly ImpactOperation[] = [
+  "cree",
+  "modifie",
+  "abroge",
+  "touche",
 ];
 
 /**
@@ -21,23 +24,21 @@ const PARTICIPLES: ReadonlyArray<[ImpactOperation, string, string]> = [
  *
  * It tells at a glance whether the scoping changes the product's behaviour or comments on it. The noun appears only once, at the first count: the rest reads in its momentum. « Cibles » as soon as a decision or an architecture document is mixed in, so as not to call a rule what is not one.
  */
-export function formatImpactCount(impacts: readonly Impact[]): string {
+export function formatImpactCount(
+  impacts: readonly Impact[],
+  language: Language,
+): string {
+  const t = scopingPageMessages[language];
   const rules = impacts.every((i) => i.kind === "regle");
   const parts: string[] = [];
-  for (const [operation, one, several] of PARTICIPLES) {
+  for (const operation of OPERATIONS) {
     const n = impacts.filter((i) => i.operation === operation).length;
     if (!n) continue;
-    const participle = n > 1 ? several : one;
+    const participle = t.participle(operation, n);
     if (parts.length) {
       parts.push(`${n} ${participle}`);
     } else {
-      const name = rules
-        ? n > 1
-          ? "règles"
-          : "règle"
-        : n > 1
-          ? "cibles"
-          : "cible";
+      const name = rules ? t.rules(n) : t.targets(n);
       parts.push(`${n} ${name} ${participle}`);
     }
   }
@@ -49,6 +50,7 @@ export function formatImpactCount(impacts: readonly Impact[]): string {
 import { computed, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LinksService } from "../../core/repo/links.service";
 import { AuthoringService } from "../../core/repo/authoring.service";
@@ -78,6 +80,8 @@ const store = inject(SpecificationStore);
 const links = inject(LinksService);
 const dialog = inject(DialogService);
 const authoring = inject(AuthoringService);
+const locale = inject(LocaleService);
+const t = locale.messages(scopingPageMessages);
 
 /**
  * The write in progress, designated by the address of the link it touches.
@@ -135,7 +139,7 @@ async function addLink(): Promise<void> {
     ADDITION,
     () => authoring.addLink(id.value, link),
     (list) => list.some((l) => l.url === link.url),
-    "Le lien n’a pas pu être ajouté.",
+    t().linkAddFailed,
   );
 }
 
@@ -151,7 +155,7 @@ async function editLink(current: Lien): Promise<void> {
       list.some(
         (l) => l.url === link.url && l.name === link.name && l.tag === link.tag,
       ),
-    "Le lien n’a pas pu être modifié.",
+    t().linkEditFailed,
   );
 }
 
@@ -165,9 +169,9 @@ async function deleteLink(link: Lien): Promise<void> {
   const confirmed = await dialog.open<boolean>(ConfirmationDialog, {
     focus: "dialogue",
     data: {
-      title: "Supprimer ce lien ?",
-      message: `« ${formatLabel(link)} » ne sera plus rattaché à ce cadrage. La ressource, elle, n’est pas touchée.`,
-      action: "Supprimer",
+      title: t().deleteLinkTitle,
+      message: t().deleteLinkMessage(formatLabel(link)),
+      action: t().delete,
     },
   });
   if (!confirmed) return;
@@ -176,7 +180,7 @@ async function deleteLink(link: Lien): Promise<void> {
     link.url,
     () => authoring.deleteLink(id.value, link.url),
     (list) => !list.some((l) => l.url === link.url),
-    "Le lien n’a pas pu être supprimé.",
+    t().linkDeleteFailed,
   );
 }
 
@@ -221,7 +225,7 @@ function formatLabel(l: Lien): string {
 }
 
 function formatTagLabel(tag: string): string {
-  return LINK_TAG_LABEL[tag] ?? tag;
+  return LINK_TAG_LABEL[locale.language()][tag] ?? tag;
 }
 
 /** The whole repo: a hue is computed relative to the others. */
@@ -267,6 +271,12 @@ const impacts = computed(() => {
   return c ? store.listTargetsByScoping(c) : [];
 });
 
+const impactCount = computed(() =>
+  scoping.value
+    ? formatImpactCount(scoping.value.impacts, locale.language())
+    : "",
+);
+
 /** The impacts that change their target, in declared order. */
 const changingImpacts = computed(() =>
   impacts.value.filter((i) => i.impact.operation !== "touche"),
@@ -304,14 +314,8 @@ const impactBlocks = computed(() => {
 /** « 7 règles touchées », or « cibles » if a decision is mixed in. */
 function formatTouched(n: number): string {
   const rules = touchImpacts.value.every((i) => i.impact.kind === "regle");
-  const name = rules
-    ? n > 1
-      ? "règles"
-      : "règle"
-    : n > 1
-      ? "cibles"
-      : "cible";
-  return `${n} ${name} ${n > 1 ? "touchées" : "touchée"}`;
+  const name = rules ? t().rules(n) : t().targets(n);
+  return `${n} ${name} ${t().participle("touche", n)}`;
 }
 
 /**
@@ -344,35 +348,36 @@ const toc = computed<TocEntry[]>(() => {
   if (!c) return [];
   const entries: TocEntry[] = [];
 
-  if (c.goal) entries.push({ id: "objectif", label: "Objectif", level: 0 });
+  const m = t();
+  if (c.goal) entries.push({ id: "objectif", label: m.goal, level: 0 });
   if (c.journey) {
     entries.push({
       id: "parcours",
-      label: "Parcours utilisateur",
+      label: m.journey,
       level: 0,
     });
   }
 
   if (c.decisions.length) {
-    entries.push({ id: "decisions", label: "Décisions", level: 0 });
+    entries.push({ id: "decisions", label: m.decisions, level: 0 });
     for (const d of c.decisions) {
       entries.push({
         id: `decision-${d.id}`,
         label: d.title,
         level: 1,
-        badge: d.status === "annulee" ? "annulée" : undefined,
+        badge: d.status === "annulee" ? m.cancelled : undefined,
       });
     }
   }
 
   if (c.impacts.length) {
-    entries.push({ id: "impacts", label: "Impacts", level: 0 });
+    entries.push({ id: "impacts", label: m.impacts, level: 0 });
     for (const i of c.impacts.filter((i) => i.operation !== "touche")) {
       entries.push({
         id: `impact-${i.target}`,
         label: i.target,
         level: 1,
-        badge: OPERATION_LABEL[i.operation],
+        badge: OPERATION_LABEL[locale.language()][i.operation],
       });
     }
     // One entry for all: listed at the same rank as creations, they drowned out what the scoping changes — RG-sommaire-fiche-longue.
@@ -387,7 +392,7 @@ const toc = computed<TocEntry[]>(() => {
   }
 
   if (c.misc.length) {
-    entries.push({ id: "divers", label: "Divers", level: 0 });
+    entries.push({ id: "divers", label: m.misc, level: 0 });
     for (const [i, section] of c.misc.entries()) {
       entries.push({ id: `divers-${i}`, label: section.title, level: 1 });
     }
@@ -396,7 +401,7 @@ const toc = computed<TocEntry[]>(() => {
   if (c.attachments.length) {
     entries.push({
       id: "pieces-jointes",
-      label: "Pièces jointes",
+      label: m.attachments,
       level: 0,
     });
   }
@@ -430,7 +435,7 @@ function scrollTo(target: HTMLElement): void {
 }
 
 function buildMissingRuleMessage(): string {
-  return "Cette règle n’existe pas dans le référentiel courant.";
+  return t().missingRule;
 }
 
 /**
@@ -442,16 +447,16 @@ function isDivergent(carries: string, current: string | undefined): boolean {
 }
 
 function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} o`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} ko`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  return t().size(bytes);
 }
 
-// Angular's `date` pipe in the fr locale, with the `'longDate'` format.
-const LONG_DATE = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
+// Angular's `date` pipe with the `'longDate'` format, in the displayed language.
+const longDate = computed(
+  () => new Intl.DateTimeFormat(locale.formatLocale(), { dateStyle: "long" }),
+);
 
 function formatDate(iso: string): string {
-  return LONG_DATE.format(new Date(iso));
+  return longDate.value.format(new Date(iso));
 }
 </script>
 
@@ -464,7 +469,7 @@ function formatDate(iso: string): string {
 
     <div class="fiche">
       <RouterLink class="retour" :to="links.path('cadrages')">
-        <UiIcon name="arrow_back" /> Cadrages
+        <UiIcon name="arrow_back" /> {{ t().back }}
       </RouterLink>
 
       <header class="fiche-entete">
@@ -472,7 +477,7 @@ function formatDate(iso: string): string {
 
         <!-- The title says what it is about; what follows says what one is dealing with. The labels carry the distinction, which a row of pills side by side left to guesswork. -->
         <dl class="identite">
-          <dt>Cadrage</dt>
+          <dt>{{ t().scoping }}</dt>
           <dd class="ligne-type">
             <span class="cid">{{ show(scoping.id) }}</span>
             <StatusChip :status="scoping.status" />
@@ -482,12 +487,12 @@ function formatDate(iso: string): string {
               class="editer"
               :to="links.path('cadrages', scoping.id, 'editer')"
             >
-              <UiIcon name="edit" /> Reprendre
+              <UiIcon name="edit" /> {{ t().resume }}
             </RouterLink>
           </dd>
 
           <template v-if="scoping.domains.length">
-            <dt>Domaines</dt>
+            <dt>{{ t().domains }}</dt>
             <dd class="meta">
               <RouterLink
                 v-for="d in scoping.domains"
@@ -501,16 +506,16 @@ function formatDate(iso: string): string {
             </dd>
           </template>
 
-          <template v-if="formatImpactCount(scoping.impacts)">
-            <dt>Impacts</dt>
+          <template v-if="impactCount">
+            <dt>{{ t().impacts }}</dt>
             <dd class="decompte">
-              {{ formatImpactCount(scoping.impacts) }}
+              {{ impactCount }}
             </dd>
           </template>
 
           <!-- Delivered and without links, there is nothing to show: the label would stand alone facing an empty cell. Not delivered, the add button always occupies the row. -->
           <template v-if="scoping.links.length || scoping.status !== 'livree'">
-            <dt>Ressources</dt>
+            <dt>{{ t().resources }}</dt>
             <dd class="liens">
               <!-- A scoping in progress is discussed on its pull request: it is the first link one looks for there. -->
               <ExternalLink
@@ -519,7 +524,7 @@ function formatDate(iso: string): string {
                 :href="links.toGithub('pull', scoping.provenance.pullRequest)"
               >
                 <UiIcon name="call_split" />
-                Demande de fusion #{{ scoping.provenance.pullRequest }}
+                {{ t().pullRequest(scoping.provenance.pullRequest) }}
               </ExternalLink>
               <!-- Without a pull request, a started scoping is found on its branch: that is what gets opened. -->
               <ExternalLink
@@ -533,7 +538,7 @@ function formatDate(iso: string): string {
                 "
               >
                 <UiIcon name="call_split" />
-                Branche {{ scoping.provenance.branch }}
+                {{ t().branch(scoping.provenance.branch) }}
               </ExternalLink>
               <!-- Opening remains the direct gesture: the menu opens only on request, and the anchor keeps the chip's surface. -->
               <span
@@ -554,12 +559,12 @@ function formatDate(iso: string): string {
                   v-if="scoping.status !== 'livree'"
                   :actions="[
                     {
-                      label: 'Modifier',
+                      label: t().edit,
                       icon: 'edit',
                       action: () => void editLink(l),
                     },
                     {
-                      label: 'Supprimer',
+                      label: t().delete,
                       icon: 'link_off',
                       action: () => void deleteLink(l),
                     },
@@ -571,7 +576,7 @@ function formatDate(iso: string): string {
                       class="menu-lien"
                       v-bind="attributs"
                       :disabled="!!writing"
-                      :aria-label="'Actions sur le lien ' + formatLabel(l)"
+                      :aria-label="t().linkActions(formatLabel(l))"
                     >
                       <UiIcon name="more_vert" />
                     </button>
@@ -589,7 +594,7 @@ function formatDate(iso: string): string {
                 <UiIcon
                   :name="writing === ADDITION ? 'hourglass_empty' : 'add_link'"
                 />
-                {{ writing === ADDITION ? "Ajout…" : "Ajouter un lien" }}
+                {{ writing === ADDITION ? t().adding : t().addLink }}
               </button>
             </dd>
           </template>
@@ -603,28 +608,24 @@ function formatDate(iso: string): string {
         >
           <UiIcon name="info" />
           <span v-if="scoping.staleBranches.length === 1">
-            La branche
+            {{ t().staleOneBefore }}
             <ExternalLink
               :href="
                 links.toGithub('tree', ...scoping.staleBranches[0].split('/'))
               "
               ><code>{{ scoping.staleBranches[0] }}</code></ExternalLink
             >
-            porte encore ce cadrage, déjà livré. Elle est sans effet — la
-            branche principale l’emporte — et n’a sans doute pas été supprimée
-            après la fusion.
+            {{ t().staleOneAfter }}
           </span>
           <span v-else>
-            Les branches
+            {{ t().staleManyBefore }}
             <template v-for="(b, i) in scoping.staleBranches" :key="b">
               {{ i ? ", " : "" }}
               <ExternalLink :href="links.toGithub('tree', ...b.split('/'))"
                 ><code>{{ b }}</code></ExternalLink
               >
             </template>
-            portent encore ce cadrage, déjà livré. Elles sont sans effet — la
-            branche principale l’emporte — et n’ont sans doute pas été
-            supprimées après la fusion.
+            {{ t().staleManyAfter }}
           </span>
         </p>
 
@@ -633,25 +634,22 @@ function formatDate(iso: string): string {
         </p>
         <p v-else-if="recentWrite" class="attente-lien">
           <UiIcon name="schedule" />
-          <span>
-            La modification est enregistrée. Elle apparaîtra ici dès que la
-            branche du cadrage aura été relue.
-          </span>
+          <span>{{ t().writePending }}</span>
         </p>
       </header>
 
       <section v-if="scoping.goal" id="objectif" class="bloc">
-        <h2 class="section">Objectif</h2>
+        <h2 class="section">{{ t().goal }}</h2>
         <RenderedMarkdown class="md" :text="scoping.goal" />
       </section>
 
       <section v-if="scoping.journey" id="parcours" class="bloc">
-        <h2 class="section">Parcours utilisateur</h2>
+        <h2 class="section">{{ t().journey }}</h2>
         <RenderedMarkdown class="md" :text="scoping.journey" />
       </section>
 
       <section v-if="scoping.decisions.length" id="decisions" class="bloc">
-        <h2 class="section">Décisions</h2>
+        <h2 class="section">{{ t().decisions }}</h2>
         <div class="decisions">
           <article
             v-for="d in scoping.decisions"
@@ -676,13 +674,13 @@ function formatDate(iso: string): string {
                 "
               />
               <h3>{{ d.title }}</h3>
-              <span v-if="d.status === 'annulee'" class="d-statut annulee"
-                >annulée</span
-              >
-              <span v-else-if="d.chosenOption" class="d-statut retenue"
-                >tranchée</span
-              >
-              <span v-else class="d-statut ouverte">ouverte</span>
+              <span v-if="d.status === 'annulee'" class="d-statut annulee">{{
+                t().cancelled
+              }}</span>
+              <span v-else-if="d.chosenOption" class="d-statut retenue">{{
+                t().settled
+              }}</span>
+              <span v-else class="d-statut ouverte">{{ t().open }}</span>
             </button>
 
             <template v-if="isCollapsed('decision-' + d.id)">
@@ -707,7 +705,9 @@ function formatDate(iso: string): string {
                 >
                   <div class="o-entete">
                     <span class="o-titre">{{ o.title }}</span>
-                    <span v-if="o.chosen" class="o-marque">retenue</span>
+                    <span v-if="o.chosen" class="o-marque">{{
+                      t().chosen
+                    }}</span>
                   </div>
                   <RenderedMarkdown class="md o-corps" :text="o.body" />
                 </li>
@@ -719,7 +719,7 @@ function formatDate(iso: string): string {
       </section>
 
       <section v-if="scoping.impacts.length" id="impacts" class="bloc">
-        <h2 class="section">Impacts sur les règles de gestion</h2>
+        <h2 class="section">{{ t().impactsOnRules }}</h2>
         <!-- RG-sommaire-fiche-longue: what changes nothing about its target comes after what changes, gathered under a heading that counts it. The table of contents leads there with a single entry. -->
         <div
           v-for="b in impactBlocks"
@@ -742,7 +742,7 @@ function formatDate(iso: string): string {
                   class="i-bascule"
                   :aria-expanded="!isCollapsed('impact-' + i.impact.target)"
                   :aria-controls="'corps-impact-' + i.impact.target"
-                  :aria-label="'Détail de ' + i.impact.target"
+                  :aria-label="t().impactDetail(i.impact.target)"
                   @click="toggleCollapsed('impact-' + i.impact.target)"
                 >
                   <UiIcon
@@ -772,7 +772,7 @@ function formatDate(iso: string): string {
                 <span
                   v-if="i.target?.status === 'abroge'"
                   class="marque-abrogee"
-                  >abrogée</span
+                  >{{ t().repealed }}</span
                 >
               </div>
 
@@ -794,17 +794,14 @@ function formatDate(iso: string): string {
                     class="i-divergence"
                   >
                     <UiIcon name="history" />
-                    L’énoncé courant diffère : il a été modifié par un cadrage
-                    ultérieur. Ce texte est celui porté par le présent cadrage.
+                    {{ t().divergent }}
                   </p>
                 </template>
                 <p v-else-if="i.impact.operation === 'touche'" class="i-touche">
-                  Ce cadrage la concerne sans la modifier. La mention sert de
-                  signal de relecture.
+                  {{ t().touched }}
                 </p>
                 <p v-else-if="!i.target" class="i-attente">
-                  Cette cible n’existe pas encore dans le référentiel : elle
-                  sera créée à la livraison du cadrage.
+                  {{ t().pending }}
                 </p>
               </div>
             </article>
@@ -814,7 +811,7 @@ function formatDate(iso: string): string {
 
       <!-- What the template does not present elsewhere is read here rather than nowhere. The original title is kept: it is what says what the section is about, « Divers » only gathers them. -->
       <section v-if="scoping.misc.length" id="divers" class="bloc">
-        <h2 class="section">Divers</h2>
+        <h2 class="section">{{ t().misc }}</h2>
         <div class="divers">
           <article
             v-for="(s, index) in scoping.misc"
@@ -835,7 +832,7 @@ function formatDate(iso: string): string {
         id="pieces-jointes"
         class="bloc"
       >
-        <h2 class="section">Pièces jointes</h2>
+        <h2 class="section">{{ t().attachments }}</h2>
         <ul class="pj">
           <li v-for="p in scoping.attachments" :key="p.sha256">
             <UiIcon name="attach_file" />
@@ -851,31 +848,28 @@ function formatDate(iso: string): string {
             </div>
           </li>
         </ul>
-        <p class="pj-note">
-          Le téléchargement des pièces jointes viendra avec la mise en place du
-          stockage objet.
-        </p>
+        <p class="pj-note">{{ t().attachmentsNote }}</p>
       </section>
     </div>
 
     <!-- What was settled is what one comes back to check most often on a reviewed scoping. The summary keeps it in view while browsing the rest of the page; the reasoning stays in its place in the Decisions section. -->
     <aside v-if="decided.length" class="rail-tranchees">
       <div class="panneau">
-        <p class="p-titre">Décisions tranchées</p>
+        <p class="p-titre">{{ t().settledDecisions }}</p>
         <ul class="p-liste">
-          <li v-for="t in decided" :key="t.decision.id">
+          <li v-for="s in decided" :key="s.decision.id">
             <a
               class="p-lien"
-              :href="'#decision-' + t.decision.id"
-              @click="scrollToDecision($event, t.decision.id)"
+              :href="'#decision-' + s.decision.id"
+              @click="scrollToDecision($event, s.decision.id)"
             >
-              <span class="p-decision">{{ t.decision.title }}</span>
+              <span class="p-decision">{{ s.decision.title }}</span>
               <span class="p-option">
                 <UiIcon name="check" />
-                {{ t.option?.title ?? t.decision.chosenOption }}
+                {{ s.option?.title ?? s.decision.chosenOption }}
               </span>
-              <span v-if="t.justification" class="p-justification">{{
-                t.justification
+              <span v-if="s.justification" class="p-justification">{{
+                s.justification
               }}</span>
             </a>
           </li>
@@ -885,9 +879,9 @@ function formatDate(iso: string): string {
   </div>
   <!-- A scoping in progress lives on its branch, read after the main one: calling it not found until then would announce as missing what is on its way. -->
   <p v-else-if="store.loadingBranches()" class="vide">
-    Lecture des cadrages en cours…
+    {{ t().loadingBranches }}
   </p>
-  <p v-else class="vide">Cadrage introuvable : {{ id }}</p>
+  <p v-else class="vide">{{ t().notFound(id) }}</p>
 </template>
 
 <style scoped>

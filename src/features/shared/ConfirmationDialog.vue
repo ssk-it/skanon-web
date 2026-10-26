@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { useMessages } from "../../core/i18n/locale.service";
 import UiButton from "../../ui/UiButton.vue";
 import UiDialog from "../../ui/UiDialog.vue";
+import { confirmationDialogMessages } from "./confirmation-dialog.messages";
 
 /** What the screen asks, and under which label it commits. */
 export interface ConfirmationRequest {
@@ -25,15 +27,16 @@ export interface ConfirmationRequest {
 defineProps<{ data: ConfirmationRequest }>();
 
 const emit = defineEmits<{ close: [confirme?: boolean] }>();
+const t = useMessages(confirmationDialogMessages);
 </script>
 
 <template>
   <UiDialog class="confirmation-dialog" :title="data.title">
     <p class="message">{{ data.message }}</p>
     <template #actions>
-      <UiButton data-focus-initial @click="emit('close', false)"
-        >Annuler</UiButton
-      >
+      <UiButton data-focus-initial @click="emit('close', false)">{{
+        t().cancel
+      }}</UiButton>
       <UiButton variant="filled" @click="emit('close', true)">{{
         data.action
       }}</UiButton>

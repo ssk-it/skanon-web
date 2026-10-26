@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { LINK_TAG_LABEL, type ExternalLink } from "../../core/model/model";
 import { SpecificationStore } from "../../core/repo/specification.store";
-import { normalizeTag } from "../../core/repo/link-tag";
+import { tagFromInput } from "../../core/repo/link-tag";
 import UiAutocomplete from "../../ui/UiAutocomplete.vue";
 import UiButton from "../../ui/UiButton.vue";
 import UiTextField from "../../ui/UiTextField.vue";
 import UiDialog from "../../ui/UiDialog.vue";
+import { linkDialogMessages } from "./link-dialog.messages";
 
 /**
  * Input of an external link attached to a scoping.
@@ -24,6 +26,8 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [lien?: ExternalLink] }>();
 
 const store = inject(SpecificationStore);
+const locale = inject(LocaleService);
+const t = locale.messages(linkDialogMessages);
 const initial = props.data ?? null;
 
 const modification = !!initial;
@@ -34,21 +38,24 @@ const name = ref(initial?.name ?? "");
 /** The project's own, plus those its scopings already use. */
 const tags = computed(() => store.linkTags());
 
+/** The labels of the known kinds, in the displayed language. */
+const tagLabels = computed(() => LINK_TAG_LABEL[locale.language()]);
+
 function tagLabel(tag: string): string {
-  return LINK_TAG_LABEL[tag] ?? tag;
+  return tagLabels.value[tag] ?? tag;
 }
 
 /**
  * What the field shows: the label, not the key.
  *
- * Choosing « Carte Trello » from the list only to see « carte_trello » written in would suggest the input had been corrected. The form written in the frontmatter is recovered by normalisation, which precisely gives back the original key for any known label.
+ * Choosing « Carte Trello » from the list only to see « carte_trello » written in would suggest the input had been corrected. The form written in the frontmatter is recovered from the label in the displayed language, which gives back the original key for any known label (RG-nature-lien-normalisee).
  */
 const tag = ref(tagLabel(initial?.tag || tags.value[0] || "document"));
 
 /**
  * The offered kinds, filtered by what is typed.
  *
- * The filter applies to the normalised kind and to its label: one searches for « Carte Trello » as read on the page, not as written in the frontmatter. The whole list stays on offer as long as the field holds a known kind — otherwise selecting one suggestion would hide all the others, and changing one's mind would require erasing everything.
+ * The filter applies to the normalised kind and to its label in the displayed language: one searches for « Carte Trello » as read on the page, not as written in the frontmatter. The whole list stays on offer as long as the field holds a known kind — otherwise selecting one suggestion would hide all the others, and changing one's mind would require erasing everything.
  */
 const proposedTags = computed(() => {
   const all = tags.value;
@@ -66,15 +73,13 @@ const proposedTags = computed(() => {
 /**
  * The kind as it will be written in the frontmatter.
  *
- * Accents folded, separators unified into underscores, case lowered: the kind is a key, and « Ticket Jira » typed here must not found a second kind next to the « ticket_jira » already used elsewhere. It is also what brings the label shown in the field back to the key it designates — « Carte Trello » gives back « carte_trello ».
+ * Accents folded, separators unified into underscores, case lowered: the kind is a key, and « Ticket Jira » typed here must not found a second kind next to the « ticket_jira » already used elsewhere. A known kind's label gives back its key, in either language — « Trello card » gives back « carte_trello », never « trello_card ».
  */
-const normalizedTag = computed(() => normalizeTag(tag.value));
+const normalizedTag = computed(() => tagFromInput(tag.value, tagLabels.value));
 
 const tagError = computed(() => {
   if (!tag.value.trim()) return null;
-  return normalizedTag.value
-    ? null
-    : "Une nature s’écrit avec des lettres ou des chiffres.";
+  return normalizedTag.value ? null : t().kindInvalid;
 });
 
 /**
@@ -89,9 +94,9 @@ const urlError = computed(() => {
     const u = new URL(raw);
     return u.protocol === "http:" || u.protocol === "https:"
       ? null
-      : "L’adresse doit commencer par http:// ou https://.";
+      : t().addressNotHttp;
   } catch {
-    return "Cette adresse n’est pas lisible.";
+    return t().addressUnreadable;
   }
 });
 
@@ -115,22 +120,19 @@ function validate(): void {
 </script>
 
 <template>
-  <UiDialog
-    class="lien-dialog"
-    :title="modification ? 'Modifier le lien' : 'Ajouter un lien'"
-  >
+  <UiDialog class="lien-dialog" :title="modification ? t().edit : t().add">
     <!-- The hint carries the error without putting the field in error: that is how SSK Canon displayed it, through a class on its mat-hint. -->
     <UiTextField
       v-model="url"
       class="champ"
-      label="Adresse"
+      :label="t().address"
       placeholder="https://…"
       autocomplete="off"
       data-focus-initial
     >
       <template #indice>
         <span class="ui-champ__indice" :class="{ erreur: !!urlError }">
-          {{ urlError ?? "L’adresse complète, telle qu’on l’ouvre" }}
+          {{ urlError ?? t().addressHint }}
         </span>
       </template>
     </UiTextField>
@@ -138,33 +140,31 @@ function validate(): void {
     <UiTextField
       v-model="name"
       class="champ"
-      label="Nom"
+      :label="t().name"
       autocomplete="off"
-      hint="Le libellé affiché sur la fiche — à défaut, sa nature"
+      :hint="t().nameHint"
       @keyup.enter="validate()"
     />
 
     <UiAutocomplete
       v-model="tag"
       class="champ"
-      label="Nature"
+      :label="t().kind"
       :options="proposedTags.map(tagLabel)"
       autocomplete="off"
       @keyup.enter="validate()"
     >
       <template #indice>
         <span class="ui-champ__indice" :class="{ erreur: !!tagError }">
-          {{
-            tagError ?? "Choisir dans la liste, ou saisir une nature nouvelle"
-          }}
+          {{ tagError ?? t().kindHint }}
         </span>
       </template>
     </UiAutocomplete>
 
     <template #actions>
-      <UiButton @click="emit('close')">Annuler</UiButton>
+      <UiButton @click="emit('close')">{{ t().cancel }}</UiButton>
       <UiButton variant="filled" :disabled="!valid" @click="validate()">
-        {{ modification ? "Enregistrer" : "Ajouter" }}
+        {{ modification ? t().save : t().confirmAdd }}
       </UiButton>
     </template>
   </UiDialog>

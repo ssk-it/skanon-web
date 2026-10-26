@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { LocaleService } from "../../core/i18n/locale.service";
+import { inject } from "../../core/injection";
 import { OPERATION_LABEL, type ImpactOperation } from "../../core/model/model";
 
 /**
@@ -7,7 +9,10 @@ import { OPERATION_LABEL, type ImpactOperation } from "../../core/model/model";
  */
 const props = defineProps<{ operation: ImpactOperation }>();
 
-const label = computed(() => OPERATION_LABEL[props.operation]);
+const locale = inject(LocaleService);
+const label = computed(
+  () => OPERATION_LABEL[locale.language()][props.operation],
+);
 </script>
 
 <template>

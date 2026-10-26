@@ -2,6 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
+import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
@@ -127,5 +128,52 @@ describe("Settings: token protection", () => {
   it("does not show under a third-party identity, whose access lasts only the session", async () => {
     const view = await mountView("proposee", "identite_tierce");
     expect(section(view).exists()).toBe(false);
+  });
+
+  // RG-textes-traduits: the page explains in the reader's language; what it writes into the repo stays French.
+  describe("in English", () => {
+    beforeEach(() => inject(LocaleService).choice.set("en"));
+
+    it("names the settings and the access modes in English", async () => {
+      const view = await mountView();
+      const text = view.text();
+      expect(view.find("h1").text()).toBe("Project settings");
+      expect(text).toContain("Access mode");
+      expect(text).toContain("Personal token");
+      expect(text).toContain("Third-party identity");
+      expect(text).toContain("not yet available");
+      expect(text).toContain("Code repos");
+      expect(text).not.toContain("Réglages du projet");
+      expect(text).not.toContain("Jeton personnel");
+    });
+
+    it("describes each way of keeping the token, in English", async () => {
+      const text = section(await mountView()).text();
+      expect(text).toContain("In clear, in the browser");
+      expect(text).toContain("Under a passkey, in the browser");
+      expect(text).toContain("not GitHub’s");
+      expect(text).not.toContain("En clair");
+    });
+
+    it("keeps in French what it writes into the repo", async () => {
+      const view = await mountView();
+      await view
+        .find('button[aria-label="What this setting writes"]')
+        .trigger("click");
+      const note = view.find(".infobulle").text();
+      expect(note).toContain("This setting writes to");
+      expect(note).toContain("depots_code:");
+      expect(note).toContain("role: Application web");
+    });
+
+    it("offers the settings through a pull request, in English", async () => {
+      const view = await mountView();
+      await choice(view, "exigee").setValue(true);
+      expect(
+        view
+          .findAll("button")
+          .some((b) => b.text() === "Propose these settings"),
+      ).toBe(true);
+    });
   });
 });

@@ -1,0 +1,36 @@
+import { defineMessages } from "../../core/i18n/language";
+
+export const linkDialogMessages = defineMessages({
+  fr: {
+    add: "Ajouter un lien",
+    edit: "Modifier le lien",
+    address: "Adresse",
+    addressHint: "L’adresse complète, telle qu’on l’ouvre",
+    addressNotHttp: "L’adresse doit commencer par http:// ou https://.",
+    addressUnreadable: "Cette adresse n’est pas lisible.",
+    name: "Nom",
+    nameHint: "Le libellé affiché sur la fiche — à défaut, sa nature",
+    kind: "Nature",
+    kindHint: "Choisir dans la liste, ou saisir une nature nouvelle",
+    kindInvalid: "Une nature s’écrit avec des lettres ou des chiffres.",
+    cancel: "Annuler",
+    save: "Enregistrer",
+    confirmAdd: "Ajouter",
+  },
+  en: {
+    add: "Add a link",
+    edit: "Edit the link",
+    address: "Address",
+    addressHint: "The full address, as you would open it",
+    addressNotHttp: "The address must start with http:// or https://.",
+    addressUnreadable: "This address cannot be read.",
+    name: "Name",
+    nameHint: "The label shown on the page — the kind, if left empty",
+    kind: "Kind",
+    kindHint: "Pick from the list, or type a new kind",
+    kindInvalid: "A kind is written with letters or digits.",
+    cancel: "Cancel",
+    save: "Save",
+    confirmAdd: "Add",
+  },
+});
