@@ -500,7 +500,7 @@ async function save(): Promise<void> {
       );
       written.push({
         ...d,
-        file: `cadrages/${id.value}/decisions/${idDecision}.md`,
+        file: authoring.decisionPath(id.value, idDecision),
         sha,
         savedText: text,
       });
