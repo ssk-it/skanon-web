@@ -151,6 +151,44 @@ describe("TokenDialog and the passkey", () => {
     expect(setForScope).toHaveBeenCalled();
   });
 
+  // 2026-065 decision 03: the author may do without the passkey in this browser, where their project leaves them the choice.
+  const preference = (view: ReturnType<typeof mount>) =>
+    view.find(".preference-passkey input[type=checkbox]");
+
+  it("no longer checks protection by default once the author opted out", async () => {
+    vi.spyOn(tokens, "protectByDefault").mockReturnValue(false);
+    const view = await mountView();
+    expect((protectCheckbox(view).element as HTMLInputElement).checked).toBe(
+      false,
+    );
+  });
+
+  it("records the preference to do without the passkey in this browser", async () => {
+    const optOut = vi.spyOn(tokens, "optOut").mockResolvedValue();
+    const view = await mountView();
+    expect(view.find(".preference-passkey").text()).toContain(
+      "Dans ce navigateur",
+    );
+    await preference(view).setValue(true);
+    await flushPromises();
+    expect(optOut).toHaveBeenCalledWith(true);
+  });
+
+  it("says the preference changes nothing on a project that requires the passkey", async () => {
+    vi.spyOn(tokens, "protectionRequired").mockReturnValue(true);
+    vi.spyOn(tokens, "optedOut").mockReturnValue(true);
+    const view = await mountView();
+    expect(view.find(".preference-passkey").text()).toContain(
+      "n’y change rien",
+    );
+  });
+
+  it("does not offer the preference where the browser cannot protect the token", async () => {
+    vi.spyOn(tokens, "canProtect").mockResolvedValue(false);
+    const view = await mountView();
+    expect(view.find(".preference-passkey").exists()).toBe(false);
+  });
+
   it("does not mention a passkey on the desktop, where the system keychain suffices", async () => {
     vi.spyOn(tokens, "form").mockReturnValue("systeme");
     vi.spyOn(tokens, "canProtect").mockResolvedValue(false);

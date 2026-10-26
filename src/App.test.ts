@@ -572,37 +572,64 @@ describe("Passkey banner", () => {
     expect(view.find(".bandeau-passkey").exists()).toBe(false);
   });
 
-  it("requests the passkey as soon as it opens, then rereads the repo", async () => {
+  // 2026-065 decision 02: no passkey window forced on load.
+  it("never requests the passkey by itself when it opens", async () => {
     vi.spyOn(tokens, "locked").mockReturnValue(true);
-    const unlock = vi
-      .spyOn(tokens, "unlockWithoutGesture")
-      .mockResolvedValue("ouvert");
-    const reread = vi
-      .spyOn(inject(SpecificationStore), "loadSpecification")
-      .mockResolvedValue();
+    const unlock = vi.spyOn(tokens, "unlock").mockResolvedValue("ouvert");
     await mountView();
     await flushPromises();
-    expect(unlock).toHaveBeenCalledOnce();
-    expect(reread).toHaveBeenCalled();
+    expect(unlock).not.toHaveBeenCalled();
   });
 
-  it("offers to unlock sealed tokens, then rereads the repo", async () => {
+  it("offers the passkey in a field the browser's autofill fills", async () => {
     vi.spyOn(tokens, "locked").mockReturnValue(true);
-    vi.spyOn(tokens, "unlockWithoutGesture").mockResolvedValue("annule");
+    vi.spyOn(tokens, "canOffer").mockResolvedValue(true);
+    const offer = vi
+      .spyOn(tokens, "offerUnlock")
+      .mockReturnValue(new Promise(() => {}));
+    const view = await mountView();
+    await flushPromises();
+    const field = view.find(".bandeau-passkey input");
+    expect(field.attributes("autocomplete")).toBe("username webauthn");
+    expect(field.attributes("aria-label")).toBe("Votre clé d’accès Skanon");
+    expect(offer).toHaveBeenCalledOnce();
+  });
+
+  it("keeps only the button where the autofill cannot offer the passkey", async () => {
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    vi.spyOn(tokens, "canOffer").mockResolvedValue(false);
+    const offer = vi.spyOn(tokens, "offerUnlock");
+    const view = await mountView();
+    await flushPromises();
+    expect(view.find(".bandeau-passkey input").exists()).toBe(false);
+    expect(offer).not.toHaveBeenCalled();
+  });
+
+  it("offers to unlock sealed tokens with a click", async () => {
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    vi.spyOn(tokens, "canOffer").mockResolvedValue(false);
     const unlock = vi.spyOn(tokens, "unlock").mockResolvedValue("ouvert");
-    const reread = vi
-      .spyOn(inject(SpecificationStore), "loadSpecification")
-      .mockResolvedValue();
     const view = await mountView();
     const banner = view.find(".bandeau-passkey");
     expect(banner.text()).toContain("protégés par une passkey");
+    expect(banner.text()).toContain("tant qu’un onglet de Skanon reste ouvert");
     await banner
       .findAll("button")
       .find((b) => b.text() === "Déverrouiller")!
       .trigger("click");
     await flushPromises();
     expect(unlock).toHaveBeenCalled();
-    expect(reread).toHaveBeenCalled();
+  });
+
+  // 2026-065 decision 01: tokens opened in another tab, or here, open the repo.
+  it("rereads the repo once the tokens are opened, here or in another tab", async () => {
+    const reread = vi
+      .spyOn(inject(SpecificationStore), "loadSpecification")
+      .mockResolvedValue();
+    await mountView();
+    tokens.unlocks.update((n) => n + 1);
+    await flushPromises();
+    expect(reread).toHaveBeenCalledOnce();
   });
 
   it("offers to forget tokens the passkey no longer opens", async () => {

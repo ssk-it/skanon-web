@@ -6,6 +6,7 @@ import {
   writeSealedText,
 } from "./web-sealing";
 import { FakeAuthenticator } from "./authenticator-testing";
+import { FakeKeyHub } from "./key-channel-testing";
 
 const TOKEN = "github_pat_11AAAAAAA0secretdurouge";
 const OTHER = "ghp_autrejetondelorganisationacme";
@@ -168,6 +169,161 @@ describe("the browser vault sealed by a passkey", () => {
     expect(await new BrowserSealedVault(auth).isPossible()).toBe(true);
     auth.possible = false;
     expect(await new BrowserSealedVault(auth).isPossible()).toBe(false);
+  });
+});
+
+/** Lets the messages between tabs, and the work they trigger, arrive. */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+}
+
+// RG-secret-conserve-localement, 2026-065 decision 01: one unlock while a tab of the application stays open, the key in memory only.
+describe("the key shared between open tabs", () => {
+  let auth: FakeAuthenticator;
+  let hub: FakeKeyHub;
+
+  beforeEach(() => {
+    localStorage.clear();
+    auth = new FakeAuthenticator();
+    hub = new FakeKeyHub();
+  });
+
+  it("opens a new tab's tokens from a tab already unlocked, without the passkey", async () => {
+    await new BrowserSealedVault(auth, hub.open()).sealTokens(TOKENS);
+    const evaluations = auth.evaluations;
+
+    const newTab = new BrowserSealedVault(auth, hub.open());
+    expect(newTab.state).toBe("verrouille");
+    expect(await newTab.joinOpenTabs()).toEqual({
+      issue: "ouvert",
+      tokens: TOKENS,
+    });
+    expect(newTab.state).toBe("ouvert");
+    expect(auth.evaluations).toBe(evaluations);
+    // the new tab can read the private contents too: RG-contenus-prives-au-repos
+    expect(newTab.findCipher()).not.toBeNull();
+  });
+
+  it("stays locked when no open tab holds the key", async () => {
+    const first = hub.open();
+    await new BrowserSealedVault(auth, first).sealTokens(TOKENS);
+    hub.close(first);
+
+    const newTab = new BrowserSealedVault(auth, hub.open());
+    expect(await newTab.joinOpenTabs()).toBeNull();
+    expect(newTab.state).toBe("verrouille");
+  });
+
+  it("ignores a key that no longer opens its sealed store", async () => {
+    await new BrowserSealedVault(auth, hub.open()).sealTokens(TOKENS);
+    // sealed again elsewhere, under another key: the open tab's key is stale
+    auth.substitute = true;
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
+
+    const newTab = new BrowserSealedVault(auth, hub.open());
+    expect(await newTab.joinOpenTabs()).toBeNull();
+    expect(newTab.state).toBe("verrouille");
+  });
+
+  it("opens the other locked tabs when one is unlocked", async () => {
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
+    const unlocked = new BrowserSealedVault(auth, hub.open());
+    const waiting = new BrowserSealedVault(auth, hub.open());
+    const opened: unknown[] = [];
+    waiting.listenChanges((tokens) => opened.push(tokens));
+
+    await unlocked.unlockTokens();
+    await settle();
+
+    expect(waiting.state).toBe("ouvert");
+    expect(opened).toEqual([TOKENS]);
+  });
+
+  it("writes the key nowhere", async () => {
+    await new BrowserSealedVault(auth, hub.open()).sealTokens(TOKENS);
+    const before = storage();
+    await new BrowserSealedVault(auth, hub.open()).joinOpenTabs();
+    expect(storage()).toBe(before);
+  });
+});
+
+// 2026-065 decision 02: the passkey is offered by the browser's autofill, never forced on load.
+describe("the unlock offered by the browser's passkey autofill", () => {
+  let auth: FakeAuthenticator;
+
+  beforeEach(async () => {
+    localStorage.clear();
+    auth = new FakeAuthenticator();
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
+  });
+
+  it("opens the tokens once the user picks the offered passkey", async () => {
+    const vault = new BrowserSealedVault(auth);
+    const offer = vault.offerUnlock(new AbortController().signal);
+    expect(auth.offering).toBe(true);
+    await auth.pick();
+    expect(await offer).toEqual({ issue: "ouvert", tokens: TOKENS });
+    expect(vault.state).toBe("ouvert");
+  });
+
+  it("withdraws the offer when it is aborted, and stays locked", async () => {
+    const vault = new BrowserSealedVault(auth);
+    const abort = new AbortController();
+    const offer = vault.offerUnlock(abort.signal);
+    abort.abort();
+    expect(await offer).toEqual({ issue: "annule" });
+    expect(auth.offering).toBe(false);
+    expect(vault.state).toBe("verrouille");
+  });
+
+  it("reports unreadable a picked passkey that does not open the sealed store", async () => {
+    const vault = new BrowserSealedVault(auth);
+    const offer = vault.offerUnlock(new AbortController().signal);
+    auth.substitute = true;
+    await auth.pick();
+    expect(await offer).toEqual({ issue: "illisible" });
+    expect(vault.state).toBe("verrouille");
+  });
+
+  it("offers it only where the browser returns the key through autofill", async () => {
+    expect(await new BrowserSealedVault(auth).canOffer()).toBe(true);
+    auth.conditionalPossible = false;
+    expect(await new BrowserSealedVault(auth).canOffer()).toBe(false);
+  });
+});
+
+// 2026-065 decision 03: the author may do without the passkey, in this browser.
+describe("the preference to do without the passkey", () => {
+  let auth: FakeAuthenticator;
+
+  beforeEach(() => {
+    localStorage.clear();
+    auth = new FakeAuthenticator();
+  });
+
+  it("is off by default, and kept from one load to the next", () => {
+    expect(new BrowserSealedVault(auth).optedOut).toBe(false);
+    expect(new BrowserSealedVault(auth).optOut(true)).toBe(true);
+    expect(new BrowserSealedVault(auth).optedOut).toBe(true);
+    new BrowserSealedVault(auth).optOut(false);
+    expect(new BrowserSealedVault(auth).optedOut).toBe(false);
+  });
+
+  it("returns open tokens to plain text, and removes the sealed store", async () => {
+    const vault = new BrowserSealedVault(auth);
+    await vault.sealTokens(TOKENS);
+    expect(await vault.unsealTokens(TOKENS)).toBe("faite");
+    expect(vault.state).toBe("aucun");
+    expect(localStorage.getItem("skanon.jetons-scelles")).toBeNull();
+    expect(await new BrowserSealedVault(auth).loadTokens()).toEqual(TOKENS);
+  });
+
+  it("refuses to unseal tokens it cannot open", async () => {
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
+    const before = storage();
+    const locked = new BrowserSealedVault(auth);
+    expect(await locked.unsealTokens(TOKENS)).toBe("refusee");
+    expect(storage()).toBe(before);
   });
 });
 

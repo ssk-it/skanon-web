@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { GithubClient, type RepoRef } from "./core/github/github-client";
 import { IdentityService } from "./core/github/identity.service";
@@ -18,6 +18,7 @@ import { VersionService, isInputUrl } from "./core/ui/version.service";
 import { INSTALLATION_FAILED_MESSAGE } from "./features/shared/version-causes";
 import { INSTALLATION_FAILED } from "./platform/ports";
 import { openSignIn } from "./features/shared/open-sign-in";
+import PasskeyUnlock from "./features/shared/PasskeyUnlock.vue";
 import ProjectSymbol from "./features/shared/ProjectSymbol.vue";
 import { DialogService } from "./ui/dialog.service";
 import UiProgressBar from "./ui/UiProgressBar.vue";
@@ -190,13 +191,11 @@ function openRepoDialog(): void {
   );
 }
 
-/** The passkey banner takes over when the browser would not request it without a click. */
-function unlockTokens(withoutGesture = false): void {
-  const open = withoutGesture ? tokens.unlockWithoutGesture() : tokens.unlock();
-  void open.then((issue) => {
-    if (issue === "ouvert") void store.loadSpecification();
-  });
-}
+/** Tokens opened — in this tab, or in another one that handed its key over —: what was read without them is read again (2026-065). */
+watch(
+  () => tokens.unlocks(),
+  () => void store.loadSpecification(),
+);
 
 function protectTokens(): void {
   void tokens.protect();
@@ -272,7 +271,6 @@ function onHistory(): void {
 onMounted(() => {
   document.addEventListener("keydown", onKeydown);
   window.addEventListener("popstate", onHistory);
-  if (tokens.locked()) unlockTokens(true);
 });
 onBeforeUnmount(() => {
   document.removeEventListener("keydown", onKeydown);
@@ -556,8 +554,7 @@ function reloadVersion(): void {
     <p>
       <template v-if="passkeyBanner === 'verrouille'">
         {{ t().passkey.locked }}
-        <UiButton @click="unlockTokens()">{{ t().passkey.unlock }}</UiButton>
-        {{ t().passkey.toUseInTab }}
+        <PasskeyUnlock />
         <template v-if="tokens.passkeyFailure() === 'illisible'">
           {{ t().passkey.unreadable }}
           <UiButton @click="tokens.erase()">{{ t().passkey.forget }}</UiButton>

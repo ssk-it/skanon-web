@@ -45,11 +45,13 @@ const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
         <template v-else-if="sealedTokens">
           <li>{{ t().tokens.sealed }}</li>
           <li>{{ t().tokens.passkeyLost }}</li>
+          <li>{{ t().tokens.optOut }}</li>
         </template>
         <template v-else>
           <li>{{ t().tokens.inClear }}</li>
           <li>{{ t().tokens.canSeal }}</li>
           <li>{{ t().tokens.projectRequires }}</li>
+          <li>{{ t().tokens.optOut }}</li>
         </template>
         <li v-if="!onDesktop">{{ t().tokens.preferLimited }}</li>
         <li>

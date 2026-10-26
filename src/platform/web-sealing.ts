@@ -16,6 +16,12 @@ import { BrowserVault, toPairs } from "./web-vault";
 const SEALED_KEY = "skanon.jetons-scelles";
 const PASSKEY_KEY = "skanon.passkey";
 
+/** The author's choice to do without the passkey in this browser. Not secret: it says how tokens are kept, not what they are. */
+const OPT_OUT_KEY = "skanon.sans-passkey";
+
+/** How long a new tab waits for an open tab to hand it the key: an open tab answers in a few milliseconds, and a load that waits for nobody must not be held back. */
+const JOIN_DELAY_MS = 200;
+
 /** What the passkey is asked to encrypt with its secret (PRF): a fixed value, which nothing requires to keep quiet. Changing it would make every sealed store unreadable. */
 const SALT = new TextEncoder().encode("skanon:coffre:v1");
 
@@ -42,9 +48,47 @@ export interface Authenticator {
     id: Uint8Array<ArrayBuffer>,
     salt: Uint8Array<ArrayBuffer>,
   ): Promise<ArrayBuffer | null>;
+  /** False when the browser surely cannot offer a passkey through its autofill. */
+  isConditionalPossible(): Promise<boolean>;
+  /** The output of the passkey the user picks in the browser's autofill; `null` if the offer is withdrawn, cancelled, or returns no output. */
+  evaluateConditional(
+    salt: Uint8Array<ArrayBuffer>,
+    signal: AbortSignal,
+  ): Promise<ArrayBuffer | null>;
 }
 
-interface Keys {
+/** What tabs of the application tell each other about the key: a new tab asks for it, an open tab hands it over, a tab that removed the sealed store says so. */
+export type KeyMessage =
+  | { readonly type: "demande" }
+  | { readonly type: "cle"; readonly keys: Keys }
+  | { readonly type: "retire" };
+
+/** The channel between tabs of the same origin. Like a `BroadcastChannel`, it never hands a tab what it posted itself. */
+export interface KeyChannel {
+  post(message: KeyMessage): void;
+  listen(onMessage: (message: KeyMessage) => void): void;
+}
+
+/** The channel of the real browser; `null` where it has none. The keys cross it by structured clone: they stay non-extractable. */
+export function browserKeyChannel(): KeyChannel | null {
+  if (typeof BroadcastChannel === "undefined") return null;
+  const channel = new BroadcastChannel("skanon.cle");
+  return {
+    post: (message) => {
+      try {
+        channel.postMessage(message);
+      } catch {
+        // A browser that cannot clone a key: the other tabs will ask for the passkey.
+      }
+    },
+    listen: (onMessage) =>
+      channel.addEventListener("message", (e: MessageEvent<KeyMessage>) =>
+        onMessage(e.data),
+      ),
+  };
+}
+
+export interface Keys {
   readonly tokens: CryptoKey;
   readonly contents: CryptoKey;
 }
@@ -53,12 +97,22 @@ interface Keys {
  * The web version's vault, which can seal tokens with a passkey (RG-secret-conserve-localement, 2026-055).
  *
  * As long as nothing is sealed, it keeps tokens in plain text, like `BrowserVault`. Sealed, it keeps only their ciphertext, and the key only exists in memory, after a user gesture: it comes from the passkey, which only returns it to this site and only after Touch ID or the device code. A program that reads the browser profile therefore finds only ciphertext. A script on the page, once open, reads the tokens as the application does: the protection covers data at rest, not the page.
+ *
+ * The key then passes, through `channel`, from an open tab to the tabs that open afterwards, in memory only: the last tab closed takes it away (2026-065, decision 01). A script on the page can ask for it as the application does — the same exposure, for as long as a tab stays open.
  */
 export class BrowserSealedVault implements TokenVault, TokenSealing {
   private readonly clair = new BrowserVault();
   private keys: Keys | null = null;
+  private readonly listeners: ((tokens: StoredTokens | null) => void)[] = [];
+  /** The answer a join waits for, while it waits. */
+  private joining: ((outcome: UnlockOutcome) => void) | null = null;
 
-  constructor(private readonly auth: Authenticator) {}
+  constructor(
+    private readonly auth: Authenticator,
+    private readonly channel: KeyChannel | null = null,
+  ) {
+    channel?.listen((message) => void this.receive(message));
+  }
 
   get state(): SealingState {
     if (this.keys) return "ouvert";
@@ -86,6 +140,7 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
   }
 
   async deleteTokens(): Promise<VaultWrite> {
+    if (this.keys) this.channel?.post({ type: "retire" });
     this.keys = null;
     const sealed = erase(SEALED_KEY);
     const clair = await this.clair.deleteTokens();
@@ -105,6 +160,7 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
     const keys = await deriveKeys(output);
     if ((await this.writeSealed(keys, tokens)) === "refusee")
       return "impossible";
+    this.share();
     return "scelle";
   }
 
@@ -117,12 +173,90 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
     } catch {
       return { issue: "annule" };
     }
+    return this.openWith(output);
+  }
+
+  async joinOpenTabs(): Promise<UnlockOutcome | null> {
+    if (!this.channel || this.state !== "verrouille") return null;
+    const answer = new Promise<UnlockOutcome | null>((resolve) => {
+      this.joining = resolve;
+      setTimeout(() => {
+        this.joining = null;
+        resolve(null);
+      }, JOIN_DELAY_MS);
+    });
+    this.channel.post({ type: "demande" });
+    return answer;
+  }
+
+  listenChanges(onChange: (tokens: StoredTokens | null) => void): void {
+    this.listeners.push(onChange);
+  }
+
+  canOffer(): Promise<boolean> {
+    return this.auth.isConditionalPossible();
+  }
+
+  async offerUnlock(signal: AbortSignal): Promise<UnlockOutcome> {
+    if (!read(SEALED_KEY)) return { issue: "illisible" };
+    let output: ArrayBuffer | null;
+    try {
+      output = await this.auth.evaluateConditional(SALT, signal);
+    } catch {
+      return { issue: "annule" };
+    }
+    return this.openWith(output);
+  }
+
+  get optedOut(): boolean {
+    return read(OPT_OUT_KEY) === "1";
+  }
+
+  optOut(value: boolean): boolean {
+    return value ? write(OPT_OUT_KEY, "1") : erase(OPT_OUT_KEY);
+  }
+
+  async unsealTokens(tokens: StoredTokens): Promise<VaultWrite> {
+    if (!this.keys) return "refusee";
+    if ((await this.clair.saveTokens(tokens)) === "refusee") return "refusee";
+    erase(SEALED_KEY);
+    this.keys = null;
+    this.channel?.post({ type: "retire" });
+    return "faite";
+  }
+
+  /** Opens the sealed store with a passkey's output, and hands the key to the tabs still locked. */
+  private async openWith(output: ArrayBuffer | null): Promise<UnlockOutcome> {
     if (!output) return { issue: "annule" };
     const keys = await deriveKeys(output);
     const tokens = await this.open(keys);
     if (!tokens) return { issue: "illisible" };
     this.keys = keys;
+    this.share();
     return { issue: "ouvert", tokens };
+  }
+
+  private share(): void {
+    if (this.keys) this.channel?.post({ type: "cle", keys: this.keys });
+  }
+
+  /** What another tab says. A key is only taken if it opens this tab's sealed store: one sealed again elsewhere would not. */
+  private async receive(message: KeyMessage): Promise<void> {
+    if (message.type === "demande") return this.share();
+    if (message.type === "retire") {
+      if (!this.keys) return;
+      this.keys = null;
+      for (const listener of this.listeners) listener(null);
+      return;
+    }
+    if (this.keys) return;
+    const tokens = await this.open(message.keys);
+    if (!tokens || this.keys) return;
+    this.keys = message.keys;
+    const joining = this.joining;
+    this.joining = null;
+    if (joining) return joining({ issue: "ouvert", tokens });
+    for (const listener of this.listeners) listener(tokens);
   }
 
   findCipher(): Cipher | null {
@@ -350,6 +484,40 @@ export class BrowserAuthenticator implements Authenticator {
           // No server checks this response: the challenge is only there because WebAuthn requires it.
           challenge: crypto.getRandomValues(new Uint8Array(32)),
           allowCredentials: [{ type: "public-key", id }],
+          userVerification: "required",
+          extensions: { prf: { eval: { first: salt } } },
+        },
+      }),
+    );
+    if (!(assertion instanceof PublicKeyCredential)) return null;
+    return copy(assertion.getClientExtensionResults().prf?.results?.first);
+  }
+
+  async isConditionalPossible(): Promise<boolean> {
+    if (!(await this.isPossible())) return false;
+    const available = (
+      PublicKeyCredential as unknown as {
+        isConditionalMediationAvailable?: () => Promise<boolean>;
+      }
+    ).isConditionalMediationAvailable;
+    return (
+      (await available?.call(PublicKeyCredential).catch(() => false)) ?? false
+    );
+  }
+
+  /**
+   * The browser offers this site's passkeys in the field marked `autocomplete="webauthn"`, and waits for the user to pick one: nothing shows until then. No `allowCredentials`: the autofill lists the passkeys itself, and PRF is evaluated on the one picked. A browser that does not return PRF this way gives no output, and the "Unlock" button remains (2026-065, « Ce qu'il faut éprouver »).
+   */
+  async evaluateConditional(
+    salt: Uint8Array<ArrayBuffer>,
+    signal: AbortSignal,
+  ): Promise<ArrayBuffer | null> {
+    const assertion = await gesture(() =>
+      navigator.credentials.get({
+        mediation: "conditional",
+        signal,
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
           userVerification: "required",
           extensions: { prf: { eval: { first: salt } } },
         },

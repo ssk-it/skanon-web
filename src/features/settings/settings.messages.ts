@@ -17,13 +17,13 @@ export const settingsMessages = defineMessages({
       `Autorisation jusqu’au ${g.scope === "chemin" ? "chemin" : "dépôt"} · auteur ${g.authorVerified ? "vérifié" : "déclaré"} · ${g.accountRequired ? "compte GitHub requis" : "aucun compte GitHub requis"}`,
     tokenProtection: "Protection du jeton dans la version web",
     tokenProtectionHelp:
-      "Sur le bureau, le jeton est toujours gardé dans le coffre du système. Dans la version web, ce projet peut exiger qu’il soit protégé par une passkey : Touch ID, ou le code de l’appareil, l’ouvre alors dans chaque onglet.",
+      "Sur le bureau, le jeton est toujours gardé dans le coffre du système. Dans la version web, ce projet peut exiger qu’il soit protégé par une passkey : Touch ID, ou le code de l’appareil, l’ouvre alors une fois, tant qu’un onglet de Skanon reste ouvert.",
     offered: "Proposée",
     offeredHelp:
-      "Chaque rédacteur choisit. Sans passkey, son jeton reste en clair dans son navigateur.",
+      "Chaque rédacteur choisit, à la saisie de son jeton ou une fois pour toutes dans son navigateur. Sans passkey, son jeton reste en clair dans son navigateur.",
     required: "Exigée",
     requiredHelp:
-      "Un jeton qui ouvre ce projet n’est jamais gardé en clair : sans passkey, il ne vaut que pour l’onglet.",
+      "Un jeton qui ouvre ce projet n’est jamais gardé en clair, même pour un rédacteur qui s’est passé de la passkey dans son navigateur : sans passkey, il ne vaut que pour l’onglet.",
     forms: [
       {
         term: "En clair, dans le navigateur",
@@ -33,7 +33,7 @@ export const settingsMessages = defineMessages({
       {
         term: "Sous passkey, dans le navigateur",
         description:
-          "Ils ne trouvent qu’un chiffré, que seuls Touch ID ou le code de l’appareil ouvrent. Un script ou une extension sur la page lit toujours le jeton tant que l’onglet est déverrouillé.",
+          "Ils ne trouvent qu’un chiffré, que seuls Touch ID ou le code de l’appareil ouvrent. Un script ou une extension sur la page lit toujours le jeton tant qu’un onglet déverrouillé reste ouvert.",
       },
       {
         term: "Dans le coffre du système, sur le bureau",
@@ -117,13 +117,13 @@ export const settingsMessages = defineMessages({
       `Authorisation down to the ${g.scope === "chemin" ? "path" : "repo"} · author ${g.authorVerified ? "verified" : "declared"} · ${g.accountRequired ? "GitHub account required" : "no GitHub account required"}`,
     tokenProtection: "Token protection in the web version",
     tokenProtectionHelp:
-      "On the desktop, the token is always kept in the system vault. In the web version, this project can require it to be protected by a passkey: Touch ID, or the device passcode, then unlocks it in each tab.",
+      "On the desktop, the token is always kept in the system vault. In the web version, this project can require it to be protected by a passkey: Touch ID, or the device passcode, then unlocks it once, while a Skanon tab stays open.",
     offered: "Offered",
     offeredHelp:
-      "Each author chooses. Without a passkey, their token stays in clear in their browser.",
+      "Each author chooses, when entering their token or once and for all in their browser. Without a passkey, their token stays in clear in their browser.",
     required: "Required",
     requiredHelp:
-      "A token that opens this project is never kept in clear: without a passkey, it holds only for the tab.",
+      "A token that opens this project is never kept in clear, even for an author who opted out of the passkey in their browser: without a passkey, it holds only for the tab.",
     forms: [
       {
         term: "In clear, in the browser",
@@ -133,7 +133,7 @@ export const settingsMessages = defineMessages({
       {
         term: "Under a passkey, in the browser",
         description:
-          "They find only ciphertext, which only Touch ID or the device passcode opens. A script or an extension on the page still reads the token while the tab is unlocked.",
+          "They find only ciphertext, which only Touch ID or the device passcode opens. A script or an extension on the page still reads the token while an unlocked tab stays open.",
       },
       {
         term: "In the system vault, on the desktop",

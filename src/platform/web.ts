@@ -1,5 +1,9 @@
 import type { VersionAnnouncement, VersionAnnouncer, Platform } from "./ports";
-import { BrowserAuthenticator, BrowserSealedVault } from "./web-sealing";
+import {
+  BrowserAuthenticator,
+  BrowserSealedVault,
+  browserKeyChannel,
+} from "./web-sealing";
 
 /** Skanon's service worker script, emitted by `tools/pwa/pwa.ts` in the web version only. */
 export const SCRIPT_SERVICE_WORKER = "/sw.js";
@@ -144,7 +148,10 @@ function serviceWorkerAvailable(): ServiceWorkerContainer | undefined {
 
 export function createWebPlatform(): Platform {
   // A single object for both ports: sealing decides what the vault writes.
-  const vault = new BrowserSealedVault(new BrowserAuthenticator());
+  const vault = new BrowserSealedVault(
+    new BrowserAuthenticator(),
+    browserKeyChannel(),
+  );
   return {
     target: "web",
     vault,

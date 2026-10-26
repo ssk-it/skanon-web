@@ -15,13 +15,15 @@ export const helpMessages = defineMessages({
       desktopVault:
         "Le jeton est rangé dans le coffre du système — le Trousseau sur macOS, le gestionnaire d’identifiants sur Windows. Si le coffre refuse de le garder, il ne vaut que pour la session, et un bandeau le dit.",
       sealed:
-        "Vos jetons sont protégés par une passkey : ce navigateur n’en garde que le chiffré, que Touch ID ou le code de l’appareil ouvrent dans chaque onglet. Un programme qui lit le profil du navigateur ne les trouve pas. Une extension ou un script qui s’exécute sur cette page, onglet déverrouillé, pourrait toujours les lire.",
+        "Vos jetons sont protégés par une passkey : ce navigateur n’en garde que le chiffré. Touch ID ou le code de l’appareil les ouvrent une fois, tant qu’un onglet de Skanon reste ouvert : les onglets ouverts ensuite reçoivent la clé, en mémoire, et le dernier fermé l’emporte. Rien ne vous est demandé au chargement : le navigateur propose votre clé d’accès enregistrée dans le bandeau, ou le bouton « Déverrouiller ». Un programme qui lit le profil du navigateur ne les trouve pas. Une extension ou un script qui s’exécute sur cette page, tant qu’un onglet déverrouillé reste ouvert, pourrait toujours les lire.",
       passkeyLost:
         "Si la passkey disparaît de votre trousseau, les jetons ne s’ouvrent plus : on les oublie, et on saisit de nouveau son jeton.",
+      optOut:
+        "Dans ce navigateur, vous pouvez vous passer de la passkey, depuis la connexion à GitHub : vos jetons y sont alors gardés en clair, sur les projets qui vous laissent le choix. Un projet qui l’exige l’obtient toujours.",
       inClear:
         "Le jeton est gardé dans ce navigateur, en clair : une extension ou un script qui s’exécute sur cette page pourrait le lire, comme un programme qui lit le profil du navigateur.",
       canSeal:
-        "Il peut être protégé par une passkey, à sa saisie : ce navigateur n’en garde alors que le chiffré, que Touch ID ou le code de l’appareil ouvrent dans chaque onglet. Un script sur la page, onglet déverrouillé, le lirait toujours.",
+        "Il peut être protégé par une passkey, à sa saisie : ce navigateur n’en garde alors que le chiffré, que Touch ID ou le code de l’appareil ouvrent une fois, tant qu’un onglet de Skanon reste ouvert. Un script sur la page, pendant ce temps, le lirait toujours.",
       projectRequires:
         "Un projet peut exiger cette protection : sans passkey, le jeton ne vaut alors que pour l’onglet.",
       preferLimited:
@@ -52,7 +54,7 @@ export const helpMessages = defineMessages({
       eviction:
         "Ce qu’aucune branche ne cite plus est retiré. Les contenus privés durent autant que l’accès qui les a lus ; ceux qu’une identité vérifiée a lus ne sont pas gardés du tout.",
       sealedContents:
-        "Les contenus privés sont gardés sous la même clé que les jetons, et ne se lisent qu’une fois l’onglet déverrouillé.",
+        "Les contenus privés sont gardés sous la même clé que les jetons, et ne se lisent que dans les onglets ouverts après le déverrouillage, tant que l’un d’eux le reste.",
       recent:
         "Les douze derniers projets ouverts sont retenus, pour l’accueil.",
     },
@@ -92,13 +94,15 @@ export const helpMessages = defineMessages({
       desktopVault:
         "The token is stored in the system vault — the Keychain on macOS, the Credential Manager on Windows. If the vault refuses to keep it, it holds only for the session, and a banner says so.",
       sealed:
-        "Your tokens are protected by a passkey: this browser keeps only their ciphertext, which Touch ID or the device code opens in each tab. A program that reads the browser profile does not find them. An extension or a script running on this page, with the tab unlocked, could still read them.",
+        "Your tokens are protected by a passkey: this browser keeps only their ciphertext. Touch ID or the device code opens them once, while a Skanon tab stays open: tabs opened afterwards receive the key, in memory, and the last one closed takes it away. Nothing is asked on load: the browser offers your saved passkey in the banner, or the « Unlock » button. A program that reads the browser profile does not find them. An extension or a script running on this page, while an unlocked tab stays open, could still read them.",
       passkeyLost:
         "If the passkey disappears from your keychain, the tokens no longer open: you forget them, and enter your token again.",
+      optOut:
+        "In this browser, you can do without the passkey, from the GitHub sign-in: your tokens are then kept in clear there, on projects that leave you the choice. A project that requires it always gets it.",
       inClear:
         "The token is kept in this browser, in clear: an extension or a script running on this page could read it, as could a program that reads the browser profile.",
       canSeal:
-        "It can be protected by a passkey when you enter it: this browser then keeps only its ciphertext, which Touch ID or the device code opens in each tab. A script on the page, with the tab unlocked, would still read it.",
+        "It can be protected by a passkey when you enter it: this browser then keeps only its ciphertext, which Touch ID or the device code opens once, while a Skanon tab stays open. A script on the page, meanwhile, would still read it.",
       projectRequires:
         "A project may require this protection: without a passkey, the token then holds only for the tab.",
       preferLimited:
@@ -129,7 +133,7 @@ export const helpMessages = defineMessages({
       eviction:
         "What no branch refers to any more is removed. Private contents last as long as the access that read them; those read through a verified identity are not kept at all.",
       sealedContents:
-        "Private contents are kept under the same key as the tokens, and can be read only once the tab is unlocked.",
+        "Private contents are kept under the same key as the tokens, and can be read only in the tabs opened after unlocking, while one of them stays open.",
       recent:
         "The last twelve projects opened are remembered, for the home page.",
     },

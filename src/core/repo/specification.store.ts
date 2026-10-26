@@ -154,6 +154,11 @@ export class SpecificationStore {
    */
   readonly tokenWithoutAccess = signal(false);
 
+  /**
+   * True when the repo was not found while sealed tokens are still locked: it may well be private, and only waits for them (2026-065). Unlocking rereads it.
+   */
+  readonly waitingForUnlock = signal(false);
+
   readonly activeRules = computed(() =>
     this.rules().filter((r) => r.status === "actif"),
   );
@@ -591,6 +596,7 @@ export class SpecificationStore {
     this.github.writeSuspended.set(null);
     this.emptyRepo.set(false);
     this.tokenWithoutAccess.set(false);
+    this.waitingForUnlock.set(false);
     this.progression.set(null);
     // the dates belong to the repo being left
     this.dates.set(new Map());
@@ -635,9 +641,11 @@ export class SpecificationStore {
       // Distinguished from other failures: this one can be fixed, and the
       // application knows how. See BootstrapService.
       this.emptyRepo.set(e instanceof GithubError && e.status === 409);
+      const notFound = e instanceof GithubError && e.status === 404;
+      this.waitingForUnlock.set(notFound && this.tokens.locked());
       this.tokenWithoutAccess.set(
-        e instanceof GithubError &&
-          e.status === 404 &&
+        notFound &&
+          !this.tokens.locked() &&
           this.tokens.source() === "personnel",
       );
       this.state.set("erreur");

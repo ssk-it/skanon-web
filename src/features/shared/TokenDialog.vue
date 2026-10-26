@@ -58,8 +58,16 @@ onMounted(async () => {
   protectable.value = await tokens.canProtect();
 });
 
-/** What the input offers by default: protect. The author may do without it, except when the project requires it (RG-protection-du-jeton-par-projet). */
-const protect = ref(true);
+/** What the input offers by default: protect, unless the author opted out in this browser. They may do without it, except when the project requires it (RG-protection-du-jeton-par-projet). */
+const protect = ref(tokens.protectByDefault());
+
+/** The author's preference, in this browser, to do without the passkey (2026-065, decision 03). */
+const optedOut = ref(tokens.optedOut());
+async function changeOptOut(value: boolean): Promise<void> {
+  optedOut.value = value;
+  await tokens.optOut(value);
+  protect.value = tokens.protectByDefault();
+}
 const protecting = ref(false);
 
 /** What the dialog says about token protection, depending on the target, the project and the browser. */
@@ -333,6 +341,23 @@ function signOut(): void {
           {{ t().protectionImpossibleRequired }}
         </p>
         <p v-else>{{ t().protectionImpossible }}</p>
+      </div>
+
+      <!-- 2026-065 decision 03, RG-protection-du-jeton-par-projet: the author's preference, which yields to a project that requires the passkey, and says so. -->
+      <div
+        v-if="protection !== 'aucune' && protectable"
+        class="preference-passkey"
+      >
+        <UiCheckbox
+          :model-value="optedOut"
+          @update:model-value="changeOptOut"
+          >{{ t().optOut }}</UiCheckbox
+        >
+        <p class="option-aide">
+          {{
+            tokens.protectionRequired() ? t().optOutRequired : t().optOutHelp
+          }}
+        </p>
       </div>
 
       <div
