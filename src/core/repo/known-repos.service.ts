@@ -2,6 +2,7 @@ import { inject } from "../injection";
 import { signal } from "../signals";
 import { GithubClient, RepoRef } from "../github/github-client";
 import { RepoConfig, sameRepo } from "./repo-config";
+import { repoText } from "./repo.messages";
 
 /** A repo offered for selection, with what is known about it. */
 export interface KnownRepo {
@@ -79,9 +80,7 @@ export class KnownReposService {
       // A failing discovery must not take the recent ones with it: they are
       // what stays useful when access is missing.
       this.error.set(
-        e instanceof Error
-          ? e.message
-          : "Les dépôts autorisés n’ont pas pu être listés.",
+        e instanceof Error ? e.message : repoText().knownReposFailed,
       );
     } finally {
       this.inProgress.set(false);

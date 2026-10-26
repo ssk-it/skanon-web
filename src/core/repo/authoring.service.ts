@@ -23,6 +23,8 @@ import {
   DecisionStatus,
 } from "../model/model";
 import { VerificationService } from "./verification.service";
+import { LocaleService } from "../i18n/locale.service";
+import { repoText } from "./repo.messages";
 
 /**
  * The kinds an impact can target, in the order they are looked for.
@@ -506,19 +508,13 @@ export class AuthoringService {
     const main = (await this.github.loadRepo(repoRef)).defaultBranch;
 
     if (await this.carries(repoRef, path, main)) {
-      throw new Error(
-        "Ce cadrage est livré : il ne se modifie plus. Ce qu’on veut y " +
-          "changer passe par un nouveau cadrage.",
-      );
+      throw new Error(repoText().scopingDelivered);
     }
     // The branch is found by the scoping it carries, not by its name: a
     // scoping written by hand follows another convention.
     const branch = await this.findScopingBranch(repoRef, id);
     if (!branch) {
-      throw new Error(
-        "Ce cadrage n’est porté par aucune branche du dépôt : il a peut-être " +
-          "été abandonné, ou sa branche supprimée.",
-      );
+      throw new Error(repoText().scopingWithoutBranch);
     }
 
     const { content, sha } = await this.github.loadEditableFile(
@@ -576,25 +572,21 @@ export class AuthoringService {
     to: ScopingStatus,
   ): Promise<{ status: ScopingStatus; toggleFailed: boolean }> {
     if (to === "validee" || to === "livree") {
+      const language = inject(LocaleService).language();
       throw new Error(
-        `« ${SCOPING_STATUS_LABEL[to]} » ne se demande pas depuis l’application : ` +
-          "ce statut vient de la relecture sur la plateforme.",
+        repoText().statusNotRequestable(SCOPING_STATUS_LABEL[language][to]),
       );
     }
 
     const repoRef = this.store.repoRef();
     const branch = await this.findScopingBranch(repoRef, id);
     if (!branch) {
-      throw new Error(
-        "Ce cadrage n’est pas porté par une branche : son statut ne bouge plus.",
-      );
+      throw new Error(repoText().statusFrozen);
     }
 
     const pr = await this.github.findPullRequestForBranch(repoRef, branch);
     if (!pr) {
-      throw new Error(
-        "Aucune demande de fusion ouverte sur ce cadrage : c’est elle qui porte son statut.",
-      );
+      throw new Error(repoText().noOpenPullRequest);
     }
 
     try {
@@ -760,7 +752,7 @@ export class AuthoringService {
     const { source, content, context } = await this.loadForEditing(id);
 
     const parse = splitFrontmatter(content);
-    if (!parse) throw new Error("Ce cadrage n’a pas de frontmatter.");
+    if (!parse) throw new Error(repoText().scopingWithoutFrontmatter);
     if (isUnreadable(parse)) throw new Error(parse.error);
 
     const data = parse.data as Record<string, unknown>;

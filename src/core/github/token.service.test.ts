@@ -2,6 +2,7 @@ import { inject, resetInjection } from "../injection";
 import { flushPromises } from "@vue/test-utils";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TokenService } from "./token.service";
+import { LocaleService } from "../i18n/locale.service";
 
 /**
  * The test environment only exposes a partial localStorage — which is
@@ -167,6 +168,16 @@ describe("TokenService", () => {
       expect(TokenService.checkForm("")).toContain("Saisir");
       expect(TokenService.checkForm("ghp_abc def")).toContain("espace");
       expect(TokenService.checkForm("ghp_court")).toContain("incomplet");
+    });
+
+    it("says what is wrong in English", () => {
+      inject(LocaleService).choice.set("en");
+      expect(TokenService.checkForm("")).toBe("Enter a token.");
+      expect(TokenService.checkForm("ghp_abc def")).toContain("space");
+      expect(TokenService.checkForm("mon-identifiant")).toContain(
+        "starts with ghp_",
+      );
+      expect(TokenService.checkForm("ghp_court")).toContain("incomplete");
     });
   });
 });

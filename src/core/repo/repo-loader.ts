@@ -8,6 +8,7 @@ import {
 } from "../github/github-client";
 import { TokenService } from "../github/token.service";
 import { ContentCache, KnownState } from "./content-cache";
+import { repoText } from "./repo.messages";
 import {
   splitFrontmatter,
   isUnreadable,
@@ -255,11 +256,7 @@ export class RepoLoader {
   }
 
   private treeAnomalies(truncated: boolean): string[] {
-    return truncated
-      ? [
-          "L’arborescence du dépôt a été tronquée par GitHub : le référentiel est incomplet.",
-        ]
-      : [];
+    return truncated ? [repoText().treeTruncated] : [];
   }
 
   private isInKnownDirectory(path: string): boolean {
@@ -314,14 +311,14 @@ export class RepoLoader {
 
       const parse = splitFrontmatter(f.content);
       if (!parse) {
-        anomalies.push(`${f.path} : frontmatter absent.`);
+        anomalies.push(repoText().frontmatterMissing(f.path));
         continue;
       }
       // An unreadable file is set aside and reported, without interrupting the
       // others: a specification missing one entity stays readable, whereas an
       // interrupted load shows nothing at all.
       if (isUnreadable(parse)) {
-        anomalies.push(`${f.path} : ${parse.error}.`);
+        anomalies.push(repoText().unreadableFile(f.path, parse.error));
         continue;
       }
 
@@ -389,9 +386,7 @@ export class RepoLoader {
             // shows from the application what would otherwise only be discovered in
             // continuous integration, once the pull request is open.
             if (data["statut"] !== undefined) {
-              anomalies.push(
-                `${f.path} : le statut ne se déclare pas, il se déduit de l’état du dépôt.`,
-              );
+              anomalies.push(repoText().statusDeclared(f.path));
             }
             rawScopings.set(scopingId, { data, body: body });
           } else if (segments[2] === "decisions") {
@@ -478,7 +473,10 @@ export class RepoLoader {
       return {
         ...defaults,
         anomalies: [
-          `${CONFIG_NAME} : illisible — ${(e as Error).message.split("\n")[0]}.`,
+          repoText().configUnreadable(
+            CONFIG_NAME,
+            (e as Error).message.split("\n")[0],
+          ),
         ],
       };
     }
@@ -500,10 +498,7 @@ export class RepoLoader {
     const readIdentity = parseIdentity(data?.["identite"]);
     anomalies.push(...readIdentity.anomalies);
     if (access === "identite_tierce" && !readIdentity.identity) {
-      anomalies.push(
-        `${CONFIG_NAME} : le mode « identite_tierce » demande un bloc « identite » ` +
-          "complet — émetteur, client et échange.",
-      );
+      anomalies.push(repoText().identityBlockRequired(CONFIG_NAME));
     }
 
     return {
@@ -619,7 +614,7 @@ export function parseCodeRepos(raw: unknown): {
   if (!Array.isArray(raw)) {
     return {
       repos: [],
-      anomalies: [`${CONFIG_NAME} : « depots_code » doit être une liste.`],
+      anomalies: [repoText().codeReposNotList(CONFIG_NAME)],
     };
   }
 
@@ -638,10 +633,7 @@ export function parseCodeRepos(raw: unknown): {
         : str((entry as Record<string, unknown>)?.["role"]);
 
     if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) {
-      anomalies.push(
-        `${CONFIG_NAME} : dépôt de code « ${repo || "(vide)"} » ignoré — ` +
-          "attendu « organisation/depot ».",
-      );
+      anomalies.push(repoText().codeRepoIgnored(CONFIG_NAME, repo));
       continue;
     }
     repos.push({ repo, role });
@@ -685,9 +677,11 @@ export function parseAccessMode(raw: unknown): {
   }
   return {
     access: "jeton_personnel",
-    anomaly:
-      `${CONFIG_NAME} : mode d'accès inconnu « ${value} » — ` +
-      `attendu ${[...ACCESS_MODES].join(", ")}. Le jeton personnel s'applique.`,
+    anomaly: repoText().unknownAccessMode(
+      CONFIG_NAME,
+      value,
+      [...ACCESS_MODES].join(", "),
+    ),
   };
 }
 
@@ -709,9 +703,11 @@ export function parseTokenProtection(raw: unknown): {
   }
   return {
     protection: "proposee",
-    anomaly:
-      `${CONFIG_NAME} : protection du jeton inconnue « ${value} » — ` +
-      `attendu ${[...TOKEN_PROTECTIONS].join(", ")}. La passkey est proposée, non exigée.`,
+    anomaly: repoText().unknownTokenProtection(
+      CONFIG_NAME,
+      value,
+      [...TOKEN_PROTECTIONS].join(", "),
+    ),
   };
 }
 
@@ -741,7 +737,7 @@ export function parseIdentity(raw: unknown): {
   for (const field of IDENTITY_FIELDS) {
     const value = str(data[field]).trim();
     if (!value) {
-      anomalies.push(`${CONFIG_NAME} : identite.${field} manquant.`);
+      anomalies.push(repoText().identityFieldMissing(CONFIG_NAME, field));
       continue;
     }
     // A malformed address would otherwise be discovered at sign-in time, far
@@ -750,9 +746,7 @@ export function parseIdentity(raw: unknown): {
       try {
         new URL(value);
       } catch {
-        anomalies.push(
-          `${CONFIG_NAME} : identite.${field} n'est pas une adresse valide.`,
-        );
+        anomalies.push(repoText().identityFieldNotAddress(CONFIG_NAME, field));
         continue;
       }
     }

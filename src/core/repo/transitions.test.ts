@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { inject } from "../injection";
+import { LocaleService } from "../i18n/locale.service";
 import { parseAccessMode, parseIdentity } from "./repo-loader";
 import { isOnItsBranch } from "./authoring.service";
 
@@ -26,6 +28,14 @@ describe("access mode declared by the project", () => {
 
   it("names the expected modes in the anomaly", () => {
     expect(parseAccessMode("inventé").anomaly).toContain("jeton_personnel");
+  });
+
+  it("reports the unknown mode in English, keeping the format's values", () => {
+    inject(LocaleService).choice.set("en");
+    const { anomaly } = parseAccessMode("oauth");
+    expect(anomaly).toContain("unknown access mode “oauth”");
+    expect(anomaly).toContain("jeton_personnel");
+    expect(anomaly).not.toContain("inconnu");
   });
 });
 

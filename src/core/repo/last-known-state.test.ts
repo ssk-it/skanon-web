@@ -8,6 +8,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { SpecificationStore } from "./specification.store";
 import { ContentCache, INDEXEDDB_FACTORY } from "./content-cache";
 import { GithubClient, GithubError } from "../github/github-client";
+import { LocaleService } from "../i18n/locale.service";
 
 /**
  * RG-dernier-etat-connu and RG-contenus-par-empreinte, seen from the store:
@@ -105,6 +106,23 @@ describe("last known state and removal from the cache", () => {
       github.createBranch(REPO, "cadrage-2", "c1"),
     ).rejects.toBeInstanceOf(GithubError);
     http.verify();
+  });
+
+  it("says in English why writing is refused, when the repo does not answer", async () => {
+    await firstVisit();
+
+    newVisit();
+    inject(LocaleService).choice.set("en");
+    const loading = store.loadSpecification(REPO);
+    http
+      .expectOne(`${API}/git/trees/HEAD?recursive=1`)
+      .error(new ProgressEvent("error"));
+    await loading;
+
+    expect(store.unconfirmed()?.cause).toContain("GitHub is unreachable");
+    expect(inject(GithubClient).writeSuspended()).toContain(
+      "The repo is not answering",
+    );
   });
 
   it("lifts the mark and reopens writing as soon as the repo answers", async () => {

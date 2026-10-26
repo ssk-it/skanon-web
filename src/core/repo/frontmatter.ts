@@ -1,5 +1,6 @@
 import { load } from "js-yaml";
 import { MiscSection } from "../model/model";
+import { repoText } from "./repo.messages";
 
 /**
  * Frontmatter / body splitting.
@@ -68,15 +69,16 @@ function formatYamlError(e: unknown): string {
   // a « : » followed by a space in an unquoted value, which YAML reads as
   // a separator. A decision title almost always contains one.
   if (/bad indentation of a mapping entry/.test(reason)) {
-    reason += " — une valeur contenant « : » doit être entre apostrophes";
+    reason += repoText().quoteColonHint;
   }
 
   // `line` is zero-indexed and relative to the block: the opening `---` shifts
   // by one more line to find the number in the file.
   const line = err?.mark?.line;
-  return typeof line === "number"
-    ? `frontmatter illisible ligne ${line + 2} : ${reason}`
-    : `frontmatter illisible : ${reason}`;
+  return repoText().unreadableFrontmatter(
+    reason,
+    typeof line === "number" ? line + 2 : undefined,
+  );
 }
 
 /** Extracts a level-2 section by its heading, without the heading itself. */

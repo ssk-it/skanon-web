@@ -4,6 +4,7 @@ import { signal } from "../signals";
 import { RateLimiter } from "./rate-limiter";
 import { TokenService } from "./token.service";
 import { ReviewDecision } from "../model/model";
+import { githubText } from "./github.messages";
 
 /**
  * An open pull request, as the list of in-progress scopings reads it.
@@ -220,42 +221,28 @@ export class GithubClient {
     type?: string;
   }): GraphqlError {
     if (error.type === "NOT_FOUND") {
-      return new GraphqlError(
-        "Dépôt introuvable, ou hors de portée du jeton. Vérifier son nom, et " +
-          "que le jeton donne accès à ce dépôt — GitHub ne distingue pas les deux cas.",
-        error.type,
-      );
+      return new GraphqlError(githubText().graphqlNotFound, error.type);
     }
     if (error.type === "RATE_LIMITED") {
-      return new GraphqlError(
-        "Le budget de requêtes d’historique est épuisé pour cette heure. " +
-          "Il se réinitialise automatiquement.",
-        error.type,
-      );
+      return new GraphqlError(githubText().graphqlRateLimited, error.type);
     }
     if (error.type === "FORBIDDEN") {
-      return new GraphqlError(
-        "Le jeton n’autorise pas cette lecture. Vérifier qu’il couvre ce dépôt.",
-        error.type,
-      );
+      return new GraphqlError(githubText().graphqlForbidden, error.type);
     }
     return new GraphqlError(error.message, error.type);
   }
 
   private toGithubError(e: unknown, writing = false): GithubError {
     if (!(e instanceof HttpErrorResponse)) {
-      return new GithubError("Erreur inattendue lors de l’appel à GitHub.", 0);
+      return new GithubError(githubText().unexpected, 0);
     }
+    const t = githubText();
     const remaining = e.headers?.get("x-ratelimit-remaining");
     const quotaExhausted = e.status === 403 && remaining === "0";
 
     if (quotaExhausted) {
       return new GithubError(
-        this.tokens.present()
-          ? "Le quota d’appels GitHub est épuisé pour cette heure. " +
-              "Il se réinitialise automatiquement."
-          : "Le quota d’appels GitHub est épuisé. Sans connexion, il est de 60 " +
-              "requêtes par heure et par adresse.",
+        this.tokens.present() ? t.quotaWithToken : t.quotaWithoutToken,
         403,
         true,
       );
@@ -266,10 +253,7 @@ export class GithubClient {
       // Without a token, talking about an expired token would send one looking for one
       // that does not exist. The cause is absence, not invalidity.
       return new GithubError(
-        this.tokens.present()
-          ? "GitHub a refusé le jeton. Il est peut-être expiré, révoqué, ou saisi " +
-              "incomplètement. Se reconnecter avec un jeton valide."
-          : "Cette opération demande une connexion. Se connecter, puis réessayer.",
+        this.tokens.present() ? t.tokenRefused : t.signInRequired,
         401,
       );
     }
@@ -278,12 +262,7 @@ export class GithubClient {
     // case: the sign-in advised for browsing is not enough for authoring, and
     // "GitHub answered 403" would not say so.
     if (e.status === 403) {
-      return new GithubError(
-        "Le jeton n’autorise pas cette opération. Écrire dans le dépôt demande " +
-          "un jeton avec la permission Contents en lecture et écriture, ainsi " +
-          "que Pull requests pour ouvrir une demande de fusion.",
-        403,
-      );
+      return new GithubError(t.writePermissionMissing, 403);
     }
     if (e.status === 404) {
       // Without sign-in, the platform answers 404 to a write it would
@@ -291,17 +270,10 @@ export class GithubClient {
       // Talking about a repo not found would send one looking for a name error
       // where a sign-in is simply missing.
       if (writing && !this.tokens.present()) {
-        return new GithubError(
-          "Écrire dans le dépôt demande une connexion. Se connecter, puis réessayer.",
-          404,
-        );
+        return new GithubError(t.writeSignInRequired, 404);
       }
       return new GithubError(
-        this.tokens.present()
-          ? "Dépôt ou fichier introuvable. Vérifier le nom du dépôt, et que le " +
-              "jeton donne accès à ce dépôt."
-          : "Dépôt ou fichier introuvable. Vérifier le nom du dépôt, et qu’il " +
-              "est public — un dépôt privé demande de se connecter.",
+        this.tokens.present() ? t.notFoundWithToken : t.notFoundWithoutToken,
         404,
       );
     }
@@ -309,30 +281,18 @@ export class GithubClient {
     // someone saved in the meantime (RG-reprise-cadrage). Talking about an
     // empty repo would send one to drop a README where a reload is needed.
     if (e.status === 409 && writing) {
-      return new GithubError(
-        "Le fichier a été modifié entre-temps, par une autre personne ou un " +
-          "autre onglet. Recharger la page pour repartir de sa dernière " +
-          "version, puis reprendre la modification.",
-        409,
-      );
+      return new GithubError(t.writeConflict, 409);
     }
     // A repo created but without any commit: its default branch is
     // announced without existing. The case comes up at a project's first use,
     // and « le dépôt n'a pas pu être chargé » would not help to get out of it.
     if (e.status === 409) {
-      return new GithubError(
-        "Ce dépôt est vide. Y déposer un premier fichier — un README suffit — " +
-          "pour que l’application puisse le lire.",
-        409,
-      );
+      return new GithubError(t.emptyRepo, 409);
     }
     if (e.status === 0) {
-      return new GithubError(
-        "GitHub est injoignable. Vérifier la connexion réseau.",
-        0,
-      );
+      return new GithubError(t.unreachable, 0);
     }
-    return new GithubError(`GitHub a répondu ${e.status}.`, e.status);
+    return new GithubError(t.status(e.status), e.status);
   }
 
   /**
@@ -654,11 +614,7 @@ export class GithubClient {
     variables: Record<string, unknown>,
   ): Promise<T> {
     if (!this.tokens.present()) {
-      throw new GithubError(
-        "Cette vue interroge l’historique, ce que GitHub ne permet qu’aux " +
-          "requêtes authentifiées. Se connecter avec un jeton pour y accéder.",
-        403,
-      );
+      throw new GithubError(githubText().historyRequiresSignIn, 403);
     }
 
     return this.apiLimiter.run(async () => {
@@ -675,8 +631,7 @@ export class GithubClient {
         const body = response.body;
         const first = body?.errors?.[0];
         if (first) throw this.toGraphqlError(first);
-        if (!body?.data)
-          throw new GraphqlError("GitHub a répondu sans donnée.");
+        if (!body?.data) throw new GraphqlError(githubText().graphqlNoData);
         return body.data;
       } catch (e) {
         if (e instanceof GraphqlError) throw e;
@@ -1063,7 +1018,7 @@ export class GithubClient {
     );
 
     const id = repository?.pullRequest?.id;
-    if (!id) throw new GraphqlError(`Demande de fusion ${number} introuvable.`);
+    if (!id) throw new GraphqlError(githubText().pullRequestNotFound(number));
 
     const mutation = draft
       ? "convertPullRequestToDraft"
@@ -1238,9 +1193,7 @@ export class GithubClient {
     });
 
     if (response.status === 401) {
-      throw new Error(
-        "Ce jeton est refusé par GitHub — expiré, ou mal recopié.",
-      );
+      throw new Error(githubText().triedTokenRefused);
     }
     if (!response.ok) {
       // An installation token has no user: the other endpoint
@@ -1255,7 +1208,7 @@ export class GithubClient {
         },
       );
       if (!installation.ok) {
-        throw new Error(`GitHub a répondu ${response.status} à ce jeton.`);
+        throw new Error(githubText().triedTokenStatus(response.status));
       }
       const raw = (await installation.json()) as {
         repositories: Array<{ full_name: string }>;
