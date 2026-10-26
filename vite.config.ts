@@ -47,12 +47,12 @@ export default defineConfig({
   },
 
   test: {
-    // `pnpm test:coverage`: the jsdom tests' coverage, which CI hands to SonarCloud. The four browser tests stay out of it — they check layout, not lines.
+    // `pnpm test:coverage`: the coverage of the jsdom and tooling tests, which CI hands to SonarCloud. The four browser tests stay out of it — they check layout, not lines.
     coverage: {
       provider: "v8",
       reporter: ["lcov", "text-summary"],
-      include: ["src/**"],
-      exclude: ["src/**/*.test.ts"],
+      include: ["src/**", "tools/cla/**"],
+      exclude: ["src/**/*.test.ts", "tools/**/*.test.mjs"],
     },
     projects: [
       {
@@ -65,6 +65,17 @@ export default defineConfig({
           setupFiles: ["src/test-setup.ts"],
           // The first test of a file pays for the cold import of what it mounts — a page, its routes, sometimes Mermaid —, and the suite runs in parallel: under that load, this first import exceeded the default 5 s (observed one time in ten). A test slow for another reason stays bounded.
           testTimeout: 15_000,
+        },
+      },
+      /**
+       * The repo's own tooling, which runs under Node in its workflows — the CLA check (`tools/cla/`).
+       */
+      {
+        extends: true,
+        test: {
+          name: "tools",
+          environment: "node",
+          include: ["tools/**/*.test.mjs"],
         },
       },
       /**
