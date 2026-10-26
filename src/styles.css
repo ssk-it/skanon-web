@@ -1,0 +1,378 @@
+/*
+ * Les jetons de style de Skanon, repris de `styles.scss` de SSK Canon.
+ *
+ * Les couleurs `--mat-sys-*` sont celles que Material 3 calcule pour la palette de SSK Canon — primaire `azure`, tertiaire `orange` —, relevées une à une dans le thème compilé par `mat.theme` (Angular Material 22). Seules y figurent celles que les vues et le kit emploient : les styles des composants portés les citent sous le même nom, et se copient tels quels.
+ *
+ * Le thème sombre s'applique à deux sélecteurs : le système qui le demande, et le choix explicite qui l'impose (`data-theme`, posé par `ThemeService`). Le CSS n'a pas de mixin : le bloc est écrit deux fois, et `src/styles.test.ts` vérifie que les deux copies ne divergent pas.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --mat-sys-primary: #005cbb;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #d7e3ff;
+  --mat-sys-on-primary-container: #00458f;
+  --mat-sys-secondary-container: #dae2f9;
+  --mat-sys-on-secondary-container: #3e4759;
+  --mat-sys-tertiary: #964900;
+  --mat-sys-error: #ba1a1a;
+  --mat-sys-on-error-container: #93000a;
+  --mat-sys-surface: #faf9fd;
+  --mat-sys-surface-variant: #e0e2ec;
+  --mat-sys-surface-container-low: #f4f3f6;
+  --mat-sys-surface-container: #efedf0;
+  --mat-sys-surface-container-high: #e9e7eb;
+  --mat-sys-surface-container-highest: #e3e2e6;
+  --mat-sys-on-surface: #1a1b1f;
+  --mat-sys-on-surface-variant: #44474e;
+  --mat-sys-outline: #74777f;
+  --mat-sys-outline-variant: #c4c6d0;
+  --mat-sys-scrim: #000000;
+  --mat-sys-level1:
+    0px 2px 1px -1px rgba(0, 0, 0, 0.2), 0px 1px 1px 0px rgba(0, 0, 0, 0.14),
+    0px 1px 3px 0px rgba(0, 0, 0, 0.12);
+  --mat-sys-level2:
+    0px 3px 3px -2px rgba(0, 0, 0, 0.2), 0px 3px 4px 0px rgba(0, 0, 0, 0.14),
+    0px 1px 8px 0px rgba(0, 0, 0, 0.12);
+}
+
+/* Tokens propres au produit, en complément du thème Material. Les statuts et les opérations d'impact portent de l'information : leur couleur est sémantique, pas décorative. */
+:root {
+  --pc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* La mesure de lecture — RG-mesure-de-lecture : environ soixante-quinze caractères par ligne au corps du texte. Elle borne une colonne entière, titre compris, jamais le texte seul : voir la règle .md plus bas. */
+  --pc-mesure: 35rem;
+
+  --pc-statut-brouillon: #5f6b7a;
+  --pc-statut-brouillon-bg: #eef0f3;
+  --pc-statut-brouillon-bd: #d8dde4;
+  --pc-statut-relecture: #96591a;
+  --pc-statut-relecture-bg: #fdf2df;
+  --pc-statut-relecture-bd: #ebd4a6;
+  --pc-statut-validee: #1f6b4d;
+  --pc-statut-validee-bg: #e3f2ea;
+  --pc-statut-validee-bd: #b4dcc6;
+  --pc-statut-livree: #3a4bb5;
+  --pc-statut-livree-bg: #eaedfb;
+  --pc-statut-livree-bd: #c3caf2;
+
+  --pc-op-cree: #1f6b4d;
+  --pc-op-cree-bg: #e3f2ea;
+  --pc-op-modifie: #96591a;
+  --pc-op-modifie-bg: #fdf2df;
+  --pc-op-abroge: #a03028;
+  --pc-op-abroge-bg: #fbeae8;
+  --pc-op-touche: #5f6b7a;
+  --pc-op-touche-bg: transparent;
+  --pc-op-touche-bd: #c3cad3;
+
+  --pc-abroge-fond: #fbeae8;
+  --pc-abroge-bord: #e5b8b2;
+  --pc-abroge-texte: #a03028;
+}
+
+/* Teintes de domaine : seules les clartés changent d'un thème à l'autre, la teinte elle-même étant calculée depuis le slug. En clair, une couleur soutenue sur un fond très pâle ; en sombre, l'inverse — une couleur claire sur un fond sourd, faute de quoi elle vibrerait. */
+:root {
+  --pc-domaine-l: 0.55;
+  --pc-domaine-c: 0.13;
+  --pc-domaine-bg-l: 0.96;
+  --pc-domaine-bg-c: 0.03;
+}
+
+/* Thème sombre — première copie : le système le demande, et aucun choix n'impose le clair. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) {
+    --mat-sys-primary: #abc7ff;
+    --mat-sys-on-primary: #002f65;
+    --mat-sys-primary-container: #00458f;
+    --mat-sys-on-primary-container: #d7e3ff;
+    --mat-sys-secondary-container: #3e4759;
+    --mat-sys-on-secondary-container: #dae2f9;
+    --mat-sys-tertiary: #ffb787;
+    --mat-sys-error: #ffb4ab;
+    --mat-sys-on-error-container: #ffdad6;
+    --mat-sys-surface: #121316;
+    --mat-sys-surface-variant: #44474e;
+    --mat-sys-surface-container-low: #1a1b1f;
+    --mat-sys-surface-container: #1f2022;
+    --mat-sys-surface-container-high: #292a2c;
+    --mat-sys-surface-container-highest: #343537;
+    --mat-sys-on-surface: #e3e2e6;
+    --mat-sys-on-surface-variant: #e0e2ec;
+    --mat-sys-outline: #8e9099;
+    --mat-sys-outline-variant: #44474e;
+    --mat-sys-scrim: #000000;
+
+    --pc-statut-brouillon: #98a3b2;
+    --pc-statut-brouillon-bg: #232a34;
+    --pc-statut-brouillon-bd: #333c48;
+    --pc-statut-relecture: #dda54a;
+    --pc-statut-relecture-bg: #33280f;
+    --pc-statut-relecture-bd: #574316;
+    --pc-statut-validee: #5cbd90;
+    --pc-statut-validee-bg: #133021;
+    --pc-statut-validee-bd: #245239;
+    --pc-statut-livree: #8f9df0;
+    --pc-statut-livree-bg: #1d2440;
+    --pc-statut-livree-bd: #313a63;
+
+    --pc-op-cree: #5cbd90;
+    --pc-op-cree-bg: #133021;
+    --pc-op-modifie: #dda54a;
+    --pc-op-modifie-bg: #33280f;
+    --pc-op-abroge: #ef8b81;
+    --pc-op-abroge-bg: #331715;
+    --pc-op-touche: #98a3b2;
+    --pc-op-touche-bg: transparent;
+    --pc-op-touche-bd: #414b59;
+
+    --pc-abroge-fond: #331715;
+    --pc-abroge-bord: #5e2a25;
+    --pc-abroge-texte: #ef8b81;
+
+    /* Sur fond sombre, la même teinte doit être plus claire et moins saturée pour garder son contraste sans éblouir. */
+    --pc-domaine-l: 0.78;
+    --pc-domaine-c: 0.11;
+    --pc-domaine-bg-l: 0.26;
+    --pc-domaine-bg-c: 0.04;
+  }
+}
+
+/* Thème sombre — seconde copie : le choix explicite gagne, y compris contre un système réglé en clair. */
+:root[data-theme="sombre"] {
+  color-scheme: dark;
+  --mat-sys-primary: #abc7ff;
+  --mat-sys-on-primary: #002f65;
+  --mat-sys-primary-container: #00458f;
+  --mat-sys-on-primary-container: #d7e3ff;
+  --mat-sys-secondary-container: #3e4759;
+  --mat-sys-on-secondary-container: #dae2f9;
+  --mat-sys-tertiary: #ffb787;
+  --mat-sys-error: #ffb4ab;
+  --mat-sys-on-error-container: #ffdad6;
+  --mat-sys-surface: #121316;
+  --mat-sys-surface-variant: #44474e;
+  --mat-sys-surface-container-low: #1a1b1f;
+  --mat-sys-surface-container: #1f2022;
+  --mat-sys-surface-container-high: #292a2c;
+  --mat-sys-surface-container-highest: #343537;
+  --mat-sys-on-surface: #e3e2e6;
+  --mat-sys-on-surface-variant: #e0e2ec;
+  --mat-sys-outline: #8e9099;
+  --mat-sys-outline-variant: #44474e;
+  --mat-sys-scrim: #000000;
+
+  --pc-statut-brouillon: #98a3b2;
+  --pc-statut-brouillon-bg: #232a34;
+  --pc-statut-brouillon-bd: #333c48;
+  --pc-statut-relecture: #dda54a;
+  --pc-statut-relecture-bg: #33280f;
+  --pc-statut-relecture-bd: #574316;
+  --pc-statut-validee: #5cbd90;
+  --pc-statut-validee-bg: #133021;
+  --pc-statut-validee-bd: #245239;
+  --pc-statut-livree: #8f9df0;
+  --pc-statut-livree-bg: #1d2440;
+  --pc-statut-livree-bd: #313a63;
+
+  --pc-op-cree: #5cbd90;
+  --pc-op-cree-bg: #133021;
+  --pc-op-modifie: #dda54a;
+  --pc-op-modifie-bg: #33280f;
+  --pc-op-abroge: #ef8b81;
+  --pc-op-abroge-bg: #331715;
+  --pc-op-touche: #98a3b2;
+  --pc-op-touche-bg: transparent;
+  --pc-op-touche-bd: #414b59;
+
+  --pc-abroge-fond: #331715;
+  --pc-abroge-bord: #5e2a25;
+  --pc-abroge-texte: #ef8b81;
+
+  /* Sur fond sombre, la même teinte doit être plus claire et moins saturée pour garder son contraste sans éblouir. */
+  --pc-domaine-l: 0.78;
+  --pc-domaine-c: 0.11;
+  --pc-domaine-bg-l: 0.26;
+  --pc-domaine-bg-c: 0.04;
+}
+
+:root[data-theme="clair"] {
+  color-scheme: light;
+}
+
+/* La police des icônes. `UiIcone` rend un `<span class="material-symbols-outlined">` : sans cette règle, il hériterait de la police du texte et afficherait le nom du symbole en toutes lettres. La boîte est celle de `mat-icon`, 24 px de côté. */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  flex-shrink: 0;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+/* Une colonne, pour que la barre du bas reste au pied de l'écran quand la page est courte. */
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+body {
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+/* Rendu du Markdown des fiches. La mesure est celle du conteneur, jamais une largeur posée sur le texte : une borne en `ch` replie les paragraphes à mi-page sous un titre qui, lui, prend toute la largeur, et ce déséquilibre se lit comme du texte haché. C'est donc la colonne de chaque fiche qui est bornée, par `--pc-mesure`, titre compris (RG-mesure-de-lecture). Les diagrammes le sont avec elle, et s'agrandissent au clic. */
+.md {
+  line-height: 1.65;
+
+  > :first-child {
+    margin-top: 0;
+  }
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  p,
+  ul,
+  ol {
+    margin: 0 0 0.9em;
+  }
+  ul,
+  ol {
+    padding-left: 1.4em;
+  }
+  li + li {
+    margin-top: 0.35em;
+  }
+
+  h1,
+  h2,
+  h3 {
+    margin: 1.6em 0 0.5em;
+    line-height: 1.25;
+    font-weight: 500;
+  }
+  h1 {
+    font-size: 1.35rem;
+  }
+  h2 {
+    font-size: 1.2rem;
+  }
+  h3 {
+    font-size: 1.05rem;
+  }
+
+  code {
+    font-family: var(--pc-mono);
+    font-size: 0.87em;
+    background: var(--mat-sys-surface-container);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  pre {
+    background: var(--mat-sys-surface-container);
+    padding: 14px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+
+    code {
+      background: none;
+      padding: 0;
+    }
+  }
+
+  blockquote {
+    margin: 0 0 0.9em;
+    padding-left: 14px;
+    border-left: 3px solid var(--mat-sys-outline-variant);
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0 0 0.9em;
+    font-size: 0.93em;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+  th {
+    font-weight: 500;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  a {
+    color: var(--mat-sys-primary);
+  }
+
+  strong {
+    font-weight: 600;
+  }
+}
+
+/* Un diagramme agrandi, par-dessus la page. Global plutôt que porté par le composant : l'élément est ajouté au `body`, hors de la portée des styles d'un composant. */
+.pc-diagramme-agrandi {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: color-mix(in srgb, var(--mat-sys-scrim) 72%, transparent);
+  cursor: zoom-out;
+}
+
+.pc-diagramme-agrandi-contenu {
+  max-width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--mat-sys-surface);
+  cursor: default;
+
+  /* Une largeur explicite, parce que le SVG porte `width="100%"` : dans un conteneur dimensionné par son contenu, ce pourcentage se résout à zéro et le diagramme s'affiche sans jamais être visible. */
+  width: min(92vw, 1400px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    /* Le moteur pose aussi `max-width` sur le SVG : sans cela, le diagramme resterait à la largeur qui le rendait illisible. */
+    max-width: none !important;
+    width: 100%;
+    height: auto;
+  }
+}
