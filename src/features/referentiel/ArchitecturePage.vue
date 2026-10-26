@@ -2,21 +2,21 @@
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import EtatVue from "../shared/EtatVue.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import ViewState from "../shared/EtatVue.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
 
 /**
  * L'entrée dans ce qui décrit comment le produit est construit.
  *
  * Les trois natures sont présentées séparément parce qu'on ne les consulte pas pour la même raison : le contexte pour comprendre l'ensemble, les composants pour savoir ce qui existe, les flux pour suivre un échange. Une liste unique obligerait à trier de l'œil à chaque visite.
  */
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 
-const composants = computed(() => store.listArchitectureByNature("composant"));
-const flux = computed(() => store.listArchitectureByNature("flux"));
+const components = computed(() => store.listArchitectureByKind("composant"));
+const flows = computed(() => store.listArchitectureByKind("flux"));
 const decisions = computed(() => store.decisions());
 
 /**
@@ -24,8 +24,8 @@ const decisions = computed(() => store.decisions());
  *
  * Le modèle n'en impose pas l'unicité : un projet peut en écrire plusieurs sans que rien ne casse. En présenter un seul ici est un choix d'affichage, et les autres restent atteignables par leur page.
  */
-const contexte = computed(
-  () => store.listArchitectureByNature("contexte")[0] ?? null,
+const context = computed(
+  () => store.listArchitectureByKind("contexte")[0] ?? null,
 );
 
 /**
@@ -33,14 +33,14 @@ const contexte = computed(
  *
  * Les quatre natures comptent ensemble : un projet qui n'aurait qu'une décision d'architecture décrit déjà quelque chose, et l'état explicatif lui dirait ce qu'il sait déjà.
  */
-const vide = computed(
+const empty = computed(
   () => store.architecture().length === 0 && store.decisions().length === 0,
 );
 </script>
 
 <template>
   <div class="page-architecture">
-    <EtatVue v-if="store.etat() !== 'pret'" />
+    <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
       <header class="entete">
         <p class="type">Architecture</p>
@@ -48,7 +48,7 @@ const vide = computed(
       </header>
 
       <!-- L'entrée de la barre ne dépend pas du contenu : c'est donc ici que l'absence se traite. Une liste vide se lit aussi bien « ce projet ne décrit rien » que « le chargement a échoué », et c'est la seconde lecture qui reste. Dire ce que la vue accueillerait lève les deux. -->
-      <section v-if="vide" class="vide-instruit">
+      <section v-if="empty" class="vide-instruit">
         <h2>Ce projet ne décrit pas encore son architecture</h2>
         <p class="intro">Cette vue accueille quatre natures de documents :</p>
         <dl>
@@ -70,43 +70,43 @@ const vide = computed(
           cadrage dont un impact le vise, et se relit avec lui. C’est ce qui le
           distingue d’une page de wiki que plus rien ne rattache à une décision.
         </p>
-        <RouterLink class="action" :to="liens.chemin('cadrages', 'nouveau')">
+        <RouterLink class="action" :to="links.path('cadrages', 'nouveau')">
           Ouvrir un cadrage
         </RouterLink>
       </section>
       <template v-else>
-        <section v-if="contexte" class="contexte">
-          <MarkdownRendu class="md" :texte="contexte.enonce" />
+        <section v-if="context" class="contexte">
+          <RenderedMarkdown class="md" :text="context.statement" />
         </section>
 
         <h2 class="section">Composants</h2>
         <div class="liste">
           <RouterLink
-            v-for="d in composants"
+            v-for="d in components"
             :key="d.id"
             class="ligne"
-            :to="liens.chemin('architecture', 'document', d.id)"
+            :to="links.path('architecture', 'document', d.id)"
           >
             <span class="nom">{{ d.id }}</span>
             <span class="compte"
-              >{{ store.listFluxByComposant(d.id).length }} flux</span
+              >{{ store.listFlowsByComponent(d.id).length }} flux</span
             >
           </RouterLink>
-          <p v-if="!composants.length" class="vide">Aucun composant décrit.</p>
+          <p v-if="!components.length" class="vide">Aucun composant décrit.</p>
         </div>
 
         <h2 class="section">Flux</h2>
         <div class="liste">
           <RouterLink
-            v-for="d in flux"
+            v-for="d in flows"
             :key="d.id"
             class="ligne"
-            :to="liens.chemin('architecture', 'document', d.id)"
+            :to="links.path('architecture', 'document', d.id)"
           >
             <span class="nom">{{ d.id }}</span>
-            <span class="compte">{{ d.composants.length }} composants</span>
+            <span class="compte">{{ d.components.length }} composants</span>
           </RouterLink>
-          <p v-if="!flux.length" class="vide">Aucun flux décrit.</p>
+          <p v-if="!flows.length" class="vide">Aucun flux décrit.</p>
         </div>
 
         <h2 class="section">Décisions</h2>
@@ -115,10 +115,10 @@ const vide = computed(
             v-for="d in decisions"
             :key="d.id"
             class="ligne"
-            :to="liens.chemin('architecture', 'decision', d.id)"
+            :to="links.path('architecture', 'decision', d.id)"
           >
             <span class="nom">{{ d.id }}</span>
-            <span v-if="d.statut === 'abroge'" class="compte">abrogée</span>
+            <span v-if="d.status === 'abroge'" class="compte">abrogée</span>
           </RouterLink>
           <p v-if="!decisions.length" class="vide">
             Aucune décision d’architecture.

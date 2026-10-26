@@ -2,26 +2,26 @@
 /**
  * Au-delà, la colonne des voisines cesse d'aider à s'orienter et se met à dupliquer la fiche de la fonctionnalité, qui les liste toutes.
  */
-const MAX_VOISINES = 8;
+const MAX_NEIGHBORS = 8;
 
 /**
  * Les règles à montrer autour de la règle courante.
  *
  * Toutes quand elles tiennent ; sinon une fenêtre qui place la règle courante vers le haut, calée sur le début ou la fin de la liste. C'est souvent la règle d'à côté qu'on cherchait, et l'ordre des identifiants rapproche celles qui parlent de la même chose.
  */
-export function listVoisines(
+export function listNeighbors(
   ids: readonly string[],
-  courant: string,
+  current: string,
   max: number,
 ): readonly string[] {
   if (ids.length <= max) return ids;
-  const i = Math.max(0, ids.indexOf(courant));
-  const debut = Math.min(Math.max(0, i - 3), ids.length - max);
-  return ids.slice(debut, debut + max);
+  const i = Math.max(0, ids.indexOf(current));
+  const begin = Math.min(Math.max(0, i - 3), ids.length - max);
+  return ids.slice(begin, begin + max);
 }
 
 /** Le `date: 'd MMM y'` d'Angular, en locale française. */
-const FORMAT_DATE = new Intl.DateTimeFormat("fr-FR", {
+const DATE_FORMAT = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
   month: "short",
   year: "numeric",
@@ -34,43 +34,43 @@ import { RouterLink, useRoute } from "vue-router";
 import { GithubError } from "../../core/github/github-client";
 import { inject } from "../../core/injection";
 import {
-  ORDRE_HISTORIQUE,
-  type OperationImpact,
-  type StatutCadrage,
+  HISTORY_ORDER,
+  type ImpactOperation,
+  type ScopingStatus,
 } from "../../core/model/model";
 import {
-  ChronologieService,
-  type CommitChronologie,
+  TimelineService,
+  type TimelineCommit,
 } from "../../core/repo/chronologie.service";
-import { LiensService } from "../../core/repo/liens.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { styleDomaine } from "../../core/ui/couleur-domaine";
-import LienExterne from "../../ui/LienExterne.vue";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { domainStyle } from "../../core/ui/couleur-domaine";
+import ExternalLink from "../../ui/LienExterne.vue";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
 import OperationChip from "../shared/OperationChip.vue";
-import StatutChip from "../shared/StatutChip.vue";
+import StatusChip from "../shared/StatutChip.vue";
 
 const route = useRoute();
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
-const chronologie = inject(ChronologieService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
+const timeline = inject(TimelineService);
 
 const id = computed(() => String(route.params["id"]));
-const regle = computed(() => store.findRegle(id.value));
+const rule = computed(() => store.findRule(id.value));
 
-const idsDomaines = computed(() => store.domaines().map((d) => d.id));
+const domainIds = computed(() => store.domains().map((d) => d.id));
 
 /** Les domaines de la règle, chacun une fois, par nom — via ses fonctionnalités. */
-const domaines = computed(() => {
-  const r = regle.value;
+const domains = computed(() => {
+  const r = rule.value;
   if (!r) return [];
   return store
-    .listDomainesByRegle(r)
-    .map((d) => store.findDomaine(d))
+    .listDomainsByRule(r)
+    .map((d) => store.findDomain(d))
     .filter((d) => d !== null)
-    .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
 });
 
 /**
@@ -78,19 +78,19 @@ const domaines = computed(() => {
  *
  * Les abrogées en sont écartées : on s'oriente parmi ce qui s'applique. Une fonctionnalité qui ne porte que cette règle n'a rien à proposer, et son bloc ne ferait que répéter le titre de la page.
  */
-const voisines = computed(() => {
-  const r = regle.value;
+const neighbors = computed(() => {
+  const r = rule.value;
   if (!r) return [];
-  return r.fonctionnalites
+  return r.features
     .map((f) => {
       const ids = store
-        .listReglesByFonctionnalite(f)
-        .filter((v) => v.statut === "actif" || v.id === r.id)
+        .listRulesByFeature(f)
+        .filter((v) => v.status === "actif" || v.id === r.id)
         .map((v) => v.id);
       return {
         id: f,
-        nom: store.findFonctionnalite(f)?.nom ?? f,
-        ids: listVoisines(ids, r.id, MAX_VOISINES),
+        name: store.findFeature(f)?.name ?? f,
+        ids: listNeighbors(ids, r.id, MAX_NEIGHBORS),
         total: ids.length,
       };
     })
@@ -101,49 +101,47 @@ const voisines = computed(() => {
  * Cadrages impactant cette règle, les livrés d'abord et du plus récent au plus ancien : on lit une histoire à rebours, en partant de l'état actuel.
  */
 const impacts = computed(() =>
-  [...store.listCadragesImpactantRegle(id.value)].sort((a, b) => {
-    const parStatut =
-      ORDRE_HISTORIQUE[a.cadrage.statut] - ORDRE_HISTORIQUE[b.cadrage.statut];
-    return parStatut !== 0
-      ? parStatut
-      : b.cadrage.id.localeCompare(a.cadrage.id);
+  [...store.listScopingsImpactingRule(id.value)].sort((a, b) => {
+    const byStatus =
+      HISTORY_ORDER[a.scoping.status] - HISTORY_ORDER[b.scoping.status];
+    return byStatus !== 0 ? byStatus : b.scoping.id.localeCompare(a.scoping.id);
   }),
 );
 
 /** Commits ayant touché le fichier de cette règle, indexés par cadrage. */
-const commits = ref<readonly CommitChronologie[]>([]);
-const chargementGit = ref(false);
+const commits = ref<readonly TimelineCommit[]>([]);
+const gitLoading = ref(false);
 /**
  * Pourquoi l'historique manque, s'il manque. Affiché plutôt que tu : sans jeton, GitHub refuse toute requête GraphQL même sur un dépôt public, et le lecteur doit savoir que la vue est incomplète et comment la compléter.
  */
-const erreurGit = ref<string | null>(null);
+const gitError = ref<string | null>(null);
 
 /**
  * Les données Git enrichissent la chronologie, elles ne la fondent pas.
  *
  * Un cadrage sans commit correspondant reste affiché : c'est le cas d'un référentiel rédigé après coup, où les premiers cadrages décrivent des décisions antérieures au dépôt. Voir `ChronologieService`.
  */
-const gitParCadrage = computed(() => {
-  const ids = impacts.value.map((i) => i.cadrage.id);
-  const paires = chronologie.apparier(ids, commits.value);
-  return new Map(paires.map((e) => [e.cadrage, e.commit]));
+const gitByScoping = computed(() => {
+  const ids = impacts.value.map((i) => i.scoping.id);
+  const pairs = timeline.match(ids, commits.value);
+  return new Map(pairs.map((e) => [e.scoping, e.commit]));
 });
 
 /** Chaque entrée de l'histoire, avec ce que le gabarit en lit : le commit apparié et l'énoncé porté. */
-const histoire = computed(() => {
-  const r = regle.value;
+const history = computed(() => {
+  const r = rule.value;
   return impacts.value.map((i) => ({
     ...i,
-    git: gitParCadrage.value.get(i.cadrage.id) ?? null,
-    enonce: r ? (i.cadrage.enonces.get(r.id) ?? null) : null,
+    git: gitByScoping.value.get(i.scoping.id) ?? null,
+    statement: r ? (i.scoping.statements.get(r.id) ?? null) : null,
   }));
 });
 
 // Chargé à l'affichage de la règle, pas au chargement du référentiel : l'historique coûte un appel par règle consultée, et la plupart ne le seront jamais.
 watchEffect(() => {
-  const idRegle = id.value;
-  if (store.etat() !== "pret" || !store.findRegle(idRegle)) return;
-  void loadHistorique(idRegle);
+  const ruleId = id.value;
+  if (store.state() !== "pret" || !store.findRule(ruleId)) return;
+  void loadHistory(ruleId);
 });
 
 /**
@@ -151,20 +149,20 @@ watchEffect(() => {
  *
  * Trois situations distinctes produisent la même absence, et les confondre ferait affirmer une cause qu'on ignore : un cadrage non livré n'a pas encore touché le référentiel ; un impact `touche` ne modifie aucun fichier par définition ; et un cadrage livré sans commit décrit une décision antérieure au dépôt. Ne nommer que ce qui est établi.
  */
-function libelleSansCommit(
-  statut: StatutCadrage,
-  operation: OperationImpact,
+function labelWithoutCommit(
+  status: ScopingStatus,
+  operation: ImpactOperation,
 ): string {
-  if (statut !== "livree") return "pas encore livré";
+  if (status !== "livree") return "pas encore livré";
   if (operation === "touche") return "sans écriture";
   return "antérieur au dépôt";
 }
 
-function raisonSansCommit(
-  statut: StatutCadrage,
-  operation: OperationImpact,
+function reasonWithoutCommit(
+  status: ScopingStatus,
+  operation: ImpactOperation,
 ): string {
-  if (statut !== "livree") {
+  if (status !== "livree") {
     return "Ce cadrage n’a pas encore été livré : il n’a donc pas modifié le référentiel.";
   }
   if (operation === "touche") {
@@ -174,64 +172,62 @@ function raisonSansCommit(
 }
 
 /** Lien vers la pull request sur github.com, dans le dépôt courant. */
-function lienPullRequest(numero: number): string {
-  const d = store.depot();
-  return `https://github.com/${d.owner}/${d.repo}/pull/${numero}`;
+function pullRequestLink(number: number): string {
+  const d = store.repoRef();
+  return `https://github.com/${d.owner}/${d.repo}/pull/${number}`;
 }
 
 function formatDate(date: string): string {
-  return FORMAT_DATE.format(new Date(date));
+  return DATE_FORMAT.format(new Date(date));
 }
 
-async function loadHistorique(idRegle: string): Promise<void> {
+async function loadHistory(ruleId: string): Promise<void> {
   commits.value = [];
-  erreurGit.value = null;
-  chargementGit.value = true;
+  gitError.value = null;
+  gitLoading.value = true;
   try {
-    const lus = await chronologie.loadHistoriqueRegle(store.depot(), idRegle);
+    const read = await timeline.loadRuleHistory(store.repoRef(), ruleId);
     // la règle a pu changer pendant l'appel : ne pas écraser avec du périmé
-    if (id.value === idRegle) commits.value = lus;
+    if (id.value === ruleId) commits.value = read;
   } catch (e) {
     const message =
       e instanceof GithubError
         ? e.message
         : "L’historique Git n’a pas pu être chargé.";
-    if (id.value === idRegle) erreurGit.value = message;
+    if (id.value === ruleId) gitError.value = message;
   } finally {
-    if (id.value === idRegle) chargementGit.value = false;
+    if (id.value === ruleId) gitLoading.value = false;
   }
 }
 </script>
 
 <template>
   <div class="page-regle">
-    <EtatVue v-if="store.etat() !== 'pret'" />
-    <template v-else-if="regle">
+    <ViewState v-if="store.state() !== 'pret'" />
+    <template v-else-if="rule">
       <!-- RG-regle-situee : une règle s'atteint souvent par la recherche ou par un impact, sans passer par l'arborescence. Le fil dit alors de quoi elle fait partie ; il remplace le seul retour vers le référentiel. -->
       <nav class="fil" aria-label="Fil d’Ariane">
         <ol>
           <li>
-            <RouterLink :to="liens.chemin('referentiel')"
-              >Fonctionnel</RouterLink
-            >
+            <RouterLink :to="links.path('referentiel')">Fonctionnel</RouterLink>
           </li>
-          <li v-if="domaines.length">
-            <template v-for="(d, n) in domaines" :key="d.id">
+          <li v-if="domains.length">
+            <template v-for="(d, n) in domains" :key="d.id">
               <span v-if="n > 0" class="virgule">, </span>
               <RouterLink
                 class="domaine"
-                :style="styleDomaine(d.id, idsDomaines)"
-                :to="liens.chemin('referentiel', 'domaine', d.id)"
-                >{{ d.nom }}</RouterLink
+                :style="domainStyle(d.id, domainIds)"
+                :to="links.path('referentiel', 'domaine', d.id)"
+                >{{ d.name }}</RouterLink
               >
             </template>
           </li>
-          <li v-if="regle.fonctionnalites.length">
-            <template v-for="(f, n) in regle.fonctionnalites" :key="f">
+          <li v-if="rule.features.length">
+            <template v-for="(f, n) in rule.features" :key="f">
               <span v-if="n > 0" class="virgule">, </span>
               <RouterLink
-                :to="liens.chemin('referentiel', 'fonctionnalite', f)"
-                >{{ store.findFonctionnalite(f)?.nom ?? f }}</RouterLink
+                :to="links.path('referentiel', 'fonctionnalite', f)"
+                >{{ store.findFeature(f)?.name ?? f }}</RouterLink
               >
             </template>
           </li>
@@ -240,15 +236,15 @@ async function loadHistorique(idRegle: string): Promise<void> {
 
       <header class="entete">
         <p class="type">Règle de gestion</p>
-        <h1>{{ regle.id }}</h1>
+        <h1>{{ rule.id }}</h1>
 
-        <div v-if="regle.statut === 'abroge'" class="meta">
+        <div v-if="rule.status === 'abroge'" class="meta">
           <span class="marque-abrogee">abrogée</span>
         </div>
       </header>
 
-      <div v-if="regle.statut === 'abroge'" class="bandeau-abrogee">
-        <UiIcone nom="block" />
+      <div v-if="rule.status === 'abroge'" class="bandeau-abrogee">
+        <UiIcon name="block" />
         <p>
           Cette règle ne s’applique plus. Elle reste consultable parce que les
           cadrages qui l’ont créée puis abrogée expliquent pourquoi.
@@ -259,66 +255,68 @@ async function loadHistorique(idRegle: string): Promise<void> {
         <div class="principal">
           <section class="bloc">
             <h2 class="section">Énoncé courant</h2>
-            <MarkdownRendu class="enonce md" :texte="regle.enonce" />
+            <RenderedMarkdown class="enonce md" :text="rule.statement" />
           </section>
 
           <section class="bloc">
             <h2 class="section">Histoire de cette règle</h2>
-            <template v-if="histoire.length">
+            <template v-if="history.length">
               <p class="intro">
                 Les cadrages qui l’ont touchée, du plus récent au plus ancien.
                 Chacun porte la décision qui explique son état.
               </p>
-              <p v-if="erreurGit" class="git-absent">
-                <UiIcone nom="info" />
-                <span>{{ erreurGit }}</span>
+              <p v-if="gitError" class="git-absent">
+                <UiIcon name="info" />
+                <span>{{ gitError }}</span>
               </p>
               <ol class="chrono">
-                <li v-for="i in histoire" :key="i.cadrage.id">
+                <li v-for="i in history" :key="i.scoping.id">
                   <div class="marqueur">
                     <OperationChip :operation="i.operation" />
                   </div>
                   <div class="corps">
                     <RouterLink
                       class="titre"
-                      :to="liens.chemin('cadrages', i.cadrage.id)"
+                      :to="links.path('cadrages', i.scoping.id)"
                     >
-                      {{ i.cadrage.titre }}
+                      {{ i.scoping.title }}
                     </RouterLink>
                     <div class="ligne-meta">
-                      <span class="cid">{{ i.cadrage.id }}</span>
-                      <StatutChip :statut="i.cadrage.statut" />
+                      <span class="cid">{{ i.scoping.id }}</span>
+                      <StatusChip :status="i.scoping.status" />
                       <span v-if="i.git" class="git">
                         <span class="date">{{ formatDate(i.git.date) }}</span>
-                        <template v-if="i.git.login ?? i.git.auteur">
+                        <template v-if="i.git.login ?? i.git.author">
                           <span class="sep">·</span
                           ><span class="auteur">{{
-                            i.git.login ?? i.git.auteur
+                            i.git.login ?? i.git.author
                           }}</span>
                         </template>
                         <template v-if="i.git.pullRequest">
                           <span class="sep">·</span>
-                          <LienExterne
+                          <ExternalLink
                             class="pr"
-                            :href="lienPullRequest(i.git.pullRequest)"
-                            >#{{ i.git.pullRequest }}</LienExterne
+                            :href="pullRequestLink(i.git.pullRequest)"
+                            >#{{ i.git.pullRequest }}</ExternalLink
                           >
                         </template>
                       </span>
                       <span
-                        v-else-if="!chargementGit && !erreurGit"
+                        v-else-if="!gitLoading && !gitError"
                         class="git-vide"
-                        :title="raisonSansCommit(i.cadrage.statut, i.operation)"
+                        :title="
+                          reasonWithoutCommit(i.scoping.status, i.operation)
+                        "
                         >{{
-                          libelleSansCommit(i.cadrage.statut, i.operation)
+                          labelWithoutCommit(i.scoping.status, i.operation)
                         }}</span
                       >
                     </div>
-                    <details v-if="i.enonce" class="enonce-alors">
+                    <details v-if="i.statement" class="enonce-alors">
                       <summary>Énoncé porté par ce cadrage</summary>
-                      <MarkdownRendu class="md" :texte="i.enonce" />
+                      <RenderedMarkdown class="md" :text="i.statement" />
                       <p
-                        v-if="i.enonce.trim() !== regle.enonce.trim()"
+                        v-if="i.statement.trim() !== rule.statement.trim()"
                         class="avertissement"
                       >
                         Cet énoncé diffère de l’énoncé courant : il reflète la
@@ -337,23 +335,23 @@ async function loadHistorique(idRegle: string): Promise<void> {
         </div>
 
         <aside
-          v-if="voisines.length"
+          v-if="neighbors.length"
           class="voisines"
           aria-label="Règles voisines"
         >
-          <section v-for="b in voisines" :key="b.id">
-            <h2 class="section">Dans {{ b.nom }}</h2>
+          <section v-for="b in neighbors" :key="b.id">
+            <h2 class="section">Dans {{ b.name }}</h2>
             <ul>
               <li v-for="v in b.ids" :key="v">
                 <span
-                  v-if="v === regle.id"
+                  v-if="v === rule.id"
                   class="courante"
                   aria-current="page"
                   >{{ v }}</span
                 >
                 <RouterLink
                   v-else
-                  :to="liens.chemin('referentiel', 'regle', v)"
+                  :to="links.path('referentiel', 'regle', v)"
                   >{{ v }}</RouterLink
                 >
               </li>
@@ -361,7 +359,7 @@ async function loadHistorique(idRegle: string): Promise<void> {
             <RouterLink
               v-if="b.total > b.ids.length"
               class="toutes"
-              :to="liens.chemin('referentiel', 'fonctionnalite', b.id)"
+              :to="links.path('referentiel', 'fonctionnalite', b.id)"
               >Les {{ b.total }} règles de la fonctionnalité</RouterLink
             >
           </section>

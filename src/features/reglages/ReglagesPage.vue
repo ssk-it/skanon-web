@@ -3,26 +3,26 @@ import { computed, ref, watchEffect } from "vue";
 import { GithubError } from "../../core/github/github-client";
 import { inject } from "../../core/injection";
 import {
-  GARANTIES,
-  LIBELLE_MODE_ACCES,
-  type DepotCode,
-  type ModeAcces,
-  type ProtectionDuJeton,
+  GUARANTEES,
+  ACCESS_MODE_LABEL,
+  type CodeRepo,
+  type AccessMode,
+  type TokenProtection,
 } from "../../core/model/model";
-import { AutomatisationService } from "../../core/repo/automatisation.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { ReglagesService } from "../../core/repo/reglages.service";
+import { AutomationService } from "../../core/repo/automatisation.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { SettingsService } from "../../core/repo/reglages.service";
 import {
-  commandeInstallation,
-  configurationExemple,
-  exempleDepotsCode,
+  installCommand,
+  sampleConfiguration,
+  sampleCodeRepos,
 } from "../../core/repo/skill-cadrage";
-import LienExterne from "../../ui/LienExterne.vue";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiChamp from "../../ui/UiChamp.vue";
-import UiIcone from "../../ui/UiIcone.vue";
-import BlocCode from "../shared/BlocCode.vue";
-import EtatVue from "../shared/EtatVue.vue";
+import ExternalLink from "../../ui/LienExterne.vue";
+import UiButton from "../../ui/UiBouton.vue";
+import UiTextField from "../../ui/UiChamp.vue";
+import UiIcon from "../../ui/UiIcone.vue";
+import CodeBlock from "../shared/BlocCode.vue";
+import ViewState from "../shared/EtatVue.vue";
 
 /**
  * Réglages du projet.
@@ -30,64 +30,64 @@ import EtatVue from "../shared/EtatVue.vue";
  * Ils vivent dans le dépôt, non dans le navigateur : ils valent pour tous ceux qui travaillent sur le projet. Les modifier suit donc le même chemin que n'importe quel changement — une branche, une demande de fusion — plutôt que de prendre effet sans que personne l'ait relu.
  */
 
-const MODES: ModeAcces[] = ["jeton_personnel", "identite_tierce", "relais"];
+const MODES: AccessMode[] = ["jeton_personnel", "identite_tierce", "relais"];
 
 /**
  * Modes que l'application sait honorer aujourd'hui.
  *
  * Les autres sont montrés avec leurs garanties, mais ne se choisissent pas : un projet qui en déclarerait un croirait appliquer un réglage sans effet. La gamme se voit, son avancement aussi.
  */
-const MODES_REALISES: ReadonlySet<ModeAcces> = new Set<ModeAcces>([
+const IMPLEMENTED_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>([
   "jeton_personnel",
   "identite_tierce",
 ]);
 
-const store = inject(ReferentielStore);
-const reglages = inject(ReglagesService);
-const automatisation = inject(AutomatisationService);
+const store = inject(SpecificationStore);
+const settings = inject(SettingsService);
+const automation = inject(AutomationService);
 
 const modes = MODES;
-const libelleMode = (m: ModeAcces) => LIBELLE_MODE_ACCES[m];
-const garanties = (m: ModeAcces) => GARANTIES[m];
-const realise = (m: ModeAcces) => MODES_REALISES.has(m);
+const modeLabel = (m: AccessMode) => ACCESS_MODE_LABEL[m];
+const guarantees = (m: AccessMode) => GUARANTEES[m];
+const implemented = (m: AccessMode) => IMPLEMENTED_MODES.has(m);
 /** Les valeurs du modèle sont techniques : ce que lit l'utilisateur ne l'est pas. */
-const libellePortee = (m: ModeAcces) =>
-  GARANTIES[m].portee === "chemin" ? "chemin" : "dépôt";
+const scopeLabel = (m: AccessMode) =>
+  GUARANTEES[m].scope === "chemin" ? "chemin" : "dépôt";
 
-const acces = ref<ModeAcces>("jeton_personnel");
+const access = ref<AccessMode>("jeton_personnel");
 /** Ce que le projet demande du jeton personnel dans la version web (RG-protection-du-jeton-par-projet). */
-const protectionDuJeton = ref<ProtectionDuJeton>("proposee");
-const emetteur = ref("");
+const tokenProtection = ref<TokenProtection>("proposee");
+const issuer = ref("");
 const client = ref("");
-const echange = ref("");
+const exchange = ref("");
 
 /**
  * Vrai si le mode demande des paramètres qui manquent.
  *
  * Proposer des réglages incomplets écrirait un mode que personne ne pourrait employer : le refus vaut mieux que la découverte à la première connexion.
  */
-const identiteIncomplete = computed(
+const incompleteIdentity = computed(
   () =>
-    acces.value === "identite_tierce" &&
-    !(emetteur.value.trim() && client.value.trim() && echange.value.trim()),
+    access.value === "identite_tierce" &&
+    !(issuer.value.trim() && client.value.trim() && exchange.value.trim()),
 );
 
-const envoi = ref(false);
-const erreur = ref<string | null>(null);
-const propose = ref<{ pullRequest: number; url: string } | null>(null);
+const sending = ref(false);
+const error = ref<string | null>(null);
+const proposed = ref<{ pullRequest: number; url: string } | null>(null);
 
 /** Ce qui est chargé, pour savoir si la saisie s'en écarte. */
 const initial = ref("");
 
-const modifie = computed(() => empreinte() !== initial.value);
+const modified = computed(() => fingerprint() !== initial.value);
 
 /** Les dépôts de code, tels qu'on les édite. */
-const depotsCode = ref<readonly DepotCode[]>([]);
-const aideDepots = ref(false);
+const codeRepos = ref<readonly CodeRepo[]>([]);
+const repoHelp = ref(false);
 
 /** Ce que le réglage écrira, montré dans l'infobulle. */
-const apercuDepotsCode = computed(() =>
-  exempleDepotsCode(depotsCode.value.filter((d) => d.repo.trim())),
+const codeReposPreview = computed(() =>
+  sampleCodeRepos(codeRepos.value.filter((d) => d.repo.trim())),
 );
 
 /**
@@ -95,59 +95,59 @@ const apercuDepotsCode = computed(() =>
  *
  * Bloquer la frappe interdirait de composer le nom caractère par caractère ; la vérification finale, elle, écarte ce qui n'est pas de la forme attendue.
  */
-function repoMalForme(repo: string): boolean {
+function isMalformedRepo(repo: string): boolean {
   const v = repo.trim();
   return v.length > 0 && !/^[^/\s]+\/[^/\s]+$/.test(v);
 }
 
-function ajouterDepotCode(): void {
-  depotsCode.value = [...depotsCode.value, { repo: "", role: "" }];
+function addCodeRepo(): void {
+  codeRepos.value = [...codeRepos.value, { repo: "", role: "" }];
 }
 
-function majDepotCode(i: number, champs: Partial<DepotCode>): void {
-  depotsCode.value = depotsCode.value.map((x, n) =>
-    n === i ? { ...x, ...champs } : x,
+function updateCodeRepo(i: number, fields: Partial<CodeRepo>): void {
+  codeRepos.value = codeRepos.value.map((x, n) =>
+    n === i ? { ...x, ...fields } : x,
   );
 }
 
-function retirerDepotCode(i: number): void {
-  depotsCode.value = depotsCode.value.filter((_, n) => n !== i);
+function removeCodeRepo(i: number): void {
+  codeRepos.value = codeRepos.value.filter((_, n) => n !== i);
 }
 
-const commandeSkill = commandeInstallation();
+const skillCommand = installCommand();
 // Calculés, non figés : le référentiel se charge après la construction du composant, et une valeur prise trop tôt afficherait l'exemple générique à un projet qui déclare déjà ses dépôts.
-const configSkill = computed(() => configurationExemple(store.depot().repo));
+const configSkill = computed(() => sampleConfiguration(store.repoRef().repo));
 
 /** Ce qui vient d'être copié, pour le dire en retour. */
-const copie = ref<string | null>(null);
+const copied = ref<string | null>(null);
 
-async function copier(texte: string, quoi: string): Promise<void> {
+async function copy(text: string, what: string): Promise<void> {
   try {
-    await navigator.clipboard.writeText(texte);
-    copie.value = quoi;
+    await navigator.clipboard.writeText(text);
+    copied.value = what;
     // Le retour s'efface : laissé affiché, il ferait croire à un état plutôt qu'à un accusé de réception.
-    setTimeout(() => (copie.value = null), 2000);
+    setTimeout(() => (copied.value = null), 2000);
   } catch {
     // Le presse-papiers peut être refusé — hors contexte sécurisé, ou par l'utilisateur. Le texte reste sélectionnable à la main.
   }
 }
 
 const installation = ref(false);
-const erreurAutomatisation = ref<string | null>(null);
+const automationError = ref<string | null>(null);
 
 /**
  * Installe les workflows manquants.
  *
  * Directement, sans demande de fusion : ce sont des fichiers d'outillage, non du référentiel, et une automatisation qui attend une relecture ne protège rien pendant qu'elle attend.
  */
-async function installerAutomatisation(): Promise<void> {
+async function installAutomation(): Promise<void> {
   if (installation.value) return;
   installation.value = true;
-  erreurAutomatisation.value = null;
+  automationError.value = null;
   try {
-    await automatisation.installer();
+    await automation.install();
   } catch (e) {
-    erreurAutomatisation.value =
+    automationError.value =
       e instanceof Error
         ? e.message
         : "L’automatisation n’a pas pu être installée.";
@@ -158,78 +158,76 @@ async function installerAutomatisation(): Promise<void> {
 
 // La question ne se pose qu'une fois le dépôt chargé, et elle coûte un appel : la poser ici plutôt qu'à chaque affichage de la page.
 watchEffect(() => {
-  if (store.etat() === "pret" && automatisation.installee() === null) {
-    void automatisation.verifier();
+  if (store.state() === "pret" && automation.installed() === null) {
+    void automation.check();
   }
 });
 
 watchEffect(() => {
-  if (store.etat() !== "pret") return;
-  const r = store.referentiel().reglages;
-  acces.value = r.acces;
-  protectionDuJeton.value = r.protectionDuJeton;
-  emetteur.value = r.identite?.emetteur ?? "";
-  client.value = r.identite?.client ?? "";
-  echange.value = r.identite?.echange ?? "";
-  depotsCode.value = [...store.referentiel().projet.depotsCode];
+  if (store.state() !== "pret") return;
+  const r = store.specification().settings;
+  access.value = r.access;
+  tokenProtection.value = r.tokenProtection;
+  issuer.value = r.identity?.issuer ?? "";
+  client.value = r.identity?.client ?? "";
+  exchange.value = r.identity?.exchange ?? "";
+  codeRepos.value = [...store.specification().project.codeRepos];
   // capturé après application, pour que « modifié » compare bien à l'état chargé
-  queueMicrotask(() => (initial.value = empreinte()));
+  queueMicrotask(() => (initial.value = fingerprint()));
 });
 
-function choisirMode(m: ModeAcces): void {
-  if (!MODES_REALISES.has(m)) return;
-  acces.value = m;
-  propose.value = null;
+function chooseMode(m: AccessMode): void {
+  if (!IMPLEMENTED_MODES.has(m)) return;
+  access.value = m;
+  proposed.value = null;
 }
 
-async function proposer(): Promise<void> {
-  if (envoi.value || identiteIncomplete.value) return;
-  envoi.value = true;
-  erreur.value = null;
-  propose.value = null;
+async function proposeSettings(): Promise<void> {
+  if (sending.value || incompleteIdentity.value) return;
+  sending.value = true;
+  error.value = null;
+  proposed.value = null;
   try {
-    const p = await reglages.proposerReglages({
-      acces: acces.value,
+    const p = await settings.proposeSettings({
+      access: access.value,
       // Seul le jeton personnel se garde sur le poste : un autre mode retire l'exigence, devenue sans objet.
-      protectionDuJeton:
-        acces.value === "jeton_personnel"
-          ? protectionDuJeton.value
-          : "proposee",
+      tokenProtection:
+        access.value === "jeton_personnel" ? tokenProtection.value : "proposee",
       // Les entrées vides sont écartées : une ligne ajoutée puis laissée telle quelle ne décrit aucun dépôt.
-      depotsCode: depotsCode.value
+      codeRepos: codeRepos.value
         .filter((d) => d.repo.trim())
         .map((d) => ({ repo: d.repo.trim(), role: d.role.trim() })),
-      identite:
-        acces.value === "identite_tierce"
+      identity:
+        access.value === "identite_tierce"
           ? {
-              emetteur: emetteur.value.trim(),
+              issuer: issuer.value.trim(),
               client: client.value.trim(),
-              echange: echange.value.trim(),
+              exchange: exchange.value.trim(),
             }
           : null,
     });
-    propose.value = p;
-    initial.value = empreinte();
+    proposed.value = p;
+    initial.value = fingerprint();
   } catch (e) {
-    erreur.value =
+    error.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
         : "Les réglages n’ont pas pu être proposés.";
   } finally {
-    envoi.value = false;
+    sending.value = false;
   }
 }
 
 /** Représentation stable de la saisie, pour détecter un écart. */
-function empreinte(): string {
-  const d = depotsCode.value.map((x) => `${x.repo}~${x.role}`).join(",");
-  return `${acces.value}#${protectionDuJeton.value}#${emetteur.value}#${client.value}#${echange.value}#${d}`;
+function fingerprint(): string {
+  const d = codeRepos.value.map((x) => `${x.repo}~${x.role}`).join(",");
+  return `${access.value}#${tokenProtection.value}#${issuer.value}#${client.value}#${exchange.value}#${d}`;
 }
 </script>
 
 <template>
   <div class="reglages-page">
-    <EtatVue v-if="store.etat() !== 'pret'" />
+    <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
       <header class="entete">
         <h1>Réglages du projet</h1>
@@ -253,28 +251,28 @@ function empreinte(): string {
             v-for="m of modes"
             :key="m"
             class="mode"
-            :class="{ indisponible: !realise(m) }"
+            :class="{ indisponible: !implemented(m) }"
           >
             <input
               type="radio"
               name="acces"
               :value="m"
-              :checked="acces === m"
-              :disabled="!realise(m) || envoi"
-              @change="choisirMode(m)"
+              :checked="access === m"
+              :disabled="!implemented(m) || sending"
+              @change="chooseMode(m)"
             />
             <span class="mode-corps">
               <span class="mode-tete">
-                <strong>{{ libelleMode(m) }}</strong>
-                <span v-if="!realise(m)" class="a-venir"
+                <strong>{{ modeLabel(m) }}</strong>
+                <span v-if="!implemented(m)" class="a-venir"
                   >pas encore réalisé</span
                 >
               </span>
               <span class="mode-garanties">
-                Autorisation jusqu’au {{ libellePortee(m) }} · auteur
-                {{ garanties(m).auteurVerifie ? "vérifié" : "déclaré" }} ·
+                Autorisation jusqu’au {{ scopeLabel(m) }} · auteur
+                {{ guarantees(m).authorVerified ? "vérifié" : "déclaré" }} ·
                 {{
-                  garanties(m).compteRequis
+                  guarantees(m).accountRequired
                     ? "compte GitHub requis"
                     : "aucun compte GitHub requis"
                 }}
@@ -284,7 +282,7 @@ function empreinte(): string {
         </div>
 
         <!-- RG-protection-du-jeton-par-projet, RG-garanties-annoncees : chaque façon de garder le jeton dit ce qu'elle protège et ce qu'elle laisse, et l'exigence ne se fait pas passer pour celle de GitHub. -->
-        <div v-if="acces === 'jeton_personnel'" class="protection-du-jeton">
+        <div v-if="access === 'jeton_personnel'" class="protection-du-jeton">
           <h3 class="sous-section">Protection du jeton dans la version web</h3>
           <p class="explication">
             Sur le bureau, le jeton est toujours gardé dans le coffre du
@@ -296,12 +294,12 @@ function empreinte(): string {
           <div class="modes">
             <label class="mode">
               <input
-                v-model="protectionDuJeton"
+                v-model="tokenProtection"
                 type="radio"
                 name="protection"
                 value="proposee"
-                :disabled="envoi"
-                @change="propose = null"
+                :disabled="sending"
+                @change="proposed = null"
               />
               <span class="mode-corps">
                 <span class="mode-tete"><strong>Proposée</strong></span>
@@ -313,12 +311,12 @@ function empreinte(): string {
             </label>
             <label class="mode">
               <input
-                v-model="protectionDuJeton"
+                v-model="tokenProtection"
                 type="radio"
                 name="protection"
                 value="exigee"
-                :disabled="envoi"
-                @change="propose = null"
+                :disabled="sending"
+                @change="proposed = null"
               />
               <span class="mode-corps">
                 <span class="mode-tete"><strong>Exigée</strong></span>
@@ -369,47 +367,47 @@ function empreinte(): string {
           </p>
         </div>
 
-        <div v-if="acces === 'identite_tierce'" class="identite">
+        <div v-if="access === 'identite_tierce'" class="identite">
           <p class="explication">
             Où les identités sont vérifiées. Rien de secret ici : ce sont les
             valeurs que porte toute application s’exécutant dans un navigateur.
           </p>
 
-          <UiChamp
-            v-model="emetteur"
+          <UiTextField
+            v-model="issuer"
             libelle="Émetteur d’identité"
             name="emetteur"
-            :disabled="envoi"
+            :disabled="sending"
             placeholder="https://identite.exemple.fr/realms/mon-projet"
             indice="Racine du domaine, jusqu’au projet inclus."
           />
 
-          <UiChamp
+          <UiTextField
             v-model="client"
-            libelle="Identifiant du client"
+            label="Identifiant du client"
             name="client"
-            :disabled="envoi"
+            :disabled="sending"
             placeholder="mon-application"
-            indice="Client public déclaré chez cet émetteur, sans secret."
+            hint="Client public déclaré chez cet émetteur, sans secret."
           />
 
-          <UiChamp
-            v-model="echange"
+          <UiTextField
+            v-model="exchange"
             libelle="Adresse de l’échange"
             name="echange"
-            :disabled="envoi"
+            :disabled="sending"
             placeholder="https://echange.exemple.fr"
             indice="Composant qui échange une identité contre un accès."
           />
 
-          <p v-if="identiteIncomplete" class="manque">
+          <p v-if="incompleteIdentity" class="manque">
             Ce mode demande les trois valeurs. Sans elles, personne ne pourra se
             connecter.
           </p>
         </div>
       </section>
 
-      <section v-if="automatisation.installee() === false" class="bloc">
+      <section v-if="automation.installed() === false" class="bloc">
         <h2 class="section">Automatisation</h2>
         <p class="explication">
           Ce dépôt n’a pas ses workflows. Rien ne vérifie donc qu’un cadrage est
@@ -417,31 +415,31 @@ function empreinte(): string {
           quand il est livré — le référentiel cesse d’être la projection des
           cadrages livrés.
         </p>
-        <p v-if="erreurAutomatisation" class="erreur">
-          <UiIcone nom="error_outline" />
-          <span>{{ erreurAutomatisation }}</span>
+        <p v-if="automationError" class="erreur">
+          <UiIcon name="error_outline" />
+          <span>{{ automationError }}</span>
         </p>
-        <UiBouton
-          variante="filled"
+        <UiButton
+          variant="filled"
           :disabled="installation"
-          @click="installerAutomatisation()"
+          @click="installAutomation()"
         >
           {{ installation ? "Installation…" : "Installer l’automatisation" }}
-        </UiBouton>
+        </UiButton>
       </section>
 
       <section class="bloc">
         <div class="section-tete">
           <h2 class="section">Dépôts de code</h2>
-          <UiBouton
-            variante="icon"
+          <UiButton
+            variant="icon"
             class="aide-bouton"
-            :aria-expanded="aideDepots"
+            :aria-expanded="repoHelp"
             aria-label="Ce que ce réglage écrit"
-            @click="aideDepots = !aideDepots"
+            @click="repoHelp = !repoHelp"
           >
-            <UiIcone nom="help_outline" />
-          </UiBouton>
+            <UiIcon name="help_outline" />
+          </UiButton>
         </div>
         <p class="explication">
           Les dépôts que ce projet réalise. Le lien est déclaré ici, du côté qui
@@ -449,56 +447,56 @@ function empreinte(): string {
           de code sans rien y configurer.
         </p>
 
-        <div v-if="aideDepots" class="infobulle" role="note">
+        <div v-if="repoHelp" class="infobulle" role="note">
           <p>Ce réglage écrit dans <code>ssk-canon.yml</code> :</p>
-          <BlocCode :texte="apercuDepotsCode" langage="yaml" />
+          <CodeBlock :text="codeReposPreview" language="yaml" />
         </div>
 
-        <p v-if="!depotsCode.length" class="vide">
+        <p v-if="!codeRepos.length" class="vide">
           Aucun dépôt déclaré. Un dépôt de code qui invoque le skill de cadrage
           ne se rattache alors à rien.
         </p>
 
-        <div v-for="(d, i) of depotsCode" :key="i" class="depot-ligne">
-          <UiChamp
+        <div v-for="(d, i) of codeRepos" :key="i" class="depot-ligne">
+          <UiTextField
             class="depot-repo"
             :model-value="d.repo"
-            libelle="Dépôt"
+            label="Dépôt"
             :name="'repo' + i"
             placeholder="organisation/depot"
-            :disabled="envoi"
-            @update:model-value="majDepotCode(i, { repo: $event })"
+            :disabled="sending"
+            @update:model-value="updateCodeRepo(i, { repo: $event })"
           >
-            <template v-if="repoMalForme(d.repo)" #indice>
+            <template v-if="isMalformedRepo(d.repo)" #indice>
               <span class="ui-champ__indice alerte"
                 >Attendu : organisation/depot</span
               >
             </template>
-          </UiChamp>
+          </UiTextField>
 
-          <UiChamp
+          <UiTextField
             class="depot-role"
             :model-value="d.role"
-            libelle="Ce qu’il porte"
+            label="Ce qu’il porte"
             :name="'role' + i"
             placeholder="Application web"
-            :disabled="envoi"
-            @update:model-value="majDepotCode(i, { role: $event })"
+            :disabled="sending"
+            @update:model-value="updateCodeRepo(i, { role: $event })"
           />
 
-          <UiBouton
-            variante="icon"
-            :disabled="envoi"
+          <UiButton
+            variant="icon"
+            :disabled="sending"
             aria-label="Retirer ce dépôt"
-            @click="retirerDepotCode(i)"
+            @click="removeCodeRepo(i)"
           >
-            <UiIcone nom="close" />
-          </UiBouton>
+            <UiIcon name="close" />
+          </UiButton>
         </div>
 
-        <UiBouton :disabled="envoi" @click="ajouterDepotCode()">
-          <UiIcone nom="add" /> Ajouter un dépôt
-        </UiBouton>
+        <UiButton :disabled="sending" @click="addCodeRepo()">
+          <UiIcon name="add" /> Ajouter un dépôt
+        </UiButton>
       </section>
 
       <section class="bloc">
@@ -510,21 +508,21 @@ function empreinte(): string {
         </p>
 
         <p class="etape">1. L’installer, une fois par machine :</p>
-        <BlocCode :texte="commandeSkill" langage="bash" />
-        <UiBouton @click="copier(commandeSkill, 'commande')">
-          <UiIcone :nom="copie === 'commande' ? 'check' : 'content_copy'" />
-          {{ copie === "commande" ? "Copié" : "Copier" }}
-        </UiBouton>
+        <CodeBlock :text="skillCommand" language="bash" />
+        <UiButton @click="copy(skillCommand, 'commande')">
+          <UiIcon :name="copied === 'commande' ? 'check' : 'content_copy'" />
+          {{ copied === "commande" ? "Copié" : "Copier" }}
+        </UiButton>
 
         <p class="etape">
           2. Dire où les référentiels sont clonés, dans
           <code>~/.claude/cadrage-canon.json</code> :
         </p>
-        <BlocCode :texte="configSkill" langage="json" />
-        <UiBouton @click="copier(configSkill, 'config')">
-          <UiIcone :nom="copie === 'config' ? 'check' : 'content_copy'" />
-          {{ copie === "config" ? "Copié" : "Copier" }}
-        </UiBouton>
+        <CodeBlock :text="configSkill" language="json" />
+        <UiButton @click="copy(configSkill, 'config')">
+          <UiIcon :name="copied === 'config' ? 'check' : 'content_copy'" />
+          {{ copied === "config" ? "Copié" : "Copier" }}
+        </UiButton>
 
         <p class="explication">
           Rien n’est à configurer dans les dépôts de code : le skill reconnaît
@@ -533,28 +531,28 @@ function empreinte(): string {
         </p>
       </section>
 
-      <p v-if="erreur" class="erreur">
-        <UiIcone nom="error_outline" /> <span>{{ erreur }}</span>
+      <p v-if="error" class="erreur">
+        <UiIcon name="error_outline" /> <span>{{ error }}</span>
       </p>
 
-      <p v-if="propose" class="succes">
-        <UiIcone nom="check_circle" />
+      <p v-if="proposed" class="succes">
+        <UiIcon name="check_circle" />
         <span>
           Réglages proposés dans la
-          <LienExterne :href="propose.url"
-            >demande #{{ propose.pullRequest }}</LienExterne
+          <ExternalLink :href="proposed.url"
+            >demande #{{ proposed.pullRequest }}</ExternalLink
           >. Ils prendront effet à sa fusion.
         </span>
       </p>
 
       <div class="actions">
-        <UiBouton
-          variante="filled"
-          :disabled="envoi || !modifie || identiteIncomplete"
-          @click="proposer()"
+        <UiButton
+          variant="filled"
+          :disabled="sending || !modified || incompleteIdentity"
+          @click="proposeSettings()"
         >
-          {{ envoi ? "Envoi…" : "Proposer ces réglages" }}
-        </UiBouton>
+          {{ sending ? "Envoi…" : "Proposer ces réglages" }}
+        </UiButton>
       </div>
 
       <p class="note">

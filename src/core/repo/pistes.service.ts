@@ -1,7 +1,7 @@
 import { lireRattachementsPiste } from "@ssk-it/canon-check/pistes";
-import { GithubClient, GithubError, RefDepot } from "../github/github-client";
+import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { inject } from "../injection";
-import { Cadrage } from "../model/model";
+import { Scoping } from "../model/model";
 import { signal } from "../signaux";
 
 /**
@@ -11,33 +11,33 @@ import { signal } from "../signaux";
  * Elle n'appartient pas au référentiel : elle n'a ni identifiant de cadrage,
  * ni statut, et ne se mêle jamais à ce que le dépôt contient.
  */
-export interface IssuePiste {
-  readonly numero: number;
-  readonly titre: string;
+export interface RoadmapItemIssue {
+  readonly number: number;
+  readonly title: string;
   readonly url: string;
-  readonly etiquettes: readonly string[];
+  readonly labels: readonly string[];
   /** Le titre du jalon, qui porte l'horizon ; `null` sans jalon. */
-  readonly jalon: string | null;
+  readonly milestone: string | null;
 }
 
 /** Une piste telle qu'une vue la montre : son état « en cours » déduit des cadrages. */
-export interface PisteVue extends IssuePiste {
+export interface RoadmapItemView extends RoadmapItemIssue {
   /** Les cadrages non livrés qui la citent par un lien `piste` — RG-piste-etat-deduit. */
-  readonly cadragesEnCours: readonly string[];
+  readonly scopingsInProgress: readonly string[];
 }
 
 export type Horizon = "maintenant" | "ensuite" | "plus-tard" | "non-classee";
 
-export interface GroupeHorizon {
+export interface HorizonGroup {
   readonly horizon: Horizon;
-  readonly pistes: readonly PisteVue[];
+  readonly roadmapItems: readonly RoadmapItemView[];
 }
 
-export type EtatPistes =
+export type RoadmapItemsState =
   "inactif" | "chargement" | "pret" | "droit-manquant" | "erreur";
 
 /** Les horizons dans leur ordre d'affichage — RG-piste-horizon. */
-const ORDRE_HORIZONS: readonly Horizon[] = [
+const HORIZON_ORDER: readonly Horizon[] = [
   "maintenant",
   "ensuite",
   "plus-tard",
@@ -51,29 +51,29 @@ const ORDRE_HORIZONS: readonly Horizon[] = [
  * désignent le même horizon. Un jalon d'un autre nom ne dit pas d'horizon, et
  * sa piste se range avec les non classées plutôt que de passer devant.
  */
-function horizonDuJalon(jalon: string | null): Horizon {
-  const cle = (jalon ?? "")
+function horizonOfMilestone(milestone: string | null): Horizon {
+  const key = (milestone ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .trim()
     .toLowerCase()
     .replace(/[\s_]+/g, "-");
-  return (ORDRE_HORIZONS as readonly string[]).includes(cle) &&
-    cle !== "non-classee"
-    ? (cle as Horizon)
+  return (HORIZON_ORDER as readonly string[]).includes(key) &&
+    key !== "non-classee"
+    ? (key as Horizon)
     : "non-classee";
 }
 
 /** Le numéro d'une issue de ce dépôt que désigne une adresse, ou `null`. */
-function numeroIssue(url: string, depot: RefDepot): number | null {
+function issueNumber(url: string, repoRef: RepoRef): number | null {
   const m = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)\/?$/.exec(
     url.trim(),
   );
   if (!m) return null;
-  const memeDepot =
-    m[1].toLowerCase() === depot.owner.toLowerCase() &&
-    m[2].toLowerCase() === depot.repo.toLowerCase();
-  return memeDepot ? Number(m[3]) : null;
+  const sameRepo =
+    m[1].toLowerCase() === repoRef.owner.toLowerCase() &&
+    m[2].toLowerCase() === repoRef.repo.toLowerCase();
+  return sameRepo ? Number(m[3]) : null;
 }
 
 /**
@@ -85,41 +85,43 @@ function numeroIssue(url: string, depot: RefDepot): number | null {
  * la piste, jamais l'inverse : seul un lien de nature `piste` vers une issue
  * de ce dépôt compte.
  */
-export function pistesRattachees(
-  issues: readonly IssuePiste[],
+export function linkedRoadmapItems(
+  issues: readonly RoadmapItemIssue[],
   collection: "domains" | "features",
   id: string,
-  cadrages: readonly Cadrage[],
-  depot: RefDepot,
-): PisteVue[] {
-  const enCours = new Map<number, string[]>();
-  for (const c of cadrages) {
-    if (c.statut === "livree") continue;
-    for (const lien of c.liens) {
-      if (lien.tag !== "piste") continue;
-      const numero = numeroIssue(lien.url, depot);
-      if (numero === null) continue;
-      enCours.set(numero, [...(enCours.get(numero) ?? []), c.id]);
+  scopings: readonly Scoping[],
+  repoRef: RepoRef,
+): RoadmapItemView[] {
+  const inProgress = new Map<number, string[]>();
+  for (const c of scopings) {
+    if (c.status === "livree") continue;
+    for (const link of c.links) {
+      if (link.tag !== "piste") continue;
+      const number = issueNumber(link.url, repoRef);
+      if (number === null) continue;
+      inProgress.set(number, [...(inProgress.get(number) ?? []), c.id]);
     }
   }
 
   return issues
     .filter((i) =>
-      lireRattachementsPiste(i.etiquettes).some(
+      lireRattachementsPiste(i.labels).some(
         (r) => r.collection === collection && r.id === id,
       ),
     )
-    .map((i) => ({ ...i, cadragesEnCours: enCours.get(i.numero) ?? [] }));
+    .map((i) => ({ ...i, scopingsInProgress: inProgress.get(i.number) ?? [] }));
 }
 
 /** Range les pistes par horizon, sans groupe vide — RG-piste-horizon. */
-export function grouperParHorizon(
-  pistes: readonly PisteVue[],
-): GroupeHorizon[] {
-  return ORDRE_HORIZONS.map((horizon) => ({
+export function groupByHorizon(
+  roadmapItems: readonly RoadmapItemView[],
+): HorizonGroup[] {
+  return HORIZON_ORDER.map((horizon) => ({
     horizon,
-    pistes: pistes.filter((p) => horizonDuJalon(p.jalon) === horizon),
-  })).filter((g) => g.pistes.length > 0);
+    roadmapItems: roadmapItems.filter(
+      (p) => horizonOfMilestone(p.milestone) === horizon,
+    ),
+  })).filter((g) => g.roadmapItems.length > 0);
 }
 
 /**
@@ -129,59 +131,59 @@ export function grouperParHorizon(
  * l'autre ne repaie pas l'appel (RG-pistes-a-part). Elle passe par la file
  * régulée du client, comme tout appel à l'API (INV-6).
  */
-export class PistesService {
+export class RoadmapItemsService {
   private readonly github = inject(GithubClient);
 
-  readonly etat = signal<EtatPistes>("inactif");
-  readonly issues = signal<readonly IssuePiste[]>([]);
-  readonly erreur = signal<string | null>(null);
+  readonly state = signal<RoadmapItemsState>("inactif");
+  readonly issues = signal<readonly RoadmapItemIssue[]>([]);
+  readonly error = signal<string | null>(null);
 
-  private cle: string | null = null;
-  private enVol: Promise<void> | null = null;
+  private key: string | null = null;
+  private inFlight: Promise<void> | null = null;
 
-  charger(depot: RefDepot): Promise<void> {
-    const cle = `${depot.owner}/${depot.repo}`.toLowerCase();
-    if (cle === this.cle && this.enVol) return this.enVol;
+  load(repoRef: RepoRef): Promise<void> {
+    const key = `${repoRef.owner}/${repoRef.repo}`.toLowerCase();
+    if (key === this.key && this.inFlight) return this.inFlight;
 
-    this.cle = cle;
-    this.etat.set("chargement");
+    this.key = key;
+    this.state.set("chargement");
     this.issues.set([]);
-    this.erreur.set(null);
-    this.enVol = this.lire(depot, cle);
-    return this.enVol;
+    this.error.set(null);
+    this.inFlight = this.read(repoRef, key);
+    return this.inFlight;
   }
 
-  private async lire(depot: RefDepot, cle: string): Promise<void> {
+  private async read(repoRef: RepoRef, key: string): Promise<void> {
     try {
-      const brutes = await this.github.listPistes(depot);
-      if (cle !== this.cle) return;
+      const raw = await this.github.listRoadmapItems(repoRef);
+      if (key !== this.key) return;
       this.issues.set(
-        brutes.map((i) => ({
-          numero: i.number,
-          titre: i.title,
+        raw.map((i) => ({
+          number: i.number,
+          title: i.title,
           url: i.html_url,
-          etiquettes: i.labels
+          labels: i.labels
             .map((l) => (typeof l === "string" ? l : (l.name ?? "")))
             .filter((l) => l !== ""),
-          jalon: i.milestone?.title ?? null,
+          milestone: i.milestone?.title ?? null,
         })),
       );
-      this.etat.set("pret");
+      this.state.set("pret");
     } catch (e) {
-      if (cle !== this.cle) return;
+      if (key !== this.key) return;
       // Un 403 qui n'est pas un quota épuisé : le jeton n'a pas le droit de
       // lire les issues. Le dire tel quel, plutôt qu'une section vide qui se
       // lirait « rien n'est envisagé » (RG-message-nomme-la-cause).
-      if (e instanceof GithubError && e.statut === 403 && !e.quotaEpuise) {
-        this.etat.set("droit-manquant");
+      if (e instanceof GithubError && e.status === 403 && !e.quotaExhausted) {
+        this.state.set("droit-manquant");
         return;
       }
-      this.erreur.set(
+      this.error.set(
         e instanceof Error ? e.message : "Les pistes n'ont pas pu être lues.",
       );
-      this.etat.set("erreur");
+      this.state.set("erreur");
       // Une erreur ne se garde pas : la vue suivante retentera.
-      this.enVol = null;
+      this.inFlight = null;
     }
   }
 }

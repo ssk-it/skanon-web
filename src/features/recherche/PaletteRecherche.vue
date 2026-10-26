@@ -1,10 +1,10 @@
 <script lang="ts">
 /** Ce que la barre transmet à l'ouverture. */
-export interface DonneesPalette {
+export interface PaletteData {
   /**
    * Vrai quand le lecteur regarde le référentiel à une autre date que maintenant. La recherche porte sur l'état courant (2026-042, décision 02) : sans le dire, un lecteur qui remonte le temps prendrait le présent pour ce qu'il regardait.
    */
-  readonly surEtatPasse: boolean;
+  readonly onPastState: boolean;
 }
 </script>
 
@@ -12,18 +12,18 @@ export interface DonneesPalette {
 import { computed, ref } from "vue";
 import { RouterLink, useRouter, type RouteLocationRaw } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
+import { LinksService } from "../../core/repo/liens.service";
 import {
-  NATURES_RESULTAT,
-  buildIndexRecherche,
-  findResultats,
-  type NatureResultat,
-  type ResultatRecherche,
+  RESULT_KINDS,
+  buildSearchIndex,
+  findResults,
+  type ResultKind,
+  type SearchResult,
 } from "../../core/repo/recherche";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import UiIcone from "../../ui/UiIcone.vue";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import UiIcon from "../../ui/UiIcone.vue";
 
-const LIBELLE_GROUPE: Record<NatureResultat, string> = {
+const GROUP_LABEL: Record<ResultKind, string> = {
   regle: "Règles de gestion",
   decision: "Décisions",
   architecture: "Architecture",
@@ -33,14 +33,14 @@ const LIBELLE_GROUPE: Record<NatureResultat, string> = {
 /**
  * Au-delà, la palette cesse d'aider à choisir : elle invite à préciser plutôt que de dérouler une liste qu'on ne lira pas.
  */
-const MAX_PAR_GROUPE = 6;
+const MAX_PER_GROUP = 6;
 
-interface Groupe {
-  readonly cle: string;
-  readonly titre: string;
-  readonly enCours: boolean;
-  readonly resultats: readonly ResultatRecherche[];
-  readonly masques: number;
+interface Group {
+  readonly key: string;
+  readonly title: string;
+  readonly inProgress: boolean;
+  readonly results: readonly SearchResult[];
+  readonly hidden: number;
 }
 
 /**
@@ -50,111 +50,111 @@ interface Groupe {
  *
  * L'élément racine est `div.palette-recherche`, l'hôte `pc-palette-recherche` de SSK Canon. `App.vue` l'ouvre par `DialogService` avec ces `data`, et attend `fermer`.
  */
-const props = defineProps<{ data: DonneesPalette }>();
-const emit = defineEmits<{ fermer: [] }>();
+const props = defineProps<{ data: PaletteData }>();
+const emit = defineEmits<{ close: [] }>();
 
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 const router = useRouter();
 
-const requete = ref("");
-const actifIndex = ref(0);
+const query = ref("");
+const activeIndex = ref(0);
 
 /**
  * L'index suit le référentiel : il se reconstruit quand celui-ci change — après une écriture, ou quand les branches finissent d'arriver.
  */
-const index = computed(() => buildIndexRecherche(store.referentiel()));
+const index = computed(() => buildSearchIndex(store.specification()));
 
-const resultats = computed(() => findResultats(index.value, requete.value));
+const results = computed(() => findResults(index.value, query.value));
 
 /**
  * Le référentiel par nature, puis les cadrages en cours.
  *
  * Les cadrages en cours forment un groupe à part et le dernier : ils arrivent après les autres, et s'ajouter en fin de liste ne déplace pas ce que le lecteur était en train de parcourir.
  */
-const groupes = computed<readonly Groupe[]>(() => {
-  const { referentiel, enCours } = resultats.value;
-  const liste: Groupe[] = NATURES_RESULTAT.map((nature) => {
-    const tous = referentiel.filter((r) => r.nature === nature);
+const groups = computed<readonly Group[]>(() => {
+  const { specification, inProgress } = results.value;
+  const list: Group[] = RESULT_KINDS.map((kind) => {
+    const all = specification.filter((r) => r.kind === kind);
     return {
-      cle: nature,
-      titre: LIBELLE_GROUPE[nature],
-      enCours: false,
-      resultats: tous.slice(0, MAX_PAR_GROUPE),
-      masques: Math.max(0, tous.length - MAX_PAR_GROUPE),
+      key: kind,
+      title: GROUP_LABEL[kind],
+      inProgress: false,
+      results: all.slice(0, MAX_PER_GROUP),
+      hidden: Math.max(0, all.length - MAX_PER_GROUP),
     };
-  }).filter((g) => g.resultats.length);
+  }).filter((g) => g.results.length);
 
   // Le groupe se montre aussi vide tant que les branches arrivent : c'est là qu'il dit qu'elles arrivent.
-  if (enCours.length || store.branchesEnChargement()) {
-    liste.push({
-      cle: "en-cours",
-      titre: "En cours",
-      enCours: true,
-      resultats: enCours.slice(0, MAX_PAR_GROUPE),
-      masques: Math.max(0, enCours.length - MAX_PAR_GROUPE),
+  if (inProgress.length || store.loadingBranches()) {
+    list.push({
+      key: "en-cours",
+      title: "En cours",
+      inProgress: true,
+      results: inProgress.slice(0, MAX_PER_GROUP),
+      hidden: Math.max(0, inProgress.length - MAX_PER_GROUP),
     });
   }
-  return liste;
+  return list;
 });
 
 /** Les résultats affichés, dans l'ordre où les flèches les parcourent. */
-const affiches = computed(() => groupes.value.flatMap((g) => g.resultats));
+const displayed = computed(() => groups.value.flatMap((g) => g.results));
 
-const aucunResultat = computed(() => affiches.value.length === 0);
+const noResult = computed(() => displayed.value.length === 0);
 
-const actif = computed<ResultatRecherche | null>(
-  () => affiches.value[actifIndex.value] ?? null,
+const active = computed<SearchResult | null>(
+  () => displayed.value[activeIndex.value] ?? null,
 );
 
-function indexDe(r: ResultatRecherche): number {
-  return affiches.value.indexOf(r);
+function indexOf(r: SearchResult): number {
+  return displayed.value.indexOf(r);
 }
 
 /** L'adresse d'un résultat, à son ancre s'il en a une. */
-function cible(r: ResultatRecherche): RouteLocationRaw {
+function target(r: SearchResult): RouteLocationRaw {
   return {
-    path: liens.chemin(...r.lien),
-    hash: r.ancre ? `#${r.ancre}` : undefined,
+    path: links.path(...r.link),
+    hash: r.anchor ? `#${r.anchor}` : undefined,
   };
 }
 
-function setRequete(valeur: string): void {
-  requete.value = valeur;
-  actifIndex.value = 0;
+function setQuery(value: string): void {
+  query.value = value;
+  activeIndex.value = 0;
 }
 
 function onKeydown(e: KeyboardEvent): void {
-  const total = affiches.value.length;
+  const total = displayed.value.length;
   switch (e.key) {
     case "ArrowDown":
       e.preventDefault();
-      if (total) actifIndex.value = (actifIndex.value + 1) % total;
+      if (total) activeIndex.value = (activeIndex.value + 1) % total;
       break;
     case "ArrowUp":
       e.preventDefault();
-      if (total) actifIndex.value = (actifIndex.value - 1 + total) % total;
+      if (total) activeIndex.value = (activeIndex.value - 1 + total) % total;
       break;
     case "Enter": {
-      const r = actif.value;
+      const r = active.value;
       if (!r) return;
       e.preventDefault();
-      void router.push(cible(r));
-      fermer();
+      void router.push(target(r));
+      close();
       break;
     }
   }
 }
 
-function fermer(): void {
-  emit("fermer");
+function close(): void {
+  emit("close");
 }
 </script>
 
 <template>
   <div class="palette-recherche">
     <div class="champ">
-      <UiIcone nom="search" />
+      <UiIcon name="search" />
       <input
         type="search"
         autocomplete="off"
@@ -164,16 +164,16 @@ function fermer(): void {
         role="combobox"
         aria-expanded="true"
         aria-controls="resultats-recherche"
-        :aria-activedescendant="actif ? 'resultat-' + actifIndex : undefined"
-        :value="requete"
-        @input="setRequete(($event.target as HTMLInputElement).value)"
+        :aria-activedescendant="active ? 'resultat-' + activeIndex : undefined"
+        :value="query"
+        @input="setQuery(($event.target as HTMLInputElement).value)"
         @keydown="onKeydown"
       />
       <kbd class="echap">Échap</kbd>
     </div>
 
-    <p v-if="props.data.surEtatPasse" class="etat-courant" role="note">
-      <UiIcone nom="history" />
+    <p v-if="props.data.onPastState" class="etat-courant" role="note">
+      <UiIcon name="history" />
       Les résultats valent pour le référentiel d’aujourd’hui, non pour les dates
       que vous consultez.
     </p>
@@ -184,23 +184,23 @@ function fermer(): void {
       role="listbox"
       aria-label="Résultats"
     >
-      <p v-if="!requete.trim()" class="aide">
+      <p v-if="!query.trim()" class="aide">
         Cherche dans le texte entier des règles, des décisions, de
         l’architecture et des cadrages — l’état actuel du référentiel, et les
         cadrages en cours.
       </p>
-      <template v-else-if="!aucunResultat">
+      <template v-else-if="!noResult">
         <section
-          v-for="g of groupes"
-          :key="g.cle"
+          v-for="g of groups"
+          :key="g.key"
           class="groupe"
-          :class="{ 'en-cours': g.enCours }"
+          :class="{ 'en-cours': g.inProgress }"
           role="group"
-          :aria-label="g.titre"
+          :aria-label="g.title"
         >
-          <h3 class="groupe-titre">{{ g.titre }}</h3>
-          <p v-if="g.enCours" class="groupe-note">
-            <template v-if="store.branchesEnChargement()">
+          <h3 class="groupe-titre">{{ g.title }}</h3>
+          <p v-if="g.inProgress" class="groupe-note">
+            <template v-if="store.loadingBranches()">
               Lecture des branches en cours… d’autres résultats peuvent
               s’ajouter.
             </template>
@@ -209,37 +209,37 @@ function fermer(): void {
             </template>
           </p>
           <RouterLink
-            v-for="r of g.resultats"
-            :id="'resultat-' + indexDe(r)"
-            :key="r.nature + r.id"
+            v-for="r of g.results"
+            :id="'resultat-' + indexOf(r)"
+            :key="r.kind + r.id"
             class="resultat"
             role="option"
-            :aria-selected="actif === r"
-            :class="{ actif: actif === r }"
-            :to="cible(r)"
-            @click="fermer()"
-            @mouseenter="actifIndex = indexDe(r)"
+            :aria-selected="active === r"
+            :class="{ actif: active === r }"
+            :to="target(r)"
+            @click="close()"
+            @mouseenter="activeIndex = indexOf(r)"
           >
             <span class="ligne">
-              <span class="identifiant">{{ r.identifiant }}</span>
+              <span class="identifiant">{{ r.identifier }}</span>
               <span v-if="r.pullRequest !== null" class="branche"
-                ><UiIcone nom="call_split" />#{{ r.pullRequest }}</span
+                ><UiIcon name="call_split" />#{{ r.pullRequest }}</span
               >
             </span>
-            <span v-if="r.titre" class="titre">{{ r.titre }}</span>
-            <span v-if="r.extrait" class="extrait">{{ r.extrait }}</span>
+            <span v-if="r.title" class="titre">{{ r.title }}</span>
+            <span v-if="r.excerpt" class="extrait">{{ r.excerpt }}</span>
           </RouterLink>
-          <p v-if="g.masques" class="masques">
-            {{ g.masques }} autre{{ g.masques > 1 ? "s" : "" }} — précisez la
+          <p v-if="g.hidden" class="masques">
+            {{ g.hidden }} autre{{ g.hidden > 1 ? "s" : "" }} — précisez la
             recherche.
           </p>
         </section>
       </template>
       <p v-else class="vide">
-        Aucun résultat pour « {{ requete.trim() }} ». La recherche porte sur les
+        Aucun résultat pour « {{ query.trim() }} ». La recherche porte sur les
         règles, les décisions, l’architecture et les cadrages, y compris les
         cadrages en cours.
-        <template v-if="store.branchesEnChargement()">
+        <template v-if="store.loadingBranches()">
           Les branches sont encore en lecture : un résultat peut encore
           apparaître.
         </template>

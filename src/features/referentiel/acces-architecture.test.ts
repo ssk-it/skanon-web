@@ -8,10 +8,10 @@ import {
   type HttpTestingController,
 } from "../../core/http/http-testing";
 import { inject } from "../../core/injection";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { createRouteur } from "../../routeur";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { createAppRouter } from "../../routeur";
 import ArchitecturePage from "./ArchitecturePage.vue";
-import ReferentielPage from "./ReferentielPage.vue";
+import SpecificationPage from "./ReferentielPage.vue";
 
 /**
  * L'accès au référentiel technique — RG-architecture-au-premier-niveau et RG-vue-vide-dit-ce-qui-manque.
@@ -20,14 +20,14 @@ import ReferentielPage from "./ReferentielPage.vue";
  */
 
 /** Un dépôt sans le moindre document d'architecture — le cas majoritaire. */
-const ARBRE_SANS_ARCHITECTURE = {
+const TREE_WITHOUT_ARCHITECTURE = {
   sha: "racine",
   truncated: false,
   tree: [{ path: "domains/facturation.md", sha: "d1", type: "blob" }],
 };
 
 /** Le même, décrivant un composant et un flux qui le touche. */
-const ARBRE_AVEC_ARCHITECTURE = {
+const TREE_WITH_ARCHITECTURE = {
   sha: "racine",
   truncated: false,
   tree: [
@@ -37,7 +37,7 @@ const ARBRE_AVEC_ARCHITECTURE = {
   ],
 };
 
-const FICHIERS: Record<string, string> = {
+const FILES: Record<string, string> = {
   "domains/facturation.md": `---
 id: facturation
 nom: Facturation
@@ -68,7 +68,7 @@ Export déposé chaque nuit.
 `,
 };
 
-interface Arbre {
+interface Tree {
   sha: string;
   truncated: boolean;
   tree: { path: string; sha: string; type: string }[];
@@ -76,53 +76,53 @@ interface Arbre {
 
 let http: HttpTestingController;
 
-async function charger(arbre: Arbre): Promise<void> {
-  const store = inject(ReferentielStore);
-  const p = store.loadReferentiel({ owner: "test", repo: "test" });
+async function load(tree: Tree): Promise<void> {
+  const store = inject(SpecificationStore);
+  const p = store.loadSpecification({ owner: "test", repo: "test" });
   await settle();
 
-  http.expectOne((r) => r.url.includes("/git/trees/")).flush(arbre);
+  http.expectOne((r) => r.url.includes("/git/trees/")).flush(tree);
 
-  const restants = new Set(arbre.tree.map((e) => e.path));
-  for (let tour = 0; tour < 50 && restants.size; tour++) {
+  const remaining = new Set(tree.tree.map((e) => e.path));
+  for (let round = 0; round < 50 && remaining.size; round++) {
     await Promise.resolve();
-    for (const chemin of [...restants]) {
-      const enVol = http.match((r) => r.url.endsWith(chemin));
-      if (enVol.length) {
-        enVol[0].flush(FICHIERS[chemin]);
-        restants.delete(chemin);
+    for (const path of [...remaining]) {
+      const inFlight = http.match((r) => r.url.endsWith(path));
+      if (inFlight.length) {
+        inFlight[0].flush(FILES[path]);
+        remaining.delete(path);
       }
     }
   }
-  expect([...restants]).toEqual([]);
+  expect([...remaining]).toEqual([]);
   await p;
 }
 
-async function routeurSur(adresse: string) {
-  const routeur = createRouteur(createMemoryHistory());
-  await routeur.push(adresse);
-  await routeur.isReady();
-  return routeur;
+async function routerAt(address: string) {
+  const router = createAppRouter(createMemoryHistory());
+  await router.push(address);
+  await router.isReady();
+  return router;
 }
 
 /** La coquille entière : sa racine est un fragment, d'où une lecture par l'enveloppe plutôt que par l'élément. */
-async function monterApp(adresse: string): Promise<VueWrapper> {
-  const routeur = await routeurSur(adresse);
-  const vue = mount(App, { global: { plugins: [routeur] } });
+async function mountApp(address: string): Promise<VueWrapper> {
+  const router = await routerAt(address);
+  const view = mount(App, { global: { plugins: [router] } });
   await flushPromises();
-  return vue;
+  return view;
 }
 
-async function monterPage(
-  page: typeof ArchitecturePage | typeof ReferentielPage,
+async function mountPage(
+  page: typeof ArchitecturePage | typeof SpecificationPage,
 ): Promise<HTMLElement> {
-  const routeur = await routeurSur("/test/test/referentiel");
-  const vue = mount(page, { global: { plugins: [routeur] } });
+  const router = await routerAt("/test/test/referentiel");
+  const view = mount(page, { global: { plugins: [router] } });
   await flushPromises();
-  return vue.element as HTMLElement;
+  return view.element as HTMLElement;
 }
 
-function onglets(app: VueWrapper): string[] {
+function tabs(app: VueWrapper): string[] {
   return app.findAll(".onglets a").map((a) => a.text().trim());
 }
 
@@ -132,9 +132,9 @@ describe("Accès à l’architecture depuis la barre", () => {
   });
 
   it("propose l’architecture au même rang que le fonctionnel", async () => {
-    const app = await monterApp("/test/test/referentiel");
+    const app = await mountApp("/test/test/referentiel");
 
-    expect(onglets(app)).toEqual([
+    expect(tabs(app)).toEqual([
       "Fonctionnel",
       "Architecture",
       "Cadrages",
@@ -143,22 +143,22 @@ describe("Accès à l’architecture depuis la barre", () => {
   });
 
   it("propose l’architecture même quand le projet n’en décrit aucune", async () => {
-    await charger(ARBRE_SANS_ARCHITECTURE);
-    const app = await monterApp("/test/test/referentiel");
+    await load(TREE_WITHOUT_ARCHITECTURE);
+    const app = await mountApp("/test/test/referentiel");
 
     // L'entrée ne dépend pas du contenu : celui qui n'a rien décrit est précisément celui à qui la possibilité doit être montrée.
-    expect(onglets(app)).toContain("Architecture");
+    expect(tabs(app)).toContain("Architecture");
   });
 
   it("ne propose aucune vue hors d’un projet", async () => {
-    const app = await monterApp("/");
+    const app = await mountApp("/");
 
     expect(app.find(".onglets").exists()).toBe(false);
   });
 
   it("ne garde pas de carte d’accès sur la page fonctionnelle", async () => {
-    await charger(ARBRE_AVEC_ARCHITECTURE);
-    const el = await monterPage(ReferentielPage);
+    await load(TREE_WITH_ARCHITECTURE);
+    const el = await mountPage(SpecificationPage);
 
     // L'accès est dans la barre : le redoubler ici entretiendrait l'idée que l'architecture s'atteint en traversant le fonctionnel.
     expect(el.querySelector(".vers-architecture")).toBeNull();
@@ -171,25 +171,25 @@ describe("Architecture sans contenu", () => {
   });
 
   it("dit ce que la vue accueillerait, au lieu de lister du vide", async () => {
-    await charger(ARBRE_SANS_ARCHITECTURE);
-    const el = await monterPage(ArchitecturePage);
-    const texte = el.textContent ?? "";
+    await load(TREE_WITHOUT_ARCHITECTURE);
+    const el = await mountPage(ArchitecturePage);
+    const text = el.textContent ?? "";
 
     expect(el.querySelector(".vide-instruit")).not.toBeNull();
-    expect(texte).toContain("ne décrit pas encore son architecture");
+    expect(text).toContain("ne décrit pas encore son architecture");
     // les quatre natures sont nommées : le lecteur apprend ce qu'il pourrait écrire
-    for (const nature of ["Composants", "Flux", "Contexte", "Décisions"]) {
-      expect(texte).toContain(nature);
+    for (const kind of ["Composants", "Flux", "Contexte", "Décisions"]) {
+      expect(text).toContain(kind);
     }
     // et par où commencer, le référentiel ne s'éditant pas directement
-    expect(texte).toContain("cadrage");
+    expect(text).toContain("cadrage");
     // aucune liste vide ne subsiste à côté de l'explication
     expect(el.querySelectorAll(".liste").length).toBe(0);
   });
 
   it("s’efface dès que le projet décrit quelque chose", async () => {
-    await charger(ARBRE_AVEC_ARCHITECTURE);
-    const el = await monterPage(ArchitecturePage);
+    await load(TREE_WITH_ARCHITECTURE);
+    const el = await mountPage(ArchitecturePage);
 
     expect(el.querySelector(".vide-instruit")).toBeNull();
     expect(el.textContent).toContain("CMP-api");

@@ -1,42 +1,42 @@
 import { inject } from "../injection";
 import { computed, signal } from "../signaux";
-import { EtatNonConfirme, RepoLoader } from "./repo-loader";
-import { ContenusCache } from "./contenus-cache";
-import { deriverStatut } from "./statut-derive";
+import { UnconfirmedState, RepoLoader } from "./repo-loader";
+import { ContentCache } from "./contenus-cache";
+import { deriveStatus } from "./statut-derive";
 import { RepoConfig } from "./repo-config";
 import { TokenService } from "../github/token.service";
-import { GithubClient, GithubError, RefDepot } from "../github/github-client";
+import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import {
-  Cadrage,
-  DecisionArchitecture,
-  DocumentArchitecture,
+  Scoping,
+  ArchitectureDecision,
+  ArchitectureDocument,
   Impact,
-  NatureCible,
-  NatureDocument,
-  OperationImpact,
-  ORDRE_CYCLE_VIE,
-  ProvenanceCadrage,
-  Referentiel,
-  Regle,
-  TAGS_LIENS_PAR_DEFAUT,
+  TargetKind,
+  DocumentKind,
+  ImpactOperation,
+  LIFECYCLE_ORDER,
+  ScopingProvenance,
+  Specification,
+  Rule,
+  DEFAULT_LINK_TAGS,
 } from "../model/model";
 
-export type EtatChargement = "vide" | "chargement" | "pret" | "erreur";
+export type LoadState = "vide" | "chargement" | "pret" | "erreur";
 
-const VIDE: Referentiel = {
-  projet: { nom: "", description: "", depotsCode: [], prefixe: null },
-  reglages: {
-    acces: "jeton_personnel",
-    identite: null,
-    protectionDuJeton: "proposee",
-    tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+const EMPTY: Specification = {
+  project: { name: "", description: "", codeRepos: [], prefix: null },
+  settings: {
+    access: "jeton_personnel",
+    identity: null,
+    tokenProtection: "proposee",
+    linkTags: DEFAULT_LINK_TAGS,
   },
-  domaines: new Map(),
-  fonctionnalites: new Map(),
-  regles: new Map(),
+  domains: new Map(),
+  features: new Map(),
+  rules: new Map(),
   decisions: new Map(),
   architecture: new Map(),
-  cadrages: new Map(),
+  scopings: new Map(),
   anomalies: [],
 };
 
@@ -44,31 +44,31 @@ const VIDE: Referentiel = {
  * L'état de l'application : le référentiel chargé, et les vues croisées que les
  * fichiers seuls ne donnent pas.
  */
-export class ReferentielStore {
+export class SpecificationStore {
   private readonly loader = inject(RepoLoader);
   private readonly config = inject(RepoConfig);
   private readonly github = inject(GithubClient);
   private readonly tokens = inject(TokenService);
-  private readonly cache = inject(ContenusCache);
+  private readonly cache = inject(ContentCache);
 
-  readonly etat = signal<EtatChargement>("vide");
+  readonly state = signal<LoadState>("vide");
 
   /**
    * Présent quand le référentiel affiché est le dernier lu, le dépôt n'ayant pas
    * répondu. Voir RG-dernier-etat-connu.
    */
-  readonly nonConfirme = signal<EtatNonConfirme | null>(null);
+  readonly unconfirmed = signal<UnconfirmedState | null>(null);
 
   constructor() {
     // Le réseau revenu, l'état se relit de lui-même : la marque n'a pas à
     // attendre que le lecteur pense à recharger.
     if (typeof window !== "undefined") {
       window.addEventListener("online", () => {
-        if (this.nonConfirme()) void this.loadReferentiel();
+        if (this.unconfirmed()) void this.loadSpecification();
       });
     }
   }
-  readonly erreur = signal<string | null>(null);
+  readonly error = signal<string | null>(null);
 
   /**
    * Vrai tant que les cadrages en cours se lisent sur leurs branches.
@@ -77,42 +77,42 @@ export class ReferentielStore {
    * présente doit pouvoir dire qu'ils arrivent, plutôt que de laisser croire
    * qu'il n'y en a aucun.
    */
-  readonly branchesEnChargement = signal(false);
-  readonly progression = signal<{ charges: number; total: number } | null>(
+  readonly loadingBranches = signal(false);
+  readonly progression = signal<{ loadedCount: number; total: number } | null>(
     null,
   );
-  readonly referentiel = signal<Referentiel>(VIDE);
+  readonly specification = signal<Specification>(EMPTY);
 
-  readonly depot = this.config.depot;
+  readonly repoRef = this.config.repoRef;
 
   // --- vues dérivées ---
 
-  readonly domaines = computed(() =>
-    [...this.referentiel().domaines.values()].sort((a, b) =>
-      a.nom.localeCompare(b.nom, "fr"),
+  readonly domains = computed(() =>
+    [...this.specification().domains.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, "fr"),
     ),
   );
 
-  readonly fonctionnalites = computed(() =>
-    [...this.referentiel().fonctionnalites.values()].sort((a, b) =>
-      a.nom.localeCompare(b.nom, "fr"),
+  readonly features = computed(() =>
+    [...this.specification().features.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, "fr"),
     ),
   );
 
-  readonly regles = computed(() =>
-    [...this.referentiel().regles.values()].sort((a, b) =>
+  readonly rules = computed(() =>
+    [...this.specification().rules.values()].sort((a, b) =>
       a.id.localeCompare(b.id),
     ),
   );
 
   readonly decisions = computed(() =>
-    [...this.referentiel().decisions.values()].sort((a, b) =>
+    [...this.specification().decisions.values()].sort((a, b) =>
       a.id.localeCompare(b.id),
     ),
   );
 
   readonly architecture = computed(() =>
-    [...this.referentiel().architecture.values()].sort((a, b) =>
+    [...this.specification().architecture.values()].sort((a, b) =>
       a.id.localeCompare(b.id),
     ),
   );
@@ -125,15 +125,15 @@ export class ReferentielStore {
    * l'identifiant portant l'année et la séquence, il donne cet ordre sans
    * qu'aucune date soit nécessaire, et reste stable là où un titre se reformule.
    */
-  readonly cadrages = computed(() =>
-    [...this.referentiel().cadrages.values()].sort((a, b) => {
-      const parStatut = ORDRE_CYCLE_VIE[a.statut] - ORDRE_CYCLE_VIE[b.statut];
-      return parStatut !== 0 ? parStatut : b.id.localeCompare(a.id);
+  readonly scopings = computed(() =>
+    [...this.specification().scopings.values()].sort((a, b) => {
+      const byStatus = LIFECYCLE_ORDER[a.status] - LIFECYCLE_ORDER[b.status];
+      return byStatus !== 0 ? byStatus : b.id.localeCompare(a.id);
     }),
   );
 
   /** Vrai si le dépôt existe mais ne porte encore aucun enregistrement. */
-  readonly depotVide = signal(false);
+  readonly emptyRepo = signal(false);
 
   /**
    * Vrai si le dépôt est resté introuvable sous un jeton personnel.
@@ -144,55 +144,53 @@ export class ReferentielStore {
    * Pas sous un accès temporaire : celui-là ne se règle pas dans ses jetons,
    * mais dans l'installation de l'application inscrite.
    */
-  readonly jetonSansAcces = signal(false);
+  readonly tokenWithoutAccess = signal(false);
 
-  readonly reglesActives = computed(() =>
-    this.regles().filter((r) => r.statut === "actif"),
+  readonly activeRules = computed(() =>
+    this.rules().filter((r) => r.status === "actif"),
   );
 
   /** Les natures de lien que la saisie propose. Voir `unionTagsLiens`. */
-  readonly tagsLiens = computed(() =>
-    unionTagsLiens(
-      this.referentiel().reglages.tagsLiens,
-      this.referentiel().cadrages.values(),
+  readonly linkTags = computed(() =>
+    unionLinkTags(
+      this.specification().settings.linkTags,
+      this.specification().scopings.values(),
     ),
   );
 
   /** Compte les cadrages non livrés — ce sur quoi on travaille en ce moment. */
-  readonly cadragesEnCours = computed(() =>
-    this.cadrages().filter((c) => c.statut !== "livree"),
+  readonly scopingsInProgress = computed(() =>
+    this.scopings().filter((c) => c.status !== "livree"),
   );
 
   // --- accès unitaires ---
 
-  findDomaine(id: string) {
-    return this.referentiel().domaines.get(id) ?? null;
+  findDomain(id: string) {
+    return this.specification().domains.get(id) ?? null;
   }
 
-  findFonctionnalite(id: string) {
-    return this.referentiel().fonctionnalites.get(id) ?? null;
+  findFeature(id: string) {
+    return this.specification().features.get(id) ?? null;
   }
 
-  findRegle(id: string) {
-    return this.referentiel().regles.get(id) ?? null;
+  findRule(id: string) {
+    return this.specification().rules.get(id) ?? null;
   }
 
-  findCadrage(id: string) {
-    return this.referentiel().cadrages.get(id) ?? null;
+  findScoping(id: string) {
+    return this.specification().scopings.get(id) ?? null;
   }
 
   // --- vues croisées : ce qui justifie l'outil ---
 
   /** Fonctionnalités rattachées à un domaine. */
-  listFonctionnalitesByDomaine(idDomaine: string) {
-    return this.fonctionnalites().filter((f) => f.domaines.includes(idDomaine));
+  listFeaturesByDomain(domainId: string) {
+    return this.features().filter((f) => f.domains.includes(domainId));
   }
 
   /** Règles rattachées à une fonctionnalité. */
-  listReglesByFonctionnalite(idFonctionnalite: string) {
-    return this.regles().filter((r) =>
-      r.fonctionnalites.includes(idFonctionnalite),
-    );
+  listRulesByFeature(featureId: string) {
+    return this.rules().filter((r) => r.features.includes(featureId));
   }
 
   /**
@@ -204,21 +202,21 @@ export class ReferentielStore {
    * déduire des impacts le ferait disparaître de la fiche du domaine qu'il
    * documente, et rien ne signalerait l'absence.
    */
-  listCadragesByDomaine(idDomaine: string) {
-    return this.cadrages().filter((c) => c.domaines.includes(idDomaine));
+  listScopingsByDomain(domainId: string) {
+    return this.scopings().filter((c) => c.domains.includes(domainId));
   }
 
   /**
    * Cadrages ayant déclaré un impact sur une règle, avec l'opération.
    * C'est la remontée règle → décision, la promesse du produit.
    */
-  listCadragesImpactantRegle(
-    idRegle: string,
-  ): Array<{ cadrage: Cadrage; operation: OperationImpact }> {
-    const out: Array<{ cadrage: Cadrage; operation: OperationImpact }> = [];
-    for (const c of this.cadrages()) {
-      const impact = c.impacts.find((i) => i.regle === idRegle);
-      if (impact) out.push({ cadrage: c, operation: impact.operation });
+  listScopingsImpactingRule(
+    ruleId: string,
+  ): Array<{ scoping: Scoping; operation: ImpactOperation }> {
+    const out: Array<{ scoping: Scoping; operation: ImpactOperation }> = [];
+    for (const c of this.scopings()) {
+      const impact = c.impacts.find((i) => i.rule === ruleId);
+      if (impact) out.push({ scoping: c, operation: impact.operation });
     }
     return out;
   }
@@ -233,15 +231,15 @@ export class ReferentielStore {
    * Restreint aux flux : un document de contexte cite lui aussi des composants,
    * mais il les cite tous, et il noierait la vue qu'on est venu consulter.
    */
-  listFluxByComposant(idComposant: string) {
+  listFlowsByComponent(componentId: string) {
     return this.architecture().filter(
-      (d) => d.nature === "flux" && d.composants.includes(idComposant),
+      (d) => d.kind === "flux" && d.components.includes(componentId),
     );
   }
 
   /** Documents d'architecture d'une nature donnée. */
-  listArchitectureByNature(nature: NatureDocument) {
-    return this.architecture().filter((d) => d.nature === nature);
+  listArchitectureByKind(kind: DocumentKind) {
+    return this.architecture().filter((d) => d.kind === kind);
   }
 
   /**
@@ -251,35 +249,34 @@ export class ReferentielStore {
    * une cible d'architecture : rien ne l'interdit, et c'est la nature qui les
    * sépare, pas le nom.
    */
-  listCadragesImpactantCible(
-    idCible: string,
-    nature?: NatureCible,
-  ): Array<{ cadrage: Cadrage; operation: OperationImpact }> {
-    const out: Array<{ cadrage: Cadrage; operation: OperationImpact }> = [];
-    for (const c of this.cadrages()) {
+  listScopingsImpactingTarget(
+    targetId: string,
+    kind?: TargetKind,
+  ): Array<{ scoping: Scoping; operation: ImpactOperation }> {
+    const out: Array<{ scoping: Scoping; operation: ImpactOperation }> = [];
+    for (const c of this.scopings()) {
       const impact = c.impacts.find(
-        (i) =>
-          i.cible === idCible && (nature === undefined || i.nature === nature),
+        (i) => i.target === targetId && (kind === undefined || i.kind === kind),
       );
-      if (impact) out.push({ cadrage: c, operation: impact.operation });
+      if (impact) out.push({ scoping: c, operation: impact.operation });
     }
     return out;
   }
 
-  findDecisionArchitecture(id: string) {
-    return this.referentiel().decisions.get(id) ?? null;
+  findArchitectureDecision(id: string) {
+    return this.specification().decisions.get(id) ?? null;
   }
 
-  findDocumentArchitecture(id: string) {
-    return this.referentiel().architecture.get(id) ?? null;
+  findArchitectureDocument(id: string) {
+    return this.specification().architecture.get(id) ?? null;
   }
 
   /** Domaines auxquels une règle appartient, via ses fonctionnalités. */
-  listDomainesByRegle(regle: Regle): string[] {
+  listDomainsByRule(rule: Rule): string[] {
     const ids = new Set<string>();
-    for (const idF of regle.fonctionnalites) {
-      for (const idD of this.findFonctionnalite(idF)?.domaines ?? [])
-        ids.add(idD);
+    for (const featId of rule.features) {
+      for (const domId of this.findFeature(featId)?.domains ?? [])
+        ids.add(domId);
     }
     return [...ids];
   }
@@ -293,27 +290,27 @@ export class ReferentielStore {
    * part — un défaut que rien ne signale, puisqu'une section absente ne se
    * remarque pas.
    */
-  listCiblesByCadrage(cadrage: Cadrage) {
-    return cadrage.impacts.map((i) => ({
+  listTargetsByScoping(scoping: Scoping) {
+    return scoping.impacts.map((i) => ({
       impact: i,
       /** La cible telle que le référentiel la porte, ou `null` si elle n'existe pas encore. */
-      cible: this.findCible(i),
+      target: this.findTarget(i),
       /** Énoncé porté par ce cadrage — peut différer de l'énoncé courant. */
-      enonce: cadrage.enonces.get(i.cible) ?? null,
+      statement: scoping.statements.get(i.target) ?? null,
     }));
   }
 
   /** Ce qu'un impact vise, cherché dans la collection que sa nature désigne. */
-  findCible(
+  findTarget(
     impact: Impact,
-  ): Regle | DecisionArchitecture | DocumentArchitecture | null {
-    switch (impact.nature) {
+  ): Rule | ArchitectureDecision | ArchitectureDocument | null {
+    switch (impact.kind) {
       case "adr":
-        return this.findDecisionArchitecture(impact.cible);
+        return this.findArchitectureDecision(impact.target);
       case "architecture":
-        return this.findDocumentArchitecture(impact.cible);
+        return this.findArchitectureDocument(impact.target);
       default:
-        return this.findRegle(impact.cible);
+        return this.findRule(impact.target);
     }
   }
 
@@ -332,34 +329,34 @@ export class ReferentielStore {
   private readonly dates = signal<ReadonlyMap<string, string | null>>(
     new Map(),
   );
-  private readonly enCoursDeDate = new Set<string>();
+  private readonly inProgressForDate = new Set<string>();
 
-  dateCreation(idCadrage: string): string | null | undefined {
-    return this.dates().get(idCadrage);
+  creationDate(scopingId: string): string | null | undefined {
+    return this.dates().get(scopingId);
   }
 
   /**
    * Demande la date de création d'un cadrage si elle n'est pas déjà connue.
    * Sans effet si elle l'est, ou si une demande est en vol.
    */
-  async loadDateCreation(idCadrage: string): Promise<void> {
-    if (this.dates().has(idCadrage) || this.enCoursDeDate.has(idCadrage))
+  async loadCreationDate(scopingId: string): Promise<void> {
+    if (this.dates().has(scopingId) || this.inProgressForDate.has(scopingId))
       return;
-    this.enCoursDeDate.add(idCadrage);
+    this.inProgressForDate.add(scopingId);
     try {
-      const date = await this.github.dateCreation(
-        this.config.depot(),
-        `cadrages/${idCadrage}`,
+      const date = await this.github.creationDate(
+        this.config.repoRef(),
+        `cadrages/${scopingId}`,
       );
-      this.dates.update((m) => new Map(m).set(idCadrage, date));
+      this.dates.update((m) => new Map(m).set(scopingId, date));
     } finally {
-      this.enCoursDeDate.delete(idCadrage);
+      this.inProgressForDate.delete(scopingId);
     }
   }
 
   /** Demande les dates de plusieurs cadrages, en parallèle borné par le client. */
-  async loadDatesCreation(ids: readonly string[]): Promise<void> {
-    await Promise.all(ids.map((id) => this.loadDateCreation(id)));
+  async loadCreationDates(ids: readonly string[]): Promise<void> {
+    await Promise.all(ids.map((id) => this.loadCreationDate(id)));
   }
 
   // --- chargement ---
@@ -372,8 +369,8 @@ export class ReferentielStore {
     await this.pending;
   }
 
-  loadReferentiel(depot?: RefDepot): Promise<void> {
-    this.pending = this.runLoad(depot);
+  loadSpecification(repoRef?: RepoRef): Promise<void> {
+    this.pending = this.runLoad(repoRef);
     return this.pending;
   }
 
@@ -385,27 +382,27 @@ export class ReferentielStore {
    * modifie aussi des règles ne trouble pas l'état courant, qui reste celui de
    * la branche principale.
    */
-  private async chargerCadragesEnBranche(
-    depot: RefDepot,
-    empreintesPrincipale: ReadonlySet<string>,
-    lecture: number,
+  private async loadScopingsOnBranches(
+    repoRef: RepoRef,
+    mainFingerprints: ReadonlySet<string>,
+    read: number,
   ): Promise<void> {
-    this.branchesEnChargement.set(true);
+    this.loadingBranches.set(true);
     try {
-      await this.mergeCadragesEnBranche(depot, empreintesPrincipale, lecture);
+      await this.mergeScopingsOnBranches(repoRef, mainFingerprints, read);
     } finally {
-      if (lecture === this.lectures) this.branchesEnChargement.set(false);
+      if (read === this.reads) this.loadingBranches.set(false);
     }
   }
 
-  private async mergeCadragesEnBranche(
-    depot: RefDepot,
-    empreintesPrincipale: ReadonlySet<string>,
-    lecture: number,
+  private async mergeScopingsOnBranches(
+    repoRef: RepoRef,
+    mainFingerprints: ReadonlySet<string>,
+    read: number,
   ): Promise<void> {
-    let demandes;
+    let requests;
     try {
-      demandes = await this.github.listPullRequestsOuvertes(depot);
+      requests = await this.github.listOpenPullRequests(repoRef);
     } catch {
       // Sans la liste des branches ouvertes, on ne sait pas ce que le cache
       // doit garder : mieux vaut ne rien retirer.
@@ -415,83 +412,95 @@ export class ReferentielStore {
     // Les branches de cadrage sans demande de fusion : un cadrage commencé n'en
     // a pas encore, et ne lire que les demandes le rendrait invisible avant sa
     // première relecture (RG-cadrages-en-cours-visibles).
-    const parDemande = new Set(demandes.map((d) => d.branche));
-    const sansDemande = (await this.github.listBranchesCadrage(depot)).filter(
-      (b) => !parDemande.has(b),
-    );
+    const byPullRequest = new Set(requests.map((d) => d.branch));
+    const withoutPullRequest = (
+      await this.github.listScopingBranches(repoRef)
+    ).filter((b) => !byPullRequest.has(b));
     const sources = [
-      ...demandes.map((d) => ({ branche: d.branche, demande: d })),
-      ...sansDemande.map((branche) => ({ branche, demande: null })),
+      ...requests.map((d) => ({ branch: d.branch, request: d })),
+      ...withoutPullRequest.map((branch) => ({
+        branch: branch,
+        request: null,
+      })),
     ];
 
-    const lots = await Promise.all(
-      sources.map(async ({ branche, demande }) => {
+    const batches = await Promise.all(
+      sources.map(async ({ branch, request }) => {
         try {
-          const surBranche = await this.loader.readReferentiel(
-            { ...depot, ref: branche },
-            { memoriser: true },
+          const onBranch = await this.loader.readSpecification(
+            { ...repoRef, ref: branch },
+            { remember: true },
           );
-          const provenance: ProvenanceCadrage = demande
+          const provenance: ScopingProvenance = request
             ? {
-                branche,
-                pullRequest: demande.numero,
-                brouillon: demande.brouillon,
-                approbation: demande.approbation,
+                branch,
+                pullRequest: request.number,
+                draft: request.draft,
+                approval: request.approval,
               }
             : // Sans demande de fusion, le cadrage est en brouillon.
-              { branche, brouillon: true };
-          const cadrages = [...surBranche.referentiel.cadrages.values()].map(
+              { branch, draft: true };
+          const scopings = [...onBranch.specification.scopings.values()].map(
             (c) =>
               // Le chargeur rend « livree » faute de savoir d'où il lit ; c'est
               // ici qu'on le sait, et la provenance qui tranche.
-              ({ ...c, provenance, statut: deriverStatut(provenance) }),
+              ({ ...c, provenance, status: deriveStatus(provenance) }),
           );
-          return { branche, cadrages, empreintes: surBranche.empreintes };
+          return {
+            branch: branch,
+            scopings,
+            fingerprints: onBranch.fingerprints,
+          };
         } catch {
           // Une branche illisible ne doit pas emporter les autres ni le
           // référentiel : elle est simplement absente de la liste.
-          return { branche, cadrages: [], empreintes: new Set<string>() };
+          return {
+            branch: branch,
+            scopings: [],
+            fingerprints: new Set<string>(),
+          };
         }
       }),
     );
 
     // Une autre lecture a pu commencer entre-temps, sur ce dépôt ou un autre :
     // ce qui suit ne vaut que pour celle qui a lancé ces branches.
-    if (lecture !== this.lectures) return;
+    if (read !== this.reads) return;
 
-    const courant = this.referentiel();
-    const fusionnes = new Map(courant.cadrages);
-    for (const c of lots.flatMap((l) => l.cadrages)) {
+    const current = this.specification();
+    const merged = new Map(current.scopings);
+    for (const c of batches.flatMap((l) => l.scopings)) {
       // La branche principale fait foi : un cadrage qu'elle porte déjà est
       // livré, et sa version de branche n'apporterait rien.
-      if (!fusionnes.has(c.id)) fusionnes.set(c.id, c);
+      if (!merged.has(c.id)) merged.set(c.id, c);
     }
 
-    if (fusionnes.size !== courant.cadrages.size) {
-      this.referentiel.set({ ...courant, cadrages: fusionnes });
+    if (merged.size !== current.scopings.size) {
+      this.specification.set({ ...current, scopings: merged });
     }
 
     // Une branche dont tous les cadrages sont déjà livrés n'apporte rien au
     // référentiel ; elle survit peut-être à une fusion, et se signale alors.
-    const sansCadrageEnCours = lots
+    const withoutScopingInProgress = batches
       .filter(
         (l) =>
-          l.cadrages.length > 0 &&
-          l.cadrages.every((c) => courant.cadrages.has(c.id)),
+          l.scopings.length > 0 &&
+          l.scopings.every((c) => current.scopings.has(c.id)),
       )
-      .map((l) => l.branche);
-    await this.signalerBranchesSurvivantes(depot, sansCadrageEnCours, lecture);
+      .map((l) => l.branch);
+    await this.flagStaleBranches(repoRef, withoutScopingInProgress, read);
 
     // Le cache suit le référentiel en vigueur : la branche principale et les
     // branches ouvertes. Une branche illisible voit ce qu'elle a en propre
     // retiré, et le redemande au chargement suivant (2026-043, décision 04).
-    const empreintes = new Set(empreintesPrincipale);
-    for (const l of lots) for (const e of l.empreintes) empreintes.add(e);
+    const fingerprints = new Set(mainFingerprints);
+    for (const l of batches)
+      for (const e of l.fingerprints) fingerprints.add(e);
     const refs = new Set([
-      depot.ref ?? "HEAD",
-      ...sources.map((s) => s.branche),
+      repoRef.ref ?? "HEAD",
+      ...sources.map((s) => s.branch),
     ]);
-    await this.cache.pruneDepot(depot, empreintes, refs);
+    await this.cache.pruneRepo(repoRef, fingerprints, refs);
   }
 
   /**
@@ -504,101 +513,97 @@ export class ReferentielStore {
    * rien en propre, et n'est donc pas signalée. Une comparaison qui échoue ne
    * signale rien : le signalement informe, il n'est pas indispensable.
    */
-  private async signalerBranchesSurvivantes(
-    depot: RefDepot,
+  private async flagStaleBranches(
+    repoRef: RepoRef,
     branches: readonly string[],
-    lecture: number,
+    read: number,
   ): Promise<void> {
     if (!branches.length) return;
     let base: string;
     try {
-      base = (await this.github.loadDepot(depot)).defaultBranch;
+      base = (await this.github.loadRepo(repoRef)).defaultBranch;
     } catch {
       return;
     }
 
-    const parCadrage = new Map<string, string[]>();
+    const byScoping = new Map<string, string[]>();
     await Promise.all(
-      branches.map(async (branche) => {
-        let chemins: string[];
+      branches.map(async (branch) => {
+        let paths: string[];
         try {
-          chemins = await this.github.listCheminsDeBranche(
-            depot,
-            base,
-            branche,
-          );
+          paths = await this.github.listBranchPaths(repoRef, base, branch);
         } catch {
           return;
         }
         const ids = new Set(
-          chemins
+          paths
             .map((c) => /^cadrages\/([^/]+)\//.exec(c)?.[1])
             .filter((id): id is string => !!id),
         );
         for (const id of ids) {
-          parCadrage.set(id, [...(parCadrage.get(id) ?? []), branche]);
+          byScoping.set(id, [...(byScoping.get(id) ?? []), branch]);
         }
       }),
     );
-    if (lecture !== this.lectures || !parCadrage.size) return;
+    if (read !== this.reads || !byScoping.size) return;
 
-    const courant = this.referentiel();
-    const cadrages = new Map(courant.cadrages);
-    for (const [id, survivantes] of parCadrage) {
-      const c = cadrages.get(id);
+    const current = this.specification();
+    const scopings = new Map(current.scopings);
+    for (const [id, stale] of byScoping) {
+      const c = scopings.get(id);
       // Seul un cadrage livré a des branches survivantes : celle d'un cadrage
       // en cours est sa branche, tout simplement.
       if (!c || c.provenance) continue;
-      cadrages.set(id, { ...c, branchesSurvivantes: survivantes.sort() });
+      scopings.set(id, { ...c, staleBranches: stale.sort() });
     }
-    this.referentiel.set({ ...courant, cadrages });
+    this.specification.set({ ...current, scopings });
   }
 
   /** Compte les lectures lancées, pour qu'une lecture dépassée n'agisse plus. */
-  private lectures = 0;
+  private reads = 0;
 
-  private async runLoad(depot?: RefDepot): Promise<void> {
-    const lecture = ++this.lectures;
-    if (depot) this.config.saveDepot(depot);
-    const cible = this.config.depot();
+  private async runLoad(repoRef?: RepoRef): Promise<void> {
+    const read = ++this.reads;
+    if (repoRef) this.config.saveRepo(repoRef);
+    const target = this.config.repoRef();
 
     // Avant toute lecture : c'est ce qui décide quel jeton sera présenté. Un
     // rédacteur travaillant sur plusieurs organisations en a un par
     // organisation, et présenter celui d'une autre produirait « introuvable »
     // sur un dépôt bien réel.
-    this.tokens.cibler(cible);
+    this.tokens.targetRepo(target);
 
-    this.etat.set("chargement");
-    this.branchesEnChargement.set(false);
-    this.erreur.set(null);
-    this.nonConfirme.set(null);
-    this.github.ecritureSuspendue.set(null);
-    this.depotVide.set(false);
-    this.jetonSansAcces.set(false);
+    this.state.set("chargement");
+    this.loadingBranches.set(false);
+    this.error.set(null);
+    this.unconfirmed.set(null);
+    this.github.writeSuspended.set(null);
+    this.emptyRepo.set(false);
+    this.tokenWithoutAccess.set(false);
     this.progression.set(null);
     // les dates appartiennent au dépôt qu'on quitte
     this.dates.set(new Map());
 
     try {
-      const resultat = await this.loader.readReferentiel(cible, {
-        progression: (charges, total) =>
-          this.progression.set({ charges, total }),
-        memoriser: true,
-        dernierEtatConnu: true,
+      const result = await this.loader.readSpecification(target, {
+        progression: (loadedCount, total) =>
+          this.progression.set({ loadedCount, total }),
+        remember: true,
+        lastKnownState: true,
       });
-      this.referentiel.set(resultat.referentiel);
+      this.specification.set(result.specification);
       // Dès la lecture du projet : un jeton qu'il exige protégé ne doit pas rester en clair le temps d'un autre geste (RG-protection-du-jeton-par-projet).
-      this.tokens.exigerProtection(
-        resultat.referentiel.reglages.protectionDuJeton,
+      this.tokens.requireProtection(
+        result.specification.settings.tokenProtection,
       );
-      this.etat.set("pret");
+      this.state.set("pret");
 
-      if (resultat.nonConfirme) {
+      if (result.unconfirmed) {
         // Un état non confirmé se lit, ne s'écrit pas. Les branches ne sont pas
         // lues : le dépôt qui n'a pas répondu pour la principale ne répondra
         // pas davantage pour elles.
-        this.nonConfirme.set(resultat.nonConfirme);
-        this.github.ecritureSuspendue.set(
+        this.unconfirmed.set(result.unconfirmed);
+        this.github.writeSuspended.set(
           "Le dépôt ne répond pas : l’état affiché est le dernier lu, et rien ne " +
             "peut s’y enregistrer avant qu’il ait été relu.",
         );
@@ -609,27 +614,27 @@ export class ReferentielStore {
       // fusion, jamais sur la principale : sans cette lecture, l'outil ne
       // montrerait que les cadrages terminés. Après coup et sans bloquer — le
       // référentiel est déjà consultable, et ceci ne fait que le compléter.
-      void this.chargerCadragesEnBranche(cible, resultat.empreintes, lecture);
+      void this.loadScopingsOnBranches(target, result.fingerprints, read);
       // Mémorisé après coup, non à la demande : un dépôt qu'on n'a pas su
       // charger n'a rien à faire dans la liste des projets ouverts. Cela couvre
       // aussi celui d'ouverture, que personne n'a « changé ».
-      this.config.memoriserOuvert(cible);
+      this.config.rememberOpened(target);
     } catch (e) {
-      this.referentiel.set(VIDE);
-      this.erreur.set(
+      this.specification.set(EMPTY);
+      this.error.set(
         e instanceof GithubError
           ? e.message
           : "Le chargement du dépôt a échoué.",
       );
       // Distingué des autres échecs : celui-ci se répare, et l'application sait
       // comment. Voir AmorcageService.
-      this.depotVide.set(e instanceof GithubError && e.statut === 409);
-      this.jetonSansAcces.set(
+      this.emptyRepo.set(e instanceof GithubError && e.status === 409);
+      this.tokenWithoutAccess.set(
         e instanceof GithubError &&
-          e.statut === 404 &&
+          e.status === 404 &&
           this.tokens.source() === "personnel",
       );
-      this.etat.set("erreur");
+      this.state.set("erreur");
     } finally {
       this.progression.set(null);
     }
@@ -648,17 +653,17 @@ export class ReferentielStore {
  * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
  * l'éprouver ne doit pas demander de construire un store.
  */
-export function unionTagsLiens(
-  declares: readonly string[],
-  cadrages: Iterable<Cadrage>,
+export function unionLinkTags(
+  declared: readonly string[],
+  scopings: Iterable<Scoping>,
 ): readonly string[] {
-  const employes = new Set<string>();
-  for (const c of cadrages) {
-    for (const l of c.liens) {
+  const used = new Set<string>();
+  for (const c of scopings) {
+    for (const l of c.links) {
       const t = l.tag.trim();
-      if (t) employes.add(t);
+      if (t) used.add(t);
     }
   }
-  for (const d of declares) employes.delete(d);
-  return [...declares, ...[...employes].sort((a, b) => a.localeCompare(b))];
+  for (const d of declared) used.delete(d);
+  return [...declared, ...[...used].sort((a, b) => a.localeCompare(b))];
 }

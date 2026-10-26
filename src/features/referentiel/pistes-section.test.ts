@@ -7,13 +7,13 @@ import {
   settle,
 } from "../../core/http/http-testing";
 import { inject } from "../../core/injection";
-import { TAGS_LIENS_PAR_DEFAUT, type Cadrage } from "../../core/model/model";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { DEFAULT_LINK_TAGS, type Scoping } from "../../core/model/model";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { RepoConfig } from "../../core/repo/repo-config";
-import { createRouteur } from "../../routeur";
-import DomainePage from "./DomainePage.vue";
-import FonctionnalitePage from "./FonctionnalitePage.vue";
-import PistesSection from "./PistesSection.vue";
+import { createAppRouter } from "../../routeur";
+import DomainPage from "./DomainePage.vue";
+import FeaturePage from "./FonctionnalitePage.vue";
+import RoadmapItemsSection from "./PistesSection.vue";
 
 /**
  * La section « À venir » d'un domaine ou d'une fonctionnalité —
@@ -24,97 +24,97 @@ import PistesSection from "./PistesSection.vue";
  * qu'une piste en cours mène à son cadrage, et que le vide comme le droit
  * manquant se disent au lieu de se taire.
  */
-const URL_ISSUES =
+const ISSUES_URL =
   "https://api.github.com/repos/org/depot/issues?labels=piste&state=open&per_page=100&page=1";
 
-function issue(numero: number, etiquettes: string[], jalon: string | null) {
+function issue(number: number, labels: string[], milestone: string | null) {
   return {
-    number: numero,
-    title: `Commenter un cadrage ${numero}`,
-    html_url: `https://github.com/org/depot/issues/${numero}`,
-    labels: ["piste", ...etiquettes].map((name) => ({ name })),
-    milestone: jalon ? { title: jalon } : null,
+    number: number,
+    title: `Commenter un cadrage ${number}`,
+    html_url: `https://github.com/org/depot/issues/${number}`,
+    labels: ["piste", ...labels].map((name) => ({ name })),
+    milestone: milestone ? { title: milestone } : null,
   };
 }
 
-const EN_COURS: Cadrage = {
+const IN_PROGRESS: Scoping = {
   id: "2026-071",
-  titre: "Commenter",
-  statut: "brouillon",
-  domaines: ["cadrage"],
-  liens: [
-    { tag: "piste", url: "https://github.com/org/depot/issues/12", nom: "" },
+  title: "Commenter",
+  status: "brouillon",
+  domains: ["cadrage"],
+  links: [
+    { tag: "piste", url: "https://github.com/org/depot/issues/12", name: "" },
   ],
   impacts: [],
-  objectif: "",
-  parcours: "",
-  enonces: new Map(),
+  goal: "",
+  journey: "",
+  statements: new Map(),
   decisions: [],
-  piecesJointes: [],
-  divers: [],
+  attachments: [],
+  misc: [],
 };
 
 let http: HttpTestingController;
 
-async function preparer() {
-  const store = inject(ReferentielStore);
-  store.referentiel.set({
-    projet: { nom: "Test", description: "", depotsCode: [], prefixe: null },
-    reglages: {
-      acces: "jeton_personnel",
-      identite: null,
-      protectionDuJeton: "proposee",
-      tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+async function prepare() {
+  const store = inject(SpecificationStore);
+  store.specification.set({
+    project: { name: "Test", description: "", codeRepos: [], prefix: null },
+    settings: {
+      access: "jeton_personnel",
+      identity: null,
+      tokenProtection: "proposee",
+      linkTags: DEFAULT_LINK_TAGS,
     },
-    domaines: new Map([
-      ["cadrage", { id: "cadrage", nom: "Cadrage", description: "" }],
+    domains: new Map([
+      ["cadrage", { id: "cadrage", name: "Cadrage", description: "" }],
     ]),
-    fonctionnalites: new Map([
+    features: new Map([
       [
         "redaction",
         {
           id: "redaction",
-          nom: "Rédaction",
-          domaines: ["cadrage"],
+          name: "Rédaction",
+          domains: ["cadrage"],
           description: "",
         },
       ],
     ]),
-    regles: new Map(),
+    rules: new Map(),
     decisions: new Map(),
     architecture: new Map(),
-    cadrages: new Map([[EN_COURS.id, EN_COURS]]),
+    scopings: new Map([[IN_PROGRESS.id, IN_PROGRESS]]),
     anomalies: [],
   });
-  store.etat.set("pret");
-  const routeur = createRouteur(createMemoryHistory());
-  await routeur.push("/org/depot/referentiel");
-  await routeur.isReady();
-  return routeur;
+  store.state.set("pret");
+  const router = createAppRouter(createMemoryHistory());
+  await router.push("/org/depot/referentiel");
+  await router.isReady();
+  return router;
 }
 
-async function monterSection(
-  reponse: (r: ReturnType<HttpTestingController["expectOne"]>) => void,
+async function mountSection(
+  response: (r: ReturnType<HttpTestingController["expectOne"]>) => void,
 ) {
-  const routeur = await preparer();
-  const vue = mount(PistesSection, {
+  const router = await prepare();
+  const view = mount(RoadmapItemsSection, {
     props: { collection: "domains", id: "cadrage" },
-    global: { plugins: [routeur] },
+    global: { plugins: [router] },
   });
   await settle();
-  reponse(http.expectOne(URL_ISSUES));
+  response(http.expectOne(ISSUES_URL));
   await flushPromises();
-  return vue;
+  return view;
 }
 
 describe("La section « À venir »", () => {
   beforeEach(() => {
     http = provideHttpTesting();
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
   it("se présente repliée, avec le nombre de pistes", async () => {
-    const vue = await monterSection((r) =>
+    const view = await mountSection((r) =>
       r.flush([
         issue(12, ["domaine/cadrage"], "ensuite"),
         issue(13, ["domaine/cadrage"], null),
@@ -122,85 +122,85 @@ describe("La section « À venir »", () => {
       ]),
     );
 
-    const bascule = vue.get("button.bascule");
-    expect(bascule.text()).toContain("À venir");
-    expect(bascule.text()).toContain("2");
-    expect(bascule.attributes("aria-expanded")).toBe("false");
-    expect(vue.find(".piste").exists()).toBe(false);
+    const toggle = view.get("button.bascule");
+    expect(toggle.text()).toContain("À venir");
+    expect(toggle.text()).toContain("2");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    expect(view.find(".piste").exists()).toBe(false);
   });
 
   it("dépliée, range les pistes par horizon et dit que rien n'y est décidé", async () => {
-    const vue = await monterSection((r) =>
+    const view = await mountSection((r) =>
       r.flush([
         issue(13, ["domaine/cadrage"], null),
         issue(12, ["domaine/cadrage"], "Maintenant"),
       ]),
     );
-    await vue.get("button.bascule").trigger("click");
+    await view.get("button.bascule").trigger("click");
 
-    expect(vue.text()).toContain("rien n’y est décidé");
-    const horizons = vue.findAll(".horizon").map((h) => h.text());
+    expect(view.text()).toContain("rien n’y est décidé");
+    const horizons = view.findAll(".horizon").map((h) => h.text());
     expect(horizons).toEqual(["Maintenant", "Non classées"]);
-    const liens = vue.findAll(".piste a.issue");
-    expect(liens.map((a) => a.attributes("href"))).toEqual([
+    const links = view.findAll(".piste a.issue");
+    expect(links.map((a) => a.attributes("href"))).toEqual([
       "https://github.com/org/depot/issues/12",
       "https://github.com/org/depot/issues/13",
     ]);
   });
 
   it("mène une piste en cours au cadrage qui la traite", async () => {
-    const vue = await monterSection((r) =>
+    const view = await mountSection((r) =>
       r.flush([issue(12, ["domaine/cadrage"], "ensuite")]),
     );
-    await vue.get("button.bascule").trigger("click");
+    await view.get("button.bascule").trigger("click");
 
-    const cadrage = vue.get(".piste a.cadrage");
-    expect(cadrage.text()).toContain("2026-071");
-    expect(cadrage.attributes("href")).toBe("/org/depot/cadrages/2026-071");
+    const scoping = view.get(".piste a.cadrage");
+    expect(scoping.text()).toContain("2026-071");
+    expect(scoping.attributes("href")).toBe("/org/depot/cadrages/2026-071");
   });
 
   it("sans piste, dit ce qu'elle accueillerait", async () => {
-    const vue = await monterSection((r) => r.flush([]));
-    await vue.get("button.bascule").trigger("click");
+    const view = await mountSection((r) => r.flush([]));
+    await view.get("button.bascule").trigger("click");
 
-    expect(vue.text()).toContain("Aucune piste");
-    expect(vue.text()).toContain("domaine/cadrage");
+    expect(view.text()).toContain("Aucune piste");
+    expect(view.text()).toContain("domaine/cadrage");
   });
 
   it("nomme le droit manquant quand le jeton ne lit pas les issues", async () => {
-    const vue = await monterSection((r) =>
+    const view = await mountSection((r) =>
       r.flush({ message: "Resource not accessible" }, { status: 403 }),
     );
-    await vue.get("button.bascule").trigger("click");
+    await view.get("button.bascule").trigger("click");
 
-    expect(vue.text()).toContain("Issues");
-    expect(vue.text()).not.toContain("Aucune piste");
+    expect(view.text()).toContain("Issues");
+    expect(view.text()).not.toContain("Aucune piste");
   });
 });
 
 describe("La place de la section", () => {
   beforeEach(() => {
     http = provideHttpTesting();
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
   it("vient en dernier dans un domaine", async () => {
-    const routeur = await preparer();
-    await routeur.push("/org/depot/referentiel/domaine/cadrage");
-    const vue = mount(DomainePage, { global: { plugins: [routeur] } });
+    const router = await prepare();
+    await router.push("/org/depot/referentiel/domaine/cadrage");
+    const view = mount(DomainPage, { global: { plugins: [router] } });
     await flushPromises();
 
-    const sections = vue.findAll("h2, .pistes");
+    const sections = view.findAll("h2, .pistes");
     expect(sections.at(-1)?.classes()).toContain("pistes");
   });
 
   it("vient en dernier dans une fonctionnalité", async () => {
-    const routeur = await preparer();
-    await routeur.push("/org/depot/referentiel/fonctionnalite/redaction");
-    const vue = mount(FonctionnalitePage, { global: { plugins: [routeur] } });
+    const router = await prepare();
+    await router.push("/org/depot/referentiel/fonctionnalite/redaction");
+    const view = mount(FeaturePage, { global: { plugins: [router] } });
     await flushPromises();
 
-    const sections = vue.findAll("h2, .pistes");
+    const sections = view.findAll("h2, .pistes");
     expect(sections.at(-1)?.classes()).toContain("pistes");
   });
 });

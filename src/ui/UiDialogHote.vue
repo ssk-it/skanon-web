@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, watch } from "vue";
 import { inject } from "../core/injection";
-import { DialogService, type DialogueOuvert } from "./dialog.service";
+import { DialogService, type OpenDialog } from "./dialog.service";
 
 /**
  * L'hôte des dialogues, monté une fois dans `App.vue` : il affiche ceux que `DialogService` tient ouverts, par-dessus la page.
@@ -12,145 +12,145 @@ import { DialogService, type DialogueOuvert } from "./dialog.service";
  * - le focus posé dans le dialogue à l'ouverture, piégé dedans tant qu'il est ouvert — Tab boucle sur ses éléments —, rendu ensuite à l'élément qui l'avait ;
  * - le défilement de la page bloqué derrière.
  */
-const dialogues = inject(DialogService);
+const dialogs = inject(DialogService);
 
 /** L'élément qui avait le focus avant chaque dialogue, pour le lui rendre. */
-const precedents = new Map<number, HTMLElement | null>();
-const panneaux = new Map<number, HTMLElement>();
+const previousOnes = new Map<number, HTMLElement | null>();
+const panels = new Map<number, HTMLElement>();
 
-const FOCALISABLES =
+const FOCUSABLES =
   'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), iframe, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
 
-function focalisables(panneau: HTMLElement): HTMLElement[] {
-  return Array.from(panneau.querySelectorAll<HTMLElement>(FOCALISABLES)).filter(
+function focusables(panel: HTMLElement): HTMLElement[] {
+  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLES)).filter(
     (el) => !el.closest("[inert]") && el.getAttribute("aria-hidden") !== "true",
   );
 }
 
-function enregistrer(id: number, el: unknown): void {
-  if (el instanceof HTMLElement) panneaux.set(id, el);
-  else panneaux.delete(id);
+function save(id: number, el: unknown): void {
+  if (el instanceof HTMLElement) panels.set(id, el);
+  else panels.delete(id);
 }
 
-function poserFocus(d: DialogueOuvert): void {
-  const panneau = panneaux.get(d.id);
-  if (!panneau) return;
+function placeFocus(d: OpenDialog): void {
+  const panel = panels.get(d.id);
+  if (!panel) return;
   const initial =
     d.options.focus === "dialogue"
       ? null
-      : (panneau.querySelector<HTMLElement>("[data-focus-initial]") ??
-        focalisables(panneau)[0] ??
+      : (panel.querySelector<HTMLElement>("[data-focus-initial]") ??
+        focusables(panel)[0] ??
         null);
-  (initial ?? panneau).focus();
+  (initial ?? panel).focus();
 }
 
-function surTouche(d: DialogueOuvert, e: KeyboardEvent): void {
-  const liste = dialogues.ouverts();
-  if (liste[liste.length - 1]?.id !== d.id) return;
+function onKey(d: OpenDialog, e: KeyboardEvent): void {
+  const list = dialogs.openDialogs();
+  if (list[list.length - 1]?.id !== d.id) return;
   if (e.key === "Escape") {
     e.preventDefault();
-    d.fermer(undefined);
+    d.close(undefined);
     return;
   }
   if (e.key !== "Tab") return;
-  const panneau = panneaux.get(d.id);
-  if (!panneau) return;
-  const elements = focalisables(panneau);
+  const panel = panels.get(d.id);
+  if (!panel) return;
+  const elements = focusables(panel);
   if (!elements.length) {
     e.preventDefault();
-    panneau.focus();
+    panel.focus();
     return;
   }
-  const premier = elements[0];
-  const dernier = elements[elements.length - 1];
-  const actif = document.activeElement;
-  if (e.shiftKey && (actif === premier || actif === panneau)) {
+  const first = elements[0];
+  const last = elements[elements.length - 1];
+  const active = document.activeElement;
+  if (e.shiftKey && (active === first || active === panel)) {
     e.preventDefault();
-    dernier.focus();
-  } else if (!e.shiftKey && actif === dernier) {
+    last.focus();
+  } else if (!e.shiftKey && active === last) {
     e.preventDefault();
-    premier.focus();
+    first.focus();
   }
 }
 
 /**
  * Le défilement de la page est bloqué tant qu'un dialogue est ouvert, sans que sa barre disparaisse : la page ne se décale pas sous le fond — la stratégie de blocage du CDK.
  */
-let defilementBloque: { x: number; y: number } | null = null;
+let scrollLocked: { x: number; y: number } | null = null;
 
-function bloquerDefilement(): void {
-  const racine = document.documentElement;
-  if (defilementBloque || racine.scrollHeight <= window.innerHeight) return;
-  defilementBloque = { x: window.scrollX, y: window.scrollY };
-  racine.style.top = `${-defilementBloque.y}px`;
-  racine.style.left = `${-defilementBloque.x}px`;
-  racine.classList.add("ui-defilement-bloque");
+function lockScroll(): void {
+  const root = document.documentElement;
+  if (scrollLocked || root.scrollHeight <= window.innerHeight) return;
+  scrollLocked = { x: window.scrollX, y: window.scrollY };
+  root.style.top = `${-scrollLocked.y}px`;
+  root.style.left = `${-scrollLocked.x}px`;
+  root.classList.add("ui-defilement-bloque");
 }
 
-function libererDefilement(): void {
-  if (!defilementBloque) return;
-  const racine = document.documentElement;
-  racine.classList.remove("ui-defilement-bloque");
-  racine.style.top = "";
-  racine.style.left = "";
-  window.scrollTo(defilementBloque.x, defilementBloque.y);
-  defilementBloque = null;
+function unlockScroll(): void {
+  if (!scrollLocked) return;
+  const root = document.documentElement;
+  root.classList.remove("ui-defilement-bloque");
+  root.style.top = "";
+  root.style.left = "";
+  window.scrollTo(scrollLocked.x, scrollLocked.y);
+  scrollLocked = null;
 }
 
 watch(
-  () => dialogues.ouverts(),
-  async (apres, avant = []) => {
-    const ouverts = apres.filter((d) => !avant.includes(d));
-    const fermes = avant.filter((d) => !apres.includes(d));
-    for (const d of ouverts)
-      precedents.set(d.id, document.activeElement as HTMLElement | null);
+  () => dialogs.openDialogs(),
+  async (after, before = []) => {
+    const openDialogs = after.filter((d) => !before.includes(d));
+    const closed = before.filter((d) => !after.includes(d));
+    for (const d of openDialogs)
+      previousOnes.set(d.id, document.activeElement as HTMLElement | null);
 
-    if (apres.length) bloquerDefilement();
-    else libererDefilement();
+    if (after.length) lockScroll();
+    else unlockScroll();
 
     await nextTick();
-    for (const d of ouverts) poserFocus(d);
-    for (const d of fermes) {
-      const precedent = precedents.get(d.id);
-      precedents.delete(d.id);
-      if (!ouverts.length && precedent?.isConnected) precedent.focus();
+    for (const d of openDialogs) placeFocus(d);
+    for (const d of closed) {
+      const previous = previousOnes.get(d.id);
+      previousOnes.delete(d.id);
+      if (!openDialogs.length && previous?.isConnected) previous.focus();
     }
   },
   { immediate: true },
 );
 
-onBeforeUnmount(libererDefilement);
+onBeforeUnmount(unlockScroll);
 </script>
 
 <template>
   <Teleport to="body">
     <div
-      v-for="(d, i) in dialogues.ouverts()"
+      v-for="(d, i) in dialogs.openDialogs()"
       :key="d.id"
       class="ui-dialog-calque"
-      :class="{ 'ui-dialog-calque--haut': !!d.options.haut }"
-      :inert="i < dialogues.ouverts().length - 1 || undefined"
+      :class="{ 'ui-dialog-calque--haut': !!d.options.top }"
+      :inert="i < dialogs.openDialogs().length - 1 || undefined"
     >
-      <div class="ui-dialog-fond" @click="d.fermer(undefined)"></div>
+      <div class="ui-dialog-fond" @click="d.close(undefined)"></div>
       <div
-        :ref="(el) => enregistrer(d.id, el)"
+        :ref="(el) => save(d.id, el)"
         class="ui-dialog-panneau"
-        :class="d.options.classe"
+        :class="d.options.className"
         role="dialog"
         aria-modal="true"
-        :aria-label="d.options.libelle"
+        :aria-label="d.options.label"
         tabindex="-1"
         :style="{
-          width: d.options.largeur,
-          maxWidth: d.options.largeurMax,
-          marginTop: d.options.haut,
+          width: d.options.width,
+          maxWidth: d.options.maxWidth,
+          marginTop: d.options.top,
         }"
-        @keydown="surTouche(d, $event)"
+        @keydown="onKey(d, $event)"
       >
         <component
-          :is="d.composant"
+          :is="d.component"
           :data="d.options.data"
-          @fermer="d.fermer($event)"
+          @close="d.close($event)"
         />
       </div>
     </div>

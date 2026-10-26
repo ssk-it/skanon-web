@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useAttrs, useId } from "vue";
-import UiCadreChamp from "./UiCadreChamp.vue";
+import UiFieldFrame from "./UiCadreChamp.vue";
 
 /**
  * Un champ de saisie : `mat-form-field appearance="outline"` et son `matInput`, ensemble.
@@ -18,107 +18,107 @@ import UiCadreChamp from "./UiCadreChamp.vue";
  */
 defineOptions({ inheritAttrs: false });
 
-const modele = defineModel<string>({ default: "" });
+const model = defineModel<string>({ default: "" });
 
 const props = withDefaults(
   defineProps<{
-    libelle?: string;
+    label?: string;
     type?: string;
-    multiligne?: boolean;
+    multiline?: boolean;
     rows?: number;
     placeholder?: string;
-    indice?: string | null;
-    erreur?: string | null;
+    hint?: string | null;
+    error?: string | null;
     disabled?: boolean;
-    libelleFixe?: boolean;
+    fixedLabel?: boolean;
   }>(),
   {
     type: "text",
-    multiligne: false,
+    multiline: false,
     rows: 2,
     disabled: false,
-    libelle: undefined,
+    label: undefined,
     placeholder: undefined,
-    indice: null,
-    erreur: null,
+    hint: null,
+    error: null,
   },
 );
 
 const attrs = useAttrs();
 const id = useId();
 const focus = ref(false);
-const controle = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
+const control = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
-const attrsControle = computed(() => {
-  const { class: _c, style: _s, ...reste } = attrs;
-  return reste;
+const controlAttrs = computed(() => {
+  const { class: _c, style: _s, ...rest } = attrs;
+  return rest;
 });
 
-const flotte = computed(
-  () => props.libelleFixe || focus.value || modele.value !== "",
+const floating = computed(
+  () => props.fixedLabel || focus.value || model.value !== "",
 );
 
-function saisir(evenement: Event): void {
-  modele.value = (evenement.target as HTMLInputElement).value;
+function enter(event: Event): void {
+  model.value = (event.target as HTMLInputElement).value;
 }
 
-function activer(): void {
-  if (!props.disabled) controle.value?.focus();
+function activate(): void {
+  if (!props.disabled) control.value?.focus();
 }
 
 defineExpose({
   /** Donne le focus à la saisie. */
-  focus: activer,
+  focus: activate,
   /** L'élément de saisie, pour qui doit s'y accrocher — `UiAutocompletion`. */
-  element: controle,
+  element: control,
 });
 </script>
 
 <template>
-  <UiCadreChamp
+  <UiFieldFrame
     :class="attrs.class"
     :style="attrs.style"
-    :libelle="libelle"
-    :id-controle="id"
-    :flotte="flotte"
+    :label="label"
+    :control-id="id"
+    :floating="floating"
     :focus="focus"
-    :erreur="erreur"
-    :indice="indice"
-    :desactive="disabled"
-    @activer="activer"
+    :error="error"
+    :hint="hint"
+    :disabled="disabled"
+    @activate="activate"
   >
     <textarea
-      v-if="multiligne"
+      v-if="multiline"
       :id="id"
-      ref="controle"
+      ref="control"
       class="ui-champ__saisie"
-      :value="modele"
+      :value="model"
       :rows="rows"
       :placeholder="placeholder"
       :disabled="disabled"
-      :aria-invalid="!!erreur || undefined"
-      v-bind="attrsControle"
-      @input="saisir"
+      :aria-invalid="!!error || undefined"
+      v-bind="controlAttrs"
+      @input="enter"
       @focus="focus = true"
       @blur="focus = false"
     ></textarea>
     <input
       v-else
       :id="id"
-      ref="controle"
+      ref="control"
       class="ui-champ__saisie"
       :type="type"
-      :value="modele"
+      :value="model"
       :placeholder="placeholder"
       :disabled="disabled"
-      :aria-invalid="!!erreur || undefined"
-      v-bind="attrsControle"
-      @input="saisir"
+      :aria-invalid="!!error || undefined"
+      v-bind="controlAttrs"
+      @input="enter"
       @focus="focus = true"
       @blur="focus = false"
     />
     <!-- Ce qui accompagne la saisie dans le cadre : le panneau de UiAutocompletion. -->
     <slot />
     <template v-if="$slots.indice" #indice><slot name="indice" /></template>
-  </UiCadreChamp>
+  </UiFieldFrame>
 </template>

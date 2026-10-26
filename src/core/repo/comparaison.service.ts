@@ -1,32 +1,32 @@
 import { inject } from "../injection";
-import { CommitDate, GithubClient, RefDepot } from "../github/github-client";
+import { CommitDate, GithubClient, RepoRef } from "../github/github-client";
 import { RepoLoader } from "./repo-loader";
-import { Referentiel, Regle } from "../model/model";
+import { Specification, Rule } from "../model/model";
 
 /** Ce qui est arrivé à une règle entre deux dates. */
 export type Evolution = "ajoutee" | "modifiee" | "abrogee" | "retiree";
 
-export interface RegleComparee {
+export interface ComparedRule {
   readonly id: string;
   readonly evolution: Evolution;
   /** État à la date de départ. Absent si la règle n'existait pas encore. */
-  readonly avant: Regle | null;
+  readonly before: Rule | null;
   /** État à la date d'arrivée. Absent si la règle a disparu du référentiel. */
-  readonly apres: Regle | null;
+  readonly after: Rule | null;
 }
 
-export interface Comparaison {
-  readonly depart: BorneComparaison;
-  readonly arrivee: BorneComparaison;
-  readonly regles: readonly RegleComparee[];
+export interface Comparison {
+  readonly departure: ComparisonBound;
+  readonly arrival: ComparisonBound;
+  readonly rules: readonly ComparedRule[];
   /** Cadrages livrés entre les deux bornes, qui expliquent les écarts. */
-  readonly cadragesLivres: readonly string[];
+  readonly deliveredScopings: readonly string[];
 }
 
-export interface BorneComparaison {
+export interface ComparisonBound {
   readonly date: Date;
   readonly commit: CommitDate;
-  readonly referentiel: Referentiel;
+  readonly specification: Specification;
 }
 
 /**
@@ -41,46 +41,49 @@ export interface BorneComparaison {
  * ou les domaines : ce sont elles qui portent le comportement du produit, et
  * elles seules qu'un cadrage prétend transformer.
  */
-export class ComparaisonService {
+export class ComparisonService {
   private readonly github = inject(GithubClient);
   private readonly loader = inject(RepoLoader);
 
-  async comparer(
-    depot: RefDepot,
-    depart: Date,
-    arrivee: Date,
-  ): Promise<Comparaison> {
+  async compare(
+    repoRef: RepoRef,
+    departure: Date,
+    arrival: Date,
+  ): Promise<Comparison> {
     // Les deux bornes se chargent de front : elles ne dépendent pas l'une de
     // l'autre, et la file d'attente de la couche d'accès borne déjà la charge.
     const [a, b] = await Promise.all([
-      this.loadBorne(depot, depart),
-      this.loadBorne(depot, arrivee),
+      this.loadBound(repoRef, departure),
+      this.loadBound(repoRef, arrival),
     ]);
 
     return {
-      depart: a,
-      arrivee: b,
-      regles: comparerRegles(a.referentiel, b.referentiel),
-      cadragesLivres: listCadragesLivresEntre(a.referentiel, b.referentiel),
+      departure: a,
+      arrival: b,
+      rules: compareRules(a.specification, b.specification),
+      deliveredScopings: listScopingsDeliveredBetween(
+        a.specification,
+        b.specification,
+      ),
     };
   }
 
-  private async loadBorne(
-    depot: RefDepot,
+  private async loadBound(
+    repoRef: RepoRef,
     date: Date,
-  ): Promise<BorneComparaison> {
-    const commit = await this.github.commitALaDate(depot, date);
+  ): Promise<ComparisonBound> {
+    const commit = await this.github.commitAtDate(repoRef, date);
     if (!commit) {
       throw new Error(
         `Le dépôt n’a aucun enregistrement au ${date.toLocaleDateString("fr-FR")} : ` +
           "cette date précède sa création.",
       );
     }
-    const referentiel = await this.loader.loadReferentiel({
-      ...depot,
+    const specification = await this.loader.loadSpecification({
+      ...repoRef,
       ref: commit.sha,
     });
-    return { date, commit, referentiel };
+    return { date, commit, specification };
   }
 }
 
@@ -94,37 +97,37 @@ export class ComparaisonService {
  * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
  * l'éprouver ne doit pas demander de construire un service.
  */
-export function comparerRegles(
-  avant: Referentiel,
-  apres: Referentiel,
-): RegleComparee[] {
-  const out: RegleComparee[] = [];
+export function compareRules(
+  before: Specification,
+  after: Specification,
+): ComparedRule[] {
+  const out: ComparedRule[] = [];
 
-  for (const [id, regleApres] of apres.regles) {
-    const regleAvant = avant.regles.get(id);
+  for (const [id, ruleAfter] of after.rules) {
+    const ruleBefore = before.rules.get(id);
 
-    if (!regleAvant) {
-      out.push({ id, evolution: "ajoutee", avant: null, apres: regleApres });
+    if (!ruleBefore) {
+      out.push({ id, evolution: "ajoutee", before: null, after: ruleAfter });
       continue;
     }
     // L'abrogation prime sur la modification : c'est le changement dont la
     // portée est la plus grande, et il s'accompagne presque toujours d'une
     // réécriture de l'énoncé qui masquerait le reste.
-    if (regleAvant.statut !== "abroge" && regleApres.statut === "abroge") {
+    if (ruleBefore.status !== "abroge" && ruleAfter.status === "abroge") {
       out.push({
         id,
         evolution: "abrogee",
-        avant: regleAvant,
-        apres: regleApres,
+        before: ruleBefore,
+        after: ruleAfter,
       });
       continue;
     }
-    if (regleAvant.enonce.trim() !== regleApres.enonce.trim()) {
+    if (ruleBefore.statement.trim() !== ruleAfter.statement.trim()) {
       out.push({
         id,
         evolution: "modifiee",
-        avant: regleAvant,
-        apres: regleApres,
+        before: ruleBefore,
+        after: ruleAfter,
       });
     }
   }
@@ -132,9 +135,9 @@ export function comparerRegles(
   // Une règle disparue est une anomalie — un chemin ne se renomme jamais et un
   // fichier de règle ne se supprime pas — mais la taire priverait le lecteur du
   // seul signal qu'il en a.
-  for (const [id, regleAvant] of avant.regles) {
-    if (!apres.regles.has(id)) {
-      out.push({ id, evolution: "retiree", avant: regleAvant, apres: null });
+  for (const [id, ruleBefore] of before.rules) {
+    if (!after.rules.has(id)) {
+      out.push({ id, evolution: "retiree", before: ruleBefore, after: null });
     }
   }
 
@@ -148,14 +151,14 @@ export function comparerRegles(
  * que le référentiel a changé sans dire pourquoi, ce qui est exactement le vide
  * que le produit prétend combler.
  */
-export function listCadragesLivresEntre(
-  avant: Referentiel,
-  apres: Referentiel,
+export function listScopingsDeliveredBetween(
+  before: Specification,
+  after: Specification,
 ): string[] {
   const out: string[] = [];
-  for (const [id, cadrage] of apres.cadrages) {
-    if (cadrage.statut !== "livree") continue;
-    if (avant.cadrages.get(id)?.statut !== "livree") out.push(id);
+  for (const [id, scoping] of after.scopings) {
+    if (scoping.status !== "livree") continue;
+    if (before.scopings.get(id)?.status !== "livree") out.push(id);
   }
   return out.sort();
 }

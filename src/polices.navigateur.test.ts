@@ -8,10 +8,10 @@ import "@fontsource/material-symbols-outlined/400.css";
 describe("polices embarquées", () => {
   it.each([["Roboto"], ["Material Symbols Outlined"]])(
     "charge %s",
-    async (famille) => {
-      const chargees = await document.fonts.load(`24px "${famille}"`, "a");
-      expect(chargees.length).toBeGreaterThan(0);
-      expect(document.fonts.check(`24px "${famille}"`, "a")).toBe(true);
+    async (family) => {
+      const loaded = await document.fonts.load(`24px "${family}"`, "a");
+      expect(loaded.length).toBeGreaterThan(0);
+      expect(document.fonts.check(`24px "${family}"`, "a")).toBe(true);
     },
   );
 });

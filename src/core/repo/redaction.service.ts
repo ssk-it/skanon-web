@@ -1,26 +1,26 @@
 import { inject } from "../injection";
-import { GithubClient, GithubError, RefDepot } from "../github/github-client";
-import { ReferentielStore } from "./referentiel.store";
+import { GithubClient, GithubError, RepoRef } from "../github/github-client";
+import { SpecificationStore } from "./referentiel.store";
 import { RepoLoader } from "./repo-loader";
 import {
   splitFrontmatter,
-  estIllisible,
+  isUnreadable,
   extractSection,
-  extractSectionsAutres,
-  extractEnonces,
-  extractSousSections,
-  SECTIONS_CONNUES,
+  extractOtherSections,
+  extractStatements,
+  extractSubsections,
+  KNOWN_SECTIONS,
 } from "./frontmatter";
 import {
-  BASCULES_STATUT,
-  Cadrage,
-  LIBELLE_STATUT_CADRAGE,
-  LienExterne,
-  NatureCible,
-  OperationImpact,
-  Referentiel,
-  StatutCadrage,
-  StatutDecision,
+  STATUS_TOGGLES,
+  Scoping,
+  SCOPING_STATUS_LABEL,
+  ExternalLink,
+  TargetKind,
+  ImpactOperation,
+  Specification,
+  ScopingStatus,
+  DecisionStatus,
 } from "../model/model";
 import { VerificationService } from "./verification.service";
 
@@ -31,35 +31,35 @@ import { VerificationService } from "./verification.service";
  * désaccord se paierait par un impact compris différemment selon le chemin
  * emprunté pour le lire.
  */
-const NATURES_CIBLE = ["regle", "adr", "architecture"] as const;
+const TARGET_KINDS = ["regle", "adr", "architecture"] as const;
 
 /** Ce qu'il faut fournir pour ouvrir un cadrage. */
-export interface NouveauCadrage {
-  readonly titre: string;
-  readonly domaines: readonly string[];
-  readonly objectif: string;
-  readonly parcours: string;
+export interface NewScoping {
+  readonly title: string;
+  readonly domains: readonly string[];
+  readonly goal: string;
+  readonly journey: string;
 }
 
 /** Un impact et l'énoncé qui l'accompagne, tels que saisis. */
-export interface ImpactSaisi {
+export interface ImpactInput {
   /** L'identifiant visé, quelle que soit sa nature. */
-  readonly cible: string;
+  readonly target: string;
   /**
    * La nature visée, qui décide du champ écrit dans le fichier.
    *
    * Absente sur un impact rédigé avant que l'impact puisse viser autre chose
    * qu'une règle : le repli est donc `regle`, seule valeur qu'il pouvait avoir.
    */
-  readonly nature?: NatureCible;
-  readonly operation: OperationImpact;
+  readonly kind?: TargetKind;
+  readonly operation: ImpactOperation;
   /** Obligatoire pour `cree` et `modifie` — sans lui la propagation n'écrit rien. */
-  readonly enonce: string;
+  readonly statement: string;
 }
 
 /** L'état complet d'un cadrage en cours de rédaction. */
-export interface CadrageEditable extends NouveauCadrage {
-  readonly impacts: readonly ImpactSaisi[];
+export interface EditableScoping extends NewScoping {
+  readonly impacts: readonly ImpactInput[];
   /**
    * Les liens externes portés par le cadrage.
    *
@@ -67,7 +67,7 @@ export interface CadrageEditable extends NouveauCadrage {
    * reconstruit tout le frontmatter, et ce qu'on ne lui donne pas disparaît.
    * Tout appelant qui réécrit un cadrage existant doit donc les relire d'abord.
    */
-  readonly liens?: readonly LienExterne[];
+  readonly links?: readonly ExternalLink[];
   /**
    * Les sections que l'éditeur ne connaît pas, telles qu'elles étaient.
    *
@@ -76,13 +76,13 @@ export interface CadrageEditable extends NouveauCadrage {
    * seules sections connues les effacerait sans le dire : la pire faute pour un
    * outil dont la raison d'être est de conserver ce qui a été écrit.
    */
-  readonly sectionsInconnues?: string;
+  readonly unknownSections?: string;
 }
 
 /** Où vit un cadrage, et ce qu'il faut pour y réécrire. */
-export interface SourceCadrage {
-  readonly branche: string;
-  readonly chemin: string;
+export interface ScopingSource {
+  readonly branch: string;
+  readonly path: string;
   /** SHA du fichier, exigé par l'API pour remplacer un contenu existant. */
   readonly sha: string;
 }
@@ -99,11 +99,11 @@ export interface SourceCadrage {
  * Faute de connaître la branche principale, on répond non : proposer une
  * transition qu'on ne peut pas situer vaut moins que n'en proposer aucune.
  */
-export function estSurSaBranche(
-  branche: string | undefined,
-  principale: string,
+export function isOnItsBranch(
+  branch: string | undefined,
+  main: string,
 ): boolean {
-  return !!branche && !!principale && branche !== principale;
+  return !!branch && !!main && branch !== main;
 }
 
 /**
@@ -113,16 +113,16 @@ export function estSurSaBranche(
  * décrit alors ce qui est déjà dans le référentiel, et le changer sans passer
  * par une demande de fusion contournerait la vérification.
  */
-export function listBascules(
-  depuis: StatutCadrage,
-  surSaBranche: boolean,
-): readonly StatutCadrage[] {
-  return surSaBranche ? (BASCULES_STATUT.get(depuis) ?? []) : [];
+export function listToggles(
+  from: ScopingStatus,
+  onItsBranch: boolean,
+): readonly ScopingStatus[] {
+  return onItsBranch ? (STATUS_TOGGLES.get(from) ?? []) : [];
 }
 
-export interface CadrageCree {
+export interface CreatedScoping {
   readonly id: string;
-  readonly branche: string;
+  readonly branch: string;
   readonly pullRequest: number;
   readonly url: string;
 }
@@ -138,27 +138,26 @@ export interface CadrageCree {
  * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
  * l'éprouver ne doit pas demander de construire un service.
  */
-export function prochainIdCadrage(
-  existants: Iterable<string>,
-  annee: number,
+export function nextScopingId(
+  existing: Iterable<string>,
+  year: number,
 ): string {
-  const prefixe = String(annee);
+  const prefix = String(year);
   let max = 0;
-  for (const id of existants) {
+  for (const id of existing) {
     const m = /^(\d{4})-(\d{3})$/.exec(id);
-    if (m?.[1] === prefixe) max = Math.max(max, Number(m[2]));
+    if (m?.[1] === prefix) max = Math.max(max, Number(m[2]));
   }
-  return `${prefixe}-${String(max + 1).padStart(3, "0")}`;
+  return `${prefix}-${String(max + 1).padStart(3, "0")}`;
 }
 
 /** Échappe une valeur de frontmatter si YAML pourrait la mal lire. */
-function valeurYaml(texte: string): string {
-  const propre = texte.trim().replace(/\s+/g, " ");
+function yamlValue(text: string): string {
+  const own = text.trim().replace(/\s+/g, " ");
   // Un « : » suivi d'une espace se lit comme un séparateur, et une apostrophe
   // ouvrante en tête ferait de même. Les titres en contiennent presque toujours.
-  const risque =
-    /:\s|^[-?[\]{}#&*!|>'"%@`]/.test(propre) || propre.includes(" #");
-  return risque ? `'${propre.replace(/'/g, "''")}'` : propre;
+  const risky = /:\s|^[-?[\]{}#&*!|>'"%@`]/.test(own) || own.includes(" #");
+  return risky ? `'${own.replace(/'/g, "''")}'` : own;
 }
 
 /**
@@ -168,8 +167,8 @@ function valeurYaml(texte: string): string {
  * pull request serait bloquée dès son ouverture. Un cadrage sans impact est
  * valide : les impacts se déclarent au fil de la rédaction, pas à la création.
  */
-export function serializeNouveauCadrage(id: string, c: NouveauCadrage): string {
-  return serializeCadrage(id, { ...c, impacts: [], liens: [] });
+export function serializeNewScoping(id: string, c: NewScoping): string {
+  return serializeScoping(id, { ...c, impacts: [], links: [] });
 }
 
 /**
@@ -184,20 +183,20 @@ export function serializeNouveauCadrage(id: string, c: NouveauCadrage): string {
  * produit aucune écriture.
  */
 /** Une décision en cours d'écriture. */
-export interface DecisionEditable {
-  readonly titre: string;
-  readonly statut: StatutDecision;
+export interface EditableDecision {
+  readonly title: string;
+  readonly status: DecisionStatus;
   readonly description: string;
-  readonly options: readonly OptionEditable[];
+  readonly options: readonly EditableOption[];
   /** L'identifiant de l'option retenue, ou `null` tant que rien n'est tranché. */
-  readonly optionRetenue: string | null;
+  readonly chosenOption: string | null;
   /** Ce qui a tranché, en une phrase — la valeur d'une décision relue plus tard. */
   readonly decision: string;
 }
 
-export interface OptionEditable {
+export interface EditableOption {
   readonly id: string;
-  readonly corps: string;
+  readonly body: string;
 }
 
 /**
@@ -208,19 +207,19 @@ export interface OptionEditable {
  * Écrire autrement produirait un fichier que l'application ne saurait pas
  * relire — le défaut le plus coûteux, puisqu'il ne se voit qu'au rechargement.
  */
-export function serializeDecision(id: string, d: DecisionEditable): string {
+export function serializeDecision(id: string, d: EditableDecision): string {
   const options = d.options
     .filter((o) => o.id.trim())
     .flatMap((o) => {
       // La marque ouvre le premier paragraphe plutôt que d'occuper une ligne à
       // elle : c'est ainsi qu'on l'écrit à la main, et réécrire autrement ferait
       // apparaître un écart dans l'historique sans que rien n'ait changé.
-      const corps = o.corps.trim();
-      const retenue = o.id.trim() === d.optionRetenue;
+      const body = o.body.trim();
+      const chosen = o.id.trim() === d.chosenOption;
       return [
         `### ${o.id.trim()}`,
         "",
-        retenue ? `**Retenue.** ${corps}`.trim() : corps,
+        chosen ? `**Retenue.** ${body}`.trim() : body,
         "",
       ];
     });
@@ -228,9 +227,9 @@ export function serializeDecision(id: string, d: DecisionEditable): string {
   return [
     "---",
     `id: ${id}`,
-    `titre: ${valeurYaml(d.titre)}`,
-    `statut: ${d.statut}`,
-    `option_retenue: ${d.optionRetenue ? valeurYaml(d.optionRetenue) : "null"}`,
+    `titre: ${yamlValue(d.title)}`,
+    `statut: ${d.status}`,
+    `option_retenue: ${d.chosenOption ? yamlValue(d.chosenOption) : "null"}`,
     "---",
     "",
     "## Description",
@@ -257,11 +256,11 @@ export function serializeDecision(id: string, d: DecisionEditable): string {
  * Une même ressource ne se référence pas deux fois : le lien saisi remplace
  * celui qui portait déjà cette adresse, plutôt que de s'ajouter à côté.
  */
-export function avecLien(
-  liens: readonly LienExterne[],
-  lien: LienExterne,
-): LienExterne[] {
-  return [...liens.filter((l) => l.url !== lien.url), lien];
+export function withLink(
+  links: readonly ExternalLink[],
+  link: ExternalLink,
+): ExternalLink[] {
+  return [...links.filter((l) => l.url !== link.url), link];
 }
 
 /**
@@ -273,58 +272,58 @@ export function avecLien(
  * rang — le voir sauter en fin de rangée pour un nom retouché ferait douter de
  * ce qui a été écrit.
  */
-export function avecLienModifie(
-  liens: readonly LienExterne[],
+export function withLinkModified(
+  links: readonly ExternalLink[],
   url: string,
-  lien: LienExterne,
-): LienExterne[] {
-  const rang = liens.findIndex((l) => l.url === url);
+  link: ExternalLink,
+): ExternalLink[] {
+  const rank = links.findIndex((l) => l.url === url);
   // Le lien a disparu entre l'affichage et l'écriture — livré, ou repris
   // ailleurs. L'ajouter vaut mieux que de perdre la saisie sans rien dire.
-  if (rang < 0) return avecLien(liens, lien);
+  if (rank < 0) return withLink(links, link);
   // La nouvelle adresse peut être celle d'un autre lien de la liste : la garder
   // deux fois romprait l'unicité que l'ajout maintient déjà.
-  return liens
-    .map((l, k) => (k === rang ? lien : l))
-    .filter((l, k) => k === rang || l.url !== lien.url);
+  return links
+    .map((l, k) => (k === rank ? link : l))
+    .filter((l, k) => k === rank || l.url !== link.url);
 }
 
 /** Retire de la liste le lien portant cette adresse. */
-export function sansLien(
-  liens: readonly LienExterne[],
+export function withoutLink(
+  links: readonly ExternalLink[],
   url: string,
-): LienExterne[] {
-  return liens.filter((l) => l.url !== url);
+): ExternalLink[] {
+  return links.filter((l) => l.url !== url);
 }
 
-function serializeLien(l: LienExterne): string {
-  const champs = [`tag: ${valeurYaml(l.tag)}`];
-  if (l.nom.trim()) champs.push(`nom: ${valeurYaml(l.nom)}`);
+function serializeLink(l: ExternalLink): string {
+  const fields = [`tag: ${yamlValue(l.tag)}`];
+  if (l.name.trim()) fields.push(`nom: ${yamlValue(l.name)}`);
   // L'adresse est toujours entre apostrophes, comme dans le référentiel écrit à
   // la main : `valeurYaml` la laisserait nue — le « : » d'un schéma n'est pas
   // suivi d'une espace — et réécrire un cadrage existant l'aurait dénudée, ce
   // qui ferait apparaître en relecture un lien que personne n'a touché.
-  champs.push(`url: '${l.url.trim().replace(/'/g, "''")}'`);
-  return `  - { ${champs.join(", ")} }`;
+  fields.push(`url: '${l.url.trim().replace(/'/g, "''")}'`);
+  return `  - { ${fields.join(", ")} }`;
 }
 
-export function serializeCadrage(id: string, c: CadrageEditable): string {
-  const domaines = c.domaines.length ? `[${c.domaines.join(", ")}]` : "[]";
-  const liens = (c.liens ?? []).filter((l) => l.url.trim());
+export function serializeScoping(id: string, c: EditableScoping): string {
+  const domains = c.domains.length ? `[${c.domains.join(", ")}]` : "[]";
+  const links = (c.links ?? []).filter((l) => l.url.trim());
   const impacts = c.impacts.length
     ? c.impacts
         .map(
           (i) =>
-            `  - { ${i.nature ?? "regle"}: ${i.cible}, operation: ${i.operation} }`,
+            `  - { ${i.kind ?? "regle"}: ${i.target}, operation: ${i.operation} }`,
         )
         .join("\n")
     : "[]";
 
-  const avecEnonce = c.impacts.filter((i) => i.enonce.trim());
-  const sections = avecEnonce.flatMap((i) => [
-    `### ${i.cible}`,
+  const withStatement = c.impacts.filter((i) => i.statement.trim());
+  const sections = withStatement.flatMap((i) => [
+    `### ${i.target}`,
     "",
-    i.enonce.trim(),
+    i.statement.trim(),
     "",
   ]);
 
@@ -332,30 +331,30 @@ export function serializeCadrage(id: string, c: CadrageEditable): string {
     [
       "---",
       `id: ${id}`,
-      `titre: ${valeurYaml(c.titre)}`,
+      `titre: ${yamlValue(c.title)}`,
       // Pas de `statut:` : le vérificateur de l'Action le refuse, le statut se
       // déduisant de l'état du dépôt. L'écrire produisait un fichier rejeté en
       // intégration continue, donc une demande de fusion en échec.
-      `domaines: ${domaines}`,
-      liens.length
-        ? `liens:\n${liens.map(serializeLien).join("\n")}`
+      `domaines: ${domains}`,
+      links.length
+        ? `liens:\n${links.map(serializeLink).join("\n")}`
         : "liens: []",
       c.impacts.length ? `impacts:\n${impacts}` : "impacts: []",
       "---",
       "",
       "## Objectif",
       "",
-      c.objectif.trim(),
+      c.goal.trim(),
       "",
       "## Parcours utilisateur",
       "",
-      c.parcours.trim(),
+      c.journey.trim(),
       "",
       ...(sections.length ? ["## Énoncés", "", ...sections] : []),
       // Rendues telles quelles, à la fin : les replacer où elles étaient
       // demanderait de mémoriser leur ordre, alors que les préserver suffit à ne
       // rien perdre.
-      ...(c.sectionsInconnues?.trim() ? [c.sectionsInconnues.trim(), ""] : []),
+      ...(c.unknownSections?.trim() ? [c.unknownSections.trim(), ""] : []),
     ]
       .join("\n")
       // Une seule ligne vide finale : sans cela le fichier en gagne une à chaque
@@ -371,21 +370,21 @@ export function serializeCadrage(id: string, c: CadrageEditable): string {
  * branche par cadrage, un commit, une pull request. Le statut se lit sur
  * cette pull request : en brouillon, le cadrage l'est (RG-statuts-cadrage).
  */
-export class RedactionService {
+export class AuthoringService {
   private readonly github = inject(GithubClient);
-  private readonly store = inject(ReferentielStore);
+  private readonly store = inject(SpecificationStore);
   private readonly loader = inject(RepoLoader);
   private readonly verification = inject(VerificationService);
 
   /** Identifiants des règles du référentiel, pour valider les impacts. */
-  reglesConnues(): ReadonlySet<string> {
-    return new Set(this.store.regles().map((r) => r.id));
+  knownRules(): ReadonlySet<string> {
+    return new Set(this.store.rules().map((r) => r.id));
   }
 
   /** Identifiant que prendrait un cadrage créé maintenant. */
-  prochainId(): string {
-    return prochainIdCadrage(
-      this.store.cadrages().map((c: Cadrage) => c.id),
+  nextId(): string {
+    return nextScopingId(
+      this.store.scopings().map((c: Scoping) => c.id),
       new Date().getFullYear(),
     );
   }
@@ -398,49 +397,49 @@ export class RedactionService {
    * branche sans commit s'ignore, un commit sans pull request se retrouve par
    * son nom de branche. L'inverse produirait une pull request vide.
    */
-  async createCadrage(nouveau: NouveauCadrage): Promise<CadrageCree> {
-    const depot: RefDepot = this.store.depot();
-    const id = this.prochainId();
-    const branche = `cadrage/${id}`;
+  async createScoping(next: NewScoping): Promise<CreatedScoping> {
+    const repoRef: RepoRef = this.store.repoRef();
+    const id = this.nextId();
+    const branch = `cadrage/${id}`;
 
-    const base = (await this.github.loadDepot(depot)).defaultBranch;
-    const depuis = await this.github.shaDeBranche(depot, base);
-    await this.github.createBranche(depot, branche, depuis);
+    const base = (await this.github.loadRepo(repoRef)).defaultBranch;
+    const from = await this.github.branchSha(repoRef, base);
+    await this.github.createBranch(repoRef, branch, from);
 
-    await this.github.commitFichier(
-      depot,
-      branche,
+    await this.github.commitFile(
+      repoRef,
+      branch,
       `cadrages/${id}/cadrage.md`,
-      serializeNouveauCadrage(id, nouveau),
-      `Cadrage ${id} : ${nouveau.titre}`,
+      serializeNewScoping(id, next),
+      `Cadrage ${id} : ${next.title}`,
     );
 
     // Le cadrage naît en brouillon, et c'est sa demande qui le porte : une
     // demande prête à relire annoncerait un cadrage qui n'est pas commencé
     // (RG-bascule-de-statut).
-    const enBrouillon = true;
+    const inDraft = true;
 
     const pullRequest = await this.github.createPullRequest(
-      depot,
-      branche,
+      repoRef,
+      branch,
       base,
-      `Cadrage ${id} : ${nouveau.titre}`,
+      `Cadrage ${id} : ${next.title}`,
       [
-        nouveau.objectif.trim(),
+        next.goal.trim(),
         "",
         "---",
         "",
         "Cadrage en **brouillon**. Il sera livré au merge de cette demande, " +
           "qui déclenchera la propagation de ses impacts au référentiel.",
       ].join("\n"),
-      enBrouillon,
+      inDraft,
     );
 
     return {
       id,
-      branche,
+      branch,
       pullRequest,
-      url: `https://github.com/${depot.owner}/${depot.repo}/pull/${pullRequest}`,
+      url: `https://github.com/${repoRef.owner}/${repoRef.repo}/pull/${pullRequest}`,
     };
   }
 
@@ -452,19 +451,19 @@ export class RedactionService {
    * première relecture (RG-cadrages-en-cours-visibles). Retient la première
    * qui contient ce cadrage : c'est lui qui rattache la branche, non son nom.
    */
-  private async trouverBrancheDuCadrage(
-    depot: RefDepot,
+  private async findScopingBranch(
+    repoRef: RepoRef,
     id: string,
   ): Promise<string | null> {
-    const parDemande = (await this.github.listPullRequestsOuvertes(depot)).map(
-      (d) => d.branche,
+    const byPullRequest = (await this.github.listOpenPullRequests(repoRef)).map(
+      (d) => d.branch,
     );
-    const sansDemande = (await this.github.listBranchesCadrage(depot)).filter(
-      (b) => !parDemande.includes(b),
-    );
-    for (const branche of [...parDemande, ...sansDemande]) {
-      if (await this.porte(depot, `cadrages/${id}/cadrage.md`, branche))
-        return branche;
+    const withoutPullRequest = (
+      await this.github.listScopingBranches(repoRef)
+    ).filter((b) => !byPullRequest.includes(b));
+    for (const branch of [...byPullRequest, ...withoutPullRequest]) {
+      if (await this.carries(repoRef, `cadrages/${id}/cadrage.md`, branch))
+        return branch;
     }
     return null;
   }
@@ -473,16 +472,16 @@ export class RedactionService {
    * Dit si une branche porte un fichier. Seul un « introuvable » vaut absence :
    * un dépôt qui ne répond pas ne dit rien de ce qu'il contient.
    */
-  private async porte(
-    depot: RefDepot,
-    chemin: string,
-    branche: string,
+  private async carries(
+    repoRef: RepoRef,
+    path: string,
+    branch: string,
   ): Promise<boolean> {
     try {
-      await this.github.loadFichierEditable(depot, chemin, branche);
+      await this.github.loadEditableFile(repoRef, path, branch);
       return true;
     } catch (e) {
-      if (e instanceof GithubError && e.statut === 404) return false;
+      if (e instanceof GithubError && e.status === 404) return false;
       throw e;
     }
   }
@@ -496,17 +495,17 @@ export class RedactionService {
    * vérification ; l'écrire sur une branche survivante produirait une demande
    * qu'elle refuserait.
    */
-  async loadPourEdition(id: string): Promise<{
-    source: SourceCadrage;
-    contenu: string;
-    contexte: Referentiel | null;
-    branchePrincipale: string;
+  async loadForEditing(id: string): Promise<{
+    source: ScopingSource;
+    content: string;
+    context: Specification | null;
+    mainBranch: string;
   }> {
-    const depot = this.store.depot();
-    const chemin = `cadrages/${id}/cadrage.md`;
-    const principale = (await this.github.loadDepot(depot)).defaultBranch;
+    const repoRef = this.store.repoRef();
+    const path = `cadrages/${id}/cadrage.md`;
+    const main = (await this.github.loadRepo(repoRef)).defaultBranch;
 
-    if (await this.porte(depot, chemin, principale)) {
+    if (await this.carries(repoRef, path, main)) {
       throw new Error(
         "Ce cadrage est livré : il ne se modifie plus. Ce qu’on veut y " +
           "changer passe par un nouveau cadrage.",
@@ -514,46 +513,49 @@ export class RedactionService {
     }
     // La branche se trouve par le cadrage qu'elle porte, non par son nom : un
     // cadrage rédigé à la main suit une autre convention.
-    const branche = await this.trouverBrancheDuCadrage(depot, id);
-    if (!branche) {
+    const branch = await this.findScopingBranch(repoRef, id);
+    if (!branch) {
       throw new Error(
         "Ce cadrage n’est porté par aucune branche du dépôt : il a peut-être " +
           "été abandonné, ou sa branche supprimée.",
       );
     }
 
-    const { contenu, sha } = await this.github.loadFichierEditable(
-      depot,
-      chemin,
-      branche,
+    const { content, sha } = await this.github.loadEditableFile(
+      repoRef,
+      path,
+      branch,
     );
 
     // Le référentiel de la branche sert à vérifier ce qu'on y écrit : un
     // cadrage crée souvent le domaine et les règles qu'il déclare, absents de
     // la branche principale. Sans ce contexte, la vérification les dirait
     // inconnus, alors que celle de la livraison les accepte.
-    let contexte: Referentiel | null = null;
+    let context: Specification | null = null;
     try {
-      contexte = await this.loader.loadReferentiel({ ...depot, ref: branche });
+      context = await this.loader.loadSpecification({
+        ...repoRef,
+        ref: branch,
+      });
     } catch {
       // Sans lui, la vérification se rabat sur la branche principale : moins
       // juste, mais mieux que de ne pas pouvoir éditer.
     }
 
     return {
-      source: { branche, chemin, sha },
-      contenu,
-      contexte,
-      branchePrincipale: principale,
+      source: { branch, path, sha },
+      content,
+      context,
+      mainBranch: main,
     };
   }
 
   /** Voir `listBascules`. */
-  transitionsPossibles(
-    depuis: StatutCadrage,
-    surSaBranche: boolean,
-  ): readonly StatutCadrage[] {
-    return listBascules(depuis, surSaBranche);
+  possibleTransitions(
+    from: ScopingStatus,
+    onItsBranch: boolean,
+  ): readonly ScopingStatus[] {
+    return listToggles(from, onItsBranch);
   }
 
   /**
@@ -569,26 +571,26 @@ export class RedactionService {
    * se l'accorder à soi-même la viderait de son sens. « livree » résulte de la
    * fusion, comme auparavant.
    */
-  async changerStatut(
+  async changeStatus(
     id: string,
-    vers: StatutCadrage,
-  ): Promise<{ statut: StatutCadrage; basculeEchouee: boolean }> {
-    if (vers === "validee" || vers === "livree") {
+    to: ScopingStatus,
+  ): Promise<{ status: ScopingStatus; toggleFailed: boolean }> {
+    if (to === "validee" || to === "livree") {
       throw new Error(
-        `« ${LIBELLE_STATUT_CADRAGE[vers]} » ne se demande pas depuis l’application : ` +
+        `« ${SCOPING_STATUS_LABEL[to]} » ne se demande pas depuis l’application : ` +
           "ce statut vient de la relecture sur la plateforme.",
       );
     }
 
-    const depot = this.store.depot();
-    const branche = await this.trouverBrancheDuCadrage(depot, id);
-    if (!branche) {
+    const repoRef = this.store.repoRef();
+    const branch = await this.findScopingBranch(repoRef, id);
+    if (!branch) {
       throw new Error(
         "Ce cadrage n’est pas porté par une branche : son statut ne bouge plus.",
       );
     }
 
-    const pr = await this.github.findPullRequestDeBranche(depot, branche);
+    const pr = await this.github.findPullRequestForBranch(repoRef, branch);
     if (!pr) {
       throw new Error(
         "Aucune demande de fusion ouverte sur ce cadrage : c’est elle qui porte son statut.",
@@ -600,17 +602,17 @@ export class RedactionService {
       // en retard d'une transition, la plateforme ne rendant pas une mutation
       // visible instantanément. La demander à l'identique est sans effet, la
       // comparer sur une lecture périmée ne l'est pas.
-      await this.github.basculerBrouillonPullRequest(
-        depot,
-        pr.numero,
-        vers === "brouillon",
+      await this.github.toggleDraftPullRequest(
+        repoRef,
+        pr.number,
+        to === "brouillon",
       );
-      return { statut: vers, basculeEchouee: false };
+      return { status: to, toggleFailed: false };
     } catch {
       // Rien n'a changé : le statut vivant sur la demande, un échec ici n'est
       // pas rattrapable en écrivant ailleurs. On le dit plutôt que de laisser
       // croire à un changement.
-      return { statut: vers, basculeEchouee: true };
+      return { status: to, toggleFailed: true };
     }
   }
 
@@ -630,82 +632,80 @@ export class RedactionService {
    */
   async loadDecisions(
     id: string,
-    branche: string,
-  ): Promise<
-    Array<{ fichier: string; sha: string; decision: DecisionEditable }>
-  > {
-    const depot = this.store.depot();
-    const prefixe = `cadrages/${id}/decisions/`;
-    const arbre = await this.github.loadArbre({ ...depot, ref: branche });
+    branch: string,
+  ): Promise<Array<{ file: string; sha: string; decision: EditableDecision }>> {
+    const repoRef = this.store.repoRef();
+    const prefix = `cadrages/${id}/decisions/`;
+    const tree = await this.github.loadTree({ ...repoRef, ref: branch });
 
-    const fichiers = arbre.entrees.filter(
+    const files = tree.entries.filter(
       (e) =>
         e.type === "blob" &&
-        e.path.startsWith(prefixe) &&
+        e.path.startsWith(prefix) &&
         e.path.endsWith(".md"),
     );
 
-    const lues = await Promise.all(
-      fichiers.map(async (f) => {
-        const { contenu, sha } = await this.github.loadFichierEditable(
-          depot,
+    const read = await Promise.all(
+      files.map(async (f) => {
+        const { content, sha } = await this.github.loadEditableFile(
+          repoRef,
           f.path,
-          branche,
+          branch,
         );
-        const parse = splitFrontmatter(contenu);
-        if (!parse || estIllisible(parse)) return null;
+        const parse = splitFrontmatter(content);
+        if (!parse || isUnreadable(parse)) return null;
 
         const data = parse.data as Record<string, unknown>;
-        const retenue = data["option_retenue"]
+        const chosen = data["option_retenue"]
           ? String(data["option_retenue"])
           : null;
         return {
-          fichier: f.path,
+          file: f.path,
           sha,
           decision: {
-            titre: String(data["titre"] ?? ""),
-            statut: (String(data["statut"] ?? "ouverte") ||
-              "ouverte") as StatutDecision,
+            title: String(data["titre"] ?? ""),
+            status: (String(data["statut"] ?? "ouverte") ||
+              "ouverte") as DecisionStatus,
             description: extractSection(parse.body, "Description"),
-            options: [...extractSousSections(parse.body, "Options")].map(
-              ([id, corps]) => ({
+            options: [...extractSubsections(parse.body, "Options")].map(
+              ([id, body]) => ({
                 id,
                 // La marque « Retenue » est dérivée du frontmatter : la garder
                 // dans le texte la ferait réécrire en double au prochain
                 // enregistrement.
-                corps: corps.replace(/^\*\*Retenue\.\*\*\s*/, "").trim(),
+                body: body.replace(/^\*\*Retenue\.\*\*\s*/, "").trim(),
               }),
             ),
-            optionRetenue: retenue,
+            chosenOption: chosen,
             decision: extractSection(parse.body, "Décision"),
           },
         };
       }),
     );
 
-    return lues
+    return read
       .filter((d): d is NonNullable<typeof d> => d !== null)
-      .sort((a, b) => a.fichier.localeCompare(b.fichier));
+      .sort((a, b) => a.file.localeCompare(b.file));
   }
 
   /** Écrit une décision sur la branche du cadrage. */
   async saveDecision(
-    idCadrage: string,
+    scopingId: string,
     idDecision: string,
-    branche: string,
-    decision: DecisionEditable,
-    shaActuel?: string,
+    branch: string,
+    decision: EditableDecision,
+    currentSha?: string,
   ): Promise<string> {
-    const chemin = `cadrages/${idCadrage}/decisions/${idDecision}.md`;
-    const { fichier } = await this.github.commitFichier(
-      this.store.depot(),
-      branche,
-      chemin,
+    const path = `cadrages/${scopingId}/decisions/${idDecision}.md`;
+    const { file } = await this.github.commitFile(
+      this.store.repoRef(),
+      branch,
+      path,
       serializeDecision(idDecision, decision),
-      `Cadrage ${idCadrage} — décision ${idDecision}`,
-      shaActuel,
+      `Cadrage ${scopingId} — décision ${idDecision}`,
+      currentSha,
     );
-    return fichier;
+    return file;
   }
 
   /**
@@ -715,39 +715,31 @@ export class RedactionService {
    * plusieurs minutes a pu changer entre-temps, et la plateforme refuserait la
    * suppression — ce qui vaut mieux que de l'imposer.
    */
-  async supprimerDecision(branche: string, chemin: string): Promise<void> {
-    const depot = this.store.depot();
-    const { sha } = await this.github.loadFichierEditable(
-      depot,
-      chemin,
-      branche,
-    );
-    await this.github.supprimerFichier(
-      depot,
-      branche,
-      chemin,
+  async deleteDecision(branch: string, path: string): Promise<void> {
+    const repoRef = this.store.repoRef();
+    const { sha } = await this.github.loadEditableFile(repoRef, path, branch);
+    await this.github.deleteFile(
+      repoRef,
+      branch,
+      path,
       sha,
-      `Retire ${chemin.split("/").pop()}`,
+      `Retire ${path.split("/").pop()}`,
     );
   }
 
   /** Ajoute un lien externe à un cadrage, sans passer par l'éditeur. */
-  async ajouterLien(id: string, lien: LienExterne): Promise<void> {
-    await this.recrireLiens(id, (liens) => avecLien(liens, lien));
+  async addLink(id: string, link: ExternalLink): Promise<void> {
+    await this.rewriteLinks(id, (links) => withLink(links, link));
   }
 
   /** Corrige un lien déjà attaché, l'adresse comprise. */
-  async modifierLien(
-    id: string,
-    url: string,
-    lien: LienExterne,
-  ): Promise<void> {
-    await this.recrireLiens(id, (liens) => avecLienModifie(liens, url, lien));
+  async editLink(id: string, url: string, link: ExternalLink): Promise<void> {
+    await this.rewriteLinks(id, (links) => withLinkModified(links, url, link));
   }
 
   /** Détache un lien du cadrage. La ressource, elle, n'est pas touchée. */
-  async supprimerLien(id: string, url: string): Promise<void> {
-    await this.recrireLiens(id, (liens) => sansLien(liens, url));
+  async deleteLink(id: string, url: string): Promise<void> {
+    await this.rewriteLinks(id, (links) => withoutLink(links, url));
   }
 
   /**
@@ -761,105 +753,105 @@ export class RedactionService {
    * La relecture porte aussi les sections que l'application ne présente pas —
    * une note, un état de l'art — que la sérialisation effacerait sans elles.
    */
-  private async recrireLiens(
+  private async rewriteLinks(
     id: string,
-    transformer: (liens: readonly LienExterne[]) => LienExterne[],
+    transformer: (links: readonly ExternalLink[]) => ExternalLink[],
   ): Promise<void> {
-    const { source, contenu, contexte } = await this.loadPourEdition(id);
+    const { source, content, context } = await this.loadForEditing(id);
 
-    const parse = splitFrontmatter(contenu);
+    const parse = splitFrontmatter(content);
     if (!parse) throw new Error("Ce cadrage n’a pas de frontmatter.");
-    if (estIllisible(parse)) throw new Error(parse.erreur);
+    if (isUnreadable(parse)) throw new Error(parse.error);
 
     const data = parse.data as Record<string, unknown>;
-    const enonces = extractEnonces(parse.body);
+    const statements = extractStatements(parse.body);
     // La cible se lit du champ employé, comme au chargement du référentiel : un
     // cadrage rédigé avant ce changement ne porte que `regle`, et reste donc
     // relisible sans que rien ne soit réécrit.
     const impacts = ((data["impacts"] as Array<Record<string, unknown>>) ?? [])
       .filter((i) => !!i && typeof i === "object")
       .map((i) => {
-        const nature = NATURES_CIBLE.find((n) => i[n] !== undefined) ?? "regle";
-        const brut = i[nature];
-        const cible = typeof brut === "string" ? brut : "";
+        const kind = TARGET_KINDS.find((n) => i[n] !== undefined) ?? "regle";
+        const raw = i[kind];
+        const target = typeof raw === "string" ? raw : "";
         return {
-          cible,
-          nature,
-          operation: i["operation"] as OperationImpact,
-          enonce: enonces.get(cible) ?? "",
+          target: target,
+          kind: kind,
+          operation: i["operation"] as ImpactOperation,
+          statement: statements.get(target) ?? "",
         };
       });
 
-    const existants = ((data["liens"] as Array<Record<string, unknown>>) ?? [])
+    const existing = ((data["liens"] as Array<Record<string, unknown>>) ?? [])
       .filter((l) => !!l && typeof l === "object")
       .map((l) => ({
         tag: String(l["tag"] ?? ""),
         url: String(l["url"] ?? ""),
-        nom: String(l["nom"] ?? ""),
+        name: String(l["nom"] ?? ""),
       }))
       .filter((l) => l.url);
 
-    await this.saveCadrage(
+    await this.saveScoping(
       id,
       source,
       {
-        titre: String(data["titre"] ?? ""),
-        domaines: (data["domaines"] as string[]) ?? [],
-        objectif: extractSection(parse.body, "Objectif"),
-        parcours: extractSection(parse.body, "Parcours utilisateur"),
+        title: String(data["titre"] ?? ""),
+        domains: (data["domaines"] as string[]) ?? [],
+        goal: extractSection(parse.body, "Objectif"),
+        journey: extractSection(parse.body, "Parcours utilisateur"),
         impacts,
-        liens: transformer(existants),
-        sectionsInconnues: extractSectionsAutres(parse.body, SECTIONS_CONNUES),
+        links: transformer(existing),
+        unknownSections: extractOtherSections(parse.body, KNOWN_SECTIONS),
       },
-      contexte ?? undefined,
+      context ?? undefined,
     );
   }
 
-  async saveCadrage(
+  async saveScoping(
     id: string,
-    source: SourceCadrage,
-    cadrage: CadrageEditable,
-    contexte?: Referentiel,
-  ): Promise<SourceCadrage> {
+    source: ScopingSource,
+    scoping: EditableScoping,
+    context?: Specification,
+  ): Promise<ScopingSource> {
     // Les règles sont celles du vérificateur partagé, que l'Action exécute avant
     // chaque livraison : ce qui est refusé ici est exactement ce qui bloquerait
     // là-bas, sans qu'aucune règle n'existe en double.
-    const { erreurs } = this.verification.verifierCadrage(
+    const { errors } = this.verification.checkScoping(
       {
         id,
-        titre: cadrage.titre,
-        domaines: cadrage.domaines,
-        impacts: cadrage.impacts.map((i) => ({
-          cible: i.cible.trim(),
-          nature: i.nature ?? "regle",
+        title: scoping.title,
+        domains: scoping.domains,
+        impacts: scoping.impacts.map((i) => ({
+          target: i.target.trim(),
+          kind: i.kind ?? "regle",
           operation: i.operation,
         })),
-        enonces: new Map(
-          cadrage.impacts
-            .filter((i) => i.enonce.trim())
-            .map((i) => [i.cible.trim(), i.enonce.trim()]),
+        statements: new Map(
+          scoping.impacts
+            .filter((i) => i.statement.trim())
+            .map((i) => [i.target.trim(), i.statement.trim()]),
         ),
       },
       // Le même contexte qu'à la saisie : sans lui, l'enregistrement refuse un
       // domaine ou une règle que le cadrage crée sur sa branche, alors que la
       // vérification de la livraison les accepte. Refuser d'écrire est pire que
       // de le signaler — le travail reste bloqué.
-      contexte,
+      context,
     );
-    if (erreurs.length) throw new Error(erreurs.join(" "));
+    if (errors.length) throw new Error(errors.join(" "));
 
-    const { fichier } = await this.github.commitFichier(
-      this.store.depot(),
-      source.branche,
-      source.chemin,
-      serializeCadrage(id, cadrage),
-      `Cadrage ${id} : ${cadrage.titre}`,
+    const { file } = await this.github.commitFile(
+      this.store.repoRef(),
+      source.branch,
+      source.path,
+      serializeScoping(id, scoping),
+      `Cadrage ${id} : ${scoping.title}`,
       source.sha,
     );
 
     // La source rendue porte le nouveau SHA : l'appelant peut réécrire aussitôt,
     // sans relire — et sans risquer de lire une version que la référence de
     // branche n'a pas encore rattrapée.
-    return { ...source, sha: fichier };
+    return { ...source, sha: file };
   }
 }

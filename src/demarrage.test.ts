@@ -1,30 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { inject } from "./core/injection";
-import { fournirLaRacine } from "./demarrage";
+import { provideRoot } from "./demarrage";
 import { COMPOSITION } from "./extension/composer";
-import { PLATEFORME } from "./plateforme/jeton";
-import { createPlateformeWeb } from "./plateforme/web";
+import { PLATFORM } from "./plateforme/jeton";
+import { createWebPlatform } from "./plateforme/web";
 
 /**
  * Ce que la racine de composition d'un livrable remet au démarrage : sa plateforme et ses extensions (ADR-extensions-commerciales). L'interface commune ne choisit ni l'une ni les autres.
  */
 describe("fournirLaRacine", () => {
   it("fournit la plateforme et la composition des extensions reçues", () => {
-    const plateforme = createPlateformeWeb();
-    fournirLaRacine({
-      plateforme,
+    const platform = createWebPlatform();
+    provideRoot({
+      platform,
       extensions: [
-        { id: "essai", pages: { mentions: { hebergeur: "Un hébergeur." } } },
+        { id: "essai", pages: { legalNotice: { host: "Un hébergeur." } } },
       ],
     });
-    expect(inject(PLATEFORME)).toBe(plateforme);
-    expect(inject(COMPOSITION).mentions.hebergeur).toBe("Un hébergeur.");
+    expect(inject(PLATFORM)).toBe(platform);
+    expect(inject(COMPOSITION).legalNotice.host).toBe("Un hébergeur.");
   });
 
   it("refuse une composition fausse avant tout démarrage", () => {
     expect(() =>
-      fournirLaRacine({
-        plateforme: createPlateformeWeb(),
+      provideRoot({
+        platform: createWebPlatform(),
         extensions: [{ id: "a" }, { id: "a" }],
       }),
     ).toThrow();

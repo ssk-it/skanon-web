@@ -5,7 +5,7 @@
  */
 
 /** Un diagramme trouvé dans du Markdown rendu. */
-export interface DiagrammeTrouve {
+export interface FoundDiagram {
   /** Identifiant unique dans la page, qui relie l'emplacement à sa source. */
   readonly id: string;
   /** Le texte du diagramme, tel que le moteur l'attend. */
@@ -15,7 +15,7 @@ export interface DiagrammeTrouve {
 }
 
 /** L'emplacement qu'un diagramme occupe en attendant d'être dessiné. */
-export function marqueurDiagramme(id: string): string {
+export function diagramMarker(id: string): string {
   return `<div class="pc-diagramme" data-diagramme="${id}"></div>`;
 }
 
@@ -24,30 +24,30 @@ export function marqueurDiagramme(id: string): string {
  *
  * Le texte est rendu à sa forme d'origine : le rendu Markdown a échappé les chevrons et les esperluettes, que le moteur de diagramme attend intacts. Lui passer le texte échappé produirait une erreur de syntaxe sur un diagramme pourtant correct — et le rédacteur chercherait longtemps.
  */
-export function extraireDiagrammes(html: string): DiagrammeTrouve[] {
-  const trouves: DiagrammeTrouve[] = [];
-  let courant = html;
+export function extractDiagrams(html: string): FoundDiagram[] {
+  const found: FoundDiagram[] = [];
+  let current = html;
   let n = 0;
 
-  const motif =
+  const pattern =
     /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g;
   let m: RegExpExecArray | null;
 
-  while ((m = motif.exec(html)) !== null) {
+  while ((m = pattern.exec(html)) !== null) {
     const id = `d${n++}-${Math.random().toString(36).slice(2, 8)}`;
-    const source = desechapper(m[1]);
-    courant = courant.replace(m[0], marqueurDiagramme(id));
-    trouves.push({ id, source, html: courant });
+    const source = unescape(m[1]);
+    current = current.replace(m[0], diagramMarker(id));
+    found.push({ id, source, html: current });
   }
 
   // Chaque entrée porte le HTML tel qu'il est après son propre remplacement ; la dernière porte donc celui où tous les blocs ont été remplacés. C'est celui-là que l'appelant affiche.
-  return trouves.map((d) => ({ ...d, html: courant }));
+  return found.map((d) => ({ ...d, html: current }));
 }
 
 /** Rend au texte les caractères que le rendu Markdown a échappés. */
-function desechapper(texte: string): string {
+function unescape(text: string): string {
   return (
-    texte
+    text
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&quot;/g, '"')
@@ -62,6 +62,8 @@ function desechapper(texte: string): string {
  *
  * Un thème figé laisse, dans l'autre mode, un texte de la couleur des formes qui le portent : le diagramme s'affiche, ses libellés sont illisibles. C'est plus coûteux qu'une absence — rien ne signale que quelque chose manque, et le lecteur croit que le schéma est ainsi.
  */
-export function themeMermaid(effectif: "clair" | "sombre"): "dark" | "neutral" {
-  return effectif === "sombre" ? "dark" : "neutral";
+export function themeMermaid(
+  effective: "clair" | "sombre",
+): "dark" | "neutral" {
+  return effective === "sombre" ? "dark" : "neutral";
 }

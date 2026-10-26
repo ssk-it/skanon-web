@@ -2,16 +2,16 @@
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
+import { LinksService } from "../../core/repo/liens.service";
 import {
-  grouperParHorizon,
+  groupByHorizon,
   Horizon,
-  pistesRattachees,
-  PistesService,
+  linkedRoadmapItems,
+  RoadmapItemsService,
 } from "../../core/repo/pistes.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import LienExterne from "../../ui/LienExterne.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import ExternalLink from "../../ui/LienExterne.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 
 /**
  * Ce qui est envisagé pour un domaine ou une fonctionnalité — RG-pistes-a-part.
@@ -25,38 +25,38 @@ const props = defineProps<{
   id: string;
 }>();
 
-const store = inject(ReferentielStore);
-const service = inject(PistesService);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const service = inject(RoadmapItemsService);
+const links = inject(LinksService);
 
-const ouverte = ref(false);
+const open = ref(false);
 
-const LIBELLES: Record<Horizon, string> = {
+const LABELS: Record<Horizon, string> = {
   maintenant: "Maintenant",
   ensuite: "Ensuite",
   "plus-tard": "Plus tard",
   "non-classee": "Non classées",
 };
 
-const pistes = computed(() =>
-  pistesRattachees(
+const roadmapItems = computed(() =>
+  linkedRoadmapItems(
     service.issues(),
     props.collection,
     props.id,
-    store.cadrages(),
-    store.depot(),
+    store.scopings(),
+    store.repoRef(),
   ),
 );
-const groupes = computed(() => grouperParHorizon(pistes.value));
-const etiquette = computed(
+const groups = computed(() => groupByHorizon(roadmapItems.value));
+const label = computed(
   () =>
     `${props.collection === "domains" ? "domaine" : "fonctionnalite"}/${props.id}`,
 );
-const sujet = computed(() =>
+const subject = computed(() =>
   props.collection === "domains" ? "ce domaine" : "cette fonctionnalité",
 );
 
-onMounted(() => void service.charger(store.depot()));
+onMounted(() => void service.load(store.repoRef()));
 </script>
 
 <template>
@@ -64,52 +64,52 @@ onMounted(() => void service.charger(store.depot()));
     <button
       type="button"
       class="bascule"
-      :aria-expanded="ouverte"
+      :aria-expanded="open"
       aria-controls="contenu-pistes"
-      @click="ouverte = !ouverte"
+      @click="open = !open"
     >
-      <UiIcone :nom="ouverte ? 'expand_less' : 'expand_more'" />
+      <UiIcon :name="open ? 'expand_less' : 'expand_more'" />
       <span class="titre">À venir</span>
-      <span v-if="service.etat() === 'pret'" class="compte">
-        · {{ pistes.length }}
+      <span v-if="service.state() === 'pret'" class="compte">
+        · {{ roadmapItems.length }}
       </span>
     </button>
 
-    <div v-if="ouverte" id="contenu-pistes" class="contenu">
+    <div v-if="open" id="contenu-pistes" class="contenu">
       <p class="avertissement">
         Des pistes, non des règles : rien n’y est décidé tant qu’un cadrage ne
         les a pas instruites.
       </p>
 
-      <p v-if="service.etat() === 'chargement'" class="vide">
+      <p v-if="service.state() === 'chargement'" class="vide">
         Lecture des pistes…
       </p>
-      <p v-else-if="service.etat() === 'droit-manquant'" class="vide">
+      <p v-else-if="service.state() === 'droit-manquant'" class="vide">
         Le jeton ne permet pas de lire les issues de ce dépôt, où vivent les
         pistes. Lui accorder la permission <strong>Issues</strong> en lecture.
       </p>
-      <p v-else-if="service.etat() === 'erreur'" class="vide">
-        {{ service.erreur() }}
+      <p v-else-if="service.state() === 'erreur'" class="vide">
+        {{ service.error() }}
       </p>
-      <p v-else-if="!pistes.length" class="vide">
-        Aucune piste pour {{ sujet }}. Une piste est une issue de ce dépôt
-        étiquetée <code>piste</code> et <code>{{ etiquette }}</code
+      <p v-else-if="!roadmapItems.length" class="vide">
+        Aucune piste pour {{ subject }}. Une piste est une issue de ce dépôt
+        étiquetée <code>piste</code> et <code>{{ label }}</code
         >, rangée par son jalon : « maintenant », « ensuite » ou « plus tard ».
       </p>
 
-      <template v-for="g in groupes" v-else :key="g.horizon">
-        <h3 class="horizon">{{ LIBELLES[g.horizon] }}</h3>
+      <template v-for="g in groups" v-else :key="g.horizon">
+        <h3 class="horizon">{{ LABELS[g.horizon] }}</h3>
         <ul class="liste">
-          <li v-for="p in g.pistes" :key="p.numero" class="piste">
-            <LienExterne class="issue" :href="p.url">
-              <span class="numero">#{{ p.numero }}</span>
-              <span class="nom">{{ p.titre }}</span>
-            </LienExterne>
+          <li v-for="p in g.roadmapItems" :key="p.number" class="piste">
+            <ExternalLink class="issue" :href="p.url">
+              <span class="numero">#{{ p.number }}</span>
+              <span class="nom">{{ p.title }}</span>
+            </ExternalLink>
             <RouterLink
-              v-for="c in p.cadragesEnCours"
+              v-for="c in p.scopingsInProgress"
               :key="c"
               class="cadrage"
-              :to="liens.chemin('cadrages', c)"
+              :to="links.path('cadrages', c)"
             >
               en cours · {{ c }}
             </RouterLink>

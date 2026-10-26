@@ -12,27 +12,29 @@ const props = withDefaults(
   defineProps<{
     owner: string;
     /** Côté demandé au CDN, en pixels d'affichage. */
-    taille?: number;
+    size?: number;
   }>(),
-  { taille: 18 },
+  { size: 18 },
 );
 
 const url = computed(() => {
   // Demander le double sur un écran dense coûte peu et évite un avatar flou ; au-delà de 3 le gain n'est plus visible.
-  const cote = Math.round(props.taille * Math.min(devicePixelRatio || 1, 3));
-  return `https://avatars.githubusercontent.com/${encodeURIComponent(props.owner)}?s=${cote}`;
+  const side = Math.round(props.size * Math.min(devicePixelRatio || 1, 3));
+  return `https://avatars.githubusercontent.com/${encodeURIComponent(props.owner)}?s=${side}`;
 });
 
 // L'échec appartient à une URL, pas au composant : changer de dépôt doit redonner sa chance à l'image plutôt que garder le repli du précédent.
-const echoue = ref(false);
-watch(url, () => (echoue.value = false));
+const failed = ref(false);
+watch(url, () => (failed.value = false));
 
-const initiale = computed(() => props.owner.charAt(0));
+const initialValue = computed(() => props.owner.charAt(0));
 </script>
 
 <template>
   <span class="avatar-organisation">
-    <span v-if="echoue" class="repli" aria-hidden="true">{{ initiale }}</span>
+    <span v-if="failed" class="repli" aria-hidden="true">{{
+      initialValue
+    }}</span>
     <img
       v-else
       class="avatar"
@@ -41,7 +43,7 @@ const initiale = computed(() => props.owner.charAt(0));
       loading="lazy"
       decoding="async"
       referrerpolicy="no-referrer"
-      @error="echoue = true"
+      @error="failed = true"
     />
   </span>
 </template>

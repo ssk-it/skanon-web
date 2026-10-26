@@ -9,149 +9,145 @@ import { describe, expect, it } from "vitest";
  * Sont lus : les fichiers `.css`, les blocs `<style>` des composants `.vue`, et les attributs `style="…"` de leurs gabarits. Le kit (`src/ui/`) étant en sources, ses dialogues, menus, listes de choix et autocomplétions sont lus comme le reste — là où, sous Material, il fallait en tenir la liste à part.
  */
 
-interface BlocDefilant {
+interface ScrollableBlock {
   source: string;
-  ligne: number;
-  selecteur: string;
-  aGouttiere: boolean;
+  line: number;
+  selector: string;
+  hasGutter: boolean;
 }
 
-const DEFILE = /^(auto|scroll)$/;
+const SCROLLS = /^(auto|scroll)$/;
 
 /** Vrai si les déclarations font défiler le bloc en hauteur. */
-function defileVerticalement(declarations: string): boolean {
-  let defile = false;
+function scrollsVertically(declarations: string): boolean {
+  let scrolls = false;
   for (const declaration of declarations.split(";")) {
-    const [propriete, ...reste] = declaration.split(":");
-    const nom = propriete?.trim().toLowerCase();
-    const valeurs = reste
-      .join(":")
-      .replace("!important", "")
-      .trim()
-      .split(/\s+/);
+    const [ownership, ...rest] = declaration.split(":");
+    const name = ownership?.trim().toLowerCase();
+    const values = rest.join(":").replace("!important", "").trim().split(/\s+/);
     // `overflow: <x> <y>` : la seconde valeur, quand elle existe, vaut pour la hauteur.
-    if (nom === "overflow")
-      defile = DEFILE.test(valeurs[1] ?? valeurs[0] ?? "");
-    if (nom === "overflow-y" || nom === "overflow-block")
-      defile = DEFILE.test(valeurs[0] ?? "");
+    if (name === "overflow")
+      scrolls = SCROLLS.test(values[1] ?? values[0] ?? "");
+    if (name === "overflow-y" || name === "overflow-block")
+      scrolls = SCROLLS.test(values[0] ?? "");
   }
-  return defile;
+  return scrolls;
 }
 
-function aGouttiereStable(declarations: string): boolean {
+function hasStableGutter(declarations: string): boolean {
   return /(^|;)\s*scrollbar-gutter\s*:\s*stable\b/.test(declarations);
 }
 
 /**
  * Relève les blocs défilants d'une feuille CSS. Le CSS imbrique les règles : seules les déclarations propres à un bloc comptent pour lui, celles de ses enfants non.
  */
-export function listBlocsDefilants(
+export function listScrollableBlocks(
   css: string,
   source: string,
-  ligneDepart = 1,
-): BlocDefilant[] {
+  startLine = 1,
+): ScrollableBlock[] {
   // Les commentaires sont remplacés par des blancs de même longueur, pour que les numéros de ligne restent justes.
-  const texte = css.replace(/\/\*[\s\S]*?\*\//g, (c) =>
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, (c) =>
     c.replace(/[^\n]/g, " "),
   );
-  const blocs: BlocDefilant[] = [];
-  const pile: { selecteur: string; position: number; declarations: string }[] =
+  const blocks: ScrollableBlock[] = [];
+  const stack: { selector: string; position: number; declarations: string }[] =
     [];
-  let debut = 0;
-  for (let i = 0; i < texte.length; i++) {
-    const c = texte[i];
+  let begin = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
     if (c === "{") {
-      const selecteur = texte.slice(debut, i).trim();
-      pile.push({ selecteur, position: i, declarations: "" });
-      debut = i + 1;
+      const selector = text.slice(begin, i).trim();
+      stack.push({ selector, position: i, declarations: "" });
+      begin = i + 1;
     } else if (c === "}") {
-      const bloc = pile.pop();
-      if (!bloc) continue;
-      bloc.declarations += texte.slice(debut, i);
-      if (defileVerticalement(bloc.declarations)) {
-        blocs.push({
+      const block = stack.pop();
+      if (!block) continue;
+      block.declarations += text.slice(begin, i);
+      if (scrollsVertically(block.declarations)) {
+        blocks.push({
           source,
-          ligne:
-            ligneDepart + texte.slice(0, bloc.position).split("\n").length - 1,
-          selecteur: bloc.selecteur,
-          aGouttiere: aGouttiereStable(bloc.declarations),
+          line:
+            startLine + text.slice(0, block.position).split("\n").length - 1,
+          selector: block.selector,
+          hasGutter: hasStableGutter(block.declarations),
         });
       }
-      debut = i + 1;
-    } else if (c === ";" && pile.length > 0) {
-      pile[pile.length - 1]!.declarations += texte.slice(debut, i + 1);
-      debut = i + 1;
+      begin = i + 1;
+    } else if (c === ";" && stack.length > 0) {
+      stack[stack.length - 1]!.declarations += text.slice(begin, i + 1);
+      begin = i + 1;
     }
   }
-  return blocs;
+  return blocks;
 }
 
 /** Les styles en ligne d'un gabarit : `style="…"` est un bloc à lui seul. */
-export function listStylesEnLigne(
-  gabarit: string,
+export function listInlineStyles(
+  template: string,
   source: string,
-  ligneDepart = 1,
-): BlocDefilant[] {
-  const blocs: BlocDefilant[] = [];
-  for (const m of gabarit.matchAll(/\sstyle\s*=\s*"([^"]*)"/g)) {
+  startLine = 1,
+): ScrollableBlock[] {
+  const blocks: ScrollableBlock[] = [];
+  for (const m of template.matchAll(/\sstyle\s*=\s*"([^"]*)"/g)) {
     const declarations = m[1] ?? "";
-    if (!defileVerticalement(declarations)) continue;
-    blocs.push({
+    if (!scrollsVertically(declarations)) continue;
+    blocks.push({
       source,
-      ligne: ligneDepart + gabarit.slice(0, m.index).split("\n").length - 1,
-      selecteur: m[0].trim(),
-      aGouttiere: aGouttiereStable(declarations),
+      line: startLine + template.slice(0, m.index).split("\n").length - 1,
+      selector: m[0].trim(),
+      hasGutter: hasStableGutter(declarations),
     });
   }
-  return blocs;
+  return blocks;
 }
 
 /** Les blocs `<style>` d'un composant, et les styles en ligne de son `<template>`. */
-export function listBlocsDefilantsDeComposant(
+export function listComponentScrollableBlocks(
   sfc: string,
   source: string,
-): BlocDefilant[] {
-  const ligneDe = (index: number) => sfc.slice(0, index).split("\n").length;
-  const blocs: BlocDefilant[] = [];
+): ScrollableBlock[] {
+  const lineOf = (index: number) => sfc.slice(0, index).split("\n").length;
+  const blocks: ScrollableBlock[] = [];
   for (const m of sfc.matchAll(/(<style\b[^>]*>)([\s\S]*?)<\/style>/g)) {
-    const debut = (m.index ?? 0) + (m[1] ?? "").length;
-    blocs.push(...listBlocsDefilants(m[2] ?? "", source, ligneDe(debut)));
+    const begin = (m.index ?? 0) + (m[1] ?? "").length;
+    blocks.push(...listScrollableBlocks(m[2] ?? "", source, lineOf(begin)));
   }
-  const ouverture = /^<template\b[^>]*>/m.exec(sfc);
-  const fermeture = sfc.lastIndexOf("</template>");
-  if (ouverture && fermeture > ouverture.index) {
-    const debut = ouverture.index + ouverture[0].length;
-    blocs.push(
-      ...listStylesEnLigne(sfc.slice(debut, fermeture), source, ligneDe(debut)),
+  const opening = /^<template\b[^>]*>/m.exec(sfc);
+  const closing = sfc.lastIndexOf("</template>");
+  if (opening && closing > opening.index) {
+    const begin = opening.index + opening[0].length;
+    blocks.push(
+      ...listInlineStyles(sfc.slice(begin, closing), source, lineOf(begin)),
     );
   }
-  return blocs;
+  return blocks;
 }
 
-function listFichiers(dossier: string): string[] {
-  return readdirSync(dossier, { withFileTypes: true }).flatMap((entree) => {
-    const chemin = join(dossier, entree.name);
-    return entree.isDirectory() ? listFichiers(chemin) : [chemin];
+function listFiles(folder: string): string[] {
+  return readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(folder, entry.name);
+    return entry.isDirectory() ? listFiles(path) : [path];
   });
 }
 
 /** `pnpm test` se lance depuis la racine du dépôt, en local comme en CI. */
-const RACINE = join(process.cwd(), "src");
+const ROOT = join(process.cwd(), "src");
 
-function listBlocsDefilantsDuProjet(): BlocDefilant[] {
-  return listFichiers(RACINE).flatMap((chemin) => {
-    const source = relative(process.cwd(), chemin);
-    const contenu = readFileSync(chemin, "utf8");
-    if (chemin.endsWith(".css")) return listBlocsDefilants(contenu, source);
-    if (chemin.endsWith(".vue"))
-      return listBlocsDefilantsDeComposant(contenu, source);
+function listProjectScrollableBlocks(): ScrollableBlock[] {
+  return listFiles(ROOT).flatMap((path) => {
+    const source = relative(process.cwd(), path);
+    const content = readFileSync(path, "utf8");
+    if (path.endsWith(".css")) return listScrollableBlocks(content, source);
+    if (path.endsWith(".vue"))
+      return listComponentScrollableBlocks(content, source);
     return [];
   });
 }
 
 describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
   it("relève un bloc défilant, imbriqué ou non, et ignore le défilement en largeur", () => {
-    const blocs = listBlocsDefilants(
+    const blocks = listScrollableBlocks(
       `
       .liste { overflow-y: auto; scrollbar-gutter: stable; }
       .panneau {
@@ -165,24 +161,24 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
       "exemple.css",
     );
 
-    expect(blocs.map((b) => [b.selecteur, b.ligne, b.aGouttiere])).toEqual([
+    expect(blocks.map((b) => [b.selector, b.line, b.hasGutter])).toEqual([
       [".liste", 2, true],
       [".contenu", 5, false],
     ]);
   });
 
   it("relève un style en ligne défilant", () => {
-    const blocs = listStylesEnLigne(
+    const blocks = listInlineStyles(
       '<div style="max-height: 50vh; overflow: auto">',
       "exemple.vue",
     );
 
-    expect(blocs).toHaveLength(1);
-    expect(blocs[0]!.aGouttiere).toBe(false);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.hasGutter).toBe(false);
   });
 
   it("lit les blocs <style> et le gabarit d’un composant, au bon numéro de ligne", () => {
-    const blocs = listBlocsDefilantsDeComposant(
+    const blocks = listComponentScrollableBlocks(
       [
         '<script setup lang="ts">',
         'const css = ".faux { overflow: auto; }";',
@@ -201,7 +197,7 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
       "Exemple.vue",
     );
 
-    expect(blocs.map((b) => [b.selecteur, b.ligne, b.aGouttiere])).toEqual([
+    expect(blocks.map((b) => [b.selector, b.line, b.hasGutter])).toEqual([
       [".liste", 10, false],
       ['style="overflow-y: scroll"', 6, false],
     ]);
@@ -209,15 +205,15 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
 
   it("trouve des blocs défilants dans le projet", () => {
     // Sans cette garde, une lecture qui ne trouverait plus rien passerait le test suivant sans rien prouver.
-    expect(listBlocsDefilantsDuProjet().length).toBeGreaterThanOrEqual(8);
+    expect(listProjectScrollableBlocks().length).toBeGreaterThanOrEqual(8);
   });
 
   it("lit les blocs que le kit fait défiler : dialogue, menu, liste de choix et autocomplétion", () => {
-    const selecteurs = listBlocsDefilantsDuProjet().flatMap((b) =>
-      b.selecteur.split(",").map((s) => s.trim()),
+    const selectors = listProjectScrollableBlocks().flatMap((b) =>
+      b.selector.split(",").map((s) => s.trim()),
     );
 
-    expect(selecteurs).toEqual(
+    expect(selectors).toEqual(
       expect.arrayContaining([
         ".ui-dialog-panneau",
         ".ui-dialogue__contenu",
@@ -228,10 +224,10 @@ describe("scrollbar-gutter: stable sur les blocs qui défilent", () => {
   });
 
   it("exige la gouttière stable de chaque bloc défilant du projet", () => {
-    const sansGouttiere = listBlocsDefilantsDuProjet()
-      .filter((b) => !b.aGouttiere)
-      .map((b) => `${b.source}:${b.ligne} ${b.selecteur}`);
+    const withoutGutter = listProjectScrollableBlocks()
+      .filter((b) => !b.hasGutter)
+      .map((b) => `${b.source}:${b.line} ${b.selector}`);
 
-    expect(sansGouttiere).toEqual([]);
+    expect(withoutGutter).toEqual([]);
   });
 });

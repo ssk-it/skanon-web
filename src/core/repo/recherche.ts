@@ -1,5 +1,5 @@
-import { Cadrage, Decision, Referentiel } from "../model/model";
-import { afficherIdentifiant } from "./reference-cadrage";
+import { Scoping, Decision, Specification } from "../model/model";
+import { displayIdentifier } from "./reference-cadrage";
 
 /**
  * La recherche dans le référentiel — RG-index-recherche-client,
@@ -14,54 +14,54 @@ import { afficherIdentifiant } from "./reference-cadrage";
  */
 
 /** Les natures que la recherche distingue, dans l'ordre où elles s'affichent. */
-export type NatureResultat = "regle" | "decision" | "architecture" | "cadrage";
+export type ResultKind = "regle" | "decision" | "architecture" | "cadrage";
 
-export const NATURES_RESULTAT: readonly NatureResultat[] = [
+export const RESULT_KINDS: readonly ResultKind[] = [
   "regle",
   "decision",
   "architecture",
   "cadrage",
 ];
 
-export interface ResultatRecherche {
-  readonly nature: NatureResultat;
+export interface SearchResult {
+  readonly kind: ResultKind;
   /** L'identifiant stocké — celui d'une décision de cadrage est préfixé du cadrage. */
   readonly id: string;
   /** L'identifiant tel qu'il se donne à lire — RG-prefixe-projet. */
-  readonly identifiant: string;
+  readonly identifier: string;
   /** Vide pour une règle ou un document, qui n'ont que leur identifiant et leur énoncé. */
-  readonly titre: string;
-  readonly extrait: string;
+  readonly title: string;
+  readonly excerpt: string;
   /** Les segments de la vue, sous le dépôt ouvert — voir `LiensService.vers`. */
-  readonly lien: readonly string[];
+  readonly link: readonly string[];
   /** L'ancre où l'élément se trouve dans sa vue, quand il n'en a pas une à lui. */
-  readonly ancre: string | null;
+  readonly anchor: string | null;
   /** Vrai pour ce qui vit sur une branche, et n'appartient pas encore au référentiel. */
-  readonly enCours: boolean;
+  readonly inProgress: boolean;
   /** La demande de fusion d'un résultat en cours, quand elle est connue. */
   readonly pullRequest: number | null;
 }
 
-interface EntreeIndex extends Omit<ResultatRecherche, "extrait"> {
+interface IndexEntry extends Omit<SearchResult, "excerpt"> {
   /** Le corps débarrassé de son balisage, d'où l'extrait est tiré. */
-  readonly corps: string;
-  readonly cleIdentifiant: string;
-  readonly cleTitre: string;
-  readonly cleCorps: string;
+  readonly body: string;
+  readonly identifierKey: string;
+  readonly titleKey: string;
+  readonly bodyKey: string;
 }
 
-export interface IndexRecherche {
-  readonly entrees: readonly EntreeIndex[];
+export interface SearchIndex {
+  readonly entries: readonly IndexEntry[];
 }
 
-export interface ResultatsRecherche {
+export interface SearchResults {
   /** Ce que le référentiel porte, classé par pertinence. */
-  readonly referentiel: readonly ResultatRecherche[];
+  readonly specification: readonly SearchResult[];
   /** Ce qui vit sur une branche, présenté à part — RG-cadrages-ouverts-visibles. */
-  readonly enCours: readonly ResultatRecherche[];
+  readonly inProgress: readonly SearchResult[];
 }
 
-const MARQUES_DIACRITIQUES = /[̀-ͯ]/g;
+const DIACRITIC_MARKS = /[̀-ͯ]/g;
 
 /**
  * Minuscules et sans accents, **à longueur égale**.
@@ -70,13 +70,10 @@ const MARQUES_DIACRITIQUES = /[̀-ͯ]/g;
  * découpé dans le texte d'origine : les deux doivent garder les mêmes positions,
  * ce qu'une normalisation de la chaîne entière ne garantit pas.
  */
-function normaliser(texte: string): string {
+function normalize(text: string): string {
   let out = "";
-  for (const c of texte) {
-    const n = c
-      .normalize("NFD")
-      .replace(MARQUES_DIACRITIQUES, "")
-      .toLowerCase();
+  for (const c of text) {
+    const n = c.normalize("NFD").replace(DIACRITIC_MARKS, "").toLowerCase();
     // un caractère hors du plan de base occupe deux unités : on les rend toutes
     out += n.length === c.length ? n : (n + c).slice(0, c.length);
   }
@@ -84,7 +81,7 @@ function normaliser(texte: string): string {
 }
 
 /** Le texte à lire, sans le balisage Markdown qui gênerait l'extrait. */
-function toTexteBrut(markdown: string): string {
+function toPlainText(markdown: string): string {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
@@ -94,33 +91,33 @@ function toTexteBrut(markdown: string): string {
     .trim();
 }
 
-function entree(
-  base: Omit<EntreeIndex, "corps" | "cleIdentifiant" | "cleTitre" | "cleCorps">,
+function entry(
+  base: Omit<IndexEntry, "body" | "identifierKey" | "titleKey" | "bodyKey">,
   markdown: string,
-): EntreeIndex {
-  const corps = toTexteBrut(markdown);
+): IndexEntry {
+  const body = toPlainText(markdown);
   return {
     ...base,
-    corps,
-    cleIdentifiant: normaliser(`${base.id} ${base.identifiant}`),
-    cleTitre: normaliser(base.titre),
-    cleCorps: normaliser(corps),
+    body,
+    identifierKey: normalize(`${base.id} ${base.identifier}`),
+    titleKey: normalize(base.title),
+    bodyKey: normalize(body),
   };
 }
 
-function corpsDecision(d: Decision): string {
+function decisionBody(d: Decision): string {
   return [
     d.description,
-    ...d.options.map((o) => `${o.titre} — ${o.corps}`),
+    ...d.options.map((o) => `${o.title} — ${o.body}`),
   ].join("\n\n");
 }
 
-function corpsCadrage(c: Cadrage): string {
+function scopingBody(c: Scoping): string {
   return [
-    c.objectif,
-    c.parcours,
-    ...c.enonces.values(),
-    ...c.divers.flatMap((s) => [s.titre, s.corps]),
+    c.goal,
+    c.journey,
+    ...c.statements.values(),
+    ...c.misc.flatMap((s) => [s.title, s.body]),
   ].join("\n\n");
 }
 
@@ -130,129 +127,127 @@ function corpsCadrage(c: Cadrage): string {
  * La provenance le dit ; le statut le redit pour un cadrage construit sans
  * elle. L'un ou l'autre suffit à le tenir hors du référentiel.
  */
-function isEnCours(c: Cadrage): boolean {
-  return c.provenance !== undefined || c.statut !== "livree";
+function isInProgress(c: Scoping): boolean {
+  return c.provenance !== undefined || c.status !== "livree";
 }
 
-export function buildIndexRecherche(ref: Referentiel): IndexRecherche {
-  const entrees: EntreeIndex[] = [];
-  const sansCadrage = {
-    titre: "",
-    ancre: null,
-    enCours: false,
+export function buildSearchIndex(ref: Specification): SearchIndex {
+  const entries: IndexEntry[] = [];
+  const withoutScoping = {
+    title: "",
+    anchor: null,
+    inProgress: false,
     pullRequest: null,
   };
 
-  for (const r of ref.regles.values()) {
-    entrees.push(
-      entree(
+  for (const r of ref.rules.values()) {
+    entries.push(
+      entry(
         {
-          ...sansCadrage,
-          nature: "regle",
+          ...withoutScoping,
+          kind: "regle",
           id: r.id,
-          identifiant: r.id,
-          lien: ["referentiel", "regle", r.id],
+          identifier: r.id,
+          link: ["referentiel", "regle", r.id],
         },
-        r.enonce,
+        r.statement,
       ),
     );
   }
   for (const d of ref.decisions.values()) {
-    entrees.push(
-      entree(
+    entries.push(
+      entry(
         {
-          ...sansCadrage,
-          nature: "decision",
+          ...withoutScoping,
+          kind: "decision",
           id: d.id,
-          identifiant: d.id,
-          lien: ["architecture", "decision", d.id],
+          identifier: d.id,
+          link: ["architecture", "decision", d.id],
         },
-        d.enonce,
+        d.statement,
       ),
     );
   }
   for (const d of ref.architecture.values()) {
-    entrees.push(
-      entree(
+    entries.push(
+      entry(
         {
-          ...sansCadrage,
-          nature: "architecture",
+          ...withoutScoping,
+          kind: "architecture",
           id: d.id,
-          identifiant: d.id,
-          lien: ["architecture", "document", d.id],
+          identifier: d.id,
+          link: ["architecture", "document", d.id],
         },
-        d.enonce,
+        d.statement,
       ),
     );
   }
 
-  const prefixe = ref.projet.prefixe;
-  for (const c of ref.cadrages.values()) {
-    const identifiant = afficherIdentifiant(c.id, prefixe);
-    const lien = ["cadrages", c.id];
-    const enCours = isEnCours(c);
+  const prefix = ref.project.prefix;
+  for (const c of ref.scopings.values()) {
+    const identifier = displayIdentifier(c.id, prefix);
+    const link = ["cadrages", c.id];
+    const inProgress = isInProgress(c);
     const pullRequest = c.provenance?.pullRequest ?? null;
 
-    entrees.push(
-      entree(
+    entries.push(
+      entry(
         {
-          nature: "cadrage",
+          kind: "cadrage",
           id: c.id,
-          identifiant,
-          titre: c.titre,
-          lien,
-          ancre: null,
-          enCours,
+          identifier,
+          title: c.title,
+          link,
+          anchor: null,
+          inProgress,
           pullRequest,
         },
-        corpsCadrage(c),
+        scopingBody(c),
       ),
     );
     // Une décision de cadrage n'a pas de vue à elle : elle se lit dans son
     // cadrage, à son ancre, et suit le sort du cadrage — en cours avec lui.
     for (const d of c.decisions) {
-      entrees.push(
-        entree(
+      entries.push(
+        entry(
           {
-            nature: "decision",
+            kind: "decision",
             id: `${c.id}/${d.id}`,
-            identifiant: `${identifiant} · ${d.id}`,
-            titre: d.titre,
-            lien,
-            ancre: `decision-${d.id}`,
-            enCours,
+            identifier: `${identifier} · ${d.id}`,
+            title: d.title,
+            link,
+            anchor: `decision-${d.id}`,
+            inProgress,
             pullRequest,
           },
-          corpsDecision(d),
+          decisionBody(d),
         ),
       );
     }
   }
 
-  return { entrees };
+  return { entries };
 }
 
 /** Avant et après la correspondance, en caractères : de quoi la situer. */
-const AVANT = 50;
-const APRES = 90;
+const BEFORE = 50;
+const AFTER = 90;
 
-function toExtrait(e: EntreeIndex, termes: readonly string[]): string {
-  const positions = termes
-    .map((t) => e.cleCorps.indexOf(t))
+function toExcerpt(e: IndexEntry, terms: readonly string[]): string {
+  const positions = terms
+    .map((t) => e.bodyKey.indexOf(t))
     .filter((p) => p >= 0);
   const position = positions.length ? Math.min(...positions) : 0;
 
-  let debut = Math.max(0, position - AVANT);
-  let fin = Math.min(e.corps.length, position + APRES);
+  let begin = Math.max(0, position - BEFORE);
+  let end = Math.min(e.body.length, position + AFTER);
   // On coupe entre deux mots, jamais au milieu d'un.
-  if (debut > 0) debut = e.corps.indexOf(" ", debut) + 1 || debut;
-  if (fin < e.corps.length)
-    fin =
-      e.corps.lastIndexOf(" ", fin) > debut
-        ? e.corps.lastIndexOf(" ", fin)
-        : fin;
+  if (begin > 0) begin = e.body.indexOf(" ", begin) + 1 || begin;
+  if (end < e.body.length)
+    end =
+      e.body.lastIndexOf(" ", end) > begin ? e.body.lastIndexOf(" ", end) : end;
 
-  return `${debut > 0 ? "… " : ""}${e.corps.slice(debut, fin).trim()}${fin < e.corps.length ? " …" : ""}`;
+  return `${begin > 0 ? "… " : ""}${e.body.slice(begin, end).trim()}${end < e.body.length ? " …" : ""}`;
 }
 
 /**
@@ -263,36 +258,33 @@ function toExtrait(e: EntreeIndex, termes: readonly string[]): string {
  * l'identifiant pèse plus que dans le titre, qui pèse plus que dans le corps —
  * qui tape un identifiant sait ce qu'il cherche.
  */
-function score(e: EntreeIndex, termes: readonly string[]): number {
+function score(e: IndexEntry, terms: readonly string[]): number {
   let total = 0;
-  for (const t of termes) {
-    if (e.cleIdentifiant.includes(t)) total += 3;
-    else if (e.cleTitre.includes(t)) total += 2;
-    else if (e.cleCorps.includes(t)) total += 1;
+  for (const t of terms) {
+    if (e.identifierKey.includes(t)) total += 3;
+    else if (e.titleKey.includes(t)) total += 2;
+    else if (e.bodyKey.includes(t)) total += 1;
     else return 0;
   }
   return total;
 }
 
-export function findResultats(
-  index: IndexRecherche,
-  requete: string,
-): ResultatsRecherche {
-  const termes = normaliser(requete).split(/\s+/).filter(Boolean);
-  if (!termes.length) return { referentiel: [], enCours: [] };
+export function findResults(index: SearchIndex, query: string): SearchResults {
+  const terms = normalize(query).split(/\s+/).filter(Boolean);
+  if (!terms.length) return { specification: [], inProgress: [] };
 
-  const trouves = index.entrees
-    .map((e) => ({ e, poids: score(e, termes) }))
-    .filter((x) => x.poids > 0)
+  const found = index.entries
+    .map((e) => ({ e, weight: score(e, terms) }))
+    .filter((x) => x.weight > 0)
     // le tri est stable : à poids égal, l'ordre de l'index est conservé
-    .sort((a, b) => b.poids - a.poids)
-    .map(({ e }): ResultatRecherche => {
-      const { corps, cleIdentifiant, cleTitre, cleCorps, ...resultat } = e;
-      return { ...resultat, extrait: toExtrait(e, termes) };
+    .sort((a, b) => b.weight - a.weight)
+    .map(({ e }): SearchResult => {
+      const { body, identifierKey, titleKey, bodyKey, ...result } = e;
+      return { ...result, excerpt: toExcerpt(e, terms) };
     });
 
   return {
-    referentiel: trouves.filter((r) => !r.enCours),
-    enCours: trouves.filter((r) => r.enCours),
+    specification: found.filter((r) => !r.inProgress),
+    inProgress: found.filter((r) => r.inProgress),
   };
 }

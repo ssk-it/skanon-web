@@ -1,40 +1,40 @@
 import {
-  DepotCode,
-  ModeAcces,
-  ProtectionDuJeton,
-  ReglagesIdentite,
+  CodeRepo,
+  AccessMode,
+  TokenProtection,
+  IdentitySettings,
 } from "../model/model";
 
 /** Ce que la page de réglages sait modifier. */
-const COMMENTAIRE_DEPOTS_CODE = [
+const CODE_REPOS_COMMENT = [
   "# Les depots de code que ce projet realise. Le lien est declare ici, du cote",
   "# qui a autorite : le referentiel porte la vue projet, que plusieurs depots",
   "# de code composent.",
 ].join("\n");
 
-export interface ReglagesEditables {
-  readonly acces: ModeAcces;
+export interface EditableSettings {
+  readonly access: AccessMode;
   /** Absent dans les modes qui n'en ont pas l'usage. */
-  readonly identite: ReglagesIdentite | null;
+  readonly identity: IdentitySettings | null;
   /** Facultatif : un projet qui n'en déclare aucun est un cas ordinaire. */
-  readonly depotsCode?: readonly DepotCode[];
+  readonly codeRepos?: readonly CodeRepo[];
   /** Facultatif : absent, le fichier garde ce qu'il déclarait. */
-  readonly protectionDuJeton?: ProtectionDuJeton;
+  readonly tokenProtection?: TokenProtection;
 }
 
-const COMMENTAIRE_ACCES = [
+const ACCESS_COMMENT = [
   "# Comment les rédacteurs obtiennent l'accès au dépôt.",
   "# jeton_personnel : chacun apporte le sien — rien à héberger.",
   "# identite_tierce : un composant échange une identité contre un accès temporaire.",
   "# relais : chaque requête passe par un composant qui la vérifie.",
 ].join("\n");
 
-const COMMENTAIRE_PROTECTION = [
+const PROTECTION_COMMENT = [
   "# Dans la version web, le jeton qui ouvre ce projet doit être gardé sous passkey.",
   "# Sans cette ligne, la passkey est proposée à chaque rédacteur, sans être exigée.",
 ].join("\n");
 
-const COMMENTAIRE_IDENTITE = [
+const IDENTITY_COMMENT = [
   "# Où les identités sont vérifiées. Rien de secret ici : ce sont les valeurs",
   "# que porte toute application s'exécutant dans un navigateur.",
 ].join("\n");
@@ -50,62 +50,62 @@ const COMMENTAIRE_IDENTITE = [
  * Le commentaire qui précède immédiatement le bloc est repris avec lui : il le
  * décrit, et le laisser en place ferait commenter un bloc absent.
  */
-export function remplacerBloc(
+export function replaceBlock(
   source: string,
-  cle: string,
-  bloc: string | null,
-  commentaire: string,
+  key: string,
+  block: string | null,
+  comment: string,
 ): string {
-  const lignes = source.split("\n");
-  const debut = lignes.findIndex((l) => l.startsWith(`${cle}:`));
+  const lines = source.split("\n");
+  const begin = lines.findIndex((l) => l.startsWith(`${key}:`));
 
   // Un bloc à retirer qui n'est pas là : rien à faire.
-  if (debut === -1 && bloc === null) return source;
+  if (begin === -1 && block === null) return source;
 
-  if (debut === -1) {
+  if (begin === -1) {
     // Ajouté en fin de document, précédé de son commentaire : sans repère où
     // l'insérer, la fin est le seul endroit qui ne bouscule rien.
-    const fin = source.replace(/\s*$/, "");
-    return `${fin}\n\n${commentaire}\n${bloc}\n`;
+    const end = source.replace(/\s*$/, "");
+    return `${end}\n\n${comment}\n${block}\n`;
   }
 
   // le bloc s'étend jusqu'à la prochaine ligne non indentée et non vide
-  let fin = debut + 1;
+  let end = begin + 1;
   while (
-    fin < lignes.length &&
-    (lignes[fin].startsWith(" ") || lignes[fin].trim() === "")
+    end < lines.length &&
+    (lines[end].startsWith(" ") || lines[end].trim() === "")
   ) {
-    fin++;
+    end++;
   }
   // les lignes vides finales appartiennent à la séparation, pas au bloc
-  while (fin > debut + 1 && lignes[fin - 1].trim() === "") fin--;
+  while (end > begin + 1 && lines[end - 1].trim() === "") end--;
 
   // remonter sur le commentaire qui précède, pour le remplacer aussi
-  let tete = debut;
-  while (tete > 0 && lignes[tete - 1].trim().startsWith("#")) tete--;
+  let head = begin;
+  while (head > 0 && lines[head - 1].trim().startsWith("#")) head--;
 
   // Un commentaire déjà en place est conservé tel quel : le remplacer par un
   // texte équivalent ferait apparaître des lignes modifiées dans chaque
   // relecture, alors que rien n'y a changé. Celui du produit ne sert qu'à
   // renseigner un bloc qui n'en avait pas.
-  const commentaireExistant = lignes.slice(tete, debut);
-  const aEcrire = commentaireExistant.length
-    ? commentaireExistant
-    : commentaire.split("\n");
+  const existingComment = lines.slice(head, begin);
+  const toWrite = existingComment.length
+    ? existingComment
+    : comment.split("\n");
 
   // Retirer emporte aussi le commentaire et la ligne vide qui suivait, sans
   // quoi le fichier garderait la trace d'un réglage disparu.
-  if (bloc === null) {
-    const apres = lignes.slice(fin);
-    while (apres.length && apres[0].trim() === "") apres.shift();
-    return [...lignes.slice(0, tete), ...apres].join("\n");
+  if (block === null) {
+    const after = lines.slice(end);
+    while (after.length && after[0].trim() === "") after.shift();
+    return [...lines.slice(0, head), ...after].join("\n");
   }
 
   return [
-    ...lignes.slice(0, tete),
-    ...aEcrire,
-    ...bloc.split("\n"),
-    ...lignes.slice(fin),
+    ...lines.slice(0, head),
+    ...toWrite,
+    ...block.split("\n"),
+    ...lines.slice(end),
   ].join("\n");
 }
 
@@ -116,66 +116,61 @@ export function remplacerBloc(
  * fichier — description, tags, stockage — est conservé tel quel, y compris ce
  * que l'application ne sait pas lire.
  */
-export function ecrireReglages(
+export function writeSettings(
   source: string,
-  reglages: ReglagesEditables,
+  settings: EditableSettings,
 ): string {
   // Les deux réglages du cycle ont disparu (2026-045) : le premier
   // enregistrement les retire, commentaires compris, plutôt que de laisser dans
   // le fichier des clés qui ne règlent plus rien. Cet enregistrement passe par
   // une relecture : le retrait s'y voit.
-  let out = remplacerBloc(source, "transitions", null, "");
-  out = remplacerBloc(out, "reflet_demande_fusion", null, "");
-  out = remplacerBloc(
-    out,
-    "acces",
-    `acces: ${reglages.acces}`,
-    COMMENTAIRE_ACCES,
-  );
+  let out = replaceBlock(source, "transitions", null, "");
+  out = replaceBlock(out, "reflet_demande_fusion", null, "");
+  out = replaceBlock(out, "acces", `acces: ${settings.access}`, ACCESS_COMMENT);
 
   // Seule l'exigence s'écrit : la proposition est le défaut, qu'un fichier muet vaut déjà.
-  if (reglages.protectionDuJeton) {
-    out = remplacerBloc(
+  if (settings.tokenProtection) {
+    out = replaceBlock(
       out,
       "protection_du_jeton",
-      reglages.protectionDuJeton === "exigee"
+      settings.tokenProtection === "exigee"
         ? "protection_du_jeton: exigee"
         : null,
-      COMMENTAIRE_PROTECTION,
+      PROTECTION_COMMENT,
     );
   }
 
   // Le bloc n'est écrit que si le mode l'emploie : le laisser derrière soi
   // décrirait une configuration que le projet n'applique plus.
-  const i = reglages.identite;
-  out = remplacerBloc(
+  const i = settings.identity;
+  out = replaceBlock(
     out,
     "identite",
     i
       ? [
           "identite:",
-          `  emetteur: ${i.emetteur}`,
+          `  emetteur: ${i.issuer}`,
           `  client: ${i.client}`,
-          `  echange: ${i.echange}`,
+          `  echange: ${i.exchange}`,
         ].join("\n")
       : null,
-    COMMENTAIRE_IDENTITE,
+    IDENTITY_COMMENT,
   );
   // Les dépôts de code : le bloc disparaît quand la liste est vide, plutôt que
   // de rester en place et de décrire un projet qui n'en déclare plus.
-  out = remplacerBloc(
+  out = replaceBlock(
     out,
     "depots_code",
-    reglages.depotsCode?.length
+    settings.codeRepos?.length
       ? [
           "depots_code:",
-          ...reglages.depotsCode.map(
+          ...settings.codeRepos.map(
             (d) =>
               `  - { repo: ${d.repo}${d.role.trim() ? `, role: ${d.role.trim()}` : ""} }`,
           ),
         ].join("\n")
       : null,
-    COMMENTAIRE_DEPOTS_CODE,
+    CODE_REPOS_COMMENT,
   );
 
   return out.endsWith("\n") ? out : `${out}\n`;

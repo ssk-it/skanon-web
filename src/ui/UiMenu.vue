@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId } from "vue";
-import UiIcone from "./UiIcone.vue";
+import UiIcon from "./UiIcone.vue";
 import {
-  Z_PANNEAU,
-  placerSous,
-  useSuperposition,
+  Z_PANEL,
+  placeBelow,
+  useOverlay,
   type Position,
 } from "./superposition";
 
 /** Une entrée du menu. */
-export interface ActionMenu {
-  readonly libelle: string;
+export interface MenuAction {
+  readonly label: string;
   /** Le nom d'une icône Material Symbols, posée devant le libellé. */
-  readonly icone?: string;
-  readonly desactive?: boolean;
+  readonly icon?: string;
+  readonly disabled?: boolean;
   readonly action: () => void;
 }
 
@@ -37,122 +37,122 @@ export interface ActionMenu {
  *
  * Comme chez Material : le panneau s'ouvre sous le déclencheur, aligné à sa gauche ; il se referme au clic dehors, à Échap et à Tab, et rend alors le focus au déclencheur. Au clavier, les flèches, Origine et Fin parcourent les entrées. Une entrée choisie referme le menu avant que son action ne s'exécute.
  */
-defineProps<{ actions: readonly ActionMenu[] }>();
+defineProps<{ actions: readonly MenuAction[] }>();
 
 const id = useId();
-const ouvert = ref(false);
+const opened = ref(false);
 const position = ref<Position>({ top: "0px", left: "0px" });
-const hote = ref<HTMLElement | null>(null);
-const panneau = ref<HTMLElement | null>(null);
+const host = ref<HTMLElement | null>(null);
+const panel = ref<HTMLElement | null>(null);
 
-function declencheur(): HTMLElement | null {
-  return (hote.value?.firstElementChild as HTMLElement | null) ?? null;
+function trigger(): HTMLElement | null {
+  return (host.value?.firstElementChild as HTMLElement | null) ?? null;
 }
 
-function entrees(): HTMLButtonElement[] {
+function entries(): HTMLButtonElement[] {
   return Array.from(
-    panneau.value?.querySelectorAll<HTMLButtonElement>(
+    panel.value?.querySelectorAll<HTMLButtonElement>(
       ".ui-menu__entree:not(:disabled)",
     ) ?? [],
   );
 }
 
-function replacer(): void {
-  const ancre = declencheur()?.getBoundingClientRect();
-  if (!ancre) return;
-  const taille = panneau.value?.getBoundingClientRect();
-  position.value = placerSous(ancre, {
-    width: taille?.width ?? 0,
-    height: taille?.height ?? 0,
+function reposition(): void {
+  const anchor = trigger()?.getBoundingClientRect();
+  if (!anchor) return;
+  const size = panel.value?.getBoundingClientRect();
+  position.value = placeBelow(anchor, {
+    width: size?.width ?? 0,
+    height: size?.height ?? 0,
   });
 }
 
-async function ouvrir(): Promise<void> {
-  if (ouvert.value) return;
-  ouvert.value = true;
-  replacer();
+async function open(): Promise<void> {
+  if (opened.value) return;
+  opened.value = true;
+  reposition();
   await nextTick();
-  replacer();
-  entrees()[0]?.focus();
+  reposition();
+  entries()[0]?.focus();
 }
 
-function fermer(rendreFocus = true): void {
-  if (!ouvert.value) return;
-  ouvert.value = false;
-  if (rendreFocus) declencheur()?.focus();
+function close(restoreFocus = true): void {
+  if (!opened.value) return;
+  opened.value = false;
+  if (restoreFocus) trigger()?.focus();
 }
 
-function basculer(): void {
-  if (ouvert.value) fermer();
-  else void ouvrir();
+function toggle(): void {
+  if (opened.value) close();
+  else void open();
 }
 
-function choisir(action: ActionMenu): void {
-  fermer();
+function choose(action: MenuAction): void {
+  close();
   action.action();
 }
 
-useSuperposition(
-  ouvert,
-  () => [declencheur(), panneau.value],
-  () => fermer(false),
-  replacer,
+useOverlay(
+  opened,
+  () => [trigger(), panel.value],
+  () => close(false),
+  reposition,
 );
 
-function surTouche(e: KeyboardEvent): void {
-  const liste = entrees();
-  const courant = liste.indexOf(document.activeElement as HTMLButtonElement);
-  const aller = (i: number) => {
+function onKey(e: KeyboardEvent): void {
+  const list = entries();
+  const current = list.indexOf(document.activeElement as HTMLButtonElement);
+  const goTo = (i: number) => {
     e.preventDefault();
-    liste[(i + liste.length) % liste.length]?.focus();
+    list[(i + list.length) % list.length]?.focus();
   };
   switch (e.key) {
     case "ArrowDown":
-      aller(courant + 1);
+      goTo(current + 1);
       break;
     case "ArrowUp":
-      aller(courant <= 0 ? liste.length - 1 : courant - 1);
+      goTo(current <= 0 ? list.length - 1 : current - 1);
       break;
     case "Home":
-      aller(0);
+      goTo(0);
       break;
     case "End":
-      aller(liste.length - 1);
+      goTo(list.length - 1);
       break;
     case "Escape":
       e.preventDefault();
       e.stopPropagation();
-      fermer();
+      close();
       break;
     case "Tab":
       e.preventDefault();
-      fermer();
+      close();
       break;
   }
 }
 
-const attributs = computed(() => ({
+const attributes = computed(() => ({
   "aria-haspopup": "menu" as const,
-  "aria-expanded": ouvert.value,
-  "aria-controls": ouvert.value ? id : undefined,
-  onClick: basculer,
+  "aria-expanded": opened.value,
+  "aria-controls": opened.value ? id : undefined,
+  onClick: toggle,
 }));
 
-defineExpose({ ouvrir, fermer, ouvert });
+defineExpose({ open: open, close: close, ouvert: opened });
 </script>
 
 <template>
-  <span ref="hote" class="ui-menu">
-    <slot name="declencheur" :attributs="attributs" :ouvert="ouvert" />
+  <span ref="host" class="ui-menu">
+    <slot name="declencheur" :attributs="attributes" :ouvert="opened" />
     <Teleport to="body">
       <div
-        v-if="ouvert"
+        v-if="opened"
         :id="id"
-        ref="panneau"
+        ref="panel"
         class="ui-menu__panneau"
         role="menu"
-        :style="{ ...position, zIndex: Z_PANNEAU }"
-        @keydown="surTouche"
+        :style="{ ...position, zIndex: Z_PANEL }"
+        @keydown="onKey"
       >
         <button
           v-for="(a, i) in actions"
@@ -160,11 +160,11 @@ defineExpose({ ouvrir, fermer, ouvert });
           type="button"
           class="ui-menu__entree"
           role="menuitem"
-          :disabled="a.desactive"
-          @click="choisir(a)"
+          :disabled="a.disabled"
+          @click="choose(a)"
         >
-          <UiIcone v-if="a.icone" :nom="a.icone" />
-          <span>{{ a.libelle }}</span>
+          <UiIcon v-if="a.icon" :name="a.icon" />
+          <span>{{ a.label }}</span>
         </button>
       </div>
     </Teleport>

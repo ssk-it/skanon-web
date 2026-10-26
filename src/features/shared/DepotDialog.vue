@@ -1,61 +1,61 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import type { RefDepot } from "../../core/github/github-client";
+import type { RepoRef } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
-import { DepotsConnusService } from "../../core/repo/depots-connus.service";
-import { RepoConfig, memeDepot } from "../../core/repo/repo-config";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiChamp from "../../ui/UiChamp.vue";
-import UiDialogue from "../../ui/UiDialogue.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import { KnownReposService } from "../../core/repo/depots-connus.service";
+import { RepoConfig, sameRepo } from "../../core/repo/repo-config";
+import UiButton from "../../ui/UiBouton.vue";
+import UiTextField from "../../ui/UiChamp.vue";
+import UiDialog from "../../ui/UiDialogue.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 import UiSpinner from "../../ui/UiSpinner.vue";
-import AvatarOrganisation from "./AvatarOrganisation.vue";
-import SymboleProjet from "./SymboleProjet.vue";
+import OrganizationAvatar from "./AvatarOrganisation.vue";
+import ProjectSymbol from "./SymboleProjet.vue";
 
 /**
  * Le choix du dépôt de projet à ouvrir : ceux qui portent un référentiel, les autres que le jeton ouvre, ou une saisie libre. Se ferme sur le dépôt choisi, ou sans réponse.
  */
 defineProps<{ data?: unknown }>();
-const emit = defineEmits<{ fermer: [depot?: RefDepot] }>();
+const emit = defineEmits<{ close: [depot?: RepoRef] }>();
 
 const config = inject(RepoConfig);
-const connus = inject(DepotsConnusService);
+const known = inject(KnownReposService);
 const tokens = inject(TokenService);
 
-const saisie = ref(`${config.depot().owner}/${config.depot().repo}`);
-const erreur = ref<string | null>(null);
+const input = ref(`${config.repoRef().owner}/${config.repoRef().repo}`);
+const error = ref<string | null>(null);
 
-const cadres = computed(() =>
+const framedRepos = computed(() =>
   // Un récent est proposé même si le contrôle n'a pas encore répondu : il a déjà été ouvert, donc il porte un référentiel.
-  connus.depots().filter((d) => d.cadre || d.recent),
+  known.repos().filter((d) => d.framed || d.recent),
 );
-const autres = computed(() =>
-  connus.depots().filter((d) => !d.cadre && !d.recent),
+const others = computed(() =>
+  known.repos().filter((d) => !d.framed && !d.recent),
 );
 
-void connus.rafraichir();
+void known.refresh();
 
-function estOuvert(depot: RefDepot): boolean {
-  return memeDepot(depot, config.depot());
+function isOpen(repoRef: RepoRef): boolean {
+  return sameRepo(repoRef, config.repoRef());
 }
 
-function choisir(depot: RefDepot): void {
-  emit("fermer", depot);
+function choose(repoRef: RepoRef): void {
+  emit("close", repoRef);
 }
 
-function oublier(depot: RefDepot): void {
-  config.oublier(depot);
-  void connus.rafraichir();
+function forget(repoRef: RepoRef): void {
+  config.forget(repoRef);
+  void known.refresh();
 }
 
-function validateDepot(): void {
-  const depot = RepoConfig.parseDepot(saisie.value);
-  if (!depot) {
-    erreur.value = "Format attendu : organisation/depot";
+function validateRepo(): void {
+  const repoRef = RepoConfig.parseRepo(input.value);
+  if (!repoRef) {
+    error.value = "Format attendu : organisation/depot";
     return;
   }
-  emit("fermer", depot);
+  emit("close", repoRef);
 }
 </script>
 
@@ -63,37 +63,40 @@ function validateDepot(): void {
   Défaut hérité, porté tel quel (CLAUDE.md, « Porter sans changer ») : dans SSK Canon, le `mat-error` de la saisie ne s'affiche jamais — Material ne le montre que pour un champ invalide, et aucun validateur ne l'est. Une saisie mal formée efface donc l'indication sans rien dire. Ici aussi : le message est tenu dans `erreur`, et seule l'indication disparaît.
 -->
 <template>
-  <UiDialogue titre="Ouvrir un dépôt de projet">
-    <template v-if="cadres.length">
+  <UiDialog title="Ouvrir un dépôt de projet">
+    <template v-if="framedRepos.length">
       <p class="titre-liste">Dépôts cadrés</p>
       <ul class="depots">
-        <li v-for="d in cadres" :key="d.depot.owner + '/' + d.depot.repo">
-          <button type="button" class="depot" @click="choisir(d.depot)">
-            <SymboleProjet :depot="d.depot" />
-            <span class="nom">{{ d.depot.owner }}/{{ d.depot.repo }}</span>
-            <span v-if="estOuvert(d.depot)" class="marque">ouvert</span>
+        <li
+          v-for="d in framedRepos"
+          :key="d.repoRef.owner + '/' + d.repoRef.repo"
+        >
+          <button type="button" class="depot" @click="choose(d.repoRef)">
+            <ProjectSymbol :repo-ref="d.repoRef" />
+            <span class="nom">{{ d.repoRef.owner }}/{{ d.repoRef.repo }}</span>
+            <span v-if="isOpen(d.repoRef)" class="marque">ouvert</span>
             <span v-else-if="d.recent" class="marque">déjà ouvert</span>
           </button>
-          <UiBouton
+          <UiButton
             v-if="d.recent"
-            variante="icon"
+            variant="icon"
             class="oublier"
             aria-label="Retirer de la liste"
-            @click="oublier(d.depot)"
+            @click="forget(d.repoRef)"
           >
-            <UiIcone nom="close" />
-          </UiBouton>
+            <UiIcon name="close" />
+          </UiButton>
         </li>
       </ul>
     </template>
 
-    <details v-if="autres.length" class="autres">
-      <summary>Autres dépôts autorisés ({{ autres.length }})</summary>
+    <details v-if="others.length" class="autres">
+      <summary>Autres dépôts autorisés ({{ others.length }})</summary>
       <ul class="depots">
-        <li v-for="d in autres" :key="d.depot.owner + '/' + d.depot.repo">
-          <button type="button" class="depot" @click="choisir(d.depot)">
-            <AvatarOrganisation :owner="d.depot.owner" />
-            <span class="nom">{{ d.depot.owner }}/{{ d.depot.repo }}</span>
+        <li v-for="d in others" :key="d.repoRef.owner + '/' + d.repoRef.repo">
+          <button type="button" class="depot" @click="choose(d.repoRef)">
+            <OrganizationAvatar :owner="d.repoRef.owner" />
+            <span class="nom">{{ d.repoRef.owner }}/{{ d.repoRef.repo }}</span>
           </button>
         </li>
       </ul>
@@ -103,36 +106,36 @@ function validateDepot(): void {
       </p>
     </details>
 
-    <p v-if="connus.enCours()" class="attente">
-      <UiSpinner :diametre="16" />
+    <p v-if="known.inProgress()" class="attente">
+      <UiSpinner :diameter="16" />
       <span>Recherche des dépôts autorisés…</span>
     </p>
 
-    <p v-if="connus.erreur()" class="echec">
-      <UiIcone nom="error_outline" /> <span>{{ connus.erreur() }}</span>
+    <p v-if="known.error()" class="echec">
+      <UiIcon name="error_outline" /> <span>{{ known.error() }}</span>
     </p>
 
-    <p v-if="!tokens.present() && !connus.enCours()" class="aide">
+    <p v-if="!tokens.present() && !known.inProgress()" class="aide">
       Sans connexion, seuls les dépôts publics sont lisibles, et l’application
       ne peut pas dire lesquels vous sont autorisés.
     </p>
 
-    <UiChamp
-      v-model="saisie"
+    <UiTextField
+      v-model="input"
       class="champ"
-      libelle="Ou saisir un dépôt"
+      label="Ou saisir un dépôt"
       placeholder="organisation/depot"
       autocomplete="off"
       data-focus-initial
-      :indice="erreur ? null : 'Un nom court, ou une URL GitHub complète'"
-      @keyup.enter="validateDepot()"
+      :hint="error ? null : 'Un nom court, ou une URL GitHub complète'"
+      @keyup.enter="validateRepo()"
     />
 
     <template #actions>
-      <UiBouton @click="emit('fermer')">Annuler</UiBouton>
-      <UiBouton variante="filled" @click="validateDepot()">Ouvrir</UiBouton>
+      <UiButton @click="emit('close')">Annuler</UiButton>
+      <UiButton variant="filled" @click="validateRepo()">Ouvrir</UiButton>
     </template>
-  </UiDialogue>
+  </UiDialog>
 </template>
 
 <style scoped>

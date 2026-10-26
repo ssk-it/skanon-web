@@ -6,15 +6,15 @@
  * <UiDialogue titre="Supprimer ce lien ?">
  *   <p>Le message.</p>
  *   <template #actions>
- *     <UiBouton @click="emit('fermer', false)">Annuler</UiBouton>
- *     <UiBouton variante="filled" @click="emit('fermer', true)">Supprimer</UiBouton>
+ *     <UiBouton @click="emit('close', false)">Annuler</UiBouton>
+ *     <UiBouton variante="filled" @click="emit('close', true)">Supprimer</UiBouton>
  *   </template>
  * </UiDialogue>
  * ```
  *
  * Le contenu défile seul au-delà de 65 % de la hauteur de la fenêtre ; titre et actions restent en place. Les actions s'alignent à droite, espacées de 8 px. Une vue qui doit régler le contenu — sa hauteur, sa largeur, sa disposition — le vise par `:deep(.ui-dialogue__contenu)` depuis une classe posée sur `UiDialogue`.
  */
-defineProps<{ titre?: string }>();
+defineProps<{ title?: string }>();
 </script>
 
 <template>
@@ -22,8 +22,8 @@ defineProps<{ titre?: string }>();
     class="ui-dialogue"
     :class="{ 'ui-dialogue--avec-actions': !!$slots.actions }"
   >
-    <h2 v-if="titre || $slots.titre" class="ui-dialogue__titre">
-      <slot name="titre">{{ titre }}</slot>
+    <h2 v-if="title || $slots.titre" class="ui-dialogue__titre">
+      <slot name="titre">{{ title }}</slot>
     </h2>
     <div class="ui-dialogue__contenu"><slot /></div>
     <div v-if="$slots.actions" class="ui-dialogue__actions">

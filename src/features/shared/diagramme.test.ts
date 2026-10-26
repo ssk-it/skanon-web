@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extraireDiagrammes, marqueurDiagramme } from "./diagramme";
+import { extractDiagrams, diagramMarker } from "./diagramme";
 
 /**
  * Le repérage des diagrammes dans du Markdown — RG-diagrammes-rendus.
@@ -10,17 +10,17 @@ describe("repérage des diagrammes", () => {
   it("ne trouve rien dans un Markdown ordinaire", () => {
     const html =
       '<p>Un texte.</p><pre><code class="language-java">int a;</code></pre>';
-    expect(extraireDiagrammes(html)).toEqual([]);
+    expect(extractDiagrams(html)).toEqual([]);
   });
 
   it("trouve un bloc mermaid et le remplace par un marqueur", () => {
     const html =
       '<pre><code class="language-mermaid">flowchart LR\n  A --&gt; B</code></pre>';
-    const trouves = extraireDiagrammes(html);
+    const found = extractDiagrams(html);
 
-    expect(trouves.length).toBe(1);
+    expect(found.length).toBe(1);
     // Le texte est rendu à sa forme d'origine : `marked` a échappé les chevrons, que le moteur de diagramme attend intacts.
-    expect(trouves[0]!.source).toBe("flowchart LR\n  A --> B");
+    expect(found[0]!.source).toBe("flowchart LR\n  A --> B");
   });
 
   it("distingue plusieurs diagrammes d’une même page", () => {
@@ -28,24 +28,24 @@ describe("repérage des diagrammes", () => {
       '<pre><code class="language-mermaid">flowchart LR</code></pre>' +
       "<p>Entre les deux.</p>" +
       '<pre><code class="language-mermaid">sequenceDiagram</code></pre>';
-    const trouves = extraireDiagrammes(html);
+    const found = extractDiagrams(html);
 
-    expect(trouves.map((d) => d.source)).toEqual([
+    expect(found.map((d) => d.source)).toEqual([
       "flowchart LR",
       "sequenceDiagram",
     ]);
     // Deux marqueurs distincts : rendre le second dans le premier emplacement afficherait un diagramme à la place d'un autre, sans erreur visible.
-    expect(trouves[0]!.id).not.toBe(trouves[1]!.id);
+    expect(found[0]!.id).not.toBe(found[1]!.id);
   });
 
   it("laisse dans le HTML un emplacement pour chaque diagramme", () => {
     const html =
       '<pre><code class="language-mermaid">flowchart LR</code></pre>';
-    const trouves = extraireDiagrammes(html);
-    const attendu = marqueurDiagramme(trouves[0]!.id);
+    const found = extractDiagrams(html);
+    const expected = diagramMarker(found[0]!.id);
 
-    expect(trouves[0]!.html).toContain(attendu);
+    expect(found[0]!.html).toContain(expected);
     // La source ne doit plus figurer dans le HTML rendu : un diagramme affiché à la fois en image et en texte double la section.
-    expect(trouves[0]!.html).not.toContain("flowchart LR");
+    expect(found[0]!.html).not.toContain("flowchart LR");
   });
 });

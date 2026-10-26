@@ -5,17 +5,17 @@ import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { inject } from "../../core/injection";
 import {
-  TAGS_LIENS_PAR_DEFAUT,
-  type Cadrage,
+  DEFAULT_LINK_TAGS,
+  type Scoping,
   type Impact,
-  type NatureCible,
-  type OperationImpact,
-  type Referentiel,
+  type TargetKind,
+  type ImpactOperation,
+  type Specification,
 } from "../../core/model/model";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { RepoConfig } from "../../core/repo/repo-config";
-import { createRouteur } from "../../routeur";
-import CadragePage, { formatDecompteImpacts } from "./CadragePage.vue";
+import { createAppRouter } from "../../routeur";
+import ScopingPage, { formatImpactCount } from "./CadragePage.vue";
 
 /**
  * La fiche d'un cadrage — RG-en-tete-cadrage et RG-sommaire-fiche-longue.
@@ -24,32 +24,32 @@ import CadragePage, { formatDecompteImpacts } from "./CadragePage.vue";
  */
 
 function impact(
-  cible: string,
-  operation: OperationImpact,
-  nature: NatureCible = "regle",
+  target: string,
+  operation: ImpactOperation,
+  kind: TargetKind = "regle",
 ): Impact {
-  return { cible, regle: nature === "regle" ? cible : "", nature, operation };
+  return { target, rule: kind === "regle" ? target : "", kind, operation };
 }
 
-function cadrage(id: string, extra: Partial<Cadrage> = {}): Cadrage {
+function scoping(id: string, extra: Partial<Scoping> = {}): Scoping {
   return {
     id,
-    titre: "Un cadrage",
-    statut: "livree",
-    domaines: [],
-    liens: [],
+    title: "Un cadrage",
+    status: "livree",
+    domains: [],
+    links: [],
     impacts: [],
-    objectif: "Un objectif.",
-    parcours: "",
-    enonces: new Map(),
+    goal: "Un objectif.",
+    journey: "",
+    statements: new Map(),
     decisions: [],
-    piecesJointes: [],
-    divers: [],
+    attachments: [],
+    misc: [],
     ...extra,
   };
 }
 
-const MELANGE = [
+const MIX = [
   impact("RG-a", "cree"),
   impact("RG-t1", "touche"),
   impact("RG-b", "cree"),
@@ -57,66 +57,66 @@ const MELANGE = [
   impact("RG-t2", "touche"),
 ];
 
-function referentiel(cadrages: Cadrage[]): Referentiel {
+function specification(scopings: Scoping[]): Specification {
   return {
-    projet: { nom: "Test", description: "", depotsCode: [], prefixe: null },
-    reglages: {
-      acces: "jeton_personnel",
-      identite: null,
-      protectionDuJeton: "proposee",
-      tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+    project: { name: "Test", description: "", codeRepos: [], prefix: null },
+    settings: {
+      access: "jeton_personnel",
+      identity: null,
+      tokenProtection: "proposee",
+      linkTags: DEFAULT_LINK_TAGS,
     },
-    domaines: new Map(),
-    fonctionnalites: new Map(),
-    regles: new Map(),
+    domains: new Map(),
+    features: new Map(),
+    rules: new Map(),
     decisions: new Map(),
     architecture: new Map(),
-    cadrages: new Map(cadrages.map((c) => [c.id, c])),
+    scopings: new Map(scopings.map((c) => [c.id, c])),
     anomalies: [],
   };
 }
 
 /** Monte la fiche à l'adresse du cadrage `id`, le référentiel portant `cadrages`. */
-async function monterA(id: string, cadrages: Cadrage[]): Promise<HTMLElement> {
-  const store = inject(ReferentielStore);
-  store.referentiel.set(referentiel(cadrages));
-  store.etat.set("pret");
-  const router = createRouteur(createMemoryHistory());
+async function mountAt(id: string, scopings: Scoping[]): Promise<HTMLElement> {
+  const store = inject(SpecificationStore);
+  store.specification.set(specification(scopings));
+  store.state.set("pret");
+  const router = createAppRouter(createMemoryHistory());
   await router.push(`/org/depot/cadrages/${id}`);
   await router.isReady();
-  const f = mount(CadragePage, { global: { plugins: [router] } });
+  const f = mount(ScopingPage, { global: { plugins: [router] } });
   await flushPromises();
   return f.element.parentElement ?? (f.element as HTMLElement);
 }
 
-function monter(c: Cadrage): Promise<HTMLElement> {
-  return monterA(c.id, [c]);
+function mountView(c: Scoping): Promise<HTMLElement> {
+  return mountAt(c.id, [c]);
 }
 
 /** La valeur d'une rangée de l'en-tête, par son intitulé. */
-function rangee(el: HTMLElement, intitule: string): HTMLElement | null {
+function row(el: HTMLElement, heading: string): HTMLElement | null {
   const dt = [...el.querySelectorAll(".identite dt")].find(
-    (d) => d.textContent?.trim() === intitule,
+    (d) => d.textContent?.trim() === heading,
   );
   return (dt?.nextElementSibling as HTMLElement) ?? null;
 }
 
 describe("Le décompte des impacts", () => {
   it("se lit par opération, dans l’ordre de ce qui change le plus", () => {
-    expect(formatDecompteImpacts(MELANGE)).toBe(
+    expect(formatImpactCount(MIX)).toBe(
       "2 règles créées · 1 modifiée · 2 touchées",
     );
   });
 
   it("accorde au singulier et omet ce qui est à zéro", () => {
-    expect(formatDecompteImpacts([impact("RG-a", "abroge")])).toBe(
+    expect(formatImpactCount([impact("RG-a", "abroge")])).toBe(
       "1 règle abrogée",
     );
   });
 
   it("parle de cibles quand toutes ne sont pas des règles", () => {
     expect(
-      formatDecompteImpacts([
+      formatImpactCount([
         impact("RG-a", "cree"),
         impact("ADR-x", "cree", "adr"),
       ]),
@@ -124,76 +124,76 @@ describe("Le décompte des impacts", () => {
   });
 
   it("ne dit rien d’un cadrage sans impact", () => {
-    expect(formatDecompteImpacts([])).toBe("");
+    expect(formatImpactCount([])).toBe("");
   });
 });
 
 describe("La fiche d’un cadrage", () => {
   beforeEach(() => {
     provideHttpTesting();
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
   it("dit dans l’en-tête ce que le cadrage change", async () => {
-    const el = await monter(cadrage("2026-001", { impacts: MELANGE }));
+    const el = await mountView(scoping("2026-001", { impacts: MIX }));
 
-    expect(rangee(el, "Impacts")?.textContent?.trim()).toBe(
+    expect(row(el, "Impacts")?.textContent?.trim()).toBe(
       "2 règles créées · 1 modifiée · 2 touchées",
     );
   });
 
   it("mène à la demande de fusion d’un cadrage en cours", async () => {
-    const el = await monter(
-      cadrage("2026-002", {
-        statut: "en_relecture",
+    const el = await mountView(
+      scoping("2026-002", {
+        status: "en_relecture",
         provenance: {
-          branche: "cadrage-2026-002",
+          branch: "cadrage-2026-002",
           pullRequest: 9,
-          brouillon: false,
+          draft: false,
         },
       }),
     );
 
-    const lien = rangee(el, "Ressources")?.querySelector<HTMLAnchorElement>(
+    const link = row(el, "Ressources")?.querySelector<HTMLAnchorElement>(
       "a.demande",
     );
-    expect(lien?.textContent).toContain("Demande de fusion #9");
-    expect(lien?.href).toBe("https://github.com/org/depot/pull/9");
+    expect(link?.textContent).toContain("Demande de fusion #9");
+    expect(link?.href).toBe("https://github.com/org/depot/pull/9");
   });
 
   it("liste d’abord ce qui change, puis ce qui est seulement touché", async () => {
-    const el = await monter(cadrage("2026-001", { impacts: MELANGE }));
+    const el = await mountView(scoping("2026-001", { impacts: MIX }));
 
-    const ordre = [...el.querySelectorAll("#impacts .impact")].map((a) => a.id);
-    expect(ordre).toEqual([
+    const order = [...el.querySelectorAll("#impacts .impact")].map((a) => a.id);
+    expect(order).toEqual([
       "impact-RG-a",
       "impact-RG-b",
       "impact-RG-c",
       "impact-RG-t1",
       "impact-RG-t2",
     ]);
-    const touches = el.querySelector("#impacts-touches");
-    expect(touches?.querySelectorAll(".impact").length).toBe(2);
+    const touched = el.querySelector("#impacts-touches");
+    expect(touched?.querySelectorAll(".impact").length).toBe(2);
   });
 
   it("regroupe au sommaire les impacts « touche » en une entrée", async () => {
-    const el = await monter(cadrage("2026-001", { impacts: MELANGE }));
+    const el = await mountView(scoping("2026-001", { impacts: MIX }));
 
-    const entrees = [...el.querySelectorAll(".sommaire a")].map((a) => ({
-      texte: a.textContent?.replace(/\s+/g, " ").trim(),
-      cible: a.getAttribute("href"),
+    const entries = [...el.querySelectorAll(".sommaire a")].map((a) => ({
+      text: a.textContent?.replace(/\s+/g, " ").trim(),
+      target: a.getAttribute("href"),
     }));
-    const cibles = entrees.map((e) => e.cible);
-    expect(cibles).toContain("#impact-RG-a");
-    expect(cibles).not.toContain("#impact-RG-t1");
-    expect(entrees.find((e) => e.cible === "#impacts-touches")?.texte).toBe(
+    const targets = entries.map((e) => e.target);
+    expect(targets).toContain("#impact-RG-a");
+    expect(targets).not.toContain("#impact-RG-t1");
+    expect(entries.find((e) => e.target === "#impacts-touches")?.text).toBe(
       "2 règles touchées",
     );
   });
 
   it("n’ouvre pas d’entrée de regroupement sans impact « touche »", async () => {
-    const el = await monter(
-      cadrage("2026-001", { impacts: [impact("RG-a", "cree")] }),
+    const el = await mountView(
+      scoping("2026-001", { impacts: [impact("RG-a", "cree")] }),
     );
 
     expect(el.querySelector('.sommaire a[href="#impacts-touches"]')).toBeNull();
@@ -201,8 +201,8 @@ describe("La fiche d’un cadrage", () => {
   });
 
   it("ancre et replie un impact d’architecture par sa cible", async () => {
-    const el = await monter(
-      cadrage("2026-003", {
+    const el = await mountView(
+      scoping("2026-003", {
         impacts: [
           impact("ADR-x", "cree", "adr"),
           impact("ADR-y", "modifie", "adr"),
@@ -222,44 +222,44 @@ describe("La fiche d’un cadrage", () => {
 
   describe("ouverte sur un cadrage en cours, avant que les branches soient lues", () => {
     /** La branche principale est lue ; le cadrage demandé, lui, vit sur une branche. */
-    async function monterSansLui(branchesEnChargement: boolean): Promise<{
+    async function mountWithout(loadingBranches: boolean): Promise<{
       el: HTMLElement;
-      store: ReferentielStore;
+      store: SpecificationStore;
     }> {
-      const store = inject(ReferentielStore);
-      store.branchesEnChargement.set(branchesEnChargement);
-      const el = await monterA("2026-002", [cadrage("2026-001")]);
+      const store = inject(SpecificationStore);
+      store.loadingBranches.set(loadingBranches);
+      const el = await mountAt("2026-002", [scoping("2026-001")]);
       return { el, store };
     }
 
     it("dit que les cadrages en cours se lisent, et non que celui-ci n’existe pas", async () => {
-      const { el } = await monterSansLui(true);
+      const { el } = await mountWithout(true);
 
       expect(el.textContent).not.toContain("introuvable");
       expect(el.textContent).toContain("Lecture des cadrages en cours");
     });
 
     it("affiche le cadrage dès que sa branche est lue", async () => {
-      const { el, store } = await monterSansLui(true);
+      const { el, store } = await mountWithout(true);
 
-      store.referentiel.update((r) => ({
+      store.specification.update((r) => ({
         ...r,
-        cadrages: new Map(r.cadrages).set(
+        scopings: new Map(r.scopings).set(
           "2026-002",
-          cadrage("2026-002", {
-            titre: "Sur sa branche",
-            statut: "en_relecture",
+          scoping("2026-002", {
+            title: "Sur sa branche",
+            status: "en_relecture",
           }),
         ),
       }));
-      store.branchesEnChargement.set(false);
+      store.loadingBranches.set(false);
       await nextTick();
 
       expect(el.querySelector("h1")?.textContent).toBe("Sur sa branche");
     });
 
     it("le dit introuvable une fois les branches lues sans lui", async () => {
-      const { el } = await monterSansLui(false);
+      const { el } = await mountWithout(false);
 
       expect(el.textContent).toContain("Cadrage introuvable : 2026-002");
     });
@@ -274,12 +274,12 @@ describe("La fiche d’un cadrage", () => {
 describe("Une branche survivante", () => {
   beforeEach(() => {
     provideHttpTesting();
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
   });
 
   it("se signale sur la fiche du cadrage livré, avec son nom et un lien", async () => {
-    const el = await monter(
-      cadrage("2026-032", { branchesSurvivantes: ["cadrage-2026-032"] }),
+    const el = await mountView(
+      scoping("2026-032", { staleBranches: ["cadrage-2026-032"] }),
     );
 
     const note = el.querySelector(".branches-survivantes");
@@ -291,7 +291,7 @@ describe("Une branche survivante", () => {
   });
 
   it("ne se montre pas quand aucune branche ne survit", async () => {
-    const el = await monter(cadrage("2026-032"));
+    const el = await mountView(scoping("2026-032"));
 
     expect(el.querySelector(".branches-survivantes")).toBeNull();
   });

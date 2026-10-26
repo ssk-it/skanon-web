@@ -3,7 +3,7 @@ import { inject } from "../injection";
 import { signal } from "../signaux";
 import { RateLimiter } from "./rate-limiter";
 import { TokenService } from "./token.service";
-import { DecisionRelecture } from "../model/model";
+import { ReviewDecision } from "../model/model";
 
 /**
  * Une demande de fusion ouverte, telle que la liste des cadrages en cours la lit.
@@ -12,53 +12,53 @@ import { DecisionRelecture } from "../model/model";
  * la lecture n'a pas pu l'obtenir : l'appelant ne doit donc jamais en conclure
  * qu'une validation a été refusée, seulement qu'elle n'est pas établie.
  */
-export interface DemandeOuverte {
-  readonly numero: number;
-  readonly branche: string;
-  readonly brouillon: boolean;
-  readonly approbation: DecisionRelecture | null;
+export interface OpenPullRequest {
+  readonly number: number;
+  readonly branch: string;
+  readonly draft: boolean;
+  readonly approval: ReviewDecision | null;
 }
 
 /** Une entrée de l'arborescence Git. */
-export interface EntreeArbre {
+export interface TreeEntry {
   readonly path: string;
   readonly sha: string;
   readonly type: "blob" | "tree";
   readonly size?: number;
 }
 
-export interface Arbre {
+export interface Tree {
   /**
    * Le commit résolu, non l'objet arbre : interrogé sur une branche ou sur
    * `HEAD`, `git/trees` répond avec le SHA du commit-ish demandé. C'est ce qui
    * permet de lire les contenus à un commit figé sans appel supplémentaire.
    */
   readonly sha: string;
-  readonly entrees: readonly EntreeArbre[];
+  readonly entries: readonly TreeEntry[];
   /** Vrai si l'API a tronqué la réponse — jamais atteint sur du Markdown. */
-  readonly tronque: boolean;
+  readonly truncated: boolean;
   /** L'étiquette de la réponse, pour redemander l'arborescence sous condition. */
   readonly etag: string | null;
 }
 
 /** Une arborescence déjà lue, à redemander sous condition. */
-export interface ArbreConnu {
+export interface KnownTree {
   readonly etag: string | null;
   readonly commit: string;
-  readonly entrees: readonly EntreeArbre[];
-  readonly tronque: boolean;
+  readonly entries: readonly TreeEntry[];
+  readonly truncated: boolean;
 }
 
 /** Un commit, tel que résolu depuis une date. */
 export interface CommitDate {
   readonly sha: string;
   readonly date: string | null;
-  readonly titre: string;
+  readonly title: string;
 }
 
 /** Coordonnées d'un dépôt de projet. */
 /** Une issue telle que la rend l'API REST, réduite à ce que l'application en lit. */
-export interface IssueBrute {
+export interface RawIssue {
   readonly number: number;
   readonly title: string;
   readonly html_url: string;
@@ -67,7 +67,7 @@ export interface IssueBrute {
   readonly pull_request?: unknown;
 }
 
-export interface RefDepot {
+export interface RepoRef {
   readonly owner: string;
   readonly repo: string;
   /** Branche, tag ou SHA. Par défaut la branche par défaut du dépôt. */
@@ -93,8 +93,8 @@ export class GraphqlError extends Error {
 export class GithubError extends Error {
   constructor(
     message: string,
-    readonly statut: number,
-    readonly quotaEpuise = false,
+    readonly status: number,
+    readonly quotaExhausted = false,
   ) {
     super(message);
   }
@@ -123,7 +123,7 @@ export class GithubClient {
   private readonly base = "https://api.github.com";
 
   /** Quota restant tel que rapporté par la dernière réponse. */
-  readonly quotaRestant = signal<number | null>(null);
+  readonly quotaRemaining = signal<number | null>(null);
 
   /**
    * Pourquoi les écritures sont suspendues, s'il y a lieu.
@@ -134,7 +134,7 @@ export class GithubClient {
    * éviter. Voir RG-dernier-etat-connu. Toutes les écritures passant par
    * `send`, c'est là qu'elles sont refusées.
    */
-  readonly ecritureSuspendue = signal<string | null>(null);
+  readonly writeSuspended = signal<string | null>(null);
 
   /**
    * Charger les contenus par l'API plutôt que par raw.
@@ -151,23 +151,23 @@ export class GithubClient {
    *
    * Reste donc désactivé par défaut, et n'a de sens qu'avec un jeton.
    */
-  readonly contenusParApi = signal(false);
+  readonly contentsViaApi = signal(false);
 
-  useApiForContenus(actif: boolean): void {
-    this.contenusParApi.set(actif);
+  useApiForContents(active: boolean): void {
+    this.contentsViaApi.set(active);
   }
 
-  private buildHeaders(depot?: RefDepot): HttpHeaders {
+  private buildHeaders(repoRef?: RepoRef): HttpHeaders {
     // Le jeton vient du service dédié, jamais du stockage directement : en
     // phase 7, le proxy fournira un jeton d'installation et cette méthode ne
     // changera pas d'une ligne.
-    let entetes = new HttpHeaders({
+    let headers = new HttpHeaders({
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
     });
-    const jeton = depot ? this.tokens.valeurPour(depot) : this.tokens.valeur();
-    if (jeton) entetes = entetes.set("Authorization", `Bearer ${jeton}`);
-    return entetes;
+    const token = repoRef ? this.tokens.valueFor(repoRef) : this.tokens.value();
+    if (token) headers = headers.set("Authorization", `Bearer ${token}`);
+    return headers;
   }
 
   /**
@@ -177,25 +177,25 @@ export class GithubClient {
   private async call<T>(
     url: string,
     accept?: string,
-    depot?: RefDepot,
+    repoRef?: RepoRef,
   ): Promise<T> {
     return this.apiLimiter.run(async () => {
-      let headers = this.buildHeaders(depot);
+      let headers = this.buildHeaders(repoRef);
       if (accept) headers = headers.set("Accept", accept);
 
       try {
-        const reponse = await this.http.get<T>(url, { headers });
-        const restant = reponse.headers.get("x-ratelimit-remaining");
-        if (restant !== null) this.quotaRestant.set(Number(restant));
-        return reponse.body as T;
+        const response = await this.http.get<T>(url, { headers });
+        const remaining = response.headers.get("x-ratelimit-remaining");
+        if (remaining !== null) this.quotaRemaining.set(Number(remaining));
+        return response.body as T;
       } catch (e) {
         // GitHub renvoie l'en-tête de quota sur les erreurs aussi, et c'est
         // justement là qu'il compte : sans cette lecture, l'application ne sait
         // plus où elle en est au moment précis où elle est bloquée.
         if (e instanceof HttpErrorResponse) {
-          const restant = e.headers?.get("x-ratelimit-remaining");
-          if (restant !== null && restant !== undefined) {
-            this.quotaRestant.set(Number(restant));
+          const remaining = e.headers?.get("x-ratelimit-remaining");
+          if (remaining !== null && remaining !== undefined) {
+            this.quotaRemaining.set(Number(remaining));
           }
         }
         throw this.toGithubError(e);
@@ -215,41 +215,41 @@ export class GithubClient {
    * pas distinguer un privé d'un absent est délibéré de sa part, et le message
    * doit donc couvrir les deux cas sans en affirmer un.
    */
-  private toGraphqlError(erreur: {
+  private toGraphqlError(error: {
     message: string;
     type?: string;
   }): GraphqlError {
-    if (erreur.type === "NOT_FOUND") {
+    if (error.type === "NOT_FOUND") {
       return new GraphqlError(
         "Dépôt introuvable, ou hors de portée du jeton. Vérifier son nom, et " +
           "que le jeton donne accès à ce dépôt — GitHub ne distingue pas les deux cas.",
-        erreur.type,
+        error.type,
       );
     }
-    if (erreur.type === "RATE_LIMITED") {
+    if (error.type === "RATE_LIMITED") {
       return new GraphqlError(
         "Le budget de requêtes d’historique est épuisé pour cette heure. " +
           "Il se réinitialise automatiquement.",
-        erreur.type,
+        error.type,
       );
     }
-    if (erreur.type === "FORBIDDEN") {
+    if (error.type === "FORBIDDEN") {
       return new GraphqlError(
         "Le jeton n’autorise pas cette lecture. Vérifier qu’il couvre ce dépôt.",
-        erreur.type,
+        error.type,
       );
     }
-    return new GraphqlError(erreur.message, erreur.type);
+    return new GraphqlError(error.message, error.type);
   }
 
-  private toGithubError(e: unknown, ecriture = false): GithubError {
+  private toGithubError(e: unknown, writing = false): GithubError {
     if (!(e instanceof HttpErrorResponse)) {
       return new GithubError("Erreur inattendue lors de l’appel à GitHub.", 0);
     }
-    const restant = e.headers?.get("x-ratelimit-remaining");
-    const quotaEpuise = e.status === 403 && restant === "0";
+    const remaining = e.headers?.get("x-ratelimit-remaining");
+    const quotaExhausted = e.status === 403 && remaining === "0";
 
-    if (quotaEpuise) {
+    if (quotaExhausted) {
       return new GithubError(
         this.tokens.present()
           ? "Le quota d’appels GitHub est épuisé pour cette heure. " +
@@ -290,7 +290,7 @@ export class GithubClient {
       // refuserait — elle ne révèle pas ce qui existe à qui n'y a pas droit.
       // Parler d'un dépôt introuvable enverrait chercher une erreur de nom là
       // où il manque simplement une connexion.
-      if (ecriture && !this.tokens.present()) {
+      if (writing && !this.tokens.present()) {
         return new GithubError(
           "Écrire dans le dépôt demande une connexion. Se connecter, puis réessayer.",
           404,
@@ -308,7 +308,7 @@ export class GithubClient {
     // À une écriture, le 409 dit que la version lue n'est plus la dernière :
     // quelqu'un a enregistré entre-temps (RG-reprise-cadrage). Parler d'un
     // dépôt vide enverrait déposer un README là où il faut recharger.
-    if (e.status === 409 && ecriture) {
+    if (e.status === 409 && writing) {
       return new GithubError(
         "Le fichier a été modifié entre-temps, par une autre personne ou un " +
           "autre onglet. Recharger la page pour repartir de sa dernière " +
@@ -341,21 +341,21 @@ export class GithubClient {
    * GraphQL n'est pas utilisable ici : `Tree.entries` n'est ni récursif ni
    * paginé. C'est l'un des cas où REST est obligatoire.
    */
-  async loadArbre(depot: RefDepot, connu?: ArbreConnu | null): Promise<Arbre> {
-    const ref = depot.ref ?? "HEAD";
-    const url = `${this.base}/repos/${depot.owner}/${depot.repo}/git/trees/${ref}?recursive=1`;
+  async loadTree(repoRef: RepoRef, known?: KnownTree | null): Promise<Tree> {
+    const ref = repoRef.ref ?? "HEAD";
+    const url = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/git/trees/${ref}?recursive=1`;
 
     // Sous condition seulement avec un jeton : la plateforme ne décompte pas
     // alors une réponse « inchangé », mais elle la décompte sans connexion —
     // mesuré. Anonyme, la condition ne ferait qu'ajouter un cas sans rien
     // épargner.
-    const etag = connu?.etag && this.tokens.present() ? connu.etag : null;
+    const etag = known?.etag && this.tokens.present() ? known.etag : null;
 
     return this.apiLimiter.run(async () => {
       let headers = this.buildHeaders();
       if (etag) headers = headers.set("If-None-Match", etag);
       try {
-        const reponse = await this.http.get<{
+        const response = await this.http.get<{
           sha: string;
           truncated: boolean;
           tree: Array<{
@@ -365,13 +365,13 @@ export class GithubClient {
             size?: number;
           }>;
         }>(url, { headers });
-        this.noterQuota(reponse.headers.get("x-ratelimit-remaining"));
-        const brut = reponse.body;
+        this.recordQuota(response.headers.get("x-ratelimit-remaining"));
+        const raw = response.body;
         return {
-          sha: brut.sha,
-          tronque: brut.truncated,
-          etag: reponse.headers.get("etag"),
-          entrees: brut.tree
+          sha: raw.sha,
+          truncated: raw.truncated,
+          etag: response.headers.get("etag"),
+          entries: raw.tree
             .filter((e) => e.type === "blob" || e.type === "tree")
             .map((e) => ({
               path: e.path,
@@ -382,15 +382,15 @@ export class GithubClient {
         };
       } catch (e) {
         if (e instanceof HttpErrorResponse) {
-          this.noterQuota(e.headers?.get("x-ratelimit-remaining") ?? null);
+          this.recordQuota(e.headers?.get("x-ratelimit-remaining") ?? null);
           // Inchangée : l'arborescence connue est l'arborescence courante, et
           // la plateforme vient de le confirmer.
-          if (e.status === 304 && connu && etag) {
+          if (e.status === 304 && known && etag) {
             return {
-              sha: connu.commit,
-              tronque: connu.tronque,
-              etag: connu.etag,
-              entrees: connu.entrees,
+              sha: known.commit,
+              truncated: known.truncated,
+              etag: known.etag,
+              entries: known.entries,
             };
           }
         }
@@ -399,8 +399,8 @@ export class GithubClient {
     });
   }
 
-  private noterQuota(restant: string | null): void {
-    if (restant !== null) this.quotaRestant.set(Number(restant));
+  private recordQuota(remaining: string | null): void {
+    if (remaining !== null) this.quotaRemaining.set(Number(remaining));
   }
 
   /**
@@ -419,17 +419,17 @@ export class GithubClient {
    * première voie est ce qui rend la lecture d'un dépôt réel praticable sans
    * authentification. En phase 7, les dépôts privés basculeront sur la seconde.
    */
-  async loadContenu(
-    depot: RefDepot,
-    chemin: string,
+  async loadContent(
+    repoRef: RepoRef,
+    path: string,
     sha: string,
   ): Promise<string> {
-    if (!this.contenusParApi()) {
+    if (!this.contentsViaApi()) {
       // `depot.ref` porte de préférence un SHA de commit : l'appelant a déjà
       // résolu la branche, et une URL de branche serait servie depuis le cache
       // pendant cinq minutes après une écriture.
-      const ref = depot.ref ?? "HEAD";
-      const url = `https://raw.githubusercontent.com/${depot.owner}/${depot.repo}/${ref}/${chemin}`;
+      const ref = repoRef.ref ?? "HEAD";
+      const url = `https://raw.githubusercontent.com/${repoRef.owner}/${repoRef.repo}/${ref}/${path}`;
       try {
         return await this.rawLimiter.run(() =>
           this.http.get(url, { responseType: "text" }).then((r) => r.body),
@@ -443,13 +443,13 @@ export class GithubClient {
           e.status === 404 &&
           this.tokens.present()
         ) {
-          this.contenusParApi.set(true);
-          return this.loadBlob(depot, sha);
+          this.contentsViaApi.set(true);
+          return this.loadBlob(repoRef, sha);
         }
         throw this.toGithubError(e);
       }
     }
-    return this.loadBlob(depot, sha);
+    return this.loadBlob(repoRef, sha);
   }
 
   /**
@@ -458,8 +458,8 @@ export class GithubClient {
    * Adresser par SHA plutôt que par chemin fonctionne quel que soit le commit et
    * rend le cache trivial : un SHA identifie un contenu, pour toujours.
    */
-  async loadBlob(depot: RefDepot, sha: string): Promise<string> {
-    const url = `${this.base}/repos/${depot.owner}/${depot.repo}/git/blobs/${sha}`;
+  async loadBlob(repoRef: RepoRef, sha: string): Promise<string> {
+    const url = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/git/blobs/${sha}`;
 
     return this.apiLimiter.run(async () => {
       // Le contenu d'un fichier n'est pas du JSON : sans `responseType`, Angular
@@ -470,13 +470,13 @@ export class GithubClient {
         "application/vnd.github.raw",
       );
       try {
-        const reponse = await this.http.get(url, {
+        const response = await this.http.get(url, {
           headers,
           responseType: "text",
         });
-        const restant = reponse.headers.get("x-ratelimit-remaining");
-        if (restant !== null) this.quotaRestant.set(Number(restant));
-        return reponse.body ?? "";
+        const remaining = response.headers.get("x-ratelimit-remaining");
+        if (remaining !== null) this.quotaRemaining.set(Number(remaining));
+        return response.body ?? "";
       } catch (e) {
         throw this.toGithubError(e);
       }
@@ -497,25 +497,25 @@ export class GithubClient {
    * chaque écriture et sa marque avec lui, là où la liste de la racine ne
    * change que si l'un de ses répertoires change.
    */
-  async loadRacine(
-    depot: RefDepot,
+  async loadRoot(
+    repoRef: RepoRef,
     etag: string | null,
-  ): Promise<{ etag: string | null; entrees: EntreeArbre[] } | null> {
-    const url = `${this.base}/repos/${depot.owner}/${depot.repo}/contents/`;
+  ): Promise<{ etag: string | null; entries: TreeEntry[] } | null> {
+    const url = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/contents/`;
     return this.apiLimiter.run(async () => {
-      let headers = this.buildHeaders(depot);
+      let headers = this.buildHeaders(repoRef);
       if (etag) headers = headers.set("If-None-Match", etag);
       try {
-        const reponse = await this.http.get<
+        const response = await this.http.get<
           Array<{ path: string; sha: string; type: string; size?: number }>
         >(url, {
           headers,
         });
-        this.noterQuota(reponse.headers.get("x-ratelimit-remaining"));
+        this.recordQuota(response.headers.get("x-ratelimit-remaining"));
         return {
-          etag: reponse.headers.get("etag"),
+          etag: response.headers.get("etag"),
           // Un dépôt vide, ou une réponse inattendue : rien à la racine.
-          entrees: (Array.isArray(reponse.body) ? reponse.body : [])
+          entries: (Array.isArray(response.body) ? response.body : [])
             .filter((e) => e.type === "file" || e.type === "dir")
             .map((e) => ({
               path: e.path,
@@ -526,7 +526,7 @@ export class GithubClient {
         };
       } catch (e) {
         if (e instanceof HttpErrorResponse) {
-          this.noterQuota(e.headers?.get("x-ratelimit-remaining") ?? null);
+          this.recordQuota(e.headers?.get("x-ratelimit-remaining") ?? null);
           if (e.status === 304 && etag) return null;
         }
         throw this.toGithubError(e);
@@ -540,15 +540,15 @@ export class GithubClient {
    * Une empreinte désigne un contenu pour toujours : ce qui a été lu sous elle
    * n'est jamais à redemander.
    */
-  async loadArbreParSha(depot: RefDepot, sha: string): Promise<EntreeArbre[]> {
-    const brut = await this.call<{
+  async loadTreeBySha(repoRef: RepoRef, sha: string): Promise<TreeEntry[]> {
+    const raw = await this.call<{
       tree: Array<{ path: string; sha: string; type: string; size?: number }>;
     }>(
-      `${this.base}/repos/${depot.owner}/${depot.repo}/git/trees/${sha}`,
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/git/trees/${sha}`,
       undefined,
-      depot,
+      repoRef,
     );
-    return brut.tree
+    return raw.tree
       .filter((e) => e.type === "blob")
       .map((e) => ({
         path: e.path,
@@ -559,20 +559,20 @@ export class GithubClient {
   }
 
   /** Les octets d'un blob, par l'API : une image n'est pas du texte. */
-  async loadBlobOctets(depot: RefDepot, sha: string): Promise<ArrayBuffer> {
-    const url = `${this.base}/repos/${depot.owner}/${depot.repo}/git/blobs/${sha}`;
+  async loadBlobBytes(repoRef: RepoRef, sha: string): Promise<ArrayBuffer> {
+    const url = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/git/blobs/${sha}`;
     return this.apiLimiter.run(async () => {
-      const headers = this.buildHeaders(depot).set(
+      const headers = this.buildHeaders(repoRef).set(
         "Accept",
         "application/vnd.github.raw",
       );
       try {
-        const reponse = await this.http.get(url, {
+        const response = await this.http.get(url, {
           headers,
           responseType: "arraybuffer",
         });
-        this.noterQuota(reponse.headers.get("x-ratelimit-remaining"));
-        return reponse.body ?? new ArrayBuffer(0);
+        this.recordQuota(response.headers.get("x-ratelimit-remaining"));
+        return response.body ?? new ArrayBuffer(0);
       } catch (e) {
         throw this.toGithubError(e);
       }
@@ -593,11 +593,11 @@ export class GithubClient {
    * est donc laissée au navigateur : `no-cache` lui fait revalider sa copie
    * avec la marque qu'il détient, et une réponse inchangée ne rapatrie rien.
    */
-  async loadRawOctets(
-    depot: RefDepot,
-    chemin: string,
+  async loadRawBytes(
+    repoRef: RepoRef,
+    path: string,
   ): Promise<ArrayBuffer | null> {
-    const url = `https://raw.githubusercontent.com/${depot.owner}/${depot.repo}/HEAD/${chemin}`;
+    const url = `https://raw.githubusercontent.com/${repoRef.owner}/${repoRef.repo}/HEAD/${path}`;
     try {
       return await this.rawLimiter.run(() =>
         this.http
@@ -621,10 +621,10 @@ export class GithubClient {
    * Retourne `null` plutôt que d'échouer : une date manquante dégrade
    * l'affichage, elle ne doit pas empêcher la lecture.
    */
-  async dateCreation(depot: RefDepot, chemin: string): Promise<string | null> {
+  async creationDate(repoRef: RepoRef, path: string): Promise<string | null> {
     const url =
-      `${this.base}/repos/${depot.owner}/${depot.repo}/commits` +
-      `?path=${encodeURIComponent(chemin)}&per_page=100`;
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/commits` +
+      `?path=${encodeURIComponent(path)}&per_page=100`;
     try {
       const commits =
         await this.call<
@@ -663,7 +663,7 @@ export class GithubClient {
 
     return this.apiLimiter.run(async () => {
       try {
-        const reponse = await this.http.post<{
+        const response = await this.http.post<{
           data?: T;
           errors?: Array<{ message: string; type?: string }>;
         }>(
@@ -672,12 +672,12 @@ export class GithubClient {
           { headers: this.buildHeaders() },
         );
 
-        const corps = reponse.body;
-        const premiere = corps?.errors?.[0];
-        if (premiere) throw this.toGraphqlError(premiere);
-        if (!corps?.data)
+        const body = response.body;
+        const first = body?.errors?.[0];
+        if (first) throw this.toGraphqlError(first);
+        if (!body?.data)
           throw new GraphqlError("GitHub a répondu sans donnée.");
-        return corps.data;
+        return body.data;
       } catch (e) {
         if (e instanceof GraphqlError) throw e;
         throw this.toGithubError(e);
@@ -696,9 +696,9 @@ export class GithubClient {
    * Retourne `null` si le dépôt n'a aucun commit à cette date, ce qui arrive
    * pour une date antérieure à sa création.
    */
-  async commitALaDate(depot: RefDepot, date: Date): Promise<CommitDate | null> {
+  async commitAtDate(repoRef: RepoRef, date: Date): Promise<CommitDate | null> {
     const url =
-      `${this.base}/repos/${depot.owner}/${depot.repo}/commits` +
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/commits` +
       `?until=${encodeURIComponent(date.toISOString())}&per_page=1`;
     const commits = await this.call<
       Array<{
@@ -707,12 +707,12 @@ export class GithubClient {
       }>
     >(url);
 
-    const premier = commits[0];
-    if (!premier) return null;
+    const first = commits[0];
+    if (!first) return null;
     return {
-      sha: premier.sha,
-      date: premier.commit.committer?.date ?? null,
-      titre: premier.commit.message.split("\n")[0],
+      sha: first.sha,
+      date: first.commit.committer?.date ?? null,
+      title: first.commit.message.split("\n")[0],
     };
   }
 
@@ -728,27 +728,24 @@ export class GithubClient {
    * dernière page, qui contient le commit initial. Parcourir l'historique
    * entier coûterait un appel par centaine de commits.
    */
-  async dateDuPremierCommit(depot: RefDepot): Promise<string | null> {
-    const base = `${this.base}/repos/${depot.owner}/${depot.repo}/commits?per_page=1`;
+  async firstCommitDate(repoRef: RepoRef): Promise<string | null> {
+    const base = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/commits?per_page=1`;
     type Commit = { commit: { committer: { date: string } | null } };
 
     return this.apiLimiter.run(async () => {
       try {
-        const premiere = await this.http.get<Commit[]>(base, {
+        const first = await this.http.get<Commit[]>(base, {
           headers: this.buildHeaders(),
         });
 
-        const lien = premiere.headers.get("link");
-        const derniere = lien?.match(/[?&]page=(\d+)>;\s*rel="last"/)?.[1];
+        const link = first.headers.get("link");
+        const last = link?.match(/[?&]page=(\d+)>;\s*rel="last"/)?.[1];
         // sans en-tête `link`, le dépôt tient en une page : le premier commit
         // est celui qu'on vient de recevoir
-        if (!derniere)
-          return premiere.body?.[0]?.commit.committer?.date ?? null;
+        if (!last) return first.body?.[0]?.commit.committer?.date ?? null;
 
-        const dernierePage = await this.call<Commit[]>(
-          `${base}&page=${derniere}`,
-        );
-        return dernierePage[0]?.commit.committer?.date ?? null;
+        const lastPage = await this.call<Commit[]>(`${base}&page=${last}`);
+        return lastPage[0]?.commit.committer?.date ?? null;
       } catch {
         // une borne absente dégrade la saisie, elle ne doit pas empêcher la vue
         return null;
@@ -769,34 +766,34 @@ export class GithubClient {
    * référentiel étant en français, un « é » suffirait à produire un fichier
    * illisible dans le dépôt, sans la moindre erreur pour le signaler.
    */
-  private toBase64(texte: string): string {
-    const octets = new TextEncoder().encode(texte);
-    let binaire = "";
-    for (const o of octets) binaire += String.fromCharCode(o);
-    return btoa(binaire);
+  private toBase64(text: string): string {
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    for (const o of bytes) binary += String.fromCharCode(o);
+    return btoa(binary);
   }
 
   private async send<T>(
     url: string,
-    methode: "POST" | "PUT" | "PATCH" | "DELETE",
-    corps: unknown,
+    httpMethod: "POST" | "PUT" | "PATCH" | "DELETE",
+    body: unknown,
   ): Promise<T> {
-    const suspendue = this.ecritureSuspendue();
-    if (suspendue) throw new GithubError(suspendue, 0);
+    const suspended = this.writeSuspended();
+    if (suspended) throw new GithubError(suspended, 0);
     return this.apiLimiter.run(async () => {
       try {
-        const reponse = await this.http.request<T>(methode, url, {
-          body: corps,
+        const response = await this.http.request<T>(httpMethod, url, {
+          body: body,
           headers: this.buildHeaders(),
         });
-        const restant = reponse.headers.get("x-ratelimit-remaining");
-        if (restant !== null) this.quotaRestant.set(Number(restant));
-        return reponse.body as T;
+        const remaining = response.headers.get("x-ratelimit-remaining");
+        if (remaining !== null) this.quotaRemaining.set(Number(remaining));
+        return response.body as T;
       } catch (e) {
         if (e instanceof HttpErrorResponse) {
-          const restant = e.headers?.get("x-ratelimit-remaining");
-          if (restant !== null && restant !== undefined)
-            this.quotaRestant.set(Number(restant));
+          const remaining = e.headers?.get("x-ratelimit-remaining");
+          if (remaining !== null && remaining !== undefined)
+            this.quotaRemaining.set(Number(remaining));
         }
         throw this.toGithubError(e, true);
       }
@@ -810,25 +807,25 @@ export class GithubClient {
    * traiter : c'est le signe qu'un cadrage du même identifiant est déjà en
    * cours, et l'écraser ferait perdre son travail.
    */
-  async createBranche(
-    depot: RefDepot,
-    nom: string,
-    depuisSha: string,
+  async createBranch(
+    repoRef: RepoRef,
+    name: string,
+    fromSha: string,
   ): Promise<void> {
     await this.send(
-      `${this.base}/repos/${depot.owner}/${depot.repo}/git/refs`,
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/git/refs`,
       "POST",
       {
-        ref: `refs/heads/${nom}`,
-        sha: depuisSha,
+        ref: `refs/heads/${name}`,
+        sha: fromSha,
       },
     );
   }
 
   /** SHA du sommet d'une branche. */
-  async shaDeBranche(depot: RefDepot, branche: string): Promise<string> {
+  async branchSha(repoRef: RepoRef, branch: string): Promise<string> {
     const ref = await this.call<{ object: { sha: string } }>(
-      `${this.base}/repos/${depot.owner}/${depot.repo}/git/ref/heads/${encodeURIComponent(branche)}`,
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/git/ref/heads/${encodeURIComponent(branch)}`,
     );
     return ref.object.sha;
   }
@@ -840,34 +837,34 @@ export class GithubClient {
    * c'est le contrôle de concurrence de l'API. Sans lui, deux rédacteurs
    * écrasent silencieusement le travail l'un de l'autre.
    */
-  async commitFichier(
-    depot: RefDepot,
-    branche: string,
-    chemin: string,
-    contenu: string,
+  async commitFile(
+    repoRef: RepoRef,
+    branch: string,
+    path: string,
+    content: string,
     message: string,
-    shaActuel?: string,
-  ): Promise<{ commit: string; fichier: string }> {
+    currentSha?: string,
+  ): Promise<{ commit: string; file: string }> {
     const url =
-      `${this.base}/repos/${depot.owner}/${depot.repo}/contents/` +
-      chemin.split("/").map(encodeURIComponent).join("/");
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/contents/` +
+      path.split("/").map(encodeURIComponent).join("/");
 
-    const reponse = await this.send<{
+    const response = await this.send<{
       commit: { sha: string };
       content: { sha: string };
     }>(url, "PUT", {
       message,
-      content: this.toBase64(contenu),
-      branch: branche,
-      ...(shaActuel ? { sha: shaActuel } : {}),
-      ...this.auteurDuCommit(),
+      content: this.toBase64(content),
+      branch: branch,
+      ...(currentSha ? { sha: currentSha } : {}),
+      ...this.commitAuthor(),
     });
 
     // L'écriture rend déjà le nouveau SHA du fichier, celui sur lequel la
     // prochaine devra se fonder. Le relire serait une course perdue d'avance :
     // la référence de branche peut n'avoir pas encore bougé, et l'appelant
     // écrirait alors sur une version périmée.
-    return { commit: reponse.commit.sha, fichier: reponse.content.sha };
+    return { commit: response.commit.sha, file: response.content.sha };
   }
 
   /**
@@ -877,37 +874,37 @@ export class GithubClient {
    * refuse, et c'est heureux — supprimer une version qu'on n'a pas lue
    * effacerait le travail de quelqu'un d'autre sans le voir.
    */
-  async supprimerFichier(
-    depot: RefDepot,
-    branche: string,
-    chemin: string,
-    shaActuel: string,
+  async deleteFile(
+    repoRef: RepoRef,
+    branch: string,
+    path: string,
+    currentSha: string,
     message: string,
   ): Promise<void> {
     const url =
-      `${this.base}/repos/${depot.owner}/${depot.repo}/contents/` +
-      chemin.split("/").map(encodeURIComponent).join("/");
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/contents/` +
+      path.split("/").map(encodeURIComponent).join("/");
     await this.send(url, "DELETE", {
       message,
-      sha: shaActuel,
-      branch: branche,
-      ...this.auteurDuCommit(),
+      sha: currentSha,
+      branch: branch,
+      ...this.commitAuthor(),
     });
   }
 
   /** Ouvre une pull request et retourne son numéro. */
   async createPullRequest(
-    depot: RefDepot,
-    branche: string,
+    repoRef: RepoRef,
+    branch: string,
     base: string,
-    titre: string,
-    corps: string,
-    brouillon = false,
+    title: string,
+    body: string,
+    draft = false,
   ): Promise<number> {
     const pr = await this.send<{ number: number }>(
-      `${this.base}/repos/${depot.owner}/${depot.repo}/pulls`,
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/pulls`,
       "POST",
-      { title: titre, body: corps, head: branche, base, draft: brouillon },
+      { title: title, body: body, head: branch, base, draft: draft },
     );
     return pr.number;
   }
@@ -923,10 +920,10 @@ export class GithubClient {
    * l'attribution possible pour quelqu'un qui n'y a pas de compte. Elle
    * n'apparaît alors qu'en tant que déposant, non comme auteur.
    */
-  private auteurDuCommit(): { author?: { name: string; email: string } } {
-    const qui = this.tokens.identite();
-    if (!qui?.courriel) return {};
-    return { author: { name: qui.nom, email: qui.courriel } };
+  private commitAuthor(): { author?: { name: string; email: string } } {
+    const who = this.tokens.identity();
+    if (!who?.email) return {};
+    return { author: { name: who.name, email: who.email } };
   }
 
   /**
@@ -937,9 +934,9 @@ export class GithubClient {
    * livraison. Ne lire que celle-ci revient à ne montrer que les cadrages
    * terminés, c'est-à-dire pas ceux sur lesquels on travaille.
    */
-  async listPullRequestsOuvertes(
-    depot: RefDepot,
-  ): Promise<readonly DemandeOuverte[]> {
+  async listOpenPullRequests(
+    repoRef: RepoRef,
+  ): Promise<readonly OpenPullRequest[]> {
     // GraphQL d'abord : il rend la décision des relecteurs avec le reste, en un
     // point. REST l'imposerait un appel par demande — `/pulls/{n}/reviews` —
     // contre les limites secondaires que l'application régule déjà.
@@ -950,7 +947,7 @@ export class GithubClient {
             nodes: Array<{
               number: number;
               isDraft: boolean;
-              reviewDecision: DecisionRelecture | null;
+              reviewDecision: ReviewDecision | null;
               headRefName: string;
             }>;
           };
@@ -963,16 +960,16 @@ export class GithubClient {
             }
           }
         }`,
-        { owner: depot.owner, repo: depot.repo },
+        { owner: repoRef.owner, repo: repoRef.repo },
       );
 
       const nodes = repository?.pullRequests?.nodes;
       if (nodes) {
         return nodes.map((p) => ({
-          numero: p.number,
-          branche: p.headRefName,
-          brouillon: p.isDraft,
-          approbation: p.reviewDecision,
+          number: p.number,
+          branch: p.headRefName,
+          draft: p.isDraft,
+          approval: p.reviewDecision,
         }));
       }
     } catch {
@@ -981,7 +978,7 @@ export class GithubClient {
     }
 
     const url =
-      `${this.base}/repos/${depot.owner}/${depot.repo}/pulls` +
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/pulls` +
       "?state=open&per_page=100&sort=updated&direction=desc";
     try {
       const prs =
@@ -991,10 +988,10 @@ export class GithubClient {
       // `approbation: null` et non « pas approuvée » : REST ne l'a pas lue. Un
       // cadrage validé se montrera en relecture, ce qui est le sens prudent.
       return prs.map((p) => ({
-        numero: p.number,
-        branche: p.head.ref,
-        brouillon: p.draft,
-        approbation: null,
+        number: p.number,
+        branch: p.head.ref,
+        draft: p.draft,
+        approval: null,
       }));
     } catch {
       // Sans accès, ou sur un dépôt qui n'en a aucune : le référentiel reste
@@ -1011,31 +1008,31 @@ export class GithubClient {
    * sont des issues comme les autres : elles s'écartent ici, une demande ne
    * pouvant être une piste. Les pages se suivent tant qu'elles sont pleines.
    */
-  async listPistes(depot: RefDepot): Promise<readonly IssueBrute[]> {
-    const issues: IssueBrute[] = [];
+  async listRoadmapItems(repoRef: RepoRef): Promise<readonly RawIssue[]> {
+    const issues: RawIssue[] = [];
     for (let page = 1; ; page++) {
       const url =
-        `${this.base}/repos/${depot.owner}/${depot.repo}/issues` +
+        `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/issues` +
         `?labels=piste&state=open&per_page=100&page=${page}`;
-      const lues = await this.call<IssueBrute[]>(url);
-      issues.push(...lues.filter((i) => !i.pull_request));
-      if (lues.length < 100) return issues;
+      const read = await this.call<RawIssue[]>(url);
+      issues.push(...read.filter((i) => !i.pull_request));
+      if (read.length < 100) return issues;
     }
   }
 
   /** Numéro et état de la demande de fusion ouverte sur une branche. */
-  async findPullRequestDeBranche(
-    depot: RefDepot,
-    branche: string,
-  ): Promise<{ numero: number; brouillon: boolean } | null> {
+  async findPullRequestForBranch(
+    repoRef: RepoRef,
+    branch: string,
+  ): Promise<{ number: number; draft: boolean } | null> {
     const url =
-      `${this.base}/repos/${depot.owner}/${depot.repo}/pulls` +
-      `?head=${encodeURIComponent(`${depot.owner}:${branche}`)}&state=open&per_page=1`;
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/pulls` +
+      `?head=${encodeURIComponent(`${repoRef.owner}:${branch}`)}&state=open&per_page=1`;
     try {
       const prs =
         await this.call<Array<{ number: number; draft: boolean }>>(url);
       const pr = prs[0];
-      return pr ? { numero: pr.number, brouillon: pr.draft } : null;
+      return pr ? { number: pr.number, draft: pr.draft } : null;
     } catch {
       // ne pas trouver la demande dégrade le reflet, cela ne doit pas empêcher
       // d'écrire le statut, qui est la seule source de vérité
@@ -1051,10 +1048,10 @@ export class GithubClient {
    * erreur ne soit remontée. Un reflet qui ne reflète rien serait pire que pas
    * de reflet du tout.
    */
-  async basculerBrouillonPullRequest(
-    depot: RefDepot,
-    numero: number,
-    brouillon: boolean,
+  async toggleDraftPullRequest(
+    repoRef: RepoRef,
+    number: number,
+    draft: boolean,
   ): Promise<void> {
     const { repository } = await this.graphql<{
       repository: { pullRequest: { id: string } | null } | null;
@@ -1062,13 +1059,13 @@ export class GithubClient {
       `query($owner:String!,$repo:String!,$n:Int!){
         repository(owner:$owner,name:$repo){pullRequest(number:$n){id}}
       }`,
-      { owner: depot.owner, repo: depot.repo, n: numero },
+      { owner: repoRef.owner, repo: repoRef.repo, n: number },
     );
 
     const id = repository?.pullRequest?.id;
-    if (!id) throw new GraphqlError(`Demande de fusion ${numero} introuvable.`);
+    if (!id) throw new GraphqlError(`Demande de fusion ${number} introuvable.`);
 
-    const mutation = brouillon
+    const mutation = draft
       ? "convertPullRequestToDraft"
       : "markPullRequestReadyForReview";
     await this.graphql(
@@ -1090,8 +1087,8 @@ export class GithubClient {
    * Retourne une liste vide plutôt que d'échouer : ne pas voir les cadrages en
    * cours dégrade la liste, cela ne doit pas empêcher de lire le référentiel.
    */
-  async listBranchesCadrage(depot: RefDepot): Promise<string[]> {
-    return (await this.listBranches(depot, "cadrage")).filter((b) =>
+  async listScopingBranches(repoRef: RepoRef): Promise<string[]> {
+    return (await this.listBranches(repoRef, "cadrage")).filter((b) =>
       /^cadrage[-/]/.test(b),
     );
   }
@@ -1104,18 +1101,18 @@ export class GithubClient {
    * modifié. Une branche déjà fusionnée par un commit de fusion n'a plus rien
    * en propre, et rend une liste vide.
    */
-  async listCheminsDeBranche(
-    depot: RefDepot,
+  async listBranchPaths(
+    repoRef: RepoRef,
     base: string,
-    branche: string,
+    branch: string,
   ): Promise<string[]> {
     const ref = (b: string) => b.split("/").map(encodeURIComponent).join("/");
-    const comparaison = await this.call<{
+    const comparison = await this.call<{
       files?: Array<{ filename: string }>;
     }>(
-      `${this.base}/repos/${depot.owner}/${depot.repo}/compare/${ref(base)}...${ref(branche)}`,
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/compare/${ref(base)}...${ref(branch)}`,
     );
-    return (comparaison.files ?? []).map((f) => f.filename);
+    return (comparison.files ?? []).map((f) => f.filename);
   }
 
   /**
@@ -1123,11 +1120,11 @@ export class GithubClient {
    *
    * Retourne une liste vide plutôt que d'échouer, pour la même raison.
    */
-  async listBranches(depot: RefDepot, prefixe: string): Promise<string[]> {
+  async listBranches(repoRef: RepoRef, prefix: string): Promise<string[]> {
     try {
       const refs = await this.call<Array<{ ref: string }>>(
-        `${this.base}/repos/${depot.owner}/${depot.repo}/git/matching-refs/heads/` +
-          prefixe.split("/").map(encodeURIComponent).join("/"),
+        `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/git/matching-refs/heads/` +
+          prefix.split("/").map(encodeURIComponent).join("/"),
       );
       return refs.map((r) => r.ref.replace(/^refs\/heads\//, ""));
     } catch {
@@ -1143,40 +1140,40 @@ export class GithubClient {
    * silencieusement le travail l'un de l'autre — avec lui, le second reçoit un
    * conflit qu'on peut lui présenter.
    */
-  async loadFichierEditable(
-    depot: RefDepot,
-    chemin: string,
-    branche: string,
-  ): Promise<{ contenu: string; sha: string }> {
+  async loadEditableFile(
+    repoRef: RepoRef,
+    path: string,
+    branch: string,
+  ): Promise<{ content: string; sha: string }> {
     const url =
-      `${this.base}/repos/${depot.owner}/${depot.repo}/contents/` +
-      chemin.split("/").map(encodeURIComponent).join("/") +
-      `?ref=${encodeURIComponent(branche)}`;
+      `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/contents/` +
+      path.split("/").map(encodeURIComponent).join("/") +
+      `?ref=${encodeURIComponent(branch)}`;
 
-    const brut = await this.call<{
+    const raw = await this.call<{
       content: string;
       sha: string;
       encoding: string;
     }>(url);
     // le contenu vient en base64 : le décoder en UTF-8, sinon les accents sont
     // perdus exactement comme `btoa` les perdrait à l'écriture
-    const binaire = atob(brut.content.replace(/\s/g, ""));
-    const octets = Uint8Array.from(binaire, (c) => c.charCodeAt(0));
-    return { contenu: new TextDecoder().decode(octets), sha: brut.sha };
+    const binary = atob(raw.content.replace(/\s/g, ""));
+    const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+    return { content: new TextDecoder().decode(bytes), sha: raw.sha };
   }
 
   /** Métadonnées du dépôt — sert à vérifier qu'il existe et à lire sa branche. */
-  async loadDepot(
-    depot: RefDepot,
+  async loadRepo(
+    repoRef: RepoRef,
   ): Promise<{ defaultBranch: string; description: string | null }> {
-    const url = `${this.base}/repos/${depot.owner}/${depot.repo}`;
-    const brut = await this.call<{
+    const url = `${this.base}/repos/${repoRef.owner}/${repoRef.repo}`;
+    const raw = await this.call<{
       default_branch: string;
       description: string | null;
     }>(url);
     return {
-      defaultBranch: brut.default_branch,
-      description: brut.description,
+      defaultBranch: raw.default_branch,
+      description: raw.description,
     };
   }
 
@@ -1193,15 +1190,15 @@ export class GithubClient {
    * incomplète est pire qu'aucune liste — elle fait conclure qu'un dépôt n'est
    * pas autorisé.
    */
-  async listDepotsAutorises(): Promise<readonly RefDepot[]> {
+  async listAllowedRepos(): Promise<readonly RepoRef[]> {
     if (!this.tokens.present()) return [];
 
-    const pages: RefDepot[] = [];
+    const pages: RepoRef[] = [];
     for (let page = 1; page <= 5; page++) {
-      const lot = await this.pageDepots(page);
-      pages.push(...lot);
+      const batch = await this.reposPage(page);
+      pages.push(...batch);
       // Une page incomplète est la dernière ; s'arrêter évite un appel pour rien.
-      if (lot.length < 100) break;
+      if (batch.length < 100) break;
     }
     return pages;
   }
@@ -1216,8 +1213,8 @@ export class GithubClient {
    */
   // Une portée « org » ou « org/depot » désigne un dépôt fictif suffisant pour
   // que le service choisisse le bon jeton.
-  private porteeVersDepot(cle: string): RefDepot {
-    const [owner, repo] = cle.split("/");
+  private scopeToRepo(key: string): RepoRef {
+    const [owner, repo] = key.split("/");
     return { owner, repo: repo ?? "" };
   }
 
@@ -1229,87 +1226,87 @@ export class GithubClient {
    * bien réel. Le montrer au moment de la saisie évite d'en chercher la cause
    * ailleurs.
    */
-  async essayerJeton(jeton: string): Promise<readonly string[]> {
+  async tryToken(token: string): Promise<readonly string[]> {
     const url =
       `${this.base}/user/repos` +
       "?affiliation=owner,collaborator,organization_member&sort=updated&per_page=100";
-    const reponse = await fetch(url, {
+    const response = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${jeton}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
       },
     });
 
-    if (reponse.status === 401) {
+    if (response.status === 401) {
       throw new Error(
         "Ce jeton est refusé par GitHub — expiré, ou mal recopié.",
       );
     }
-    if (!reponse.ok) {
+    if (!response.ok) {
       // Un jeton d'installation n'a pas d'utilisateur : l'autre point d'entrée
       // répond alors, et c'est un usage légitime.
       const installation = await fetch(
         `${this.base}/installation/repositories?per_page=100`,
         {
           headers: {
-            Authorization: `Bearer ${jeton}`,
+            Authorization: `Bearer ${token}`,
             Accept: "application/vnd.github+json",
           },
         },
       );
       if (!installation.ok) {
-        throw new Error(`GitHub a répondu ${reponse.status} à ce jeton.`);
+        throw new Error(`GitHub a répondu ${response.status} à ce jeton.`);
       }
-      const brut = (await installation.json()) as {
+      const raw = (await installation.json()) as {
         repositories: Array<{ full_name: string }>;
       };
-      return brut.repositories.map((d) => d.full_name);
+      return raw.repositories.map((d) => d.full_name);
     }
 
-    const brut = (await reponse.json()) as Array<{ full_name: string }>;
-    return brut.map((d) => d.full_name);
+    const raw = (await response.json()) as Array<{ full_name: string }>;
+    return raw.map((d) => d.full_name);
   }
 
-  async listDepotsTousJetons(): Promise<readonly RefDepot[]> {
-    const cible = this.tokens.cibleCourante();
-    const portees = this.tokens.portees().map((p) => p.cle);
+  async listReposAllTokens(): Promise<readonly RepoRef[]> {
+    const target = this.tokens.currentTarget();
+    const scopes = this.tokens.scopes().map((p) => p.key);
     // La cible nulle rend le jeton général, s'il existe.
-    const aInterroger: Array<string | null> = [null, ...portees];
+    const toQuery: Array<string | null> = [null, ...scopes];
 
-    const vus = new Map<string, RefDepot>();
+    const seen = new Map<string, RepoRef>();
     try {
-      for (const cle of aInterroger) {
-        this.tokens.cibler(cle === null ? null : this.porteeVersDepot(cle));
+      for (const key of toQuery) {
+        this.tokens.targetRepo(key === null ? null : this.scopeToRepo(key));
         if (!this.tokens.present()) continue;
-        for (const d of await this.listDepotsAutorises()) {
-          vus.set(`${d.owner.toLowerCase()}/${d.repo.toLowerCase()}`, d);
+        for (const d of await this.listAllowedRepos()) {
+          seen.set(`${d.owner.toLowerCase()}/${d.repo.toLowerCase()}`, d);
         }
       }
     } finally {
       // La cible est un état partagé : la laisser déplacée ferait présenter le
       // mauvais jeton au chargement suivant.
-      this.tokens.cibler(cible);
+      this.tokens.targetRepo(target);
     }
-    return [...vus.values()];
+    return [...seen.values()];
   }
 
-  private async pageDepots(page: number): Promise<RefDepot[]> {
-    const commun = `per_page=100&page=${page}`;
+  private async reposPage(page: number): Promise<RepoRef[]> {
+    const shared = `per_page=100&page=${page}`;
     try {
-      const brut = await this.call<
+      const raw = await this.call<
         Array<{ owner: { login: string }; name: string }>
       >(
-        `${this.base}/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&${commun}`,
+        `${this.base}/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&${shared}`,
       );
-      return brut.map((d) => ({ owner: d.owner.login, repo: d.name }));
+      return raw.map((d) => ({ owner: d.owner.login, repo: d.name }));
     } catch (e) {
       // Un accès d'installation n'a pas d'utilisateur : la plateforme refuse
       // l'appel précédent, et c'est l'autre point d'entrée qui répond.
-      if (e instanceof GithubError && (e.statut === 403 || e.statut === 401)) {
-        const brut = await this.call<{
+      if (e instanceof GithubError && (e.status === 403 || e.status === 401)) {
+        const raw = await this.call<{
           repositories: Array<{ owner: { login: string }; name: string }>;
-        }>(`${this.base}/installation/repositories?${commun}`);
-        return brut.repositories.map((d) => ({
+        }>(`${this.base}/installation/repositories?${shared}`);
+        return raw.repositories.map((d) => ({
           owner: d.owner.login,
           repo: d.name,
         }));
@@ -1329,12 +1326,12 @@ export class GithubClient {
    * autre organisation, celui-ci obtient « introuvable », et ses référentiels
    * passaient pour des dépôts de code.
    */
-  async estDepotCadre(depot: RefDepot): Promise<boolean> {
+  async isScopingRepo(repoRef: RepoRef): Promise<boolean> {
     try {
       await this.call(
-        `${this.base}/repos/${depot.owner}/${depot.repo}/contents/ssk-canon.yml`,
+        `${this.base}/repos/${repoRef.owner}/${repoRef.repo}/contents/ssk-canon.yml`,
         undefined,
-        depot,
+        repoRef,
       );
       return true;
     } catch {

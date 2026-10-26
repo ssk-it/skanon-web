@@ -5,8 +5,8 @@
  *
  * Dans SSK Canon, la fonction vivait dans le dialogue de saisie d'un lien ; elle n'a rien d'une vue, et l'écriture d'un cadrage l'emploie aussi.
  */
-export function normaliserTag(brut: string): string {
-  return brut
+export function normalizeTag(raw: string): string {
+  return raw
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()

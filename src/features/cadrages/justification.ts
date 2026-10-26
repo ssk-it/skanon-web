@@ -13,24 +13,24 @@
  * pèserait plus qu'il n'apporterait ; le corps complet reste lisible dans la
  * fiche, à sa place.
  */
-export function extractJustification(corps: string): string {
-  const marqueur = /\*\*Retenue\.?\*\*\s*/;
-  const depart = corps.search(marqueur);
-  if (depart === -1) return "";
+export function extractJustification(body: string): string {
+  const marker = /\*\*Retenue\.?\*\*\s*/;
+  const departure = body.search(marker);
+  if (departure === -1) return "";
 
-  const apres = corps.slice(depart).replace(marqueur, "");
+  const after = body.slice(departure).replace(marker, "");
 
   // S'arrêter au premier argument : « Pour » et « Contre » pèsent le choix,
   // ils ne l'énoncent pas.
-  const fin = apres.search(/\n\s*\n|\*\*(?:Pour|Contre)\b/);
-  const brut = fin === -1 ? apres : apres.slice(0, fin);
+  const end = after.search(/\n\s*\n|\*\*(?:Pour|Contre)\b/);
+  const raw = end === -1 ? after : after.slice(0, end);
 
-  return normalizeTexte(brut);
+  return normalizeText(raw);
 }
 
 /** Replie les retours à la ligne du Markdown et retire le balisage inline. */
-function normalizeTexte(brut: string): string {
-  return brut
+function normalizeText(raw: string): string {
+  return raw
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/\*(.+?)\*/g, "$1")
     .replace(/`(.+?)`/g, "$1")

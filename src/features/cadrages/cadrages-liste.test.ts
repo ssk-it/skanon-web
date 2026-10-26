@@ -8,14 +8,14 @@ import {
 } from "../../core/http/http-testing";
 import { inject } from "../../core/injection";
 import {
-  TAGS_LIENS_PAR_DEFAUT,
-  type Cadrage,
-  type Referentiel,
+  DEFAULT_LINK_TAGS,
+  type Scoping,
+  type Specification,
 } from "../../core/model/model";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { RepoConfig } from "../../core/repo/repo-config";
-import { createRouteur } from "../../routeur";
-import CadragesPage from "./CadragesPage.vue";
+import { createAppRouter } from "../../routeur";
+import ScopingsPage from "./CadragesPage.vue";
 
 /**
  * La liste des cadrages — RG-liste-cadrages-sobre et RG-liste-cadrages-filtrable.
@@ -23,92 +23,92 @@ import CadragesPage from "./CadragesPage.vue";
  * Ce qui est éprouvé ici, c'est qu'une ligne ne dit que ce qui la distingue, et que la liste se parcourt par un mot ou un domaine sans perdre son ordre.
  */
 
-function cadrage(
+function scoping(
   id: string,
-  titre: string,
-  extra: Partial<Cadrage> = {},
-): Cadrage {
+  title: string,
+  extra: Partial<Scoping> = {},
+): Scoping {
   return {
     id,
-    titre,
-    statut: "livree",
-    domaines: [],
-    liens: [],
+    title,
+    status: "livree",
+    domains: [],
+    links: [],
     impacts: [],
-    objectif: "",
-    parcours: "",
-    enonces: new Map(),
+    goal: "",
+    journey: "",
+    statements: new Map(),
     decisions: [],
-    piecesJointes: [],
-    divers: [],
+    attachments: [],
+    misc: [],
     ...extra,
   };
 }
 
-function impacts(n: number): Cadrage["impacts"] {
+function impacts(n: number): Scoping["impacts"] {
   return Array.from({ length: n }, (_, i) => ({
-    cible: `RG-${i}`,
-    regle: `RG-${i}`,
-    nature: "regle" as const,
+    target: `RG-${i}`,
+    rule: `RG-${i}`,
+    kind: "regle" as const,
     operation: "cree" as const,
   }));
 }
 
-function decisions(n: number): Cadrage["decisions"] {
+function decisions(n: number): Scoping["decisions"] {
   return Array.from({ length: n }, (_, i) => ({
     id: `0${i + 1}-d`,
-    titre: "Une question ?",
-    statut: "retenue" as const,
-    optionRetenue: null,
+    title: "Une question ?",
+    status: "retenue" as const,
+    chosenOption: null,
     description: "",
     options: [],
-    corps: "",
+    body: "",
   }));
 }
 
-const CADRAGES: Cadrage[] = [
-  cadrage("2026-005", "Alléger la barre sur écran étroit", {
-    statut: "en_relecture",
-    domaines: ["referentiel"],
+const SCOPINGS: Scoping[] = [
+  scoping("2026-005", "Alléger la barre sur écran étroit", {
+    status: "en_relecture",
+    domains: ["referentiel"],
     provenance: {
-      branche: "cadrage-2026-005",
+      branch: "cadrage-2026-005",
       pullRequest: 9,
-      brouillon: false,
+      draft: false,
     },
   }),
-  cadrage("2026-004", "Rendre les diagrammes écrits", {
-    domaines: ["referentiel", "cadrage"],
+  scoping("2026-004", "Rendre les diagrammes écrits", {
+    domains: ["referentiel", "cadrage"],
     impacts: impacts(3),
     decisions: decisions(2),
   }),
-  cadrage("2026-003", "Chiffrer les pièces jointes", {
-    domaines: ["persistance"],
+  scoping("2026-003", "Chiffrer les pièces jointes", {
+    domains: ["persistance"],
     impacts: impacts(1),
     decisions: decisions(1),
   }),
 ];
 
-function referentiel(): Referentiel {
-  const domaine = (id: string, nom: string) =>
-    [id, { id, nom, description: "" }] as const;
+function specification(): Specification {
+  const domain = (id: string, name: string) =>
+    [id, { id, name: name, description: "" }] as const;
   return {
-    projet: { nom: "Test", description: "", depotsCode: [], prefixe: null },
-    reglages: {
-      acces: "jeton_personnel",
-      identite: null,
-      protectionDuJeton: "proposee",
-      tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+    project: { name: "Test", description: "", codeRepos: [], prefix: null },
+    settings: {
+      access: "jeton_personnel",
+      identity: null,
+      tokenProtection: "proposee",
+      linkTags: DEFAULT_LINK_TAGS,
     },
-    domaines: new Map([
-      domaine("cadrage", "Cadrage"),
-      domaine("persistance", "Persistance"),
-      domaine("referentiel", "Référentiel"),
+    domains: new Map([
+      domain("cadrage", "Cadrage"),
+      domain("persistance", "Persistance"),
+      domain("referentiel", "Référentiel"),
     ]),
-    fonctionnalites: new Map(),
-    regles: new Map(),
+    features: new Map(),
+    rules: new Map(),
     decisions: new Map(),
     architecture: new Map(),
-    cadrages: new Map(CADRAGES.map((c) => [c.id, c])),
+    scopings: new Map(SCOPINGS.map((c) => [c.id, c])),
     anomalies: [],
   };
 }
@@ -116,8 +116,8 @@ function referentiel(): Referentiel {
 let http: HttpTestingController;
 let router: Router;
 
-async function monter(): Promise<VueWrapper> {
-  const f = mount(CadragesPage, { global: { plugins: [router] } });
+async function mountView(): Promise<VueWrapper> {
+  const f = mount(ScopingsPage, { global: { plugins: [router] } });
   await nextTick();
   return f;
 }
@@ -126,28 +126,28 @@ function el(f: VueWrapper): HTMLElement {
   return f.element.parentElement ?? (f.element as HTMLElement);
 }
 
-function lignes(f: VueWrapper): string[] {
+function lines(f: VueWrapper): string[] {
   return [...el(f).querySelectorAll(".ligne .cid")].map(
     (c) => c.textContent?.trim() ?? "",
   );
 }
 
-async function taper(f: VueWrapper, texte: string): Promise<void> {
-  const champ = el(f).querySelector<HTMLInputElement>(".filtre input")!;
-  champ.value = texte;
-  champ.dispatchEvent(new Event("input"));
+async function typeText(f: VueWrapper, text: string): Promise<void> {
+  const field = el(f).querySelector<HTMLInputElement>(".filtre input")!;
+  field.value = text;
+  field.dispatchEvent(new Event("input"));
   await nextTick();
 }
 
-function domaine(f: VueWrapper, nom: string): HTMLButtonElement {
+function domain(f: VueWrapper, name: string): HTMLButtonElement {
   return [
     ...el(f).querySelectorAll<HTMLButtonElement>(".filtre button.domaine"),
-  ].find((b) => b.textContent?.includes(nom))!;
+  ].find((b) => b.textContent?.includes(name))!;
 }
 
 /** Fait échouer les lectures de dates en vol : chacune rend alors `null`. */
-async function refuserDates(): Promise<void> {
-  for (let tour = 0; tour < 20; tour++) {
+async function denyDates(): Promise<void> {
+  for (let round = 0; round < 20; round++) {
     await Promise.resolve();
     for (const r of http.match((r) => r.url.includes("/commits"))) {
       r.flush("Not Found", { status: 404, statusText: "Not Found" });
@@ -159,33 +159,33 @@ async function refuserDates(): Promise<void> {
 describe("La liste des cadrages", () => {
   beforeEach(async () => {
     http = provideHttpTesting();
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
-    const store = inject(ReferentielStore);
-    store.referentiel.set(referentiel());
-    store.etat.set("pret");
-    router = createRouteur(createMemoryHistory());
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
+    const store = inject(SpecificationStore);
+    store.specification.set(specification());
+    store.state.set("pret");
+    router = createAppRouter(createMemoryHistory());
     await router.push("/org/depot/cadrages");
     await router.isReady();
   });
 
   describe("une ligne sobre", () => {
     it("nomme ses compteurs", async () => {
-      const texte = el(await monter()).textContent ?? "";
+      const text = el(await mountView()).textContent ?? "";
 
-      expect(texte).toContain("2 décisions · 3 impacts");
-      expect(texte).toContain("1 décision · 1 impact");
+      expect(text).toContain("2 décisions · 3 impacts");
+      expect(text).toContain("1 décision · 1 impact");
     });
 
     it("ne répète pas le statut des livrés, et garde celui des en cours", async () => {
-      const f = await monter();
+      const f = await mountView();
 
-      const puces = [...el(f).querySelectorAll(".ligne .statut-chip")];
-      expect(puces.length).toBe(1);
-      expect(puces[0].closest(".ligne")?.textContent).toContain("2026-005");
+      const bullets = [...el(f).querySelectorAll(".ligne .statut-chip")];
+      expect(bullets.length).toBe(1);
+      expect(bullets[0].closest(".ligne")?.textContent).toContain("2026-005");
     });
 
     it("garde l’identifiant affiché sur chaque ligne", async () => {
-      expect(lignes(await monter())).toEqual([
+      expect(lines(await mountView())).toEqual([
         "2026-005",
         "2026-004",
         "2026-003",
@@ -193,16 +193,16 @@ describe("La liste des cadrages", () => {
     });
 
     it("réunit les livrés sous « Livrés » tant qu’aucun n’est daté", async () => {
-      const groupes = [...el(await monter()).querySelectorAll(".groupe")].map(
+      const groups = [...el(await mountView()).querySelectorAll(".groupe")].map(
         (g) => g.firstChild?.textContent?.trim(),
       );
 
-      expect(groupes).toEqual(["En cours", "Livrés"]);
+      expect(groups).toEqual(["En cours", "Livrés"]);
     });
 
     it("dit une fois, avec sa cause, que les dates n’ont pas pu être lues", async () => {
-      const f = await monter();
-      await refuserDates();
+      const f = await mountView();
+      await denyDates();
       await flushPromises();
 
       const notes = el(f).querySelectorAll(".note-dates");
@@ -215,60 +215,60 @@ describe("La liste des cadrages", () => {
 
   describe("un filtre", () => {
     it("réduit la liste à un mot du titre, dans le même ordre", async () => {
-      const f = await monter();
-      await taper(f, "diagrammes");
+      const f = await mountView();
+      await typeText(f, "diagrammes");
 
-      expect(lignes(f)).toEqual(["2026-004"]);
+      expect(lines(f)).toEqual(["2026-004"]);
       expect(el(f).querySelector(".compte")?.textContent).toContain(
         "1 cadrage sur 3",
       );
     });
 
     it("retient les cadrages des domaines choisis, en cours compris", async () => {
-      const f = await monter();
-      domaine(f, "Référentiel").click();
+      const f = await mountView();
+      domain(f, "Référentiel").click();
       await nextTick();
 
-      expect(lignes(f)).toEqual(["2026-005", "2026-004"]);
-      expect(domaine(f, "Référentiel").getAttribute("aria-pressed")).toBe(
+      expect(lines(f)).toEqual(["2026-005", "2026-004"]);
+      expect(domain(f, "Référentiel").getAttribute("aria-pressed")).toBe(
         "true",
       );
     });
 
     it("dit quand il ne retient rien, et s’efface", async () => {
-      const f = await monter();
-      await taper(f, "introuvable");
+      const f = await mountView();
+      await typeText(f, "introuvable");
 
-      const vide = el(f).querySelector(".vide");
-      expect(vide?.textContent).toContain("Aucun cadrage ne correspond");
-      vide!.querySelector("button")!.click();
+      const empty = el(f).querySelector(".vide");
+      expect(empty?.textContent).toContain("Aucun cadrage ne correspond");
+      empty!.querySelector("button")!.click();
       await nextTick();
 
-      expect(lignes(f).length).toBe(3);
+      expect(lines(f).length).toBe(3);
       expect(
         el(f).querySelector<HTMLInputElement>(".filtre input")!.value,
       ).toBe("");
     });
 
     it("se conserve au retour d’une fiche", async () => {
-      const premier = await monter();
-      await taper(premier, "pièces");
-      premier.unmount();
+      const first = await mountView();
+      await typeText(first, "pièces");
+      first.unmount();
 
-      const retour = await monter();
-      expect(lignes(retour)).toEqual(["2026-003"]);
+      const returnPath = await mountView();
+      expect(lines(returnPath)).toEqual(["2026-003"]);
       expect(
-        el(retour).querySelector<HTMLInputElement>(".filtre input")!.value,
+        el(returnPath).querySelector<HTMLInputElement>(".filtre input")!.value,
       ).toBe("pièces");
     });
 
     it("ne suit pas le lecteur dans un autre projet", async () => {
-      const premier = await monter();
-      await taper(premier, "pièces");
-      premier.unmount();
+      const first = await mountView();
+      await typeText(first, "pièces");
+      first.unmount();
 
-      inject(RepoConfig).saveDepot({ owner: "org", repo: "autre" });
-      expect(lignes(await monter()).length).toBe(3);
+      inject(RepoConfig).saveRepo({ owner: "org", repo: "autre" });
+      expect(lines(await mountView()).length).toBe(3);
     });
   });
 });

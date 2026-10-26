@@ -1,6 +1,6 @@
 import { inject, resetInjection } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
-import { LiensService } from "./liens.service";
+import { LinksService } from "./liens.service";
 import { RepoConfig } from "./repo-config";
 
 /**
@@ -10,17 +10,17 @@ import { RepoConfig } from "./repo-config";
  * pointerait encore l'ancien projet après un changement de dépôt.
  */
 describe("Lien vers GitHub", () => {
-  let stockage: Record<string, string>;
+  let storage: Record<string, string>;
 
   beforeEach(() => {
-    stockage = {};
+    storage = {};
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
       value: {
-        getItem: (c: string) => stockage[c] ?? null,
-        setItem: (c: string, v: string) => void (stockage[c] = v),
-        removeItem: (c: string) => void delete stockage[c],
-        clear: () => void (stockage = {}),
+        getItem: (c: string) => storage[c] ?? null,
+        setItem: (c: string, v: string) => void (storage[c] = v),
+        removeItem: (c: string) => void delete storage[c],
+        clear: () => void (storage = {}),
       },
     });
     resetInjection();
@@ -28,34 +28,34 @@ describe("Lien vers GitHub", () => {
 
   it("mène au dépôt ouvert", () => {
     const config = inject(RepoConfig);
-    config.depot.set({ owner: "ssk-it", repo: "ssk-canon" });
+    config.repoRef.set({ owner: "ssk-it", repo: "ssk-canon" });
 
-    expect(inject(LiensService).versGithub()).toBe(
+    expect(inject(LinksService).toGithub()).toBe(
       "https://github.com/ssk-it/ssk-canon",
     );
   });
 
   it("suit le dépôt quand on en change", () => {
     const config = inject(RepoConfig);
-    const liens = inject(LiensService);
+    const links = inject(LinksService);
 
-    config.depot.set({ owner: "ssk-it", repo: "ssk-canon" });
-    expect(liens.versGithub()).toBe("https://github.com/ssk-it/ssk-canon");
+    config.repoRef.set({ owner: "ssk-it", repo: "ssk-canon" });
+    expect(links.toGithub()).toBe("https://github.com/ssk-it/ssk-canon");
 
-    config.depot.set({ owner: "autre-org", repo: "autre-depot" });
-    expect(liens.versGithub()).toBe("https://github.com/autre-org/autre-depot");
+    config.repoRef.set({ owner: "autre-org", repo: "autre-depot" });
+    expect(links.toGithub()).toBe("https://github.com/autre-org/autre-depot");
   });
 
   it("accepte des segments et les encode", () => {
     const config = inject(RepoConfig);
-    config.depot.set({ owner: "ssk-it", repo: "ssk-canon" });
-    const liens = inject(LiensService);
+    config.repoRef.set({ owner: "ssk-it", repo: "ssk-canon" });
+    const links = inject(LinksService);
 
-    expect(liens.versGithub("issues")).toBe(
+    expect(links.toGithub("issues")).toBe(
       "https://github.com/ssk-it/ssk-canon/issues",
     );
     // Un segment ne doit jamais pouvoir sortir du dépôt qu'il désigne.
-    expect(liens.versGithub("../evasion")).toBe(
+    expect(links.toGithub("../evasion")).toBe(
       "https://github.com/ssk-it/ssk-canon/..%2Fevasion",
     );
   });

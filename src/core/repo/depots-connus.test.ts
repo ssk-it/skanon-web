@@ -5,9 +5,9 @@ import {
 import { inject, resetInjection } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  DepotConnu,
-  DepotsConnusService,
-  groupDepotsByOrganisation,
+  KnownRepo,
+  KnownReposService,
+  groupReposByOrganization,
 } from "./depots-connus.service";
 import { RepoConfig } from "./repo-config";
 import { TokenService } from "../github/token.service";
@@ -19,28 +19,31 @@ import { TokenService } from "../github/token.service";
  * référentiel. Voir RG-projets-connus.
  */
 describe("dépôts proposés à l’ouverture", () => {
-  const JETON_SSK = "ghp_ssk_aaaaaaaaaaaaaaaa";
-  const JETON_WAYNE = "ghp_wayne_aaaaaaaaaaaaaa";
+  const SSK_TOKEN = "ghp_ssk_aaaaaaaaaaaaaaaa";
+  const WAYNE_TOKEN = "ghp_wayne_aaaaaaaaaaaaaa";
 
   /** Ce que chaque jeton atteint, comme GitHub le dirait. */
-  const PORTEE: Record<string, readonly string[]> = {
-    [JETON_SSK]: ["ssk-it/skift-cadrage", "ssk-it/skift"],
-    [JETON_WAYNE]: ["Wayne-Corp/wayne-devis-cadrage"],
+  const SCOPE: Record<string, readonly string[]> = {
+    [SSK_TOKEN]: ["ssk-it/skift-cadrage", "ssk-it/skift"],
+    [WAYNE_TOKEN]: ["Wayne-Corp/wayne-devis-cadrage"],
   };
-  const CADRES = ["ssk-it/skift-cadrage", "Wayne-Corp/wayne-devis-cadrage"];
+  const FRAMED_REPOS = [
+    "ssk-it/skift-cadrage",
+    "Wayne-Corp/wayne-devis-cadrage",
+  ];
 
   let http: HttpTestingController;
-  let stockage: Record<string, string>;
+  let storage: Record<string, string>;
 
   beforeEach(() => {
-    stockage = {};
+    storage = {};
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
       value: {
-        getItem: (c: string) => stockage[c] ?? null,
-        setItem: (c: string, v: string) => void (stockage[c] = v),
-        removeItem: (c: string) => void delete stockage[c],
-        clear: () => void (stockage = {}),
+        getItem: (c: string) => storage[c] ?? null,
+        setItem: (c: string, v: string) => void (storage[c] = v),
+        removeItem: (c: string) => void delete storage[c],
+        clear: () => void (storage = {}),
       },
     });
     resetInjection();
@@ -52,32 +55,32 @@ describe("dépôts proposés à l’ouverture", () => {
    * Répond à chaque appel en jouant GitHub : un dépôt hors de portée du jeton
    * présenté est introuvable, comme la plateforme le dit d'un dépôt privé.
    */
-  async function jouerGithub(): Promise<void> {
-    for (let tour = 0; tour < 50; tour++) {
-      for (const requete of http.match(() => true)) {
-        const jeton =
-          requete.request.headers
-            .get("Authorization")
-            ?.replace("Bearer ", "") ?? "";
-        const atteints = PORTEE[jeton] ?? [];
-        const url = requete.request.url;
+  async function replayGithub(): Promise<void> {
+    for (let round = 0; round < 50; round++) {
+      for (const query of http.match(() => true)) {
+        const token =
+          query.request.headers.get("Authorization")?.replace("Bearer ", "") ??
+          "";
+        const reached = SCOPE[token] ?? [];
+        const url = query.request.url;
 
         if (url.includes("/user/repos")) {
-          requete.flush(
-            atteints.map((nom) => {
-              const [owner, name] = nom.split("/");
+          query.flush(
+            reached.map((fullName) => {
+              const [owner, name] = fullName.split("/");
               return { owner: { login: owner }, name };
             }),
           );
           continue;
         }
 
-        const contenu =
+        const content =
           /\/repos\/([^/]+\/[^/]+)\/contents\/ssk-canon\.yml/.exec(url);
-        if (contenu) {
-          const nom = contenu[1];
-          if (atteints.includes(nom) && CADRES.includes(nom)) requete.flush({});
-          else requete.flush(null, { status: 404, statusText: "Not Found" });
+        if (content) {
+          const name = content[1];
+          if (reached.includes(name) && FRAMED_REPOS.includes(name))
+            query.flush({});
+          else query.flush(null, { status: 404, statusText: "Not Found" });
           continue;
         }
         throw new Error(`Appel inattendu : ${url}`);
@@ -88,24 +91,24 @@ describe("dépôts proposés à l’ouverture", () => {
 
   it("reconnaît les référentiels de chaque organisation, sous le jeton qui l’atteint", async () => {
     const tokens = inject(TokenService);
-    tokens.definirPourPortee("ssk-it", JETON_SSK);
-    tokens.definirPourPortee("wayne-corp", JETON_WAYNE);
+    tokens.setForScope("ssk-it", SSK_TOKEN);
+    tokens.setForScope("wayne-corp", WAYNE_TOKEN);
     // L'écran de choix est montré alors qu'un projet ssk-it était ouvert.
-    tokens.cibler({ owner: "ssk-it", repo: "skift-cadrage" });
+    tokens.targetRepo({ owner: "ssk-it", repo: "skift-cadrage" });
 
-    const connus = inject(DepotsConnusService);
-    const fin = connus.rafraichir();
-    await jouerGithub();
-    await fin;
+    const known = inject(KnownReposService);
+    const end = known.refresh();
+    await replayGithub();
+    await end;
 
-    const cadres = connus
-      .depots()
-      .filter((d) => d.cadre)
-      .map((d) => `${d.depot.owner}/${d.depot.repo}`);
-    expect(cadres.sort()).toEqual([...CADRES].sort());
-    expect(connus.erreur()).toBeNull();
+    const framedRepos = known
+      .repos()
+      .filter((d) => d.framed)
+      .map((d) => `${d.repoRef.owner}/${d.repoRef.repo}`);
+    expect(framedRepos.sort()).toEqual([...FRAMED_REPOS].sort());
+    expect(known.error()).toBeNull();
     // La cible partagée n'a pas été déplacée par la vérification.
-    expect(tokens.cibleCourante()).toEqual({
+    expect(tokens.currentTarget()).toEqual({
       owner: "ssk-it",
       repo: "skift-cadrage",
     });
@@ -114,21 +117,21 @@ describe("dépôts proposés à l’ouverture", () => {
   it("écrit un dépôt déjà ouvert comme GitHub le nomme", async () => {
     // Saisi à la main en minuscules : la plateforme ne distingue pas la casse,
     // mais deux graphies d'une organisation la couperaient en deux groupes.
-    inject(RepoConfig).memoriserOuvert({
+    inject(RepoConfig).rememberOpened({
       owner: "wayne-corp",
       repo: "wayne-devis-cadrage",
     });
-    inject(TokenService).definirPourPortee("wayne-corp", JETON_WAYNE);
+    inject(TokenService).setForScope("wayne-corp", WAYNE_TOKEN);
 
-    const connus = inject(DepotsConnusService);
-    const fin = connus.rafraichir();
-    await jouerGithub();
-    await fin;
+    const known = inject(KnownReposService);
+    const end = known.refresh();
+    await replayGithub();
+    await end;
 
-    expect(connus.depots()).toEqual([
+    expect(known.repos()).toEqual([
       {
-        depot: { owner: "Wayne-Corp", repo: "wayne-devis-cadrage" },
-        cadre: true,
+        repoRef: { owner: "Wayne-Corp", repo: "wayne-devis-cadrage" },
+        framed: true,
         recent: true,
       },
     ]);
@@ -136,22 +139,22 @@ describe("dépôts proposés à l’ouverture", () => {
 });
 
 describe("regroupement des dépôts par organisation", () => {
-  const connu = (nom: string, cadre: boolean, recent = false): DepotConnu => {
-    const [owner, repo] = nom.split("/");
-    return { depot: { owner, repo }, cadre, recent };
+  const known = (name: string, framed: boolean, recent = false): KnownRepo => {
+    const [owner, repo] = name.split("/");
+    return { repoRef: { owner, repo }, framed, recent };
   };
 
   it("range les organisations par nom, et dans chacune les référentiels d’abord", () => {
-    const groupes = groupDepotsByOrganisation([
-      connu("ssk-it/skift", false),
-      connu("Wayne-Corp/wayne-devis-cadrage", true),
-      connu("ssk-it/skift-cadrage", true, true),
-      connu("ssk-it/mnesisk-cadrage", true),
-      connu("Globex/site", false),
+    const groups = groupReposByOrganization([
+      known("ssk-it/skift", false),
+      known("Wayne-Corp/wayne-devis-cadrage", true),
+      known("ssk-it/skift-cadrage", true, true),
+      known("ssk-it/mnesisk-cadrage", true),
+      known("Globex/site", false),
     ]);
 
     expect(
-      groupes.map((g) => [g.organisation, g.depots.map((d) => d.depot.repo)]),
+      groups.map((g) => [g.organization, g.repos.map((d) => d.repoRef.repo)]),
     ).toEqual([
       ["Globex", ["site"]],
       ["ssk-it", ["mnesisk-cadrage", "skift-cadrage", "skift"]],
@@ -160,12 +163,12 @@ describe("regroupement des dépôts par organisation", () => {
   });
 
   it("ne coupe pas une organisation en deux selon la casse", () => {
-    const groupes = groupDepotsByOrganisation([
-      connu("Wayne-Corp/wayne-stock-cadrage", true),
-      connu("wayne-corp/wayne-chantier-cadrage", true),
+    const groups = groupReposByOrganization([
+      known("Wayne-Corp/wayne-stock-cadrage", true),
+      known("wayne-corp/wayne-chantier-cadrage", true),
     ]);
 
-    expect(groupes).toHaveLength(1);
-    expect(groupes[0].depots).toHaveLength(2);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].repos).toHaveLength(2);
   });
 });

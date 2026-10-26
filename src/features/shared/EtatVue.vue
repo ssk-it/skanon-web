@@ -2,15 +2,15 @@
 import { ref, watchEffect } from "vue";
 import { GithubError } from "../../core/github/github-client";
 import { inject } from "../../core/injection";
-import { AmorcageService } from "../../core/repo/amorcage.service";
-import { AutomatisationService } from "../../core/repo/automatisation.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { BootstrapService } from "../../core/repo/amorcage.service";
+import { AutomationService } from "../../core/repo/automatisation.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { DialogService } from "../../ui/dialog.service";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiCaseACocher from "../../ui/UiCaseACocher.vue";
-import UiChamp from "../../ui/UiChamp.vue";
-import UiIcone from "../../ui/UiIcone.vue";
-import AideAccesDepot from "./AideAccesDepot.vue";
+import UiButton from "../../ui/UiBouton.vue";
+import UiCheckbox from "../../ui/UiCaseACocher.vue";
+import UiTextField from "../../ui/UiChamp.vue";
+import UiIcon from "../../ui/UiIcone.vue";
+import RepoAccessHelp from "./AideAccesDepot.vue";
 
 /**
  * Chargement, erreur, dépôt vide. Isolé parce que chaque écran doit le gérer, et qu'un message d'erreur utile vaut mieux qu'un écran blanc.
@@ -19,13 +19,13 @@ import AideAccesDepot from "./AideAccesDepot.vue";
  * <EtatVue v-if="store.etat() !== 'pret'" />
  * ```
  */
-const store = inject(ReferentielStore);
+const store = inject(SpecificationStore);
 const dialog = inject(DialogService);
-const amorcageService = inject(AmorcageService);
-const automatisation = inject(AutomatisationService);
+const bootstrapService = inject(BootstrapService);
+const automation = inject(AutomationService);
 
 function retry(): void {
-  void store.loadReferentiel();
+  void store.loadSpecification();
 }
 
 /** Le même dialogue que la barre, rechargeant le dépôt si le jeton a changé. */
@@ -34,62 +34,62 @@ function openTokenDialog(): void {
     const change = await dialog.open<boolean>(TokenDialog, {
       focus: "dialogue",
     });
-    if (change) void store.loadReferentiel();
+    if (change) void store.loadSpecification();
   });
 }
 
-const nomProjet = ref("");
-const descriptionProjet = ref("");
-const amorcage = ref(false);
+const projectName = ref("");
+const projectDescription = ref("");
+const bootstrap = ref(false);
 /** Cochée d'emblée : un dépôt cadré sans automatisation ne tient pas ses promesses, et l'oubli ne se voit qu'à la première livraison incohérente. */
-const avecAutomatisation = ref(true);
-const erreurAmorcage = ref<string | null>(null);
+const withAutomation = ref(true);
+const bootstrapError = ref<string | null>(null);
 
 // Le nom du dépôt sert de proposition : c'est ce que le rédacteur vient d'ouvrir, et le retaper à l'identique n'apprend rien à personne.
 watchEffect(() => {
-  if (store.depotVide() && !nomProjet.value) {
-    nomProjet.value = store.depot().repo;
+  if (store.emptyRepo() && !projectName.value) {
+    projectName.value = store.repoRef().repo;
   }
 });
 
-async function amorcer(): Promise<void> {
-  if (amorcage.value || !nomProjet.value.trim()) return;
-  amorcage.value = true;
-  erreurAmorcage.value = null;
+async function bootstrapProject(): Promise<void> {
+  if (bootstrap.value || !projectName.value.trim()) return;
+  bootstrap.value = true;
+  bootstrapError.value = null;
   try {
     // Pas de description inventée : une phrase que personne n'a écrite est prise pour vraie par ceux qui la lisent ensuite, et se recopie.
-    await amorcageService.amorcer({
-      nom: nomProjet.value.trim(),
-      description: descriptionProjet.value.trim(),
+    await bootstrapService.bootstrapProject({
+      name: projectName.value.trim(),
+      description: projectDescription.value.trim(),
     });
 
     // Après l'amorçage, non pendant : le référentiel existe désormais, et si l'accès ne permet pas d'écrire les workflows, le dépôt reste amorcé — l'installation se reprend depuis les réglages.
-    if (avecAutomatisation.value) {
-      await automatisation.installer();
+    if (withAutomation.value) {
+      await automation.install();
     }
   } catch (e) {
-    erreurAmorcage.value =
+    bootstrapError.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
         : "Le dépôt n’a pas pu être amorcé.";
   } finally {
-    amorcage.value = false;
+    bootstrap.value = false;
   }
 }
 </script>
 
 <template>
   <div class="etat-vue">
-    <div v-if="store.etat() === 'chargement'" class="etat">
+    <div v-if="store.state() === 'chargement'" class="etat">
       <p class="titre">Chargement du référentiel…</p>
       <p v-if="store.progression()" class="detail">
-        {{ store.progression()?.charges }} /
+        {{ store.progression()?.loadedCount }} /
         {{ store.progression()?.total }} fichiers
       </p>
     </div>
-    <template v-else-if="store.etat() === 'erreur'">
-      <div v-if="store.depotVide()" class="etat amorcage">
-        <UiIcone nom="rocket_launch" />
+    <template v-else-if="store.state() === 'erreur'">
+      <div v-if="store.emptyRepo()" class="etat amorcage">
+        <UiIcon name="rocket_launch" />
         <p class="titre">Ce dépôt est vide</p>
         <p class="detail">
           Il n’a encore rien reçu. L’application peut y déposer la structure
@@ -98,58 +98,58 @@ async function amorcer(): Promise<void> {
         </p>
 
         <div class="champs">
-          <UiChamp
-            v-model="nomProjet"
-            libelle="Nom du projet"
+          <UiTextField
+            v-model="projectName"
+            label="Nom du projet"
             name="nomProjet"
-            :disabled="amorcage"
+            :disabled="bootstrap"
           />
 
-          <UiChamp
-            v-model="descriptionProjet"
-            libelle="En une phrase"
-            multiligne
+          <UiTextField
+            v-model="projectDescription"
+            label="En une phrase"
+            multiline
             :rows="2"
             name="descriptionProjet"
-            :disabled="amorcage"
+            :disabled="bootstrap"
           />
         </div>
 
-        <UiCaseACocher v-model="avecAutomatisation" :disabled="amorcage">
+        <UiCheckbox v-model="withAutomation" :disabled="bootstrap">
           Installer l’automatisation
-        </UiCaseACocher>
+        </UiCheckbox>
         <p class="detail note">
           Vérifie les cadrages avant leur livraison, et met à jour les règles
           une fois livrés. Demande un accès autorisé à écrire les workflows.
         </p>
 
-        <p v-if="erreurAmorcage" class="detail echec">{{ erreurAmorcage }}</p>
+        <p v-if="bootstrapError" class="detail echec">{{ bootstrapError }}</p>
 
-        <UiBouton
-          variante="filled"
-          :disabled="amorcage || !nomProjet.trim()"
-          @click="amorcer()"
+        <UiButton
+          variant="filled"
+          :disabled="bootstrap || !projectName.trim()"
+          @click="bootstrapProject()"
         >
-          {{ amorcage ? "Dépôt en cours…" : "Amorcer le référentiel" }}
-        </UiBouton>
+          {{ bootstrap ? "Dépôt en cours…" : "Amorcer le référentiel" }}
+        </UiButton>
         <p class="detail note">
           Écrit directement sur la branche principale : il n’y a rien à relire
           dans un dépôt vide.
         </p>
       </div>
       <div v-else class="etat erreur">
-        <UiIcone nom="error_outline" />
+        <UiIcon name="error_outline" />
         <p class="titre">Le dépôt n’a pas pu être chargé</p>
-        <p class="detail">{{ store.erreur() }}</p>
-        <AideAccesDepot
-          v-if="store.jetonSansAcces()"
-          :depot="store.depot()"
-          @remplacer="openTokenDialog()"
+        <p class="detail">{{ store.error() }}</p>
+        <RepoAccessHelp
+          v-if="store.tokenWithoutAccess()"
+          :repo-ref="store.repoRef()"
+          @replace="openTokenDialog()"
         />
-        <UiBouton variante="filled" @click="retry()">Réessayer</UiBouton>
+        <UiButton variant="filled" @click="retry()">Réessayer</UiButton>
       </div>
     </template>
-    <div v-else-if="store.etat() === 'vide'" class="etat">
+    <div v-else-if="store.state() === 'vide'" class="etat">
       <p class="titre">Aucun dépôt ouvert</p>
     </div>
   </div>

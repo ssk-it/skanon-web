@@ -5,9 +5,9 @@ import { resetInjection } from "./core/injection";
 afterEach(() => {
   resetInjection();
   // Un test peut avoir remplacé le stockage par un stockage qui refuse tout : le refus est son objet, non une erreur du nettoyage.
-  for (const stockage of [globalThis.localStorage, globalThis.sessionStorage]) {
+  for (const storage of [globalThis.localStorage, globalThis.sessionStorage]) {
     try {
-      stockage.clear();
+      storage.clear();
     } catch {
       /* stockage factice d'un test */
     }

@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 import { serializeDecision } from "./redaction.service";
 import {
   splitFrontmatter,
-  estIllisible,
+  isUnreadable,
   extractSection,
-  extractSousSections,
+  extractSubsections,
 } from "./frontmatter";
 
 /** Analyse le texte produit, en échouant clairement s'il est illisible. */
-function relire(texte: string): {
+function reread(text: string): {
   data: Record<string, unknown>;
   body: string;
 } {
-  const parse = splitFrontmatter(texte);
+  const parse = splitFrontmatter(text);
   if (parse === null) throw new Error("aucun frontmatter produit");
-  if (estIllisible(parse))
-    throw new Error(`frontmatter illisible : ${parse.erreur}`);
+  if (isUnreadable(parse))
+    throw new Error(`frontmatter illisible : ${parse.error}`);
   return { data: parse.data as Record<string, unknown>, body: parse.body };
 }
 
@@ -26,19 +26,19 @@ function relire(texte: string): {
  */
 describe("écriture d’une décision", () => {
   const decision = {
-    titre: "Où stocker les pièces jointes ?",
-    statut: "retenue" as const,
+    title: "Où stocker les pièces jointes ?",
+    status: "retenue" as const,
     description: "Ce qui rendait la question ouverte.",
     options: [
-      { id: "dans-la-base", corps: "**Pour** — simple.\n**Contre** — lourd." },
-      { id: "stockage-objet", corps: "**Pour** — passe à l’échelle." },
+      { id: "dans-la-base", body: "**Pour** — simple.\n**Contre** — lourd." },
+      { id: "stockage-objet", body: "**Pour** — passe à l’échelle." },
     ],
-    optionRetenue: "stockage-objet",
+    chosenOption: "stockage-objet",
     decision: "Ce qui a tranché, en une phrase.",
   };
 
   it("produit un frontmatter que la lecture accepte", () => {
-    const { data } = relire(serializeDecision("01-stockage", decision));
+    const { data } = reread(serializeDecision("01-stockage", decision));
     expect(data["id"]).toBe("01-stockage");
     expect(data["statut"]).toBe("retenue");
     expect(data["option_retenue"]).toBe("stockage-objet");
@@ -46,12 +46,12 @@ describe("écriture d’une décision", () => {
 
   it("relit les options telles qu’elles ont été écrites", () => {
     const options = [
-      ...extractSousSections(
-        relire(serializeDecision("01-stockage", decision)).body,
+      ...extractSubsections(
+        reread(serializeDecision("01-stockage", decision)).body,
         "Options",
       ),
     ];
-    expect(options.map(([titre]) => titre)).toEqual([
+    expect(options.map(([title]) => title)).toEqual([
       "dans-la-base",
       "stockage-objet",
     ]);
@@ -59,16 +59,16 @@ describe("écriture d’une décision", () => {
 
   it("marque l’option retenue dans son texte, pour qui lit le fichier seul", () => {
     const out = serializeDecision("01-stockage", decision);
-    const options = [...extractSousSections(relire(out).body, "Options")];
-    const retenue = options.find(([t]) => t === "stockage-objet")![1];
-    expect(retenue).toContain("**Retenue.**");
+    const options = [...extractSubsections(reread(out).body, "Options")];
+    const chosen = options.find(([t]) => t === "stockage-objet")![1];
+    expect(chosen).toContain("**Retenue.**");
     expect(options.find(([t]) => t === "dans-la-base")![1]).not.toContain(
       "Retenue",
     );
   });
 
   it("relit la description et ce qui a tranché", () => {
-    const { body } = relire(serializeDecision("01-stockage", decision));
+    const { body } = reread(serializeDecision("01-stockage", decision));
     expect(extractSection(body, "Description")).toContain("question ouverte");
     expect(extractSection(body, "Décision")).toContain("a tranché");
   });
@@ -78,10 +78,10 @@ describe("écriture d’une décision", () => {
     // doit pas être refusée, ni prétendre avoir une option retenue.
     const out = serializeDecision("01-x", {
       ...decision,
-      statut: "ouverte",
-      optionRetenue: null,
+      status: "ouverte",
+      chosenOption: null,
     });
-    expect(relire(out).data["option_retenue"]).toBeNull();
+    expect(reread(out).data["option_retenue"]).toBeNull();
     expect(out).not.toContain("**Retenue.**");
   });
 
@@ -89,9 +89,9 @@ describe("écriture d’une décision", () => {
     // La faute la plus fréquente du format : YAML lit le `:` comme séparateur.
     const out = serializeDecision("01-x", {
       ...decision,
-      titre: "Stockage : où ?",
+      title: "Stockage : où ?",
     });
-    expect(relire(out).data["titre"]).toBe("Stockage : où ?");
+    expect(reread(out).data["titre"]).toBe("Stockage : où ?");
   });
 
   it("omet les sections vides plutôt que d’écrire des titres creux", () => {
@@ -107,10 +107,8 @@ describe("écriture d’une décision", () => {
   it("écarte une option sans identifiant", () => {
     const out = serializeDecision("01-x", {
       ...decision,
-      options: [...decision.options, { id: "  ", corps: "orpheline" }],
+      options: [...decision.options, { id: "  ", body: "orpheline" }],
     });
-    expect([...extractSousSections(relire(out).body, "Options")].length).toBe(
-      2,
-    );
+    expect([...extractSubsections(reread(out).body, "Options")].length).toBe(2);
   });
 });

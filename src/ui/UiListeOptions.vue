@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import { Z_PANNEAU, type Position } from "./superposition";
+import { Z_PANEL, type Position } from "./superposition";
 
 /**
  * La liste d'options commune à `UiSelect` et `UiAutocompletion` : le panneau de `mat-select` et de `mat-autocomplete`, téléporté dans `body`. Interne au kit.
@@ -10,43 +10,43 @@ import { Z_PANNEAU, type Position } from "./superposition";
 const props = defineProps<{
   id: string;
   options: readonly {
-    readonly libelle: string;
-    readonly selectionne?: boolean;
+    readonly label: string;
+    readonly selected?: boolean;
   }[];
-  actif: number;
+  active: number;
   position: Position;
-  libelle?: string;
+  label?: string;
 }>();
 
 const emit = defineEmits<{
-  choisir: [index: number];
-  survoler: [index: number];
+  choose: [index: number];
+  hover: [index: number];
 }>();
 
-const liste = ref<HTMLUListElement | null>(null);
+const list = ref<HTMLUListElement | null>(null);
 
 /** L'option active reste visible quand les flèches la font sortir du panneau. */
 watch(
-  () => props.actif,
+  () => props.active,
   async (i) => {
     await nextTick();
-    const option = liste.value?.children[i] as HTMLElement | undefined;
+    const option = list.value?.children[i] as HTMLElement | undefined;
     option?.scrollIntoView?.({ block: "nearest" });
   },
 );
 
-defineExpose({ element: liste });
+defineExpose({ element: list });
 </script>
 
 <template>
   <Teleport to="body">
     <ul
       :id="id"
-      ref="liste"
+      ref="list"
       class="ui-options"
       role="listbox"
-      :aria-label="libelle"
-      :style="{ ...position, zIndex: Z_PANNEAU }"
+      :aria-label="label"
+      :style="{ ...position, zIndex: Z_PANEL }"
     >
       <li
         v-for="(o, i) in options"
@@ -54,16 +54,16 @@ defineExpose({ element: liste });
         :key="i"
         class="ui-options__option"
         :class="{
-          'ui-options__option--actif': i === actif,
-          'ui-options__option--selectionne': o.selectionne,
+          'ui-options__option--actif': i === active,
+          'ui-options__option--selectionne': o.selected,
         }"
         role="option"
-        :aria-selected="!!o.selectionne"
+        :aria-selected="!!o.selected"
         @mousedown.prevent
-        @click="emit('choisir', i)"
-        @mouseenter="emit('survoler', i)"
+        @click="emit('choose', i)"
+        @mouseenter="emit('hover', i)"
       >
-        {{ o.libelle }}
+        {{ o.label }}
       </li>
     </ul>
   </Teleport>

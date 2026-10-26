@@ -1,15 +1,15 @@
-import type { RefDepot } from "../../core/github/github-client";
+import type { RepoRef } from "../../core/github/github-client";
 
 /**
  * Les périodes que l'Évolution propose d'un geste — RG-periode-par-defaut.
  *
  * `libre` laisse choisir les deux dates ; les autres se calculent depuis maintenant.
  */
-export type Periode = "7-jours" | "visite" | "30-jours" | "3-mois" | "libre";
+export type Period = "7-jours" | "visite" | "30-jours" | "3-mois" | "libre";
 
-const JOUR = 86_400_000;
+const DAY = 86_400_000;
 
-const RECUL_JOURS: Partial<Record<Periode, number>> = {
+const LOOKBACK_DAYS: Partial<Record<Period, number>> = {
   "7-jours": 7,
   "30-jours": 30,
   "3-mois": 90,
@@ -18,16 +18,14 @@ const RECUL_JOURS: Partial<Record<Periode, number>> = {
 /**
  * Le début d'une période, ou `null` quand elle ne se calcule pas : dates libres, ou dernière visite inconnue.
  */
-export function debutPeriode(
-  periode: Periode,
-  maintenant: Date,
-  visite: Date | null,
+export function periodStart(
+  period: Period,
+  now: Date,
+  visit: Date | null,
 ): Date | null {
-  if (periode === "visite") return visite;
-  const jours = RECUL_JOURS[periode];
-  return jours === undefined
-    ? null
-    : new Date(maintenant.getTime() - jours * JOUR);
+  if (period === "visite") return visit;
+  const days = LOOKBACK_DAYS[period];
+  return days === undefined ? null : new Date(now.getTime() - days * DAY);
 }
 
 /**
@@ -39,17 +37,17 @@ export function debutPeriode(
  *
  * Le stockage du navigateur peut manquer ou refuser : la vue retombe alors sur trente jours, sans rien perdre d'autre.
  */
-export class DerniereVisite {
-  consulter(depot: RefDepot, maintenant: Date = new Date()): Date | null {
-    const cle = `pc-evolution-visite:${depot.owner}/${depot.repo}`;
+export class LastVisit {
+  visit(repoRef: RepoRef, now: Date = new Date()): Date | null {
+    const key = `pc-evolution-visite:${repoRef.owner}/${repoRef.repo}`;
     try {
-      const retenue = sessionStorage.getItem(cle);
-      if (retenue !== null) return retenue ? new Date(retenue) : null;
+      const chosen = sessionStorage.getItem(key);
+      if (chosen !== null) return chosen ? new Date(chosen) : null;
 
-      const precedente = localStorage.getItem(cle);
-      sessionStorage.setItem(cle, precedente ?? "");
-      localStorage.setItem(cle, maintenant.toISOString());
-      return precedente ? new Date(precedente) : null;
+      const previous = localStorage.getItem(key);
+      sessionStorage.setItem(key, previous ?? "");
+      localStorage.setItem(key, now.toISOString());
+      return previous ? new Date(previous) : null;
     } catch {
       return null;
     }

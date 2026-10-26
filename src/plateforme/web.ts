@@ -1,20 +1,17 @@
-import type { AnnonceVersion, AnnonceurDeVersion, Plateforme } from "./ports";
-import {
-  AuthentificateurDuNavigateur,
-  CoffreScelleDuNavigateur,
-} from "./web-scellement";
+import type { VersionAnnouncement, VersionAnnouncer, Platform } from "./ports";
+import { BrowserAuthenticator, BrowserSealedVault } from "./web-scellement";
 
 /** Le script du service worker de Skanon, émis par `outils/pwa/pwa.ts` dans la seule version web. */
 export const SCRIPT_SERVICE_WORKER = "/sw.js";
 
 /** Ce que le service worker dit à la page : un fichier de la version en cours n'est plus servi (`outils/pwa/sw.js`). */
-export const MESSAGE_VERSION_PERDUE = "VERSION_PERDUE";
+export const VERSION_LOST_MESSAGE = "VERSION_PERDUE";
 
 /** Ce que la page demande au service worker en attente : servir dès maintenant. */
-export const MESSAGE_ACTIVER = "SKIP_WAITING";
+export const ACTIVATE_MESSAGE = "SKIP_WAITING";
 
 /** Ce que l'on attend au plus le changement de service worker avant de recharger malgré tout. */
-const DELAI_ACTIVATION = 3000;
+const ACTIVATION_DELAY = 3000;
 
 /**
  * Les versions, apprises du service worker (RG-nouvelle-version-proposee, RG-version-perdue-signalee).
@@ -23,43 +20,41 @@ const DELAI_ACTIVATION = 3000;
  *
  * Une annonce faite avant qu'on l'écoute — l'inscription précède le montage de la coquille — est rejouée à qui écoute ensuite.
  */
-export class AnnonceurDuServiceWorker implements AnnonceurDeVersion {
-  readonly actif: boolean;
+export class ServiceWorkerAnnouncer implements VersionAnnouncer {
+  readonly active: boolean;
   /** La version prête sert au rechargement de la page, non à une relance. */
-  readonly relance = false;
-  private readonly inscription: Promise<ServiceWorkerRegistration> | null;
-  private readonly ecouteurs = new Set<(a: AnnonceVersion) => void>();
-  private readonly faites = new Set<AnnonceVersion>();
+  readonly relaunches = false;
+  private readonly registration: Promise<ServiceWorkerRegistration> | null;
+  private readonly listeners = new Set<(a: VersionAnnouncement) => void>();
+  private readonly made = new Set<VersionAnnouncement>();
 
   constructor(
-    private readonly conteneur: ServiceWorkerContainer | undefined,
+    private readonly container: ServiceWorkerContainer | undefined,
     private readonly script = SCRIPT_SERVICE_WORKER,
   ) {
-    this.actif = !!conteneur;
-    if (!conteneur) {
-      this.inscription = null;
+    this.active = !!container;
+    if (!container) {
+      this.registration = null;
       return;
     }
-    conteneur.addEventListener("message", (e: MessageEvent) => {
-      if (
-        (e.data as { type?: unknown } | null)?.type === MESSAGE_VERSION_PERDUE
-      )
-        this.annoncer("perdue");
+    container.addEventListener("message", (e: MessageEvent) => {
+      if ((e.data as { type?: unknown } | null)?.type === VERSION_LOST_MESSAGE)
+        this.announce("perdue");
     });
-    this.inscription = apresChargement().then(() =>
-      conteneur.register(script, { scope: "/", updateViaCache: "none" }),
+    this.registration = afterLoad().then(() =>
+      container.register(script, { scope: "/", updateViaCache: "none" }),
     );
-    this.inscription.then(
-      (r) => this.suivre(r),
+    this.registration.then(
+      (r) => this.track(r),
       // Inscription refusée — navigation privée, stockage bloqué : l'application marche sans, et sans hors-ligne.
       () => {},
     );
   }
 
-  listen(surAnnonce: (a: AnnonceVersion) => void): () => void {
-    this.ecouteurs.add(surAnnonce);
-    for (const a of this.faites) surAnnonce(a);
-    return () => this.ecouteurs.delete(surAnnonce);
+  listen(onAnnouncement: (a: VersionAnnouncement) => void): () => void {
+    this.listeners.add(onAnnouncement);
+    for (const a of this.made) onAnnouncement(a);
+    return () => this.listeners.delete(onAnnouncement);
   }
 
   /** Le service worker ne dit pas pourquoi il n'a rien trouvé : il n'y a rien à expliquer. */
@@ -68,68 +63,68 @@ export class AnnonceurDuServiceWorker implements AnnonceurDeVersion {
   }
 
   async check(): Promise<void> {
-    const r = await this.inscription;
+    const r = await this.registration;
     await r?.update();
   }
 
   async activate(): Promise<void> {
-    const conteneur = this.conteneur;
-    const enAttente = (await this.inscription)?.waiting;
-    if (!conteneur || !enAttente) return;
-    const change = new Promise<void>((fin) => {
-      conteneur.addEventListener("controllerchange", () => fin(), {
+    const container = this.container;
+    const waiting = (await this.registration)?.waiting;
+    if (!container || !waiting) return;
+    const change = new Promise<void>((end) => {
+      container.addEventListener("controllerchange", () => end(), {
         once: true,
       });
-      setTimeout(fin, DELAI_ACTIVATION);
+      setTimeout(end, ACTIVATION_DELAY);
     });
-    enAttente.postMessage({ type: MESSAGE_ACTIVER });
+    waiting.postMessage({ type: ACTIVATE_MESSAGE });
     await change;
   }
 
-  private suivre(r: ServiceWorkerRegistration): void {
-    const surInstallation = (w: ServiceWorker | null) => {
+  private track(r: ServiceWorkerRegistration): void {
+    const onInstall = (w: ServiceWorker | null) => {
       if (!w) return;
-      const verifier = () => {
-        if (w.state === "installed" && this.servieParSkanon())
-          this.annoncer("prete");
+      const check = () => {
+        if (w.state === "installed" && this.servedBySkanon())
+          this.announce("prete");
       };
-      verifier();
-      w.addEventListener("statechange", verifier);
+      check();
+      w.addEventListener("statechange", check);
     };
-    if (r.waiting && this.servieParSkanon()) this.annoncer("prete");
-    surInstallation(r.installing);
-    r.addEventListener("updatefound", () => surInstallation(r.installing));
+    if (r.waiting && this.servedBySkanon()) this.announce("prete");
+    onInstall(r.installing);
+    r.addEventListener("updatefound", () => onInstall(r.installing));
   }
 
   /**
    * Vrai quand une version de Skanon sert déjà cette page. Sous le service worker de l'ancienne application, ou sans aucun, celui qui s'installe ne remplace pas une version de Skanon : il n'y a rien à proposer.
    */
-  private servieParSkanon(): boolean {
-    const actuel = this.conteneur?.controller?.scriptURL;
-    return !!actuel && new URL(actuel).pathname === this.script;
+  private servedBySkanon(): boolean {
+    const current = this.container?.controller?.scriptURL;
+    return !!current && new URL(current).pathname === this.script;
   }
 
-  private annoncer(a: AnnonceVersion): void {
-    if (this.faites.has(a)) return;
-    this.faites.add(a);
-    for (const e of this.ecouteurs) e(a);
+  private announce(a: VersionAnnouncement): void {
+    if (this.made.has(a)) return;
+    this.made.add(a);
+    for (const e of this.listeners) e(a);
   }
 }
 
 /** L'inscription attend la fin du chargement : le préchargement ne dispute pas la bande passante à la première page. */
-function apresChargement(): Promise<void> {
+function afterLoad(): Promise<void> {
   if (document.readyState === "complete") return Promise.resolve();
-  return new Promise((fin) =>
-    window.addEventListener("load", () => fin(), { once: true }),
+  return new Promise((end) =>
+    window.addEventListener("load", () => end(), { once: true }),
   );
 }
 
 /**
  * Le service worker n'est inscrit que dans la version web construite : le serveur de développement n'en publie pas, les tests n'en ont pas, et l'application de bureau n'en a pas l'usage.
  */
-function serviceWorkerDisponible(): ServiceWorkerContainer | undefined {
+function serviceWorkerAvailable(): ServiceWorkerContainer | undefined {
   if (
-    import.meta.env.VITE_CIBLE !== "web" ||
+    import.meta.env.VITE_TARGET !== "web" ||
     !import.meta.env.PROD ||
     typeof navigator === "undefined"
   )
@@ -137,23 +132,21 @@ function serviceWorkerDisponible(): ServiceWorkerContainer | undefined {
   return navigator.serviceWorker;
 }
 
-export function createPlateformeWeb(): Plateforme {
+export function createWebPlatform(): Platform {
   // Un seul objet pour les deux ports : le scellement décide de ce que le coffre écrit.
-  const coffre = new CoffreScelleDuNavigateur(
-    new AuthentificateurDuNavigateur(),
-  );
+  const vault = new BrowserSealedVault(new BrowserAuthenticator());
   return {
-    cible: "web",
-    coffre,
-    scellement: coffre,
-    ouvreur: {
+    target: "web",
+    vault,
+    sealing: vault,
+    opener: {
       async open(url) {
         window.open(url, "_blank", "noopener");
       },
     },
     // La version web reçoit ses liens par l'adresse même (`/lien?…`) : rien à écouter.
-    liens: { async listen() {} },
-    version: new AnnonceurDuServiceWorker(serviceWorkerDisponible()),
+    links: { async listen() {} },
+    version: new ServiceWorkerAnnouncer(serviceWorkerAvailable()),
     // Le site se redéploie à chaque fusion, sans numéro : le commit construit le désigne (`vite.config.ts`).
     loadVersion: async () => import.meta.env.VITE_VERSION,
   };

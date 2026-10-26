@@ -13,7 +13,7 @@ import { GithubClient, GithubError } from "./github-client";
  * un README dans un dépôt qui en a déjà un, au lieu de recharger le cadrage.
  */
 describe("le 409 de GitHub", () => {
-  const DEPOT = { owner: "org", repo: "projet" };
+  const REPO = { owner: "org", repo: "projet" };
   const API = "https://api.github.com/repos/org/projet";
 
   let http: HttpTestingController;
@@ -25,26 +25,26 @@ describe("le 409 de GitHub", () => {
     client = inject(GithubClient);
   });
 
-  async function attendre(): Promise<void> {
+  async function waitFor(): Promise<void> {
     for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
   }
 
   it("dit le dépôt vide à la lecture", async () => {
-    const lecture = client.loadArbre(DEPOT).catch((e: unknown) => e);
-    await attendre();
+    const read = client.loadTree(REPO).catch((e: unknown) => e);
+    await waitFor();
     http
       .expectOne(`${API}/git/trees/HEAD?recursive=1`)
       .error({ message: "Git Repository is empty." }, { status: 409 });
 
-    const erreur = (await lecture) as GithubError;
-    expect(erreur).toBeInstanceOf(GithubError);
-    expect(erreur.message).toContain("Ce dépôt est vide");
+    const error = (await read) as GithubError;
+    expect(error).toBeInstanceOf(GithubError);
+    expect(error.message).toContain("Ce dépôt est vide");
   });
 
   it("dit le conflit d’écriture quand la version lue n’est plus la dernière", async () => {
-    const ecriture = client
-      .commitFichier(
-        DEPOT,
+    const writing = client
+      .commitFile(
+        REPO,
         "cadrage-2026-001",
         "cadrages/2026-001/cadrage.md",
         "contenu",
@@ -52,7 +52,7 @@ describe("le 409 de GitHub", () => {
         "ancien",
       )
       .catch((e: unknown) => e);
-    await attendre();
+    await waitFor();
     http
       .expectOne(`${API}/contents/cadrages/2026-001/cadrage.md`)
       .error(
@@ -60,10 +60,10 @@ describe("le 409 de GitHub", () => {
         { status: 409 },
       );
 
-    const erreur = (await ecriture) as GithubError;
-    expect(erreur).toBeInstanceOf(GithubError);
-    expect(erreur.statut).toBe(409);
-    expect(erreur.message).not.toContain("vide");
-    expect(erreur.message).toContain("modifié entre-temps");
+    const error = (await writing) as GithubError;
+    expect(error).toBeInstanceOf(GithubError);
+    expect(error.status).toBe(409);
+    expect(error.message).not.toContain("vide");
+    expect(error.message).toContain("modifié entre-temps");
   });
 });

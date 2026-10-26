@@ -6,9 +6,9 @@
  *
  * Décorative, comme `mat-icon` : `aria-hidden` d'office. Un bouton qui n'a qu'une icône porte son nom par `aria-label`.
  */
-defineProps<{ nom: string }>();
+defineProps<{ name: string }>();
 </script>
 
 <template>
-  <span class="material-symbols-outlined" aria-hidden="true">{{ nom }}</span>
+  <span class="material-symbols-outlined" aria-hidden="true">{{ name }}</span>
 </template>

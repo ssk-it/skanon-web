@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject } from "../core/injection";
-import { PLATEFORME } from "../plateforme/jeton";
+import { PLATFORM } from "../plateforme/jeton";
 
 /**
  * Un lien vers une adresse hors de l'application — github.com, une carte, une issue.
@@ -15,16 +15,16 @@ import { PLATEFORME } from "../plateforme/jeton";
  */
 const props = defineProps<{ href: string }>();
 
-const ouvreur = inject(PLATEFORME).ouvreur;
+const opener = inject(PLATFORM).opener;
 
-function ouvrir(evenement: MouseEvent): void {
-  evenement.preventDefault();
-  void ouvreur.open(props.href);
+function open(event: MouseEvent): void {
+  event.preventDefault();
+  void opener.open(props.href);
 }
 </script>
 
 <template>
-  <a :href="href" target="_blank" rel="noopener noreferrer" @click="ouvrir">
+  <a :href="href" target="_blank" rel="noopener noreferrer" @click="open">
     <slot />
   </a>
 </template>

@@ -1,10 +1,10 @@
 <script lang="ts">
 /** Les langages que l'application affiche. */
-export type LangageCode = "bash" | "yaml" | "json";
+export type CodeLanguage = "bash" | "yaml" | "json";
 
 interface Fragment {
-  readonly texte: string;
-  readonly classe: string;
+  readonly text: string;
+  readonly className: string;
 }
 
 /**
@@ -12,95 +12,90 @@ interface Fragment {
  *
  * Une coloration minimale, écrite ici plutôt qu'apportée par une bibliothèque : trois langages, et seulement ce qui aide à lire — un commentaire qu'on saute, une clé qu'on cherche, une valeur qu'on recopie. Une bibliothèque de coloration pèserait plus que ce qu'elle colore.
  */
-function decouper(ligne: string, langage: LangageCode): readonly Fragment[] {
-  const commentaire = langage === "json" ? null : ligne.indexOf("#");
-  if (
-    commentaire !== null &&
-    commentaire >= 0 &&
-    !dansUneChaine(ligne, commentaire)
-  ) {
+function split(line: string, language: CodeLanguage): readonly Fragment[] {
+  const comment = language === "json" ? null : line.indexOf("#");
+  if (comment !== null && comment >= 0 && !inString(line, comment)) {
     return [
-      ...decouper(ligne.slice(0, commentaire), langage),
-      { texte: ligne.slice(commentaire), classe: "commentaire" },
+      ...split(line.slice(0, comment), language),
+      { text: line.slice(comment), className: "commentaire" },
     ];
   }
 
-  if (langage === "yaml") return decouperYaml(ligne);
-  if (langage === "json") return decouperJson(ligne);
-  return decouperBash(ligne);
+  if (language === "yaml") return splitYaml(line);
+  if (language === "json") return splitJson(line);
+  return splitBash(line);
 }
 
 /** Un `#` entre guillemets n'ouvre pas de commentaire. */
-function dansUneChaine(ligne: string, position: number): boolean {
-  let guillemets = 0;
+function inString(line: string, position: number): boolean {
+  let quotes = 0;
   for (let i = 0; i < position; i++) {
-    if (ligne[i] === '"' || ligne[i] === "'") guillemets++;
+    if (line[i] === '"' || line[i] === "'") quotes++;
   }
-  return guillemets % 2 === 1;
+  return quotes % 2 === 1;
 }
 
-function decouperYaml(ligne: string): readonly Fragment[] {
+function splitYaml(line: string): readonly Fragment[] {
   // `cle:` en début de ligne ou après un tiret, jusqu'aux deux-points.
-  const m = /^(\s*(?:-\s*)?)([\w.-]+)(:)(.*)$/.exec(ligne);
+  const m = /^(\s*(?:-\s*)?)([\w.-]+)(:)(.*)$/.exec(line);
   if (m) {
     return [
-      { texte: m[1], classe: "" },
-      { texte: m[2], classe: "cle" },
-      { texte: m[3], classe: "ponctuation" },
-      { texte: m[4], classe: "valeur" },
+      { text: m[1], className: "" },
+      { text: m[2], className: "cle" },
+      { text: m[3], className: "ponctuation" },
+      { text: m[4], className: "valeur" },
     ];
   }
-  return [{ texte: ligne, classe: "" }];
+  return [{ text: line, className: "" }];
 }
 
-function decouperJson(ligne: string): readonly Fragment[] {
+function splitJson(line: string): readonly Fragment[] {
   const fragments: Fragment[] = [];
   // Les chaînes d'abord : une clé est une chaîne suivie de deux-points.
   const re = /"(?:[^"\\]|\\.)*"|[{}[\],:]/g;
-  let dernier = 0;
-  for (const m of ligne.matchAll(re)) {
+  let last = 0;
+  for (const m of line.matchAll(re)) {
     const i = m.index ?? 0;
-    if (i > dernier)
-      fragments.push({ texte: ligne.slice(dernier, i), classe: "" });
-    const suite = ligne.slice(i + m[0].length).trimStart();
+    if (i > last) fragments.push({ text: line.slice(last, i), className: "" });
+    const remainder = line.slice(i + m[0].length).trimStart();
     fragments.push({
-      texte: m[0],
-      classe: m[0].startsWith('"')
-        ? suite.startsWith(":")
+      text: m[0],
+      className: m[0].startsWith('"')
+        ? remainder.startsWith(":")
           ? "cle"
           : "valeur"
         : "ponctuation",
     });
-    dernier = i + m[0].length;
+    last = i + m[0].length;
   }
-  if (dernier < ligne.length)
-    fragments.push({ texte: ligne.slice(dernier), classe: "" });
-  return fragments.length ? fragments : [{ texte: ligne, classe: "" }];
+  if (last < line.length)
+    fragments.push({ text: line.slice(last), className: "" });
+  return fragments.length ? fragments : [{ text: line, className: "" }];
 }
 
-function decouperBash(ligne: string): readonly Fragment[] {
+function splitBash(line: string): readonly Fragment[] {
   // La commande est le premier mot ; les options se repèrent à leur tiret.
-  const m = /^(\s*)([\w./-]+)(.*)$/.exec(ligne);
-  if (!m) return [{ texte: ligne, classe: "" }];
+  const m = /^(\s*)([\w./-]+)(.*)$/.exec(line);
+  if (!m) return [{ text: line, className: "" }];
 
-  const reste: Fragment[] = [];
+  const rest: Fragment[] = [];
   const re = /(\s)(--?[\w-]+)/g;
-  let dernier = 0;
-  const suite = m[3];
-  for (const o of suite.matchAll(re)) {
+  let last = 0;
+  const remainder = m[3];
+  for (const o of remainder.matchAll(re)) {
     const i = o.index ?? 0;
-    if (i > dernier) reste.push({ texte: suite.slice(dernier, i), classe: "" });
-    reste.push({ texte: o[1], classe: "" });
-    reste.push({ texte: o[2], classe: "option" });
-    dernier = i + o[0].length;
+    if (i > last) rest.push({ text: remainder.slice(last, i), className: "" });
+    rest.push({ text: o[1], className: "" });
+    rest.push({ text: o[2], className: "option" });
+    last = i + o[0].length;
   }
-  if (dernier < suite.length)
-    reste.push({ texte: suite.slice(dernier), classe: "" });
+  if (last < remainder.length)
+    rest.push({ text: remainder.slice(last), className: "" });
 
   return [
-    { texte: m[1], classe: "" },
-    { texte: m[2], classe: "commande-nom" },
-    ...reste,
+    { text: m[1], className: "" },
+    { text: m[2], className: "commande-nom" },
+    ...rest,
   ];
 }
 </script>
@@ -113,19 +108,19 @@ import { computed } from "vue";
  *
  * Le texte reste sélectionnable et copiable tel quel : la coloration n'insère aucun caractère, seulement des balises autour de ce qui existe.
  */
-const props = defineProps<{ texte: string; langage: LangageCode }>();
+const props = defineProps<{ text: string; language: CodeLanguage }>();
 
-const lignes = computed(() =>
-  props.texte
+const lines = computed(() =>
+  props.text
     .replace(/\n+$/, "")
     .split("\n")
-    .map((l) => decouper(l, props.langage)),
+    .map((l) => split(l, props.language)),
 );
 </script>
 
 <!-- prettier-ignore -->
 <template>
-  <pre class="bloc-code bloc"><code><span v-for="(l, i) in lignes" :key="i" class="ligne"><span v-for="(f, j) in l" :key="j" :class="f.classe">{{ f.texte }}</span></span></code></pre>
+  <pre class="bloc-code bloc"><code><span v-for="(l, i) in lines" :key="i" class="ligne"><span v-for="(f, j) in l" :key="j" :class="f.className">{{ f.text }}</span></span></code></pre>
 </template>
 
 <style scoped>

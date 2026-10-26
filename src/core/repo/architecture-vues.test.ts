@@ -1,72 +1,78 @@
 import { inject, resetInjection } from "../injection";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ReferentielStore } from "./referentiel.store";
+import { SpecificationStore } from "./referentiel.store";
 import {
-  Cadrage,
-  DecisionArchitecture,
-  DocumentArchitecture,
-  Referentiel,
-  ReglagesProjet,
-  TAGS_LIENS_PAR_DEFAUT,
+  Scoping,
+  ArchitectureDecision,
+  ArchitectureDocument,
+  Specification,
+  ProjectSettings,
+  DEFAULT_LINK_TAGS,
 } from "../model/model";
 
-const REGLAGES: ReglagesProjet = {
-  acces: "jeton_personnel",
-  identite: null,
-  protectionDuJeton: "proposee",
-  tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+const SETTINGS: ProjectSettings = {
+  access: "jeton_personnel",
+  identity: null,
+  tokenProtection: "proposee",
+  linkTags: DEFAULT_LINK_TAGS,
 };
 
 function document(
   id: string,
-  nature: DocumentArchitecture["nature"],
-  composants: string[] = [],
-): DocumentArchitecture {
+  kind: ArchitectureDocument["kind"],
+  components: string[] = [],
+): ArchitectureDocument {
   return {
     id,
-    nature,
-    statut: "actif",
-    composants,
-    enonce: "",
-    creePar: null,
-    modifiePar: [],
+    kind: kind,
+    status: "actif",
+    components,
+    statement: "",
+    createdBy: null,
+    modifiedBy: [],
   };
 }
 
-function decision(id: string): DecisionArchitecture {
-  return { id, statut: "actif", enonce: "", creePar: null, modifiePar: [] };
-}
-
-function cadrage(id: string, impacts: Cadrage["impacts"]): Cadrage {
+function decision(id: string): ArchitectureDecision {
   return {
     id,
-    titre: `Cadrage ${id}`,
-    statut: "livree",
-    domaines: [],
-    liens: [],
-    impacts,
-    objectif: "",
-    parcours: "",
-    enonces: new Map(),
-    decisions: [],
-    piecesJointes: [],
-    sectionsLibres: [],
-    provenance: null,
-  } as unknown as Cadrage;
+    status: "actif",
+    statement: "",
+    createdBy: null,
+    modifiedBy: [],
+  };
 }
 
-function referentiel(partiel: Partial<Referentiel>): Referentiel {
+function scoping(id: string, impacts: Scoping["impacts"]): Scoping {
   return {
-    projet: { nom: "test", description: "", depotsCode: [], prefixe: null },
-    reglages: REGLAGES,
-    domaines: new Map(),
-    fonctionnalites: new Map(),
-    regles: new Map(),
+    id,
+    title: `Cadrage ${id}`,
+    status: "livree",
+    domains: [],
+    links: [],
+    impacts,
+    goal: "",
+    journey: "",
+    statements: new Map(),
+    decisions: [],
+    attachments: [],
+    freeSections: [],
+    provenance: null,
+  } as unknown as Scoping;
+}
+
+function specification(partial: Partial<Specification>): Specification {
+  return {
+    project: { name: "test", description: "", codeRepos: [], prefix: null },
+    settings: SETTINGS,
+    domains: new Map(),
+    features: new Map(),
+    rules: new Map(),
     decisions: new Map(),
     architecture: new Map(),
-    cadrages: new Map(),
+    scopings: new Map(),
     anomalies: [],
-    ...partiel,
+    ...partial,
   };
 }
 
@@ -79,17 +85,17 @@ function referentiel(partiel: Partial<Referentiel>): Referentiel {
  * inexactitude ne se verrait jamais.
  */
 describe("vues croisées de l’architecture", () => {
-  let store: ReferentielStore;
+  let store: SpecificationStore;
 
   beforeEach(() => {
     resetInjection();
 
-    store = inject(ReferentielStore);
+    store = inject(SpecificationStore);
   });
 
   it("liste les flux qui touchent un composant", () => {
-    store.referentiel.set(
-      referentiel({
+    store.specification.set(
+      specification({
         architecture: new Map([
           ["CMP-api", document("CMP-api", "composant")],
           [
@@ -103,13 +109,13 @@ describe("vues croisées de l’architecture", () => {
     );
 
     // Ordre des documents du store : par identifiant, comme les règles.
-    const flux = store.listFluxByComposant("CMP-api");
-    expect(flux.map((f) => f.id)).toEqual(["FLX-auth", "FLX-export"]);
+    const flows = store.listFlowsByComponent("CMP-api");
+    expect(flows.map((f) => f.id)).toEqual(["FLX-auth", "FLX-export"]);
   });
 
   it("ne retient comme flux que les documents de cette nature", () => {
-    store.referentiel.set(
-      referentiel({
+    store.specification.set(
+      specification({
         architecture: new Map([
           ["CMP-api", document("CMP-api", "composant")],
           // Un contexte peut lui aussi citer des composants : il les cite tous,
@@ -120,14 +126,14 @@ describe("vues croisées de l’architecture", () => {
       }),
     );
 
-    expect(store.listFluxByComposant("CMP-api").map((f) => f.id)).toEqual([
+    expect(store.listFlowsByComponent("CMP-api").map((f) => f.id)).toEqual([
       "FLX-export",
     ]);
   });
 
   it("liste les documents par nature", () => {
-    store.referentiel.set(
-      referentiel({
+    store.specification.set(
+      specification({
         architecture: new Map([
           ["CMP-api", document("CMP-api", "composant")],
           ["FLX-export", document("FLX-export", "flux", ["CMP-api"])],
@@ -136,58 +142,58 @@ describe("vues croisées de l’architecture", () => {
       }),
     );
 
-    expect(
-      store.listArchitectureByNature("composant").map((d) => d.id),
-    ).toEqual(["CMP-api"]);
-    expect(store.listArchitectureByNature("flux").map((d) => d.id)).toEqual([
+    expect(store.listArchitectureByKind("composant").map((d) => d.id)).toEqual([
+      "CMP-api",
+    ]);
+    expect(store.listArchitectureByKind("flux").map((d) => d.id)).toEqual([
       "FLX-export",
     ]);
-    expect(store.listArchitectureByNature("contexte").map((d) => d.id)).toEqual(
-      ["CTX-global"],
-    );
+    expect(store.listArchitectureByKind("contexte").map((d) => d.id)).toEqual([
+      "CTX-global",
+    ]);
   });
 
   it("remonte d’une cible d’architecture aux cadrages qui l’ont produite", () => {
-    store.referentiel.set(
-      referentiel({
+    store.specification.set(
+      specification({
         decisions: new Map([["ADR-stockage", decision("ADR-stockage")]]),
-        cadrages: new Map([
+        scopings: new Map([
           [
             "2026-001",
-            cadrage("2026-001", [
+            scoping("2026-001", [
               {
-                cible: "ADR-stockage",
-                nature: "adr",
+                target: "ADR-stockage",
+                kind: "adr",
                 operation: "cree",
-                regle: "",
+                rule: "",
               },
             ]),
           ],
           [
             "2026-002",
-            cadrage("2026-002", [
+            scoping("2026-002", [
               {
-                cible: "ADR-stockage",
-                nature: "adr",
+                target: "ADR-stockage",
+                kind: "adr",
                 operation: "modifie",
-                regle: "",
+                rule: "",
               },
               {
-                cible: "RG-autre",
-                nature: "regle",
+                target: "RG-autre",
+                kind: "regle",
                 operation: "cree",
-                regle: "RG-autre",
+                rule: "RG-autre",
               },
             ]),
           ],
           [
             "2026-003",
-            cadrage("2026-003", [
+            scoping("2026-003", [
               {
-                cible: "RG-sans-rapport",
-                nature: "regle",
+                target: "RG-sans-rapport",
+                kind: "regle",
                 operation: "cree",
-                regle: "RG-sans-rapport",
+                rule: "RG-sans-rapport",
               },
             ]),
           ],
@@ -197,9 +203,9 @@ describe("vues croisées de l’architecture", () => {
 
     // Ordre des cadrages du store : cycle de vie, puis identifiant décroissant
     // — le plus récent d'abord, ce qui vaut aussi pour cette remontée.
-    const cadrages = store.listCadragesImpactantCible("ADR-stockage");
-    expect(cadrages.map((c) => c.cadrage.id)).toEqual(["2026-002", "2026-001"]);
-    expect(cadrages.map((c) => c.operation)).toEqual(["modifie", "cree"]);
+    const scopings = store.listScopingsImpactingTarget("ADR-stockage");
+    expect(scopings.map((c) => c.scoping.id)).toEqual(["2026-002", "2026-001"]);
+    expect(scopings.map((c) => c.operation)).toEqual(["modifie", "cree"]);
   });
 
   it("rend l’énoncé d’un impact visant une cible d’architecture", () => {
@@ -207,48 +213,48 @@ describe("vues croisées de l’architecture", () => {
     // impact d'architecture. L'énoncé existait dans le cadrage et n'était
     // affiché nulle part — le pire des cas, puisque rien ne signale une section
     // qu'on ne voit pas.
-    const c = cadrage("2026-001", [
+    const c = scoping("2026-001", [
       {
-        cible: "FLX-export",
-        nature: "architecture",
+        target: "FLX-export",
+        kind: "architecture",
         operation: "cree",
-        regle: "",
+        rule: "",
       },
-      { cible: "RG-a", nature: "regle", operation: "cree", regle: "RG-a" },
+      { target: "RG-a", kind: "regle", operation: "cree", rule: "RG-a" },
     ]);
-    (c as unknown as { enonces: Map<string, string> }).enonces = new Map([
+    (c as unknown as { statements: Map<string, string> }).statements = new Map([
       ["FLX-export", "Un export nocturne."],
       ["RG-a", "Une règle."],
     ]);
 
-    store.referentiel.set(
-      referentiel({
+    store.specification.set(
+      specification({
         architecture: new Map([["FLX-export", document("FLX-export", "flux")]]),
-        cadrages: new Map([["2026-001", c]]),
+        scopings: new Map([["2026-001", c]]),
       }),
     );
 
-    const lignes = store.listCiblesByCadrage(c);
-    expect(lignes.map((l) => l.enonce)).toEqual([
+    const lines = store.listTargetsByScoping(c);
+    expect(lines.map((l) => l.statement)).toEqual([
       "Un export nocturne.",
       "Une règle.",
     ]);
     // La cible résolue accompagne l'énoncé : sans elle, la fiche ne pourrait pas
     // signaler qu'un énoncé diverge de ce que la cible porte aujourd'hui.
-    expect(lignes[0].cible?.id).toBe("FLX-export");
+    expect(lines[0].target?.id).toBe("FLX-export");
   });
 
   it("ne confond pas une règle et une cible d’architecture de même identifiant", () => {
-    store.referentiel.set(
-      referentiel({
-        cadrages: new Map([
+    store.specification.set(
+      specification({
+        scopings: new Map([
           [
             "2026-001",
-            cadrage("2026-001", [
+            scoping("2026-001", [
               // Rien n'interdit qu'un identifiant se retrouve des deux côtés :
               // la nature est ce qui les sépare, pas le nom.
-              { cible: "X", nature: "regle", operation: "cree", regle: "X" },
-              { cible: "X", nature: "adr", operation: "modifie", regle: "" },
+              { target: "X", kind: "regle", operation: "cree", rule: "X" },
+              { target: "X", kind: "adr", operation: "modifie", rule: "" },
             ]),
           ],
         ]),
@@ -256,10 +262,10 @@ describe("vues croisées de l’architecture", () => {
     );
 
     expect(
-      store.listCadragesImpactantCible("X", "adr").map((c) => c.operation),
+      store.listScopingsImpactingTarget("X", "adr").map((c) => c.operation),
     ).toEqual(["modifie"]);
     expect(
-      store.listCadragesImpactantCible("X", "regle").map((c) => c.operation),
+      store.listScopingsImpactingTarget("X", "regle").map((c) => c.operation),
     ).toEqual(["cree"]);
   });
 });

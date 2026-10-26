@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  Cadrage,
+  Scoping,
   Decision,
-  DecisionArchitecture,
-  DocumentArchitecture,
-  Referentiel,
-  Regle,
-  TAGS_LIENS_PAR_DEFAUT,
+  ArchitectureDecision,
+  ArchitectureDocument,
+  Specification,
+  Rule,
+  DEFAULT_LINK_TAGS,
 } from "../model/model";
-import { buildIndexRecherche, findResultats } from "./recherche";
+import { buildSearchIndex, findResults } from "./recherche";
 
 /**
  * La recherche — RG-recherche-perimetre et RG-recherche-en-cours-a-part.
@@ -19,131 +19,129 @@ import { buildIndexRecherche, findResultats } from "./recherche";
  * déjà chargé.
  */
 
-function regle(id: string, enonce: string): Regle {
+function rule(id: string, statement: string): Rule {
   return {
     id,
-    statut: "actif",
-    fonctionnalites: [],
-    enonce,
-    creePar: null,
-    modifiePar: [],
+    status: "actif",
+    features: [],
+    statement,
+    createdBy: null,
+    modifiedBy: [],
   };
 }
 
-function adr(id: string, enonce: string): DecisionArchitecture {
-  return { id, statut: "actif", enonce, creePar: null, modifiePar: [] };
+function adr(id: string, statement: string): ArchitectureDecision {
+  return { id, status: "actif", statement, createdBy: null, modifiedBy: [] };
 }
 
-function document(id: string, enonce: string): DocumentArchitecture {
+function document(id: string, statement: string): ArchitectureDocument {
   return {
     id,
-    nature: "composant",
-    statut: "actif",
-    composants: [],
-    enonce,
-    creePar: null,
-    modifiePar: [],
+    kind: "composant",
+    status: "actif",
+    components: [],
+    statement,
+    createdBy: null,
+    modifiedBy: [],
   };
 }
 
 function decision(
   id: string,
-  titre: string,
+  title: string,
   options: Array<[string, string]> = [],
 ): Decision {
   return {
     id,
-    titre,
-    statut: "retenue",
-    optionRetenue: options[0]?.[0] ?? null,
+    title,
+    status: "retenue",
+    chosenOption: options[0]?.[0] ?? null,
     description: "",
-    options: options.map(([idOption, corps], i) => ({
+    options: options.map(([idOption, body], i) => ({
       id: idOption,
-      titre: idOption,
-      retenue: i === 0,
-      corps,
+      title: idOption,
+      chosen: i === 0,
+      body: body,
     })),
-    corps: "",
+    body: "",
   };
 }
 
-function cadrage(
+function scoping(
   id: string,
-  titre: string,
-  extra: Partial<Cadrage> = {},
-): Cadrage {
+  title: string,
+  extra: Partial<Scoping> = {},
+): Scoping {
   return {
     id,
-    titre,
-    statut: "livree",
-    domaines: [],
-    liens: [],
+    title,
+    status: "livree",
+    domains: [],
+    links: [],
     impacts: [],
-    objectif: "",
-    parcours: "",
-    enonces: new Map(),
+    goal: "",
+    journey: "",
+    statements: new Map(),
     decisions: [],
-    piecesJointes: [],
-    divers: [],
+    attachments: [],
+    misc: [],
     ...extra,
   };
 }
 
-function referentiel(contenu: {
-  regles?: Regle[];
-  decisions?: DecisionArchitecture[];
-  architecture?: DocumentArchitecture[];
-  cadrages?: Cadrage[];
-  prefixe?: string | null;
-}): Referentiel {
-  const parId = <T extends { id: string }>(l: T[] = []) =>
+function specification(content: {
+  rules?: Rule[];
+  decisions?: ArchitectureDecision[];
+  architecture?: ArchitectureDocument[];
+  scopings?: Scoping[];
+  prefix?: string | null;
+}): Specification {
+  const byId = <T extends { id: string }>(l: T[] = []) =>
     new Map(l.map((e) => [e.id, e]));
   return {
-    projet: {
-      nom: "Test",
+    project: {
+      name: "Test",
       description: "",
-      depotsCode: [],
-      prefixe: contenu.prefixe ?? null,
+      codeRepos: [],
+      prefix: content.prefix ?? null,
     },
-    reglages: {
-      acces: "jeton_personnel",
-      identite: null,
-      protectionDuJeton: "proposee",
-      tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+    settings: {
+      access: "jeton_personnel",
+      identity: null,
+      tokenProtection: "proposee",
+      linkTags: DEFAULT_LINK_TAGS,
     },
-    domaines: new Map(),
-    fonctionnalites: new Map(),
-    regles: parId(contenu.regles),
-    decisions: parId(contenu.decisions),
-    architecture: parId(contenu.architecture),
-    cadrages: parId(contenu.cadrages),
+    domains: new Map(),
+    features: new Map(),
+    rules: byId(content.rules),
+    decisions: byId(content.decisions),
+    architecture: byId(content.architecture),
+    scopings: byId(content.scopings),
     anomalies: [],
   };
 }
 
-const EN_COURS = {
+const IN_PROGRESS = {
   provenance: {
-    branche: "cadrage-2026-050",
+    branch: "cadrage-2026-050",
     pullRequest: 61,
-    brouillon: false,
+    draft: false,
   },
-  statut: "en_relecture" as const,
+  status: "en_relecture" as const,
 };
 
-function chercher(ref: Referentiel, requete: string) {
-  return findResultats(buildIndexRecherche(ref), requete);
+function search(ref: Specification, query: string) {
+  return findResults(buildSearchIndex(ref), query);
 }
 
 describe("la recherche", () => {
   describe("ce sur quoi elle porte", () => {
-    const ref = referentiel({
-      regles: [
-        regle("RG-quota", "Le **quota** anonyme est de soixante appels."),
-      ],
+    const ref = specification({
+      rules: [rule("RG-quota", "Le **quota** anonyme est de soixante appels.")],
       decisions: [adr("ADR-quota-cache", "Les contenus échappent au quota.")],
       architecture: [document("CMP-proxy", "Le proxy ne régule pas le quota.")],
-      cadrages: [
-        cadrage("2026-006", "Charger un dépôt sans épuiser le quota", {
+      scopings: [
+        scoping("2026-006", "Charger un dépôt sans épuiser le quota", {
           decisions: [
             decision("01-canal", "Par quel canal lire les contenus ?"),
           ],
@@ -152,9 +150,9 @@ describe("la recherche", () => {
     });
 
     it("trouve une règle, une décision, un document d’architecture et un cadrage", () => {
-      const r = chercher(ref, "quota");
+      const r = search(ref, "quota");
 
-      expect(r.referentiel.map((x) => [x.nature, x.id])).toEqual(
+      expect(r.specification.map((x) => [x.kind, x.id])).toEqual(
         expect.arrayContaining([
           ["regle", "RG-quota"],
           ["decision", "ADR-quota-cache"],
@@ -165,24 +163,24 @@ describe("la recherche", () => {
     });
 
     it("cherche dans le corps, non seulement dans le titre", () => {
-      const r = chercher(ref, "soixante");
+      const r = search(ref, "soixante");
 
-      expect(r.referentiel.map((x) => x.id)).toEqual(["RG-quota"]);
+      expect(r.specification.map((x) => x.id)).toEqual(["RG-quota"]);
     });
 
     it("trouve une décision de cadrage, et mène à son ancre dans le cadrage", () => {
-      const r = chercher(ref, "canal");
+      const r = search(ref, "canal");
 
-      const trouve = r.referentiel.find((x) => x.nature === "decision");
-      expect(trouve?.titre).toBe("Par quel canal lire les contenus ?");
-      expect(trouve?.lien).toEqual(["cadrages", "2026-006"]);
-      expect(trouve?.ancre).toBe("decision-01-canal");
+      const found = r.specification.find((x) => x.kind === "decision");
+      expect(found?.title).toBe("Par quel canal lire les contenus ?");
+      expect(found?.link).toEqual(["cadrages", "2026-006"]);
+      expect(found?.anchor).toBe("decision-01-canal");
     });
 
     it("trouve le motif d’une option écartée", () => {
-      const ref = referentiel({
-        cadrages: [
-          cadrage("2026-001", "Support de persistance", {
+      const ref = specification({
+        scopings: [
+          scoping("2026-001", "Support de persistance", {
             decisions: [
               decision("01-support", "Où vivent les données ?", [
                 ["git", "Retenue."],
@@ -194,73 +192,73 @@ describe("la recherche", () => {
       });
 
       expect(
-        chercher(ref, "sources de vérité").referentiel.map((x) => x.id),
+        search(ref, "sources de vérité").specification.map((x) => x.id),
       ).toEqual(["2026-001/01-support"]);
     });
 
     it("mène chaque nature à sa vue habituelle", () => {
-      const liens = Object.fromEntries(
-        chercher(ref, "quota").referentiel.map((x) => [x.id, x.lien]),
+      const links = Object.fromEntries(
+        search(ref, "quota").specification.map((x) => [x.id, x.link]),
       );
 
-      expect(liens["RG-quota"]).toEqual(["referentiel", "regle", "RG-quota"]);
-      expect(liens["ADR-quota-cache"]).toEqual([
+      expect(links["RG-quota"]).toEqual(["referentiel", "regle", "RG-quota"]);
+      expect(links["ADR-quota-cache"]).toEqual([
         "architecture",
         "decision",
         "ADR-quota-cache",
       ]);
-      expect(liens["CMP-proxy"]).toEqual([
+      expect(links["CMP-proxy"]).toEqual([
         "architecture",
         "document",
         "CMP-proxy",
       ]);
-      expect(liens["2026-006"]).toEqual(["cadrages", "2026-006"]);
+      expect(links["2026-006"]).toEqual(["cadrages", "2026-006"]);
     });
   });
 
   describe("la requête", () => {
-    const ref = referentiel({
-      regles: [
-        regle(
+    const ref = specification({
+      rules: [
+        rule(
           "RG-pieces-jointes",
           "Une pièce jointe est stockée sous son empreinte.",
         ),
-        regle("RG-ordre-upload", "Le téléversement précède le commit."),
+        rule("RG-ordre-upload", "Le téléversement précède le commit."),
       ],
     });
 
     it("ignore la casse et les accents", () => {
-      expect(chercher(ref, "PIECE").referentiel.map((x) => x.id)).toEqual([
+      expect(search(ref, "PIECE").specification.map((x) => x.id)).toEqual([
         "RG-pieces-jointes",
       ]);
       expect(
-        chercher(ref, "televersement").referentiel.map((x) => x.id),
+        search(ref, "televersement").specification.map((x) => x.id),
       ).toEqual(["RG-ordre-upload"]);
     });
 
     it("exige chaque mot, dans n’importe quel ordre", () => {
       expect(
-        chercher(ref, "empreinte pièce").referentiel.map((x) => x.id),
+        search(ref, "empreinte pièce").specification.map((x) => x.id),
       ).toEqual(["RG-pieces-jointes"]);
-      expect(chercher(ref, "empreinte commit").referentiel).toEqual([]);
+      expect(search(ref, "empreinte commit").specification).toEqual([]);
     });
 
     it("ne rend rien pour une requête vide", () => {
-      const r = chercher(ref, "   ");
+      const r = search(ref, "   ");
 
-      expect(r.referentiel).toEqual([]);
-      expect(r.enCours).toEqual([]);
+      expect(r.specification).toEqual([]);
+      expect(r.inProgress).toEqual([]);
     });
 
     it("place en tête ce qui correspond par l’identifiant", () => {
-      const ref = referentiel({
-        regles: [
-          regle("RG-autre", "Rien à voir, sinon le mot cache."),
-          regle("RG-cache", "Un énoncé."),
+      const ref = specification({
+        rules: [
+          rule("RG-autre", "Rien à voir, sinon le mot cache."),
+          rule("RG-cache", "Un énoncé."),
         ],
       });
 
-      expect(chercher(ref, "cache").referentiel.map((x) => x.id)).toEqual([
+      expect(search(ref, "cache").specification.map((x) => x.id)).toEqual([
         "RG-cache",
         "RG-autre",
       ]);
@@ -270,25 +268,25 @@ describe("la recherche", () => {
   describe("l’extrait", () => {
     it("montre le passage où le mot apparaît, sans balisage", () => {
       const long = `${"Préambule sans rapport. ".repeat(20)}Le **quota** anonyme est de soixante appels.`;
-      const ref = referentiel({ regles: [regle("RG-quota", long)] });
+      const ref = specification({ rules: [rule("RG-quota", long)] });
 
-      const extrait = chercher(ref, "anonyme").referentiel[0].extrait;
+      const excerpt = search(ref, "anonyme").specification[0].excerpt;
 
-      expect(extrait).toContain("quota anonyme est de soixante");
-      expect(extrait).not.toContain("**");
-      expect(extrait.length).toBeLessThan(200);
+      expect(excerpt).toContain("quota anonyme est de soixante");
+      expect(excerpt).not.toContain("**");
+      expect(excerpt.length).toBeLessThan(200);
     });
   });
 
   describe("les cadrages en cours", () => {
-    const ref = referentiel({
-      regles: [
-        regle("RG-barre", "La barre de navigation présente quatre entrées."),
+    const ref = specification({
+      rules: [
+        rule("RG-barre", "La barre de navigation présente quatre entrées."),
       ],
-      cadrages: [
-        cadrage("2026-041", "Donner à l’architecture sa place dans la barre"),
-        cadrage("2026-050", "Alléger la barre sur écran étroit", {
-          ...EN_COURS,
+      scopings: [
+        scoping("2026-041", "Donner à l’architecture sa place dans la barre"),
+        scoping("2026-050", "Alléger la barre sur écran étroit", {
+          ...IN_PROGRESS,
           decisions: [
             decision("01-ce-qui-cede", "Qu’est-ce qui cède dans la barre ?"),
           ],
@@ -297,35 +295,35 @@ describe("la recherche", () => {
     });
 
     it("les range à part, avec leurs décisions", () => {
-      const r = chercher(ref, "barre");
+      const r = search(ref, "barre");
 
-      expect(r.referentiel.map((x) => x.id)).toEqual(
+      expect(r.specification.map((x) => x.id)).toEqual(
         expect.arrayContaining(["RG-barre", "2026-041"]),
       );
-      expect(r.referentiel.map((x) => x.id)).not.toContain("2026-050");
-      expect(r.enCours.map((x) => x.id)).toEqual([
+      expect(r.specification.map((x) => x.id)).not.toContain("2026-050");
+      expect(r.inProgress.map((x) => x.id)).toEqual([
         "2026-050",
         "2026-050/01-ce-qui-cede",
       ]);
     });
 
     it("portent la marque de leur demande de fusion", () => {
-      const r = chercher(ref, "étroit");
+      const r = search(ref, "étroit");
 
-      expect(r.enCours[0].pullRequest).toBe(61);
+      expect(r.inProgress[0].pullRequest).toBe(61);
     });
   });
 
   describe("l’identifiant affiché", () => {
     it("porte le préfixe du projet, et se trouve par lui", () => {
-      const ref = referentiel({
-        prefixe: "SC",
-        cadrages: [cadrage("2026-042", "Recherche")],
+      const ref = specification({
+        prefix: "SC",
+        scopings: [scoping("2026-042", "Recherche")],
       });
 
-      const r = chercher(ref, "SC-2026-042");
+      const r = search(ref, "SC-2026-042");
 
-      expect(r.referentiel.map((x) => x.identifiant)).toEqual(["SC-2026-042"]);
+      expect(r.specification.map((x) => x.identifier)).toEqual(["SC-2026-042"]);
     });
   });
 });

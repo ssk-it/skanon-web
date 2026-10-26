@@ -1,24 +1,28 @@
 import { inject } from "../injection";
 import { computed, signal, untracked } from "../signaux";
-import { GithubClient, GithubError, RefDepot } from "../github/github-client";
+import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { TokenService } from "../github/token.service";
-import { ContenusCache, IdentiteConnue, SymboleConnu } from "./contenus-cache";
 import {
-  FichierIdentite,
+  ContentCache,
+  KnownProjectIdentity,
+  KnownSymbol,
+} from "./contenus-cache";
+import {
+  IdentityFile,
   POIDS_MAX_IDENTITE,
   REPERTOIRE_IDENTITE,
   VARIANTES_IDENTITE,
-  VarianteIdentite,
-  chooseSymbole,
-  formatTypeImage,
-  listCandidatsSymbole,
+  IdentityVariant,
+  chooseSymbol,
+  formatImageType,
+  listSymbolCandidates,
 } from "./identite-noms";
 
 /** Ce qui se montre pour un dépôt sur un fond, et sous quel effacement il a été lu. */
-interface SymbolePublie {
+interface PublishedSymbol {
   readonly source: string | null;
-  readonly prive: boolean;
-  readonly effacements: number;
+  readonly private: boolean;
+  readonly erasures: number;
 }
 
 /**
@@ -35,26 +39,24 @@ interface SymbolePublie {
  * Une identité absente, refusée ou illisible ne lève jamais : la vue montre
  * son repli, et rien d'autre ne dépend de cette lecture.
  */
-export class IdentitesService {
+export class ProjectIdentityService {
   private readonly github = inject(GithubClient);
   private readonly tokens = inject(TokenService);
-  private readonly cache = inject(ContenusCache);
+  private readonly cache = inject(ContentCache);
 
-  private readonly publies = signal<ReadonlyMap<string, SymbolePublie>>(
+  private readonly published = signal<ReadonlyMap<string, PublishedSymbol>>(
     new Map(),
   );
-  private readonly relectures = signal(0);
+  private readonly rereads = signal(0);
 
   /**
    * Change quand ce qui a été lu doit l'être de nouveau : un retour à
    * l'accueil, ou un accès retiré. Les vues le lisent pour redemander.
    */
-  readonly generation = computed(
-    () => this.relectures() + this.cache.effacements(),
-  );
+  readonly generation = computed(() => this.rereads() + this.cache.erasures());
 
-  private readonly lectures = new Map<string, Promise<void>>();
-  private generationLue = -1;
+  private readonly reads = new Map<string, Promise<void>>();
+  private readGeneration = -1;
   /** Les lectures d'un même dépôt se suivent : elles réécrivent le même enregistrement. */
   private readonly files = new Map<string, Promise<void>>();
 
@@ -64,12 +66,12 @@ export class IdentitesService {
    * Celui d'un dépôt privé lu avant qu'un accès soit retiré cesse aussitôt de
    * se montrer, sans attendre qu'on le relise (RG-contenus-prives-au-repos).
    */
-  findSymbole(depot: RefDepot, variante: VarianteIdentite): string | null {
-    const publie = this.publies().get(cle(depot, variante));
-    if (!publie?.source) return null;
-    if (publie.prive && publie.effacements !== this.cache.effacements())
+  findSymbol(repoRef: RepoRef, variant: IdentityVariant): string | null {
+    const published = this.published().get(key(repoRef, variant));
+    if (!published?.source) return null;
+    if (published.private && published.erasures !== this.cache.erasures())
       return null;
-    return publie.source;
+    return published.source;
   }
 
   /**
@@ -78,78 +80,75 @@ export class IdentitesService {
    * Ce que le poste détient se montre d'abord, puis la lecture le confirme ou
    * le remplace : l'accueil n'attend pas le réseau pour se dessiner.
    */
-  demander(depot: RefDepot, variante: VarianteIdentite): Promise<void> {
+  request(repoRef: RepoRef, variant: IdentityVariant): Promise<void> {
     return untracked(() => {
       const generation = this.generation();
-      if (generation !== this.generationLue) {
-        this.lectures.clear();
-        this.generationLue = generation;
+      if (generation !== this.readGeneration) {
+        this.reads.clear();
+        this.readGeneration = generation;
       }
-      const k = cle(depot, variante);
-      let lecture = this.lectures.get(k);
-      if (!lecture) {
-        lecture = this.enchainer(depot, () => this.lire(depot, variante));
-        this.lectures.set(k, lecture);
+      const k = key(repoRef, variant);
+      let read = this.reads.get(k);
+      if (!read) {
+        read = this.chain(repoRef, () => this.read(repoRef, variant));
+        this.reads.set(k, read);
       }
-      return lecture;
+      return read;
     });
   }
 
   /** Redemande toutes les identités, sous condition — au retour sur l'accueil. */
-  relire(): void {
-    this.relectures.update((n) => n + 1);
+  reread(): void {
+    this.rereads.update((n) => n + 1);
   }
 
-  private enchainer(
-    depot: RefDepot,
-    lecture: () => Promise<void>,
-  ): Promise<void> {
-    const k = cleDepot(depot);
-    const suivante = (this.files.get(k) ?? Promise.resolve()).then(lecture);
-    this.files.set(k, suivante);
-    return suivante;
+  private chain(repoRef: RepoRef, read: () => Promise<void>): Promise<void> {
+    const k = repoKey(repoRef);
+    const next = (this.files.get(k) ?? Promise.resolve()).then(read);
+    this.files.set(k, next);
+    return next;
   }
 
-  private async lire(
-    depot: RefDepot,
-    variante: VarianteIdentite,
+  private async read(
+    repoRef: RepoRef,
+    variant: IdentityVariant,
   ): Promise<void> {
-    const effacements = this.cache.effacements();
-    const connue = await this.cache.loadIdentite(depot);
-    const detenu = connue?.symboles[variante];
-    if (connue && detenu !== undefined) {
-      this.publier(
-        depot,
-        variante,
-        detenu?.source ?? null,
-        connue.prive,
-        effacements,
+    const erasures = this.cache.erasures();
+    const known = await this.cache.loadIdentity(repoRef);
+    const held = known?.symbols[variant];
+    if (known && held !== undefined) {
+      this.publish(
+        repoRef,
+        variant,
+        held?.source ?? null,
+        known.private,
+        erasures,
       );
     }
 
     try {
-      const suivante =
-        this.tokens.valeurPour(depot) !== null
-          ? await this.lireParApi(depot, variante, connue)
-          : await this.lireParRaw(depot, variante, connue);
+      const next =
+        this.tokens.valueFor(repoRef) !== null
+          ? await this.readViaApi(repoRef, variant, known)
+          : await this.readViaRaw(repoRef, variant, known);
       // Un accès retiré pendant la lecture : ce qu'elle a obtenu sous lui ne
       // doit pas lui survivre.
-      if (this.cache.effacements() !== effacements) return;
-      await this.cache.saveIdentite(depot, suivante, {
-        persister: this.isPersistable(suivante.prive),
+      if (this.cache.erasures() !== erasures) return;
+      await this.cache.saveIdentity(repoRef, next, {
+        persist: this.isPersistable(next.private),
       });
-      this.publier(
-        depot,
-        variante,
-        suivante.symboles[variante]?.source ?? null,
-        suivante.prive,
-        effacements,
+      this.publish(
+        repoRef,
+        variant,
+        next.symbols[variant]?.source ?? null,
+        next.private,
+        erasures,
       );
     } catch (e) {
-      if (isRefus(e)) {
-        await this.cache.clearIdentite(depot);
+      if (isDenial(e)) {
+        await this.cache.clearIdentity(repoRef);
         for (const v of VARIANTES_IDENTITE)
-          this.publier(depot, v, null, false, effacements);
+          this.publish(repoRef, v, null, false, erasures);
       }
       // Sinon — réseau coupé, quota épuisé — le dernier état connu reste
       // affiché : une identité périmée ne fait prendre aucun projet pour un autre.
@@ -163,144 +162,145 @@ export class IdentitesService {
    * Une fois l'identité connue, la visite suivante ne coûte qu'une réponse
    * « inchangée », que la plateforme ne décompte pas sous un accès.
    */
-  private async lireParApi(
-    depot: RefDepot,
-    variante: VarianteIdentite,
-    connue: IdentiteConnue | null,
-  ): Promise<IdentiteConnue> {
-    const precedente = connue?.canal === "api" ? connue : null;
-    const racine = await this.github.loadRacine(
-      depot,
-      precedente?.etag ?? null,
-    );
+  private async readViaApi(
+    repoRef: RepoRef,
+    variant: IdentityVariant,
+    known: KnownProjectIdentity | null,
+  ): Promise<KnownProjectIdentity> {
+    const previous = known?.channel === "api" ? known : null;
+    const root = await this.github.loadRoot(repoRef, previous?.etag ?? null);
 
     let etag: string | null;
-    let repertoire: string | null;
-    let fichiers: readonly FichierIdentite[];
-    if (racine === null && precedente) {
-      ({ etag, repertoire } = precedente);
-      fichiers = precedente.fichiers ?? [];
+    let directory: string | null;
+    let files: readonly IdentityFile[];
+    if (root === null && previous) {
+      ({ etag, directory } = previous);
+      files = previous.files ?? [];
     } else {
-      etag = racine?.etag ?? null;
-      repertoire =
-        racine?.entrees.find(
+      etag = root?.etag ?? null;
+      directory =
+        root?.entries.find(
           (e) => e.path === REPERTOIRE_IDENTITE && e.type === "tree",
         )?.sha ?? null;
-      fichiers = !repertoire
+      files = !directory
         ? []
-        : repertoire === precedente?.repertoire && precedente.fichiers
-          ? precedente.fichiers
-          : (await this.github.loadArbreParSha(depot, repertoire)).map((e) => ({
+        : directory === previous?.directory && previous.files
+          ? previous.files
+          : (await this.github.loadTreeBySha(repoRef, directory)).map((e) => ({
               path: e.path,
               sha: e.sha,
               size: e.size,
             }));
     }
 
-    const anciens = Object.values(precedente?.symboles ?? {});
-    const symboles: Partial<Record<VarianteIdentite, SymboleConnu | null>> = {};
+    const old = Object.values(previous?.symbols ?? {});
+    const symbols: Partial<Record<IdentityVariant, KnownSymbol | null>> = {};
     // L'autre fond ne se garde que s'il désigne encore le même fichier : un
     // symbole remplacé dans le dépôt doit l'être aussi à l'écran.
     for (const v of VARIANTES_IDENTITE) {
-      const s = precedente?.symboles[v];
+      const s = previous?.symbols[v];
       if (
         s !== undefined &&
-        (chooseSymbole(fichiers, v)?.sha ?? null) === (s?.sha ?? null)
+        (chooseSymbol(files, v)?.sha ?? null) === (s?.sha ?? null)
       ) {
-        symboles[v] = s;
+        symbols[v] = s;
       }
     }
 
-    const choisi = chooseSymbole(fichiers, variante);
-    symboles[variante] = !choisi
+    const chosen = chooseSymbol(files, variant);
+    symbols[variant] = !chosen
       ? null
-      : (anciens.find((s) => s?.sha === choisi.sha) ?? {
-          chemin: choisi.path,
-          sha: choisi.sha,
+      : (old.find((s) => s?.sha === chosen.sha) ?? {
+          path: chosen.path,
+          sha: chosen.sha,
           source: toDataUrl(
-            await this.github.loadBlobOctets(depot, choisi.sha),
-            choisi.path,
+            await this.github.loadBlobBytes(repoRef, chosen.sha),
+            chosen.path,
           ),
         });
 
     // Rien ne dit, à ce stade, si le dépôt est public : tout ce qu'un accès a
     // lu est traité comme privé. En effacer trop ne coûte qu'un
     // téléchargement ; en garder trop survivrait à l'accès.
-    return { canal: "api", etag, repertoire, fichiers, symboles, prive: true };
+    return { channel: "api", etag, directory, files, symbols, private: true };
   }
 
   /**
    * Sans accès : chaque nom candidat, dans l'ordre, par le canal non décompté.
    * Le premier qui répond l'emporte.
    */
-  private async lireParRaw(
-    depot: RefDepot,
-    variante: VarianteIdentite,
-    connue: IdentiteConnue | null,
-  ): Promise<IdentiteConnue> {
-    let symbole: SymboleConnu | null = null;
-    for (const nom of listCandidatsSymbole(variante)) {
-      const octets = await this.github.loadRawOctets(
-        depot,
-        `${REPERTOIRE_IDENTITE}/${nom}`,
+  private async readViaRaw(
+    repoRef: RepoRef,
+    variant: IdentityVariant,
+    known: KnownProjectIdentity | null,
+  ): Promise<KnownProjectIdentity> {
+    let symbol: KnownSymbol | null = null;
+    for (const name of listSymbolCandidates(variant)) {
+      const bytes = await this.github.loadRawBytes(
+        repoRef,
+        `${REPERTOIRE_IDENTITE}/${name}`,
       );
-      if (!octets || octets.byteLength > POIDS_MAX_IDENTITE) continue;
-      symbole = { chemin: nom, sha: null, source: toDataUrl(octets, nom) };
+      if (!bytes || bytes.byteLength > POIDS_MAX_IDENTITE) continue;
+      symbol = { path: name, sha: null, source: toDataUrl(bytes, name) };
       break;
     }
-    const precedents = connue?.canal === "raw" ? connue.symboles : {};
+    const previousOnes = known?.channel === "raw" ? known.symbols : {};
     return {
-      canal: "raw",
+      channel: "raw",
       etag: null,
-      repertoire: null,
-      fichiers: null,
-      symboles: { ...precedents, [variante]: symbole },
-      prive: false,
+      directory: null,
+      files: null,
+      symbols: { ...previousOnes, [variant]: symbol },
+      private: false,
     };
   }
 
-  private publier(
-    depot: RefDepot,
-    variante: VarianteIdentite,
+  private publish(
+    repoRef: RepoRef,
+    variant: IdentityVariant,
     source: string | null,
-    prive: boolean,
-    effacements: number,
+    isPrivate: boolean,
+    erasures: number,
   ): void {
-    this.publies.update((m) =>
-      new Map(m).set(cle(depot, variante), { source, prive, effacements }),
+    this.published.update((m) =>
+      new Map(m).set(key(repoRef, variant), {
+        source,
+        private: isPrivate,
+        erasures,
+      }),
     );
   }
 
   /** Comme les contenus : sous un accès temporaire, rien ne survit à l'onglet. */
-  private isPersistable(prive: boolean): boolean {
-    return !prive || this.tokens.source() !== "identite_tierce";
+  private isPersistable(isPrivate: boolean): boolean {
+    return !isPrivate || this.tokens.source() !== "identite_tierce";
   }
 }
 
 /** Le dépôt est hors de portée de l'accès présenté — non une panne. */
-function isRefus(e: unknown): boolean {
+function isDenial(e: unknown): boolean {
   return (
     e instanceof GithubError &&
-    !e.quotaEpuise &&
-    (e.statut === 401 || e.statut === 403 || e.statut === 404)
+    !e.quotaExhausted &&
+    (e.status === 401 || e.status === 403 || e.status === 404)
   );
 }
 
-function cleDepot(depot: RefDepot): string {
-  return `${depot.owner.toLowerCase()}/${depot.repo.toLowerCase()}`;
+function repoKey(repoRef: RepoRef): string {
+  return `${repoRef.owner.toLowerCase()}/${repoRef.repo.toLowerCase()}`;
 }
 
-function cle(depot: RefDepot, variante: VarianteIdentite): string {
-  return `${cleDepot(depot)}|${variante}`;
+function key(repoRef: RepoRef, variant: IdentityVariant): string {
+  return `${repoKey(repoRef)}|${variant}`;
 }
 
-function toDataUrl(octets: ArrayBuffer, chemin: string): string {
-  const brut = new Uint8Array(octets);
-  let binaire = "";
+function toDataUrl(bytes: ArrayBuffer, path: string): string {
+  const raw = new Uint8Array(bytes);
+  let binary = "";
   // Par tranches : `String.fromCharCode` sur cent kilo-octets d'un coup
   // dépasserait la pile d'arguments de certains moteurs.
-  for (let i = 0; i < brut.length; i += 0x8000) {
-    binaire += String.fromCharCode(...brut.subarray(i, i + 0x8000));
+  for (let i = 0; i < raw.length; i += 0x8000) {
+    binary += String.fromCharCode(...raw.subarray(i, i + 0x8000));
   }
-  return `data:${formatTypeImage(chemin) ?? "application/octet-stream"};base64,${btoa(binaire)}`;
+  return `data:${formatImageType(path) ?? "application/octet-stream"};base64,${btoa(binary)}`;
 }

@@ -1,16 +1,16 @@
 import { inject } from "../injection";
 import { signal } from "../signaux";
-import { GithubClient, GithubError, RefDepot } from "../github/github-client";
-import { ReferentielStore } from "./referentiel.store";
+import { GithubClient, GithubError, RepoRef } from "../github/github-client";
+import { SpecificationStore } from "./referentiel.store";
 
 /** Ce qui signe un dépôt outillé, quel que soit le nom donné aux fichiers. */
 const ACTION = "ssk-it/ssk-canon-action";
 
 /** Où vivent les workflows, et ce que chacun apporte. */
-const WORKFLOWS: ReadonlyArray<{ chemin: string; contenu: string }> = [
+const WORKFLOWS: ReadonlyArray<{ path: string; content: string }> = [
   {
-    chemin: ".github/workflows/verification-depot-cadre.yml",
-    contenu: `# Vérifie qu'un cadrage est cohérent avant de pouvoir être livré.
+    path: ".github/workflows/verification-depot-cadre.yml",
+    content: `# Vérifie qu'un cadrage est cohérent avant de pouvoir être livré.
 #
 # À configurer comme contrôle requis dans les règles de protection de la branche
 # principale, faute de quoi il signale sans bloquer.
@@ -45,8 +45,8 @@ jobs:
 `,
   },
   {
-    chemin: ".github/workflows/propagation-depot-cadre.yml",
-    contenu: `# Applique au référentiel les impacts des cadrages livrés, à chaque
+    path: ".github/workflows/propagation-depot-cadre.yml",
+    content: `# Applique au référentiel les impacts des cadrages livrés, à chaque
 # arrivée sur la branche principale — donc à chaque merge de cadrage.
 #
 # Deux propriétés du propagateur rendent ce déclenchement systématique sûr :
@@ -92,7 +92,7 @@ jobs:
  * permission distincte, parce qu'un workflow s'exécute avec les droits du dépôt.
  * Le refus doit donc nommer cette cause, sous peine d'être lu comme une panne.
  */
-export class AutomatisationRefusee extends Error {
+export class AutomationRefused extends Error {
   constructor() {
     super(
       "Cet accès ne permet pas d’écrire les workflows. Écrire sous " +
@@ -112,9 +112,9 @@ export class AutomatisationRefusee extends Error {
  * assez peu pour qu'on le remette à plus tard, assez conséquent pour que
  * l'oubli se paie.
  */
-export class AutomatisationService {
+export class AutomationService {
   private readonly github = inject(GithubClient);
-  private readonly store = inject(ReferentielStore);
+  private readonly store = inject(SpecificationStore);
 
   /**
    * Dit si le dépôt porte déjà les deux workflows.
@@ -122,7 +122,7 @@ export class AutomatisationService {
    * `null` tant que la question n'a pas été posée : l'absence d'automatisation
    * et l'ignorance ne se présentent pas de la même façon à l'écran.
    */
-  readonly installee = signal<boolean | null>(null);
+  readonly installed = signal<boolean | null>(null);
 
   /**
    * Regarde si l'automatisation est en place.
@@ -133,24 +133,24 @@ export class AutomatisationService {
    * de le doubler. C'est ce qu'a fait la première version, sur notre propre
    * dépôt de référence.
    */
-  async verifier(): Promise<void> {
+  async check(): Promise<void> {
     try {
-      const arbre = await this.github.loadArbre(this.store.depot());
-      const workflows = arbre.entrees.filter(
+      const tree = await this.github.loadTree(this.store.repoRef());
+      const workflows = tree.entries.filter(
         (e) =>
           e.type === "blob" &&
           e.path.startsWith(".github/workflows/") &&
           /\.ya?ml$/.test(e.path),
       );
 
-      const contenus = await Promise.all(
-        workflows.map((w) => this.github.loadBlob(this.store.depot(), w.sha)),
+      const contents = await Promise.all(
+        workflows.map((w) => this.github.loadBlob(this.store.repoRef(), w.sha)),
       );
-      this.installee.set(contenus.some((c) => c.includes(ACTION)));
+      this.installed.set(contents.some((c) => c.includes(ACTION)));
     } catch {
       // Ne rien affirmer si la question n'a pas pu être posée : proposer
       // d'installer ce qui est peut-être déjà là serait pire que se taire.
-      this.installee.set(null);
+      this.installed.set(null);
     }
   }
 
@@ -161,31 +161,31 @@ export class AutomatisationService {
    * ne protège rien pendant qu'elle attend, et c'est justement la période où le
    * dépôt est le plus exposé.
    */
-  async installer(): Promise<void> {
-    const depot: RefDepot = this.store.depot();
-    const branche = (await this.github.loadDepot(depot)).defaultBranch;
+  async install(): Promise<void> {
+    const repoRef: RepoRef = this.store.repoRef();
+    const branch = (await this.github.loadRepo(repoRef)).defaultBranch;
 
     for (const w of WORKFLOWS) {
       try {
-        await this.github.commitFichier(
-          depot,
-          branche,
-          w.chemin,
-          w.contenu,
-          `Installe l'automatisation : ${w.chemin.split("/").pop()}`,
+        await this.github.commitFile(
+          repoRef,
+          branch,
+          w.path,
+          w.content,
+          `Installe l'automatisation : ${w.path.split("/").pop()}`,
         );
       } catch (e) {
         // La plateforme refuse par un 403 dépourvu de motif lisible. Le
         // traduire ici évite de le présenter comme une panne, alors que c'est
         // un droit manquant que le rédacteur peut lui-même s'accorder.
-        if (e instanceof GithubError && e.statut === 403) {
-          throw new AutomatisationRefusee();
+        if (e instanceof GithubError && e.status === 403) {
+          throw new AutomationRefused();
         }
         throw e;
       }
     }
 
-    this.installee.set(true);
-    await this.store.loadReferentiel();
+    this.installed.set(true);
+    await this.store.loadSpecification();
   }
 }

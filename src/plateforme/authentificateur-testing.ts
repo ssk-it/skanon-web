@@ -1,15 +1,15 @@
-import type { Authentificateur, PasskeyCreee } from "./web-scellement";
+import type { Authenticator, CreatedPasskey } from "./web-scellement";
 
 /**
  * Un authentificateur simulé : jsdom n'a pas WebAuthn. Comme une vraie passkey PRF, il rend pour une passkey et un sel donnés toujours les mêmes 32 octets, et d'autres pour une autre passkey.
  */
-export class FauxAuthentificateur implements Authentificateur {
+export class FakeAuthenticator implements Authenticator {
   possible = true;
   /** Ce que la prochaine création rendra : la sortie dès la création, plus tard, ou jamais. */
-  prfALaCreation: "rendue" | "differee" | "absente" = "rendue";
-  annuler = false;
+  prfAtCreation: "rendue" | "differee" | "absente" = "rendue";
+  cancel = false;
   /** Fait rendre la sortie d'une autre passkey, comme un trousseau qui aurait changé. */
-  substituer = false;
+  substitute = false;
   readonly secrets = new Map<string, Uint8Array>();
   creations = 0;
   evaluations = 0;
@@ -18,32 +18,38 @@ export class FauxAuthentificateur implements Authentificateur {
     return this.possible;
   }
 
-  async create(sel: Uint8Array): Promise<PasskeyCreee | null> {
-    if (this.annuler) return null;
+  async create(salt: Uint8Array): Promise<CreatedPasskey | null> {
+    if (this.cancel) return null;
     this.creations++;
     const id = crypto.getRandomValues(new Uint8Array(16));
-    this.secrets.set(cle(id), crypto.getRandomValues(new Uint8Array(32)));
-    if (this.prfALaCreation === "absente")
-      return { id, prf: null, prfActif: false };
-    if (this.prfALaCreation === "differee")
-      return { id, prf: null, prfActif: true };
-    return { id, prf: await this.sortie(id, sel), prfActif: true };
+    this.secrets.set(key(id), crypto.getRandomValues(new Uint8Array(32)));
+    if (this.prfAtCreation === "absente")
+      return { id, prf: null, prfEnabled: false };
+    if (this.prfAtCreation === "differee")
+      return { id, prf: null, prfEnabled: true };
+    return { id, prf: await this.output(id, salt), prfEnabled: true };
   }
 
-  async evaluate(id: Uint8Array, sel: Uint8Array): Promise<ArrayBuffer | null> {
-    if (this.annuler || !this.secrets.has(cle(id))) return null;
+  async evaluate(
+    id: Uint8Array,
+    salt: Uint8Array,
+  ): Promise<ArrayBuffer | null> {
+    if (this.cancel || !this.secrets.has(key(id))) return null;
     this.evaluations++;
-    return this.sortie(id, sel);
+    return this.output(id, salt);
   }
 
-  private async sortie(id: Uint8Array, sel: Uint8Array): Promise<ArrayBuffer> {
-    const secret = this.substituer
+  private async output(id: Uint8Array, salt: Uint8Array): Promise<ArrayBuffer> {
+    const secret = this.substitute
       ? new Uint8Array(32).fill(7)
-      : (this.secrets.get(cle(id)) ?? new Uint8Array(32));
-    return crypto.subtle.digest("SHA-256", new Uint8Array([...secret, ...sel]));
+      : (this.secrets.get(key(id)) ?? new Uint8Array(32));
+    return crypto.subtle.digest(
+      "SHA-256",
+      new Uint8Array([...secret, ...salt]),
+    );
   }
 }
 
-function cle(id: Uint8Array): string {
+function key(id: Uint8Array): string {
   return [...id].join(",");
 }

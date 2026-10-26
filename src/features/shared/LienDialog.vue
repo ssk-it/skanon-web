@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { inject } from "../../core/injection";
-import { LIBELLE_TAG_LIEN, type LienExterne } from "../../core/model/model";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { normaliserTag } from "../../core/repo/tag-lien";
-import UiAutocompletion from "../../ui/UiAutocompletion.vue";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiChamp from "../../ui/UiChamp.vue";
-import UiDialogue from "../../ui/UiDialogue.vue";
+import { LINK_TAG_LABEL, type ExternalLink } from "../../core/model/model";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { normalizeTag } from "../../core/repo/tag-lien";
+import UiAutocomplete from "../../ui/UiAutocompletion.vue";
+import UiButton from "../../ui/UiBouton.vue";
+import UiTextField from "../../ui/UiChamp.vue";
+import UiDialog from "../../ui/UiDialogue.vue";
 
 /**
  * Saisie d'un lien externe attaché à un cadrage.
@@ -18,24 +18,24 @@ import UiDialogue from "../../ui/UiDialogue.vue";
  */
 const props = defineProps<{
   /** Le lien à corriger, absent quand l'écran sert à en ajouter un. */
-  data?: LienExterne | null;
+  data?: ExternalLink | null;
 }>();
 
-const emit = defineEmits<{ fermer: [lien?: LienExterne] }>();
+const emit = defineEmits<{ close: [lien?: ExternalLink] }>();
 
-const store = inject(ReferentielStore);
+const store = inject(SpecificationStore);
 const initial = props.data ?? null;
 
 const modification = !!initial;
 
 const url = ref(initial?.url ?? "");
-const nom = ref(initial?.nom ?? "");
+const name = ref(initial?.name ?? "");
 
 /** Celles du projet, plus celles que ses cadrages emploient déjà. */
-const tags = computed(() => store.tagsLiens());
+const tags = computed(() => store.linkTags());
 
-function libelleTag(tag: string): string {
-  return LIBELLE_TAG_LIEN[tag] ?? tag;
+function tagLabel(tag: string): string {
+  return LINK_TAG_LABEL[tag] ?? tag;
 }
 
 /**
@@ -43,23 +43,23 @@ function libelleTag(tag: string): string {
  *
  * Choisir « Carte Trello » dans la liste pour voir « carte_trello » s'inscrire donnerait à croire que la saisie a été corrigée. La forme écrite dans le frontmatter se retrouve par normalisation, qui rend justement la clé d'origine pour tout libellé connu.
  */
-const tag = ref(libelleTag(initial?.tag || tags.value[0] || "document"));
+const tag = ref(tagLabel(initial?.tag || tags.value[0] || "document"));
 
 /**
  * Les natures proposées, filtrées par ce qui est tapé.
  *
  * Le filtre porte sur la nature normalisée et sur son libellé : on cherche « Carte Trello » comme on l'a lue sur la fiche, pas comme elle s'écrit dans le frontmatter. La liste entière reste offerte tant que le champ vaut une nature connue — sinon la sélection d'une proposition masquerait toutes les autres, et changer d'avis demanderait de tout effacer.
  */
-const tagsProposes = computed(() => {
-  const tous = tags.value;
-  const saisi = tag.value.trim().toLowerCase();
-  const connu = (t: string) =>
-    t.toLowerCase() === saisi || libelleTag(t).toLowerCase() === saisi;
-  if (!saisi || tous.some(connu)) return tous;
-  return tous.filter(
+const proposedTags = computed(() => {
+  const all = tags.value;
+  const input = tag.value.trim().toLowerCase();
+  const known = (t: string) =>
+    t.toLowerCase() === input || tagLabel(t).toLowerCase() === input;
+  if (!input || all.some(known)) return all;
+  return all.filter(
     (t) =>
-      t.toLowerCase().includes(saisi) ||
-      libelleTag(t).toLowerCase().includes(saisi),
+      t.toLowerCase().includes(input) ||
+      tagLabel(t).toLowerCase().includes(input),
   );
 });
 
@@ -68,11 +68,11 @@ const tagsProposes = computed(() => {
  *
  * Accents pliés, séparateurs unifiés en soulignés, casse abaissée : la nature est une clé, et « Ticket Jira » saisi ici ne doit pas fonder une seconde nature à côté du « ticket_jira » déjà employé ailleurs. C'est aussi ce qui ramène le libellé montré dans le champ à la clé qu'il désigne — « Carte Trello » redonne « carte_trello ».
  */
-const tagNormalise = computed(() => normaliserTag(tag.value));
+const normalizedTag = computed(() => normalizeTag(tag.value));
 
-const erreurTag = computed(() => {
+const tagError = computed(() => {
   if (!tag.value.trim()) return null;
-  return tagNormalise.value
+  return normalizedTag.value
     ? null
     : "Une nature s’écrit avec des lettres ou des chiffres.";
 });
@@ -82,11 +82,11 @@ const erreurTag = computed(() => {
  *
  * Un chemin relatif ou un `javascript:` n'a aucun sens ici : le premier ne résoudrait pas depuis le dépôt, le second ferait du frontmatter un vecteur d'exécution pour quiconque ouvre la fiche.
  */
-const erreurUrl = computed(() => {
-  const brut = url.value.trim();
-  if (!brut) return null;
+const urlError = computed(() => {
+  const raw = url.value.trim();
+  if (!raw) return null;
   try {
-    const u = new URL(brut);
+    const u = new URL(raw);
     return u.protocol === "http:" || u.protocol === "https:"
       ? null
       : "L’adresse doit commencer par http:// ou https://.";
@@ -100,74 +100,74 @@ const erreurUrl = computed(() => {
  *
  * Les liens écrits avant que le champ existe n'en portent pas, et la fiche les nomme par leur nature : l'imposer ici rendrait ces liens-là impossibles à corriger sans leur inventer un libellé au passage.
  */
-const valide = computed(
-  () => !!url.value.trim() && !erreurUrl.value && !!tagNormalise.value,
+const valid = computed(
+  () => !!url.value.trim() && !urlError.value && !!normalizedTag.value,
 );
 
-function valider(): void {
-  if (!valide.value) return;
-  emit("fermer", {
-    tag: tagNormalise.value,
+function validate(): void {
+  if (!valid.value) return;
+  emit("close", {
+    tag: normalizedTag.value,
     url: url.value.trim(),
-    nom: nom.value.trim(),
+    name: name.value.trim(),
   });
 }
 </script>
 
 <template>
-  <UiDialogue
+  <UiDialog
     class="lien-dialog"
-    :titre="modification ? 'Modifier le lien' : 'Ajouter un lien'"
+    :title="modification ? 'Modifier le lien' : 'Ajouter un lien'"
   >
     <!-- L'indication porte l'erreur sans mettre le champ en erreur : c'est ainsi que SSK Canon l'affichait, par une classe sur son mat-hint. -->
-    <UiChamp
+    <UiTextField
       v-model="url"
       class="champ"
-      libelle="Adresse"
+      label="Adresse"
       placeholder="https://…"
       autocomplete="off"
       data-focus-initial
     >
       <template #indice>
-        <span class="ui-champ__indice" :class="{ erreur: !!erreurUrl }">
-          {{ erreurUrl ?? "L’adresse complète, telle qu’on l’ouvre" }}
+        <span class="ui-champ__indice" :class="{ erreur: !!urlError }">
+          {{ urlError ?? "L’adresse complète, telle qu’on l’ouvre" }}
         </span>
       </template>
-    </UiChamp>
+    </UiTextField>
 
-    <UiChamp
-      v-model="nom"
+    <UiTextField
+      v-model="name"
       class="champ"
-      libelle="Nom"
+      label="Nom"
       autocomplete="off"
-      indice="Le libellé affiché sur la fiche — à défaut, sa nature"
-      @keyup.enter="valider()"
+      hint="Le libellé affiché sur la fiche — à défaut, sa nature"
+      @keyup.enter="validate()"
     />
 
-    <UiAutocompletion
+    <UiAutocomplete
       v-model="tag"
       class="champ"
-      libelle="Nature"
-      :options="tagsProposes.map(libelleTag)"
+      label="Nature"
+      :options="proposedTags.map(tagLabel)"
       autocomplete="off"
-      @keyup.enter="valider()"
+      @keyup.enter="validate()"
     >
       <template #indice>
-        <span class="ui-champ__indice" :class="{ erreur: !!erreurTag }">
+        <span class="ui-champ__indice" :class="{ erreur: !!tagError }">
           {{
-            erreurTag ?? "Choisir dans la liste, ou saisir une nature nouvelle"
+            tagError ?? "Choisir dans la liste, ou saisir une nature nouvelle"
           }}
         </span>
       </template>
-    </UiAutocompletion>
+    </UiAutocomplete>
 
     <template #actions>
-      <UiBouton @click="emit('fermer')">Annuler</UiBouton>
-      <UiBouton variante="filled" :disabled="!valide" @click="valider()">
+      <UiButton @click="emit('close')">Annuler</UiButton>
+      <UiButton variant="filled" :disabled="!valid" @click="validate()">
         {{ modification ? "Enregistrer" : "Ajouter" }}
-      </UiBouton>
+      </UiButton>
     </template>
-  </UiDialogue>
+  </UiDialog>
 </template>
 
 <style scoped>

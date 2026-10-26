@@ -1,14 +1,14 @@
 import { inject } from "../injection";
 import { computed, signal } from "../signaux";
-import { PLATEFORME } from "../../plateforme/jeton";
+import { PLATFORM } from "../../plateforme/jeton";
 import type {
-  EcritureCoffre,
-  EtatScellement,
-  IssueScellement,
-  JetonsStockes,
+  VaultWrite,
+  SealingState,
+  SealingOutcome,
+  StoredTokens,
 } from "../../plateforme/ports";
-import type { ProtectionDuJeton } from "../model/model";
-import { ContenusCache } from "../repo/contenus-cache";
+import type { TokenProtection } from "../model/model";
+import { ContentCache } from "../repo/contenus-cache";
 
 /**
  * La clé de l'ancien coffre chiffré, effacée au démarrage.
@@ -16,8 +16,8 @@ import { ContenusCache } from "../repo/contenus-cache";
  * Son contenu n'est pas récupérable : il était scellé sous une passphrase que
  * plus rien ne demande. Le garder n'entretiendrait que l'illusion qu'il l'est.
  */
-const CLE_COFFRE_HERITE = "ssk-canon.coffre";
-const CLE_SESSION_HERITEE = "ssk-canon.cle-session";
+const LEGACY_VAULT_KEY = "ssk-canon.coffre";
+const LEGACY_SESSION_KEY = "ssk-canon.cle-session";
 
 /**
  * À quoi un jeton s'applique.
@@ -27,44 +27,44 @@ const CLE_SESSION_HERITEE = "ssk-canon.cle-session";
  * cas courant ; un dépôt peut néanmoins demander le sien — un accès en écriture
  * là où le reste de l'organisation est en lecture.
  */
-export interface JetonPortee {
+export interface ScopedToken {
   /** `organisation` ou `organisation/depot`. */
-  readonly cle: string;
-  readonly jeton: string;
+  readonly key: string;
+  readonly token: string;
 }
 
 /** La clé d'organisation d'un dépôt, et la clé exacte du dépôt. */
-export function clesDepot(depot: { owner: string; repo: string }): {
-  organisation: string;
-  exacte: string;
+export function repoKeys(repoRef: { owner: string; repo: string }): {
+  organization: string;
+  exact: string;
 } {
-  const org = depot.owner.toLowerCase();
-  return { organisation: org, exacte: `${org}/${depot.repo.toLowerCase()}` };
+  const org = repoRef.owner.toLowerCase();
+  return { organization: org, exact: `${org}/${repoRef.repo.toLowerCase()}` };
 }
 
 /** Un accès obtenu contre une identité vérifiée, et ce qu'il ouvre. */
-export interface AccesTemporaire {
-  readonly jeton: string;
+export interface TemporaryAccess {
+  readonly token: string;
   /** Instant au-delà duquel il ne doit plus être présenté. */
-  readonly valideJusqua: string;
-  readonly depots: readonly string[];
-  readonly identite: {
-    readonly identifiant: string;
-    readonly nom: string;
-    readonly courriel: string | null;
+  readonly validUntil: string;
+  readonly repos: readonly string[];
+  readonly identity: {
+    readonly identifier: string;
+    readonly name: string;
+    readonly email: string | null;
   };
 }
 
 /** D'où vient le jeton courant. */
-export type SourceJeton = "aucune" | "personnel" | "identite_tierce";
+export type TokenSource = "aucune" | "personnel" | "identite_tierce";
 
 /**
  * Sous quelle forme les jetons sont gardés sur le poste, pour que l'interface le dise (RG-secret-conserve-localement) : dans le coffre du système (bureau), en clair dans le navigateur, scellés par une passkey, ou pour l'onglet seulement — un projet de l'onglet exige la passkey, et ils ne le sont pas (RG-protection-du-jeton-par-projet).
  */
-export type FormeDuJeton = "systeme" | "en-clair" | "scelle" | "session";
+export type TokenForm = "systeme" | "en-clair" | "scelle" | "session";
 
 /** Ce qu'a donné la dernière sollicitation de la passkey, quand elle n'a pas abouti. */
-export type EchecPasskey = "annule" | "impossible" | "illisible";
+export type PasskeyFailure = "annule" | "impossible" | "illisible";
 
 /**
  * Le jeton d'accès à GitHub.
@@ -83,45 +83,45 @@ export class TokenService {
    * Les contenus privés lus sous un accès ne lui survivent pas : oublier un
    * jeton efface ce qu'il avait ouvert. Voir RG-contenus-prives-au-repos.
    */
-  private readonly cache = inject(ContenusCache);
+  private readonly cache = inject(ContentCache);
 
   /**
    * Le coffre de la cible : celui du système dans l'application de bureau, le stockage local dans la version web (INV-8). Ses écritures ne sont pas attendues : chaque appel part dans l'ordre où l'état change, et un coffre indisponible laisse les jetons valoir pour la session.
    */
-  private readonly coffre = inject(PLATEFORME).coffre;
+  private readonly vault = inject(PLATFORM).vault;
 
   /** Le scellement par passkey de la version web ; `null` sur le bureau, dont le coffre du système suffit. */
-  private readonly scellement = inject(PLATEFORME).scellement;
+  private readonly sealing = inject(PLATFORM).sealing;
 
   /** L'état du scellé, relevé après chaque geste : le coffre le tient, mais ne le signale pas. */
-  private readonly etatScellement = signal<EtatScellement>("aucun");
+  private readonly sealingState = signal<SealingState>("aucun");
 
   /**
    * Vrai dès qu'un projet ouvert dans cet onglet exige la passkey, et jusqu'à sa fermeture : un jeton peut ouvrir plusieurs projets, et il est gardé selon le plus exigeant d'entre eux (RG-protection-du-jeton-par-projet).
    */
-  private readonly exigee = signal(false);
+  private readonly required = signal(false);
 
   /** Vrai quand des jetons scellés attendent un geste de l'utilisateur pour s'ouvrir. */
-  readonly verrouille = computed(() => this.etatScellement() === "verrouille");
+  readonly locked = computed(() => this.sealingState() === "verrouille");
 
-  readonly forme = computed<FormeDuJeton>(() => {
-    if (!this.scellement) return "systeme";
-    if (this.etatScellement() !== "aucun") return "scelle";
-    return this.exigee() ? "session" : "en-clair";
+  readonly form = computed<TokenForm>(() => {
+    if (!this.sealing) return "systeme";
+    if (this.sealingState() !== "aucun") return "scelle";
+    return this.required() ? "session" : "en-clair";
   });
 
   /** Vrai quand un projet de l'onglet exige la passkey, pour le dire. */
-  readonly protectionExigee = computed(() => this.exigee());
+  readonly protectionRequired = computed(() => this.required());
 
   /** Ce qu'a donné la dernière sollicitation de la passkey, pour le dire ; `null` après un succès. */
-  readonly echecPasskey = signal<EchecPasskey | null>(null);
+  readonly passkeyFailure = signal<PasskeyFailure | null>(null);
 
   /**
    * Ce que le coffre a refusé à la dernière écriture : garder les jetons (`ecriture`) — ils valent pour la session et ne seront pas retrouvés au lancement suivant —, ou les effacer (`effacement`) — ils y seront retrouvés. `null` quand il a accepté. RG-secret-conserve-localement : l'interface le dit.
    */
-  readonly coffreRefuse = signal<"ecriture" | "effacement" | null>(null);
+  readonly vaultRefused = signal<"ecriture" | "effacement" | null>(null);
 
-  private readonly jeton = signal<string | null>(null);
+  private readonly token = signal<string | null>(null);
 
   /**
    * Les jetons par portée, du plus général au plus précis.
@@ -132,7 +132,7 @@ export class TokenService {
    * à sa propre date. N'en garder qu'un revenait à écraser le précédent sans
    * rien dire, puis à présenter « dépôt introuvable » sur un dépôt bien réel.
    */
-  private readonly parPortee = signal<ReadonlyMap<string, string>>(new Map());
+  private readonly byScope = signal<ReadonlyMap<string, string>>(new Map());
 
   /**
    * Le dépôt pour lequel le jeton est choisi.
@@ -141,26 +141,26 @@ export class TokenService {
    * couche d'accès, et dépendre en retour de la configuration du dépôt ferait
    * un cycle.
    */
-  private readonly depotCourant = signal<{
+  private readonly currentRepo = signal<{
     owner: string;
     repo: string;
   } | null>(null);
 
   /** Dit pour quel dépôt les jetons doivent être choisis. */
-  cibler(depot: { owner: string; repo: string } | null): void {
-    this.depotCourant.set(depot);
+  targetRepo(repoRef: { owner: string; repo: string } | null): void {
+    this.currentRepo.set(repoRef);
   }
 
   /** La cible courante, pour la rétablir après l'avoir déplacée. */
-  cibleCourante(): { owner: string; repo: string } | null {
-    return this.depotCourant();
+  currentTarget(): { owner: string; repo: string } | null {
+    return this.currentRepo();
   }
 
   /** Les portées déclarées, pour les présenter et les modifier. */
-  readonly portees = computed(() =>
-    [...this.parPortee().entries()]
-      .map(([cle, jeton]) => ({ cle, jeton }))
-      .sort((a, b) => a.cle.localeCompare(b.cle)),
+  readonly scopes = computed(() =>
+    [...this.byScope().entries()]
+      .map(([key, token]) => ({ key: key, token: token }))
+      .sort((a, b) => a.key.localeCompare(b.key)),
   );
 
   /**
@@ -171,16 +171,16 @@ export class TokenService {
    * accès particulier à un dépôt obligerait à le redéclarer pour tous les
    * autres de l'organisation.
    */
-  private jetonApplicable(
-    d: { owner: string; repo: string } | null = this.depotCourant(),
+  private applicableToken(
+    d: { owner: string; repo: string } | null = this.currentRepo(),
   ): string | null {
     if (d) {
-      const { organisation, exacte } = clesDepot(d);
-      const parPortee = this.parPortee();
-      const precis = parPortee.get(exacte) ?? parPortee.get(organisation);
-      if (precis) return precis;
+      const { organization, exact } = repoKeys(d);
+      const byScope = this.byScope();
+      const specific = byScope.get(exact) ?? byScope.get(organization);
+      if (specific) return specific;
     }
-    return this.jeton();
+    return this.token();
   }
 
   /**
@@ -191,37 +191,37 @@ export class TokenService {
    * cause serait invisible. Le perdre en rechargeant est le comportement juste —
    * une nouvelle identité vérifiée le rend aussitôt.
    */
-  private readonly acces = signal<AccesTemporaire | null>(null);
+  private readonly access = signal<TemporaryAccess | null>(null);
 
   /** Vrai si un jeton est disponible, quelle qu'en soit la source. */
-  readonly present = computed(() => this.valeur() !== null);
+  readonly present = computed(() => this.value() !== null);
 
   /**
    * Vrai si rien n'est enregistré : ni jeton général, ni jeton d'une portée, ni accès temporaire.
    *
    * `present` ne répond que pour le dépôt ciblé : un jeton enregistré pour une autre organisation y compte pour rien, alors qu'il est bien en place (RG-acces-par-portee).
    */
-  readonly aucunAcces = computed(
+  readonly noAccess = computed(
     () =>
-      this.jeton() === null &&
-      this.parPortee().size === 0 &&
-      this.acces() === null,
+      this.token() === null &&
+      this.byScope().size === 0 &&
+      this.access() === null,
   );
 
-  readonly source = computed<SourceJeton>(() => {
-    if (this.acces() !== null) return "identite_tierce";
-    return this.jetonApplicable() === null ? "aucune" : "personnel";
+  readonly source = computed<TokenSource>(() => {
+    if (this.access() !== null) return "identite_tierce";
+    return this.applicableToken() === null ? "aucune" : "personnel";
   });
 
   /** Qui a obtenu l'accès courant, s'il vient d'une identité vérifiée. */
-  readonly identite = computed(() => this.acces()?.identite ?? null);
+  readonly identity = computed(() => this.access()?.identity ?? null);
 
   /** Projets que cet accès atteint, s'il vient d'une identité vérifiée. */
-  readonly depots = computed(() => this.acces()?.depots ?? null);
+  readonly repos = computed(() => this.access()?.repos ?? null);
 
   /** Les quatre derniers caractères, pour identifier le jeton sans l'exposer. */
-  readonly empreinte = computed(() => {
-    const j = this.jetonApplicable();
+  readonly fingerprint = computed(() => {
+    const j = this.applicableToken();
     return j ? `…${j.slice(-4)}` : null;
   });
 
@@ -230,15 +230,15 @@ export class TokenService {
    *
    * `null` quand aucun jeton ne s'applique, `''` quand c'est le jeton général.
    */
-  readonly porteeCourante = computed<string | null>(() => {
-    const d = this.depotCourant();
+  readonly currentScope = computed<string | null>(() => {
+    const d = this.currentRepo();
     if (d) {
-      const { organisation, exacte } = clesDepot(d);
-      const parPortee = this.parPortee();
-      if (parPortee.has(exacte)) return exacte;
-      if (parPortee.has(organisation)) return organisation;
+      const { organization, exact } = repoKeys(d);
+      const byScope = this.byScope();
+      if (byScope.has(exact)) return exact;
+      if (byScope.has(organization)) return organization;
     }
-    return this.jeton() ? "" : null;
+    return this.token() ? "" : null;
   });
 
   /**
@@ -251,8 +251,8 @@ export class TokenService {
    * Un accès expiré n'est pas rendu — le présenter produirait un refus dont la
    * cause serait invisible au rédacteur.
    */
-  valeur(): string | null {
-    return this.valeurPour(this.depotCourant());
+  value(): string | null {
+    return this.valueFor(this.currentRepo());
   }
 
   /**
@@ -262,19 +262,19 @@ export class TokenService {
    * présenter le mauvais jeton aux appels lancés en parallèle — ceux qui
    * vérifient, dépôt par dépôt, lequel porte un référentiel.
    */
-  valeurPour(depot: { owner: string; repo: string } | null): string | null {
-    const a = this.acces();
+  valueFor(repoRef: { owner: string; repo: string } | null): string | null {
+    const a = this.access();
     if (a) {
-      if (Date.parse(a.valideJusqua) > Date.now()) return a.jeton;
+      if (Date.parse(a.validUntil) > Date.now()) return a.token;
       // expiré : on l'oublie, pour que la source cesse de l'annoncer
-      this.acces.set(null);
+      this.access.set(null);
     }
-    return this.jetonApplicable(depot);
+    return this.applicableToken(repoRef);
   }
 
   /** Enregistre un accès obtenu contre une identité vérifiée. */
-  definirAcces(acces: AccesTemporaire): void {
-    this.acces.set(acces);
+  setAccess(access: TemporaryAccess): void {
+    this.access.set(access);
   }
 
   /**
@@ -284,9 +284,9 @@ export class TokenService {
    * accès a lus de ceux d'un jeton personnel, et en effacer trop ne coûte
    * qu'un téléchargement, quand en garder trop survivrait à l'accès.
    */
-  effacerAcces(): void {
-    this.acces.set(null);
-    void this.cache.clearPrives();
+  eraseAccess(): void {
+    this.access.set(null);
+    void this.cache.clearPrivate();
   }
 
   /**
@@ -296,91 +296,91 @@ export class TokenService {
    * soit : le garde de route lance la lecture du dépôt et doit la lancer avec le
    * jeton en main plutôt qu'en anonyme.
    */
-  async initialiser(): Promise<void> {
-    this.oublierCoffreHerite();
-    const stockes = await this.coffre.loadJetons();
-    this.jeton.set(stockes.general);
-    this.parPortee.set(new Map(stockes.parPortee));
-    this.releverScellement();
+  async initialize(): Promise<void> {
+    this.forgetLegacyVault();
+    const stored = await this.vault.loadTokens();
+    this.token.set(stored.general);
+    this.byScope.set(new Map(stored.byScope));
+    this.readSealingState();
   }
 
   /**
    * Ce que demande le projet ouvert. Exigée, la passkey l'est pour le reste de l'onglet ; et des jetons que le navigateur gardait en clair en sont retirés aussitôt, l'onglet les gardant en mémoire : un jeton qui ouvre ce projet n'est jamais gardé en clair (RG-protection-du-jeton-par-projet).
    */
-  exigerProtection(protection: ProtectionDuJeton): void {
-    if (protection !== "exigee" || this.exigee()) return;
-    this.exigee.set(true);
-    if (this.forme() === "session")
-      void this.coffre
-        .deleteJetons()
-        .then((ecriture) => this.noterEcriture(ecriture, "effacement"));
+  requireProtection(protection: TokenProtection): void {
+    if (protection !== "exigee" || this.required()) return;
+    this.required.set(true);
+    if (this.form() === "session")
+      void this.vault
+        .deleteTokens()
+        .then((writing) => this.recordWrite(writing, "effacement"));
   }
 
   /** Vrai quand ce navigateur peut sceller les jetons ; seul l'essai le confirme. */
-  async peutProteger(): Promise<boolean> {
-    return (await this.scellement?.isPossible()) ?? false;
+  async canProtect(): Promise<boolean> {
+    return (await this.sealing?.isPossible()) ?? false;
   }
 
   /**
    * Scelle les jetons en place par une passkey. À appeler depuis un geste de l'utilisateur : le navigateur ne sollicite la passkey qu'ainsi.
    */
-  async proteger(): Promise<IssueScellement> {
-    if (!this.scellement) return "impossible";
-    const issue = await this.scellement.sealJetons(this.contenu());
-    this.echecPasskey.set(issue === "scelle" ? null : issue);
-    if (issue === "scelle") await this.ouvrirLeCache();
+  async protect(): Promise<SealingOutcome> {
+    if (!this.sealing) return "impossible";
+    const issue = await this.sealing.sealTokens(this.content());
+    this.passkeyFailure.set(issue === "scelle" ? null : issue);
+    if (issue === "scelle") await this.openCache();
     return issue;
   }
 
   /**
    * Enregistre un jeton et le scelle d'un même geste, sans jamais l'écrire en clair. `cle` vide : le jeton général. Si la passkey n'est pas créée, le jeton est gardé comme le projet le permet : en clair, ou pour l'onglet seulement.
    */
-  async definirProtege(cle: string, jeton: string): Promise<IssueScellement> {
-    const propre = jeton.trim();
-    if (!propre) return "annule";
-    this.retenir(cle, propre);
-    const issue = await this.proteger();
-    if (issue !== "scelle") this.persister();
+  async setProtected(key: string, token: string): Promise<SealingOutcome> {
+    const own = token.trim();
+    if (!own) return "annule";
+    this.keep(key, own);
+    const issue = await this.protect();
+    if (issue !== "scelle") this.persist();
     return issue;
   }
 
   /** Le rédacteur a lu l'échec, et garde le jeton tel qu'il est : il n'est plus rappelé. */
-  ignorerEchecPasskey(): void {
-    this.echecPasskey.set(null);
+  dismissPasskeyFailure(): void {
+    this.passkeyFailure.set(null);
   }
 
   /** Ouvre les jetons scellés. À appeler depuis un geste de l'utilisateur. */
-  async deverrouiller(): Promise<"ouvert" | EchecPasskey> {
-    if (!this.scellement) return "impossible";
-    const ouvert = await this.scellement.unlockJetons();
-    this.echecPasskey.set(ouvert.issue === "ouvert" ? null : ouvert.issue);
-    if (ouvert.issue !== "ouvert") return ouvert.issue;
-    this.jeton.set(ouvert.jetons.general);
-    this.parPortee.set(new Map(ouvert.jetons.parPortee));
-    this.releverScellement();
+  async unlock(): Promise<"ouvert" | PasskeyFailure> {
+    if (!this.sealing) return "impossible";
+    const opened = await this.sealing.unlockTokens();
+    this.passkeyFailure.set(opened.issue === "ouvert" ? null : opened.issue);
+    if (opened.issue !== "ouvert") return opened.issue;
+    this.token.set(opened.tokens.general);
+    this.byScope.set(new Map(opened.tokens.byScope));
+    this.readSealingState();
     return "ouvert";
   }
 
   /**
    * Ouvre les jetons scellés dès l'ouverture de l'onglet, sans attendre de clic : Touch ID ou le code de l'appareil restent le geste (RG-secret-conserve-localement). Un navigateur qui exige un clic dans la page refuse comme on annule — WebAuthn ne les distingue pas —, et ce refus ne se dit pas : le bandeau propose simplement de déverrouiller.
    */
-  async deverrouillerSansGeste(): Promise<"ouvert" | EchecPasskey> {
-    const issue = await this.deverrouiller();
-    if (issue === "annule") this.echecPasskey.set(null);
+  async unlockWithoutGesture(): Promise<"ouvert" | PasskeyFailure> {
+    const issue = await this.unlock();
+    if (issue === "annule") this.passkeyFailure.set(null);
     return issue;
   }
 
-  private releverScellement(): void {
-    this.etatScellement.set(this.scellement?.etat ?? "aucun");
-    const chiffreur = this.scellement?.findChiffreur() ?? null;
-    if (chiffreur) this.cache.chiffrerAvec(chiffreur);
-    else if (this.verrouille()) this.cache.verrouiller();
+  private readSealingState(): void {
+    this.sealingState.set(this.sealing?.state ?? "aucun");
+    const cipher = this.sealing?.findCipher() ?? null;
+    if (cipher) this.cache.encryptWith(cipher);
+    else if (this.locked()) this.cache.lock();
   }
 
   /** Ce que le cache gardait en clair ne survit pas au scellement : il se relira, sous la clé. */
-  private async ouvrirLeCache(): Promise<void> {
-    await this.cache.clearPrives();
-    this.releverScellement();
+  private async openCache(): Promise<void> {
+    await this.cache.clearPrivate();
+    this.readSealingState();
   }
 
   /**
@@ -390,91 +390,91 @@ export class TokenService {
    * retirer libère la place et évite qu'un futur lecteur croie y trouver
    * quelque chose.
    */
-  private oublierCoffreHerite(): void {
+  private forgetLegacyVault(): void {
     try {
-      localStorage.removeItem(CLE_COFFRE_HERITE);
-      sessionStorage.removeItem(CLE_SESSION_HERITEE);
+      localStorage.removeItem(LEGACY_VAULT_KEY);
+      sessionStorage.removeItem(LEGACY_SESSION_KEY);
     } catch {
       // stockage bloqué : rien à nettoyer
     }
   }
 
   /** Écrit l'état courant dans le coffre ; rien, quand ils ne valent que pour l'onglet. */
-  private persister(): void {
-    if (this.forme() === "session") return;
-    void this.coffre
-      .saveJetons(this.contenu())
-      .then((ecriture) => this.noterEcriture(ecriture, "ecriture"));
+  private persist(): void {
+    if (this.form() === "session") return;
+    void this.vault
+      .saveTokens(this.content())
+      .then((writing) => this.recordWrite(writing, "ecriture"));
   }
 
-  private noterEcriture(
-    ecriture: EcritureCoffre,
-    geste: "ecriture" | "effacement",
+  private recordWrite(
+    writing: VaultWrite,
+    gesture: "ecriture" | "effacement",
   ): void {
-    this.coffreRefuse.set(ecriture === "refusee" ? geste : null);
+    this.vaultRefused.set(writing === "refusee" ? gesture : null);
   }
 
-  private contenu(): JetonsStockes {
+  private content(): StoredTokens {
     return {
-      general: this.jeton(),
-      parPortee: [...this.parPortee().entries()],
+      general: this.token(),
+      byScope: [...this.byScope().entries()],
     };
   }
 
-  definir(jeton: string): void {
-    const propre = jeton.trim();
-    if (!propre) return;
-    this.jeton.set(propre);
-    this.persister();
+  set(token: string): void {
+    const own = token.trim();
+    if (!own) return;
+    this.token.set(own);
+    this.persist();
   }
 
   /** Garde un jeton en mémoire, sans l'écrire : `cle` vide, le jeton général. */
-  private retenir(cle: string, jeton: string): void {
-    if (!cle) {
-      this.jeton.set(jeton);
+  private keep(key: string, token: string): void {
+    if (!key) {
+      this.token.set(token);
       return;
     }
-    const suivant = new Map(this.parPortee());
-    suivant.set(cle.toLowerCase(), jeton);
-    this.parPortee.set(suivant);
+    const next = new Map(this.byScope());
+    next.set(key.toLowerCase(), token);
+    this.byScope.set(next);
   }
 
   /** Efface tout : les jetons stockés, ceux en mémoire, et l'accès temporaire. */
-  effacer(): void {
-    this.jeton.set(null);
-    this.acces.set(null);
-    this.parPortee.set(new Map());
-    void this.coffre.deleteJetons().then((ecriture) => {
-      this.noterEcriture(ecriture, "effacement");
-      this.releverScellement();
+  erase(): void {
+    this.token.set(null);
+    this.access.set(null);
+    this.byScope.set(new Map());
+    void this.vault.deleteTokens().then((writing) => {
+      this.recordWrite(writing, "effacement");
+      this.readSealingState();
     });
     // Le scellé part avec les jetons : ce que le cache gardera ensuite le sera comme eux, en clair.
-    this.etatScellement.set("aucun");
-    this.echecPasskey.set(null);
-    this.cache.chiffrerAvec(null);
-    void this.cache.clearPrives();
+    this.sealingState.set("aucun");
+    this.passkeyFailure.set(null);
+    this.cache.encryptWith(null);
+    void this.cache.clearPrivate();
   }
 
   /** Enregistre un jeton pour une portée — une organisation, ou un dépôt. */
-  definirPourPortee(cle: string, jeton: string): void {
-    const propre = jeton.trim();
-    if (!propre) return;
-    const suivant = new Map(this.parPortee());
-    suivant.set(cle.toLowerCase(), propre);
-    this.parPortee.set(suivant);
-    this.persister();
+  setForScope(key: string, token: string): void {
+    const own = token.trim();
+    if (!own) return;
+    const next = new Map(this.byScope());
+    next.set(key.toLowerCase(), own);
+    this.byScope.set(next);
+    this.persist();
   }
 
   /** Retire le jeton d'une portée. */
-  oublierPortee(cle: string): void {
-    const portee = cle.toLowerCase();
-    const suivant = new Map(this.parPortee());
-    suivant.delete(portee);
-    this.parPortee.set(suivant);
-    this.persister();
+  forgetScope(key: string): void {
+    const scope = key.toLowerCase();
+    const next = new Map(this.byScope());
+    next.delete(scope);
+    this.byScope.set(next);
+    this.persist();
     // Un dépôt que le jeton général couvre encore sera simplement relu.
-    void this.cache.clearPrives(
-      (depot) => depot === portee || depot.startsWith(`${portee}/`),
+    void this.cache.clearPrivate(
+      (repoRef) => repoRef === scope || repoRef.startsWith(`${scope}/`),
     );
   }
 
@@ -485,8 +485,8 @@ export class TokenService {
    * les erreurs de saisie les plus fréquentes : un identifiant collé à la place
    * du jeton, ou un jeton tronqué.
    */
-  static verifierForme(jeton: string): string | null {
-    const j = jeton.trim();
+  static checkForm(token: string): string | null {
+    const j = token.trim();
     if (!j) return "Saisir un jeton.";
     if (/\s/.test(j)) return "Un jeton ne contient pas d’espace.";
     if (!/^(ghp_|github_pat_|gho_|ghu_|ghs_)/.test(j)) {

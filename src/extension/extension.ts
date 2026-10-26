@@ -8,8 +8,8 @@
 export interface Extension {
   /** Unique parmi les extensions d'un livrable. */
   readonly id: string;
-  readonly coquille?: ApportsDeCoquille;
-  readonly pages?: ApportsDePages;
+  readonly shell?: ShellContributions;
+  readonly pages?: PageContributions;
 }
 
 /** Ce que porte tout apport à un point qui en reçoit plusieurs. */
@@ -17,71 +17,71 @@ export interface Contribution {
   /** Unique parmi les apports du même point. */
   readonly id: string;
   /** Rang parmi les apports du même point, du plus petit au plus grand ; 0 par défaut. À rang égal, l'ordre de composition. */
-  readonly rang?: number;
+  readonly rank?: number;
   /** Faux : l'apport ne s'affiche pas. Toujours vrai par défaut. L'extension le calcule elle-même, droits compris : l'interface commune ne sait pas pourquoi. */
   readonly visible?: () => boolean;
 }
 
-export interface ApportsDeCoquille {
+export interface ShellContributions {
   /** Des boutons de la barre du haut, avant celui de la connexion. */
-  readonly actionsDeBarre?: readonly ActionDeBarre[];
+  readonly toolbarActions?: readonly ToolbarAction[];
   /** Des bandeaux d'état, sous ceux de la coquille, dans son style : l'extension en donne le texte, la coquille la forme. */
-  readonly bandeaux?: readonly Bandeau[];
+  readonly banners?: readonly Banner[];
 }
 
-export interface ActionDeBarre extends Contribution {
+export interface ToolbarAction extends Contribution {
   /** Le nom de l'icône, qui dit l'état courant plutôt que l'action à venir. */
-  readonly icone: () => string;
+  readonly icon: () => string;
   /** Le nom accessible ; stable, puisque les tests et la suite native le visent. */
-  readonly libelle: string;
-  readonly titre: () => string;
+  readonly label: string;
+  readonly title: () => string;
   /** Vrai : le bouton est mis en avant, comme celui d'un quota bas. */
-  readonly alerte?: () => boolean;
-  readonly activer: () => void;
+  readonly alert?: () => boolean;
+  readonly activate: () => void;
 }
 
-export interface Bandeau extends Contribution {
-  readonly icone: string;
+export interface Banner extends Contribution {
+  readonly icon: string;
   /** Ce que dit le bandeau ; il ne s'affiche que visible et non vide. */
-  readonly texte: () => string;
+  readonly text: () => string;
 }
 
 /** Les sections de la page « Fonctionnement » où un livrable dit ce qui lui est propre (RG-aide-fidele). */
-export type SectionAide = "jetons" | "cache" | "communications";
+export type HelpSection = "jetons" | "cache" | "communications";
 
-export interface ApportsDePages {
+export interface PageContributions {
   /** Des phrases de la page « Fonctionnement », par section, à l'endroit que la page réserve au livrable. */
-  readonly aide?: Partial<Readonly<Record<SectionAide, readonly string[]>>>;
-  readonly mentions?: MentionsDuLivrable;
+  readonly help?: Partial<Readonly<Record<HelpSection, readonly string[]>>>;
+  readonly legalNotice?: DeliverableNotice;
 }
 
 /** Ce que les mentions légales disent du livrable courant (RG-mentions-legales). */
-export interface MentionsDuLivrable {
+export interface DeliverableNotice {
   /** Le paragraphe « Hébergeur » : celui qui sert ce livrable, ou l'absence d'hébergeur. Un seul par livrable. */
-  readonly hebergeur?: string;
+  readonly host?: string;
   /** Ajouté au paragraphe « Données personnelles ». */
-  readonly donnees?: readonly string[];
+  readonly data?: readonly string[];
   /** Ajouté à « Propriété intellectuelle » : la licence de ce que le livrable apporte. */
-  readonly propriete?: readonly PhraseDeMention[];
+  readonly ownership?: readonly NoticePhrase[];
 }
 
 /** Une phrase des mentions : du texte, ou du texte autour d'un lien hors de l'application — vers des sources, un texte de licence. */
-export type PhraseDeMention =
+export type NoticePhrase =
   | string
   | {
-      readonly avant: string;
-      readonly lien: { readonly libelle: string; readonly href: string };
-      readonly apres?: string;
+      readonly before: string;
+      readonly link: { readonly label: string; readonly href: string };
+      readonly after?: string;
     };
 
 /** Les apports de toutes les extensions d'un livrable, rassemblés point par point. */
 export interface Composition {
-  readonly actionsDeBarre: readonly ActionDeBarre[];
-  readonly bandeaux: readonly Bandeau[];
-  readonly aide: Readonly<Record<SectionAide, readonly string[]>>;
-  readonly mentions: {
-    readonly hebergeur: string | null;
-    readonly donnees: readonly string[];
-    readonly propriete: readonly PhraseDeMention[];
+  readonly toolbarActions: readonly ToolbarAction[];
+  readonly banners: readonly Banner[];
+  readonly help: Readonly<Record<HelpSection, readonly string[]>>;
+  readonly legalNotice: {
+    readonly host: string | null;
+    readonly data: readonly string[];
+    readonly ownership: readonly NoticePhrase[];
   };
 }

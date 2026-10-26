@@ -9,56 +9,53 @@ import { describe, expect, it } from "vitest";
  * Les tests en sont exemptés : ils fournissent leurs doublures, et la plateforme du navigateur en est une.
  */
 
-const RACINE = join(process.cwd(), "src");
+const ROOT = join(process.cwd(), "src");
 
 /** Ce qu'importe une source, tel qu'écrit : statique, réexporté ou dynamique. */
 export function listImports(source: string): string[] {
-  const motifs = [
+  const patterns = [
     /\b(?:import|export)\b[^;"'`]*?\bfrom\s*["']([^"']+)["']/g,
     /\bimport\s*["']([^"']+)["']/g,
     /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
   ];
-  return motifs.flatMap((motif) =>
-    [...source.matchAll(motif)].map((m) => m[1] ?? ""),
+  return patterns.flatMap((pattern) =>
+    [...source.matchAll(pattern)].map((m) => m[1] ?? ""),
   );
 }
 
 /** Le module visé, relatif à `src/` et sans extension ; un paquet garde son nom. */
-export function resoudre(fichier: string, cible: string): string {
-  if (!cible.startsWith(".")) return cible;
-  return relative(RACINE, join(dirname(fichier), cible)).replace(
-    /\.(ts|vue)$/,
-    "",
-  );
+export function resolve(file: string, target: string): string {
+  if (!target.startsWith(".")) return target;
+  return relative(ROOT, join(dirname(file), target)).replace(/\.(ts|vue)$/, "");
 }
 
-function lister(dossier: string, avecTests = false): string[] {
-  return readdirSync(dossier, { withFileTypes: true }).flatMap((entree) => {
-    const chemin = join(dossier, entree.name);
-    if (entree.isDirectory()) return lister(chemin, avecTests);
-    return /\.(ts|vue)$/.test(entree.name) &&
-      (avecTests || !/\.test\.ts$/.test(entree.name))
-      ? [chemin]
+function listFiles(folder: string, withTests = false): string[] {
+  return readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(folder, entry.name);
+    if (entry.isDirectory()) return listFiles(path, withTests);
+    return /\.(ts|vue)$/.test(entry.name) &&
+      (withTests || !/\.test\.ts$/.test(entry.name))
+      ? [path]
       : [];
   });
 }
 
 /** Ce que le cœur, les vues et le kit ne doivent pas importer : une racine de composition, le démarrage et les adaptateurs. */
-const INTERDITS = [
+const FORBIDDEN = [
   /^(main|demarrage|bureau\/main)$/,
   /^plateforme\/(web|bureau|authentificateur-testing)/,
   /^@tauri-apps\//,
 ];
 
 function violations(
-  fichiers: readonly string[],
-  interdits: readonly RegExp[] = INTERDITS,
+  files: readonly string[],
+  forbidden: readonly RegExp[] = FORBIDDEN,
 ): string[] {
-  return fichiers.flatMap((fichier) =>
-    listImports(readFileSync(fichier, "utf8"))
-      .map((cible) => resoudre(fichier, cible))
-      .filter((module) => interdits.some((motif) => motif.test(module)))
-      .map((module) => `${relative(process.cwd(), fichier)} → ${module}`),
+  return files.flatMap((file) =>
+    listImports(readFileSync(file, "utf8"))
+      .map((target) => resolve(file, target))
+      .filter((module) => forbidden.some((pattern) => pattern.test(module)))
+      .map((module) => `${relative(process.cwd(), file)} → ${module}`),
   );
 }
 
@@ -81,23 +78,23 @@ describe("les couches", () => {
   });
 
   it("résout un import relatif depuis src/", () => {
-    expect(resoudre(join(RACINE, "core/ui/x.ts"), "../../demarrage")).toBe(
+    expect(resolve(join(ROOT, "core/ui/x.ts"), "../../demarrage")).toBe(
       "demarrage",
     );
-    expect(resoudre(join(RACINE, "features/a/B.vue"), "./C.vue")).toBe(
+    expect(resolve(join(ROOT, "features/a/B.vue"), "./C.vue")).toBe(
       "features/a/C",
     );
-    expect(resoudre(join(RACINE, "x.ts"), "vue")).toBe("vue");
+    expect(resolve(join(ROOT, "x.ts"), "vue")).toBe("vue");
   });
 
   it("le cœur, les vues et le kit ne choisissent aucun adaptateur", () => {
-    const fichiers = [
-      ...lister(join(RACINE, "core")),
-      ...lister(join(RACINE, "features")),
-      ...lister(join(RACINE, "ui")),
-      join(RACINE, "App.vue"),
+    const files = [
+      ...listFiles(join(ROOT, "core")),
+      ...listFiles(join(ROOT, "features")),
+      ...listFiles(join(ROOT, "ui")),
+      join(ROOT, "App.vue"),
     ];
-    expect(violations(fichiers)).toEqual([]);
+    expect(violations(files)).toEqual([]);
   });
 });
 
@@ -105,8 +102,8 @@ describe("les couches", () => {
  * L'application de bureau et ce qui se vend vivent dans un dépôt privé, qui consomme ce paquet par son champ `exports` (ADR-extensions-commerciales). Ce dépôt n'en porte aucune logique, pas même le nom : rien n'y importe le cœur natif, et aucun fichier — tests compris, hors celui-ci, qui doit bien les écrire — ne nomme le service de mise à jour, la licence du bureau ou ses causes.
  */
 describe("ce qui se vend", () => {
-  const SOURCES = lister(RACINE, true).filter(
-    (f) => relative(RACINE, f) !== "couches.test.ts",
+  const SOURCES = listFiles(ROOT, true).filter(
+    (f) => relative(ROOT, f) !== "couches.test.ts",
   );
 
   it("n'est importé par aucun fichier", () => {
@@ -115,13 +112,13 @@ describe("ce qui se vend", () => {
     ).toEqual([]);
   });
 
-  const NOMS_DU_BUREAU =
+  const DESKTOP_NAMES =
     /Skaron|tauri|LicenceService|CoffreDeLicence|COFFRE_DE_LICENCE|Licence et mises à jour|licence du poste|sans-licence|licence-(refusee|invalide)/i;
 
   it("n'est nommé par aucun fichier", () => {
-    const nommant = SOURCES.filter((f) =>
-      NOMS_DU_BUREAU.test(readFileSync(f, "utf8")),
+    const naming = SOURCES.filter((f) =>
+      DESKTOP_NAMES.test(readFileSync(f, "utf8")),
     ).map((f) => relative(process.cwd(), f));
-    expect(nommant).toEqual([]);
+    expect(naming).toEqual([]);
   });
 });

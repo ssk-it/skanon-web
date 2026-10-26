@@ -5,13 +5,13 @@ import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { inject } from "../../core/injection";
 import {
-  TAGS_LIENS_PAR_DEFAUT,
-  type Cadrage,
-  type Referentiel,
+  DEFAULT_LINK_TAGS,
+  type Scoping,
+  type Specification,
 } from "../../core/model/model";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { RepoConfig } from "../../core/repo/repo-config";
-import PaletteRecherche, { type DonneesPalette } from "./PaletteRecherche.vue";
+import SearchPalette, { type PaletteData } from "./PaletteRecherche.vue";
 
 /**
  * La palette de recherche — RG-recherche-a-portee-de-clavier, RG-recherche-perimetre, RG-recherche-en-cours-a-part.
@@ -20,78 +20,78 @@ import PaletteRecherche, { type DonneesPalette } from "./PaletteRecherche.vue";
  */
 const VuePlaceholder = { render: () => "vue" };
 
-function cadrage(
+function scoping(
   id: string,
-  titre: string,
-  extra: Partial<Cadrage> = {},
-): Cadrage {
+  title: string,
+  extra: Partial<Scoping> = {},
+): Scoping {
   return {
     id,
-    titre,
-    statut: "livree",
-    domaines: [],
-    liens: [],
+    title,
+    status: "livree",
+    domains: [],
+    links: [],
     impacts: [],
-    objectif: "",
-    parcours: "",
-    enonces: new Map(),
+    goal: "",
+    journey: "",
+    statements: new Map(),
     decisions: [],
-    piecesJointes: [],
-    divers: [],
+    attachments: [],
+    misc: [],
     ...extra,
   };
 }
 
-const REFERENTIEL: Referentiel = {
-  projet: { nom: "Test", description: "", depotsCode: [], prefixe: null },
-  reglages: {
-    acces: "jeton_personnel",
-    identite: null,
-    protectionDuJeton: "proposee",
-    tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+const SPECIFICATION: Specification = {
+  project: { name: "Test", description: "", codeRepos: [], prefix: null },
+  settings: {
+    access: "jeton_personnel",
+    identity: null,
+    tokenProtection: "proposee",
+    linkTags: DEFAULT_LINK_TAGS,
   },
-  domaines: new Map(),
-  fonctionnalites: new Map(),
-  regles: new Map([
+  domains: new Map(),
+  features: new Map(),
+  rules: new Map([
     [
       "RG-quota",
       {
         id: "RG-quota",
-        statut: "actif",
-        fonctionnalites: [],
-        enonce: "Le quota anonyme est de soixante appels.",
-        creePar: null,
-        modifiePar: [],
+        status: "actif",
+        features: [],
+        statement: "Le quota anonyme est de soixante appels.",
+        createdBy: null,
+        modifiedBy: [],
       },
     ],
   ]),
   decisions: new Map(),
   architecture: new Map(),
-  cadrages: new Map([
+  scopings: new Map([
     [
       "2026-006",
-      cadrage("2026-006", "Charger un dépôt sans épuiser le quota", {
+      scoping("2026-006", "Charger un dépôt sans épuiser le quota", {
         decisions: [
           {
             id: "01-canal",
-            titre: "Par quel canal lire sans quota ?",
-            statut: "retenue",
-            optionRetenue: null,
+            title: "Par quel canal lire sans quota ?",
+            status: "retenue",
+            chosenOption: null,
             description: "",
             options: [],
-            corps: "",
+            body: "",
           },
         ],
       }),
     ],
     [
       "2026-050",
-      cadrage("2026-050", "Signaler le quota plus tôt", {
-        statut: "en_relecture",
+      scoping("2026-050", "Signaler le quota plus tôt", {
+        status: "en_relecture",
         provenance: {
-          branche: "cadrage-2026-050",
+          branch: "cadrage-2026-050",
           pullRequest: 61,
-          brouillon: false,
+          draft: false,
         },
       }),
     ],
@@ -102,8 +102,8 @@ const REFERENTIEL: Referentiel = {
 describe("La palette de recherche", () => {
   let router: Router;
 
-  async function monter(
-    donnees: DonneesPalette = { surEtatPasse: false },
+  async function mountView(
+    data: PaletteData = { onPastState: false },
   ): Promise<VueWrapper> {
     provideHttpTesting();
     // Le `{ path: '**' }` de SSK Canon : toute adresse mène à une vue sans garde, la palette seule est éprouvée.
@@ -113,59 +113,59 @@ describe("La palette de recherche", () => {
     });
     await router.push("/");
     await router.isReady();
-    inject(RepoConfig).saveDepot({ owner: "org", repo: "depot" });
-    inject(ReferentielStore).referentiel.set(REFERENTIEL);
-    return mount(PaletteRecherche, {
-      props: { data: donnees },
+    inject(RepoConfig).saveRepo({ owner: "org", repo: "depot" });
+    inject(SpecificationStore).specification.set(SPECIFICATION);
+    return mount(SearchPalette, {
+      props: { data: data },
       global: { plugins: [router] },
     });
   }
 
-  async function taper(f: VueWrapper, texte: string): Promise<HTMLElement> {
-    const champ = f.element.querySelector("input")!;
-    champ.value = texte;
-    champ.dispatchEvent(new Event("input"));
+  async function typeText(f: VueWrapper, text: string): Promise<HTMLElement> {
+    const field = f.element.querySelector("input")!;
+    field.value = text;
+    field.dispatchEvent(new Event("input"));
     await nextTick();
     return f.element as HTMLElement;
   }
 
-  function titresGroupes(el: HTMLElement): string[] {
+  function groupTitles(el: HTMLElement): string[] {
     return [...el.querySelectorAll(".groupe-titre")].map(
       (g) => g.textContent?.trim() ?? "",
     );
   }
 
   it("dit sur quoi elle cherche avant qu’on tape", async () => {
-    const el = (await monter()).element as HTMLElement;
+    const el = (await mountView()).element as HTMLElement;
 
-    const texte = el.textContent ?? "";
-    for (const nature of ["règles", "décisions", "architecture", "cadrages"]) {
-      expect(texte).toContain(nature);
+    const text = el.textContent ?? "";
+    for (const kind of ["règles", "décisions", "architecture", "cadrages"]) {
+      expect(text).toContain(kind);
     }
     expect(el.querySelectorAll('[role="option"]').length).toBe(0);
   });
 
   it("range les résultats par nature, et les cadrages en cours à part", async () => {
-    const el = await taper(await monter(), "quota");
+    const el = await typeText(await mountView(), "quota");
 
-    expect(titresGroupes(el)).toEqual([
+    expect(groupTitles(el)).toEqual([
       "Règles de gestion",
       "Décisions",
       "Cadrages",
       "En cours",
     ]);
-    const enCours = el.querySelector(".groupe.en-cours")!;
-    expect(enCours.textContent).toContain("2026-050");
-    expect(enCours.textContent).toContain("#61");
+    const inProgress = el.querySelector(".groupe.en-cours")!;
+    expect(inProgress.textContent).toContain("2026-050");
+    expect(inProgress.textContent).toContain("#61");
     // un cadrage en discussion ne se mêle jamais au référentiel
-    const livres = [...el.querySelectorAll(".groupe:not(.en-cours)")].map(
+    const delivered = [...el.querySelectorAll(".groupe:not(.en-cours)")].map(
       (g) => g.textContent,
     );
-    expect(livres.join(" ")).not.toContain("2026-050");
+    expect(delivered.join(" ")).not.toContain("2026-050");
   });
 
   it("dit qu’aucun résultat ne correspond, et rappelle sur quoi elle cherche", async () => {
-    const el = await taper(await monter(), "introuvable");
+    const el = await typeText(await mountView(), "introuvable");
 
     expect(el.querySelector(".vide")?.textContent).toContain("introuvable");
     expect(el.querySelector(".vide")?.textContent).toContain(
@@ -174,9 +174,9 @@ describe("La palette de recherche", () => {
   });
 
   it("dit que les cadrages en cours arrivent encore", async () => {
-    const f = await monter();
-    inject(ReferentielStore).branchesEnChargement.set(true);
-    const el = await taper(f, "soixante");
+    const f = await mountView();
+    inject(SpecificationStore).loadingBranches.set(true);
+    const el = await typeText(f, "soixante");
 
     expect(el.querySelector(".groupe.en-cours")?.textContent).toContain(
       "Lecture des branches",
@@ -186,7 +186,7 @@ describe("La palette de recherche", () => {
   });
 
   it("prévient que ses résultats valent pour aujourd’hui quand on remonte le temps", async () => {
-    const el = (await monter({ surEtatPasse: true })).element as HTMLElement;
+    const el = (await mountView({ onPastState: true })).element as HTMLElement;
 
     expect(el.querySelector(".etat-courant")?.textContent).toContain(
       "aujourd’hui",
@@ -194,25 +194,25 @@ describe("La palette de recherche", () => {
   });
 
   it("ne le dit pas sur l’état courant", async () => {
-    const el = (await monter()).element as HTMLElement;
+    const el = (await mountView()).element as HTMLElement;
 
     expect(el.querySelector(".etat-courant")).toBeNull();
   });
 
   it("mène au résultat choisi au clavier, à son ancre, et se referme", async () => {
-    const f = await monter();
-    const el = await taper(f, "quota");
-    const champ = el.querySelector("input")!;
+    const f = await mountView();
+    const el = await typeText(f, "quota");
+    const field = el.querySelector("input")!;
 
-    champ.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
     await nextTick();
-    champ.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await flushPromises();
 
     // la règle vient en tête, la décision du cadrage juste après
     expect(router.currentRoute.value.fullPath).toBe(
       "/org/depot/cadrages/2026-006#decision-01-canal",
     );
-    expect(f.emitted("fermer")).toHaveLength(1);
+    expect(f.emitted("close")).toHaveLength(1);
   });
 });

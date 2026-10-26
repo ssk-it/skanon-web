@@ -2,56 +2,56 @@
 import { computed } from "vue";
 import { RouterLink } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { afficherIdentifiant } from "../../core/repo/reference-cadrage";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import { styleDomaine } from "../../core/ui/couleur-domaine";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
-import StatutChip from "../shared/StatutChip.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { displayIdentifier } from "../../core/repo/reference-cadrage";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import { domainStyle } from "../../core/ui/couleur-domaine";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
+import StatusChip from "../shared/StatutChip.vue";
 
 /** Les derniers livrés montrés en tête : de quoi voir ce qui bouge, pas une liste. */
-const DERNIERS_LIVRES = 3;
+const LATEST_DELIVERED = 3;
 
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 
 /** La liste complète : une teinte se calcule par rapport à l'ensemble. */
-const idsDomaines = computed(() => store.domaines().map((d) => d.id));
+const domainIds = computed(() => store.domains().map((d) => d.id));
 
 /**
  * Les derniers livrés, par identifiant décroissant.
  *
  * L'identifiant porte l'année et la séquence : il donne l'ordre sans coûter un appel, là où une date demanderait l'historique.
  */
-const derniersLivres = computed(() =>
+const latestDelivered = computed(() =>
   store
-    .cadrages()
-    .filter((c) => c.statut === "livree")
+    .scopings()
+    .filter((c) => c.status === "livree")
     .sort((a, b) => b.id.localeCompare(a.id))
-    .slice(0, DERNIERS_LIVRES),
+    .slice(0, LATEST_DELIVERED),
 );
 
 /** Les autres domaines d'une fonctionnalité partagée, par leur nom. */
-function formatAutresDomaines(
-  domaines: readonly string[],
-  courant: string,
+function formatOtherDomains(
+  domains: readonly string[],
+  current: string,
 ): string {
-  return domaines
-    .filter((id) => id !== courant)
-    .map((id) => store.findDomaine(id)?.nom ?? id)
+  return domains
+    .filter((id) => id !== current)
+    .map((id) => store.findDomain(id)?.name ?? id)
     .join(", ");
 }
 
-function afficher(id: string): string {
-  return afficherIdentifiant(id, store.referentiel().projet.prefixe);
+function show(id: string): string {
+  return displayIdentifier(id, store.specification().project.prefix);
 }
 </script>
 
 <template>
   <div class="page-referentiel">
-    <EtatVue v-if="store.etat() !== 'pret'" />
+    <ViewState v-if="store.state() !== 'pret'" />
     <template v-else>
       <header class="entete">
         <h1>Référentiel fonctionnel</h1>
@@ -60,18 +60,18 @@ function afficher(id: string): string {
           aujourd’hui, et les règles qui la définissent.
         </p>
         <p class="compte">
-          {{ store.domaines().length }} domaines ·
-          {{ store.fonctionnalites().length }} fonctionnalités ·
-          {{ store.reglesActives().length }} règles actives
+          {{ store.domains().length }} domaines ·
+          {{ store.features().length }} fonctionnalités ·
+          {{ store.activeRules().length }} règles actives
         </p>
       </header>
 
-      <div v-if="store.referentiel().anomalies.length" class="anomalies">
-        <UiIcone nom="warning_amber" />
+      <div v-if="store.specification().anomalies.length" class="anomalies">
+        <UiIcon name="warning_amber" />
         <div>
           <p class="a-titre">Anomalies au chargement</p>
           <p
-            v-for="a in store.referentiel().anomalies"
+            v-for="a in store.specification().anomalies"
             :key="a"
             class="a-detail"
           >
@@ -85,20 +85,20 @@ function afficher(id: string): string {
         <div class="volet livres">
           <div class="volet-entete">
             <h2 class="surtitre">Livré récemment</h2>
-            <RouterLink class="suite" :to="liens.chemin('evolution')"
+            <RouterLink class="suite" :to="links.path('evolution')"
               >Ce qui a changé</RouterLink
             >
           </div>
           <RouterLink
-            v-for="c in derniersLivres"
+            v-for="c in latestDelivered"
             :key="c.id"
             class="ligne"
-            :to="liens.chemin('cadrages', c.id)"
+            :to="links.path('cadrages', c.id)"
           >
-            <span class="cid">{{ afficher(c.id) }}</span>
-            <span class="titre">{{ c.titre }}</span>
+            <span class="cid">{{ show(c.id) }}</span>
+            <span class="titre">{{ c.title }}</span>
           </RouterLink>
-          <p v-if="!derniersLivres.length" class="explication">
+          <p v-if="!latestDelivered.length" class="explication">
             Aucun cadrage n’a encore été livré.
           </p>
         </div>
@@ -107,22 +107,22 @@ function afficher(id: string): string {
         <div class="volet en-cours">
           <h2 class="surtitre">En cours</h2>
           <RouterLink
-            v-for="c in store.cadragesEnCours()"
+            v-for="c in store.scopingsInProgress()"
             :key="c.id"
             class="ligne"
-            :to="liens.chemin('cadrages', c.id)"
+            :to="links.path('cadrages', c.id)"
           >
-            <span class="cid">{{ afficher(c.id) }}</span>
-            <span class="titre">{{ c.titre }}</span>
+            <span class="cid">{{ show(c.id) }}</span>
+            <span class="titre">{{ c.title }}</span>
             <span class="etat">
               <span v-if="c.provenance?.pullRequest" class="branche"
                 >#{{ c.provenance.pullRequest }}</span
               >
-              <StatutChip :statut="c.statut" />
+              <StatusChip :status="c.status" />
             </span>
           </RouterLink>
-          <template v-if="!store.cadragesEnCours().length">
-            <p v-if="store.branchesEnChargement()" class="explication">
+          <template v-if="!store.scopingsInProgress().length">
+            <p v-if="store.loadingBranches()" class="explication">
               Lecture des branches en cours…
             </p>
             <template v-else>
@@ -131,9 +131,7 @@ function afficher(id: string): string {
                 apparaîtront ici, marqués de leur demande de fusion, à part de
                 ce que le référentiel porte déjà.
               </p>
-              <RouterLink
-                class="suite"
-                :to="liens.chemin('cadrages', 'nouveau')"
+              <RouterLink class="suite" :to="links.path('cadrages', 'nouveau')"
                 >Ouvrir un cadrage</RouterLink
               >
             </template>
@@ -144,45 +142,37 @@ function afficher(id: string): string {
       <div class="grille">
         <!-- Un article et non un lien : la carte mène au domaine par son nom, et à chacune de ses fonctionnalités, sans étape obligée. -->
         <article
-          v-for="d in store.domaines()"
+          v-for="d in store.domains()"
           :key="d.id"
           class="carte"
-          :style="styleDomaine(d.id, idsDomaines)"
+          :style="domainStyle(d.id, domainIds)"
         >
           <h2>
-            <RouterLink :to="liens.chemin('referentiel', 'domaine', d.id)">{{
-              d.nom
+            <RouterLink :to="links.path('referentiel', 'domaine', d.id)">{{
+              d.name
             }}</RouterLink>
           </h2>
-          <MarkdownRendu class="desc md" :texte="d.description" />
+          <RenderedMarkdown class="desc md" :text="d.description" />
           <ul class="fonctionnalites">
-            <li
-              v-for="f in store.listFonctionnalitesByDomaine(d.id)"
-              :key="f.id"
-            >
+            <li v-for="f in store.listFeaturesByDomain(d.id)" :key="f.id">
               <span>
                 <RouterLink
-                  :to="liens.chemin('referentiel', 'fonctionnalite', f.id)"
-                  >{{ f.nom }}</RouterLink
+                  :to="links.path('referentiel', 'fonctionnalite', f.id)"
+                  >{{ f.name }}</RouterLink
                 >
-                <span
-                  v-if="formatAutresDomaines(f.domaines, d.id)"
-                  class="aussi"
-                >
-                  · aussi {{ formatAutresDomaines(f.domaines, d.id) }}</span
+                <span v-if="formatOtherDomains(f.domains, d.id)" class="aussi">
+                  · aussi {{ formatOtherDomains(f.domains, d.id) }}</span
                 >
               </span>
               <span
                 class="nb"
-                :title="
-                  store.listReglesByFonctionnalite(f.id).length + ' règles'
-                "
-                >{{ store.listReglesByFonctionnalite(f.id).length }}</span
+                :title="store.listRulesByFeature(f.id).length + ' règles'"
+                >{{ store.listRulesByFeature(f.id).length }}</span
               >
             </li>
           </ul>
         </article>
-        <p v-if="!store.domaines().length" class="vide">
+        <p v-if="!store.domains().length" class="vide">
           Ce dépôt ne contient aucun domaine.
         </p>
       </div>

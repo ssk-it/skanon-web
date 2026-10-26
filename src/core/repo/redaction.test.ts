@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  prochainIdCadrage,
-  serializeNouveauCadrage,
-  serializeCadrage,
-  CadrageEditable,
+  nextScopingId,
+  serializeNewScoping,
+  serializeScoping,
+  EditableScoping,
 } from "./redaction.service";
 import {
   splitFrontmatter,
-  estIllisible,
+  isUnreadable,
   extractSection,
-  extractEnonces,
+  extractStatements,
 } from "./frontmatter";
 
 /**
@@ -19,49 +19,49 @@ import {
  */
 describe("identifiant du prochain cadrage", () => {
   it("démarre à 001 pour une année sans cadrage", () => {
-    expect(prochainIdCadrage([], 2026)).toBe("2026-001");
+    expect(nextScopingId([], 2026)).toBe("2026-001");
   });
 
   it("suit la plus haute séquence de l’année", () => {
-    expect(prochainIdCadrage(["2026-001", "2026-013", "2026-007"], 2026)).toBe(
+    expect(nextScopingId(["2026-001", "2026-013", "2026-007"], 2026)).toBe(
       "2026-014",
     );
   });
 
   it("ignore les cadrages des autres années", () => {
-    expect(prochainIdCadrage(["2025-042", "2026-002"], 2026)).toBe("2026-003");
+    expect(nextScopingId(["2025-042", "2026-002"], 2026)).toBe("2026-003");
   });
 
   it("ne comble jamais un trou", () => {
     // un identifiant abandonné reste brûlé : le réutiliser ferait pointer
     // d'anciennes références vers un cadrage sans rapport
-    expect(prochainIdCadrage(["2026-001", "2026-002", "2026-005"], 2026)).toBe(
+    expect(nextScopingId(["2026-001", "2026-002", "2026-005"], 2026)).toBe(
       "2026-006",
     );
   });
 
   it("ignore un identifiant hors format", () => {
-    expect(prochainIdCadrage(["brouillon", "2026-004"], 2026)).toBe("2026-005");
+    expect(nextScopingId(["brouillon", "2026-004"], 2026)).toBe("2026-005");
   });
 });
 
 describe("sérialisation d’un cadrage neuf", () => {
   const BASE = {
-    titre: "Un titre ordinaire",
-    domaines: ["cadrage", "referentiel"],
-    objectif: "Le pourquoi.",
-    parcours: "1. Une étape.",
+    title: "Un titre ordinaire",
+    domains: ["cadrage", "referentiel"],
+    goal: "Le pourquoi.",
+    journey: "1. Une étape.",
   };
 
-  function relire(texte: string) {
-    const r = splitFrontmatter(texte);
-    if (!r || estIllisible(r))
-      throw new Error(`frontmatter illisible : ${texte}`);
+  function reread(text: string) {
+    const r = splitFrontmatter(text);
+    if (!r || isUnreadable(r))
+      throw new Error(`frontmatter illisible : ${text}`);
     return r;
   }
 
   it("produit un frontmatter relisible par le parseur du produit", () => {
-    const { data } = relire(serializeNouveauCadrage("2026-014", BASE));
+    const { data } = reread(serializeNewScoping("2026-014", BASE));
     expect(data["id"]).toBe("2026-014");
     // Aucun statut : il se déduit de l'état du dépôt, et le vérificateur de
     // l'Action refuse un cadrage qui en déclare un.
@@ -71,23 +71,23 @@ describe("sérialisation d’un cadrage neuf", () => {
 
   it("échappe un titre contenant « : », qui sinon casse le YAML", () => {
     // la faute la plus fréquente du format, rencontrée en usage réel
-    const texte = serializeNouveauCadrage("2026-014", {
+    const text = serializeNewScoping("2026-014", {
       ...BASE,
-      titre: "Écriture : par où commencer ?",
+      title: "Écriture : par où commencer ?",
     });
-    expect(relire(texte).data["titre"]).toBe("Écriture : par où commencer ?");
+    expect(reread(text).data["titre"]).toBe("Écriture : par où commencer ?");
   });
 
   it("échappe une apostrophe dans un titre échappé", () => {
-    const texte = serializeNouveauCadrage("2026-014", {
+    const text = serializeNewScoping("2026-014", {
       ...BASE,
-      titre: "L'écriture : c'est parti",
+      title: "L'écriture : c'est parti",
     });
-    expect(relire(texte).data["titre"]).toBe("L'écriture : c'est parti");
+    expect(reread(text).data["titre"]).toBe("L'écriture : c'est parti");
   });
 
   it("n’échappe pas un titre qui n’en a pas besoin", () => {
-    expect(serializeNouveauCadrage("2026-014", BASE)).toContain(
+    expect(serializeNewScoping("2026-014", BASE)).toContain(
       "titre: Un titre ordinaire\n",
     );
   });
@@ -96,83 +96,87 @@ describe("sérialisation d’un cadrage neuf", () => {
     // un cadrage neuf n'impacte rien encore ; omettre la clé ferait échouer la
     // lecture chez qui la suppose présente
     expect(
-      relire(serializeNouveauCadrage("2026-014", BASE)).data["impacts"],
+      reread(serializeNewScoping("2026-014", BASE)).data["impacts"],
     ).toEqual([]);
   });
 
   it("accepte un cadrage sans domaine", () => {
-    const texte = serializeNouveauCadrage("2026-014", {
+    const text = serializeNewScoping("2026-014", {
       ...BASE,
-      domaines: [],
+      domains: [],
     });
-    expect(relire(texte).data["domaines"]).toEqual([]);
+    expect(reread(text).data["domaines"]).toEqual([]);
   });
 
   it("rend les sections attendues par le format", () => {
-    const { body } = relire(serializeNouveauCadrage("2026-014", BASE));
+    const { body } = reread(serializeNewScoping("2026-014", BASE));
     expect(extractSection(body, "Objectif")).toBe("Le pourquoi.");
     expect(extractSection(body, "Parcours utilisateur")).toBe("1. Une étape.");
   });
 });
 
 describe("sérialisation d’un cadrage avec impacts", () => {
-  const BASE: CadrageEditable = {
-    titre: "Un cadrage",
-    domaines: ["cadrage"],
-    objectif: "Le pourquoi.",
-    parcours: "1. Une étape.",
+  const BASE: EditableScoping = {
+    title: "Un cadrage",
+    domains: ["cadrage"],
+    goal: "Le pourquoi.",
+    journey: "1. Une étape.",
     impacts: [],
   };
 
-  function relire(texte: string) {
-    const r = splitFrontmatter(texte);
-    if (!r || estIllisible(r))
-      throw new Error(`frontmatter illisible : ${texte}`);
+  function reread(text: string) {
+    const r = splitFrontmatter(text);
+    if (!r || isUnreadable(r))
+      throw new Error(`frontmatter illisible : ${text}`);
     return r;
   }
 
   it("rend les impacts relisibles par le parseur", () => {
-    const texte = serializeCadrage("2026-020", {
+    const text = serializeScoping("2026-020", {
       ...BASE,
       impacts: [
-        { cible: "RG-a", operation: "cree", enonce: "Texte A." },
-        { cible: "RG-b", operation: "touche", enonce: "" },
+        { target: "RG-a", operation: "cree", statement: "Texte A." },
+        { target: "RG-b", operation: "touche", statement: "" },
       ],
     });
     // Le fichier porte `regle:` — c'est le champ que la nature « regle » écrit,
     // et ce que le parseur relit.
-    expect(relire(texte).data["impacts"]).toEqual([
+    expect(reread(text).data["impacts"]).toEqual([
       { regle: "RG-a", operation: "cree" },
       { regle: "RG-b", operation: "touche" },
     ]);
   });
 
   it("place chaque énoncé sous un titre portant l’identifiant de sa règle", () => {
-    const texte = serializeCadrage("2026-020", {
+    const text = serializeScoping("2026-020", {
       ...BASE,
       impacts: [
-        { cible: "RG-a", operation: "modifie", enonce: "Le nouvel énoncé." },
+        {
+          target: "RG-a",
+          operation: "modifie",
+          statement: "Le nouvel énoncé.",
+        },
       ],
     });
-    expect(extractEnonces(relire(texte).body).get("RG-a")).toBe(
+    expect(extractStatements(reread(text).body).get("RG-a")).toBe(
       "Le nouvel énoncé.",
     );
   });
 
   it("omet la section Énoncés quand rien n’est à énoncer", () => {
     // une section vide suggérerait au lecteur qu'il manque quelque chose
-    const texte = serializeCadrage("2026-020", {
+    const text = serializeScoping("2026-020", {
       ...BASE,
-      impacts: [{ cible: "RG-b", operation: "touche", enonce: "" }],
+      impacts: [{ target: "RG-b", operation: "touche", statement: "" }],
     });
-    expect(texte).not.toContain("## Énoncés");
+    expect(text).not.toContain("## Énoncés");
   });
 
   it("n’écrit aucun statut, que le vérificateur refuserait", () => {
     // Le statut vit sur la demande de fusion, non dans le fichier. L'y écrire
     // produisait un cadrage rejeté en intégration continue.
     expect(
-      relire(serializeCadrage("2026-020", BASE)).data["statut"],
+      reread(serializeScoping("2026-020", BASE)).data["statut"],
     ).toBeUndefined();
   });
 });

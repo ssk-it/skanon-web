@@ -9,7 +9,7 @@ import { RepoConfig } from "./repo-config";
  * projet courant sans le signaler ; passer par ici garantit qu'il n'existe
  * qu'un seul endroit où le préfixe est construit.
  */
-export class LiensService {
+export class LinksService {
   private readonly config = inject(RepoConfig);
 
   /**
@@ -17,14 +17,14 @@ export class LiensService {
    *
    * `vers('cadrages', id)` donne `['/', owner, repo, 'cadrages', id]`.
    */
-  vers(...segments: readonly (string | number)[]): unknown[] {
-    const d = this.config.depot();
+  to(...segments: readonly (string | number)[]): unknown[] {
+    const d = this.config.repoRef();
     return ["/", d.owner, d.repo, ...segments];
   }
 
   /** Le même lien, en une adresse : ce que prend `RouterLink`. */
-  chemin(...segments: readonly (string | number)[]): string {
-    const d = this.config.depot();
+  path(...segments: readonly (string | number)[]): string {
+    const d = this.config.repoRef();
     return (
       "/" +
       [d.owner, d.repo, ...segments]
@@ -43,11 +43,11 @@ export class LiensService {
    *
    * `versGithub('issues')` donne `https://github.com/owner/repo/issues`.
    */
-  versGithub(...segments: readonly (string | number)[]): string {
-    const d = this.config.depot();
-    const chemin = [d.owner, d.repo, ...segments]
+  toGithub(...segments: readonly (string | number)[]): string {
+    const d = this.config.repoRef();
+    const path = [d.owner, d.repo, ...segments]
       .map((s) => encodeURIComponent(String(s)))
       .join("/");
-    return `https://github.com/${chemin}`;
+    return `https://github.com/${path}`;
   }
 }

@@ -3,49 +3,49 @@ import { load } from "js-yaml";
 import {
   GithubClient,
   GithubError,
-  RefDepot,
-  EntreeArbre,
+  RepoRef,
+  TreeEntry,
 } from "../github/github-client";
 import { TokenService } from "../github/token.service";
-import { ContenusCache, EtatConnu } from "./contenus-cache";
+import { ContentCache, KnownState } from "./contenus-cache";
 import {
   splitFrontmatter,
-  estIllisible,
+  isUnreadable,
   extractSection,
-  extractEnonces,
-  extractSectionsLibres,
-  extractSousSections,
-  SECTIONS_CONNUES,
+  extractStatements,
+  extractFreeSections,
+  extractSubsections,
+  KNOWN_SECTIONS,
 } from "./frontmatter";
 import {
-  Cadrage,
+  Scoping,
   Decision,
-  DepotCode,
-  Domaine,
-  Fonctionnalite,
+  CodeRepo,
+  Domain,
+  Feature,
   Impact,
-  LienExterne,
-  MODES_ACCES,
-  ModeAcces,
+  ExternalLink,
+  ACCESS_MODES,
+  AccessMode,
   Option,
-  PROTECTIONS_DU_JETON,
-  ProtectionDuJeton,
-  PieceJointe,
-  Referentiel,
-  ReglagesIdentite,
-  ReglagesProjet,
-  Regle,
-  DecisionArchitecture,
-  DocumentArchitecture,
-  NatureDocument,
-  StatutCadrage,
-  StatutDecision,
-  StatutRegle,
-  TAGS_LIENS_PAR_DEFAUT,
+  TOKEN_PROTECTIONS,
+  TokenProtection,
+  Attachment,
+  Specification,
+  IdentitySettings,
+  ProjectSettings,
+  Rule,
+  ArchitectureDecision,
+  ArchitectureDocument,
+  DocumentKind,
+  ScopingStatus,
+  DecisionStatus,
+  RuleStatus,
+  DEFAULT_LINK_TAGS,
 } from "../model/model";
 
 /** Répertoires portant des entités. Le reste (README…) est ignoré. */
-const REPERTOIRES = [
+const DIRECTORIES = [
   "domains",
   "features",
   "rules",
@@ -61,47 +61,47 @@ const REPERTOIRES = [
  * format, et un désaccord se paierait par un impact compris différemment de
  * chaque côté.
  */
-const NATURES_CIBLE = ["regle", "adr", "architecture"] as const;
+const TARGET_KINDS = ["regle", "adr", "architecture"] as const;
 
 /** Fichier de configuration, à la racine d'un dépôt cadré. */
-const NOM_CONFIG = "ssk-canon.yml";
+const CONFIG_NAME = "ssk-canon.yml";
 
-interface LoadedFichier {
-  readonly chemin: string;
-  readonly contenu: string;
+interface LoadedFile {
+  readonly path: string;
+  readonly content: string;
 }
 
 /** Un état que le dépôt n'a pas confirmé, faute d'avoir répondu. */
-export interface EtatNonConfirme {
+export interface UnconfirmedState {
   /** Instant de la lecture qui l'a produit, au format ISO. */
-  readonly lu: string;
+  readonly readAt: string;
   /** Pourquoi le dépôt n'a pas répondu, tel que l'erreur le dit. */
   readonly cause: string;
 }
 
 /** Ce qu'une lecture rend, au-delà du référentiel lui-même. */
-export interface LectureReferentiel {
-  readonly referentiel: Referentiel;
+export interface SpecificationRead {
+  readonly specification: Specification;
   /** Les empreintes que cette lecture a citées : ce que le cache doit garder. */
-  readonly empreintes: ReadonlySet<string>;
+  readonly fingerprints: ReadonlySet<string>;
   /** Présent quand le référentiel est le dernier lu, et non l'état courant. */
-  readonly nonConfirme: EtatNonConfirme | null;
+  readonly unconfirmed: UnconfirmedState | null;
 }
 
-export interface OptionsLecture {
-  readonly progression?: (charges: number, total: number) => void;
+export interface ReadOptions {
+  readonly progression?: (loadedCount: number, total: number) => void;
   /**
    * Garder l'arborescence lue : pour la redemander sous condition, et pour la
    * montrer si le dépôt ne répond plus. Une lecture à un commit passé n'en a
    * pas l'usage.
    */
-  readonly memoriser?: boolean;
+  readonly remember?: boolean;
   /**
    * Montrer le dernier état lu si le dépôt ne répond pas (RG-dernier-etat-connu).
    * Réservé à la consultation du référentiel : une lecture faite pour écrire
    * doit échouer plutôt que de se fonder sur un état non confirmé.
    */
-  readonly dernierEtatConnu?: boolean;
+  readonly lastKnownState?: boolean;
 }
 
 /**
@@ -116,70 +116,69 @@ export interface OptionsLecture {
 export class RepoLoader {
   private readonly github = inject(GithubClient);
   private readonly tokens = inject(TokenService);
-  private readonly cache = inject(ContenusCache);
+  private readonly cache = inject(ContentCache);
 
-  async loadReferentiel(
-    depot: RefDepot,
-    progression?: (charges: number, total: number) => void,
-  ): Promise<Referentiel> {
-    return (await this.readReferentiel(depot, { progression })).referentiel;
+  async loadSpecification(
+    repoRef: RepoRef,
+    progression?: (loadedCount: number, total: number) => void,
+  ): Promise<Specification> {
+    return (await this.readSpecification(repoRef, { progression }))
+      .specification;
   }
 
-  async readReferentiel(
-    depot: RefDepot,
-    options: OptionsLecture = {},
-  ): Promise<LectureReferentiel> {
-    const ref = depot.ref ?? "HEAD";
-    const enAttente =
-      options.memoriser || options.dernierEtatConnu
-        ? this.cache.loadEtat(depot, ref)
+  async readSpecification(
+    repoRef: RepoRef,
+    options: ReadOptions = {},
+  ): Promise<SpecificationRead> {
+    const ref = repoRef.ref ?? "HEAD";
+    const waiting =
+      options.remember || options.lastKnownState
+        ? this.cache.loadState(repoRef, ref)
         : Promise.resolve(null);
     // L'état connu n'est attendu avant l'arborescence que s'il sert à la
     // demander sous condition, donc avec un jeton. Sinon, la demande part sans
     // attendre le stockage, et l'état ne sert qu'après.
-    const conditionnel = options.memoriser === true && this.tokens.present();
-    const connuAvant = conditionnel ? await enAttente : null;
+    const conditional = options.remember === true && this.tokens.present();
+    const knownBefore = conditional ? await waiting : null;
 
-    let arbre;
+    let tree;
     try {
-      arbre = await this.github.loadArbre(depot, connuAvant);
+      tree = await this.github.loadTree(repoRef, knownBefore);
     } catch (e) {
-      if (!(e instanceof GithubError) || !options.dernierEtatConnu) throw e;
-      const connu = await enAttente;
+      if (!(e instanceof GithubError) || !options.lastKnownState) throw e;
+      const known = await waiting;
 
       // Ce que le dépôt ne montre plus à quelqu'un, l'application ne le lui
       // montre pas davantage — pas même comme dernier état connu.
-      if (estRefus(e)) {
-        await this.cache.clearDepot(depot);
+      if (isDenial(e)) {
+        await this.cache.clearRepo(repoRef);
         throw e;
       }
-      if (connu && estInjoignable(e)) {
-        const fichiers = await this.readDepuisCache(depot, connu.entrees);
-        if (fichiers) {
+      if (known && isUnreachable(e)) {
+        const files = await this.readFromCache(repoRef, known.entries);
+        if (files) {
           return {
-            referentiel: this.buildReferentiel(
-              fichiers,
-              this.anomaliesArbre(connu.tronque),
+            specification: this.buildSpecification(
+              files,
+              this.treeAnomalies(known.truncated),
             ),
-            empreintes: new Set(connu.entrees.map((x) => x.sha)),
-            nonConfirme: { lu: connu.lu, cause: e.message },
+            fingerprints: new Set(known.entries.map((x) => x.sha)),
+            unconfirmed: { readAt: known.readAt, cause: e.message },
           };
         }
       }
       throw e;
     }
 
-    const anomalies = this.anomaliesArbre(arbre.tronque);
-    const pertinents = arbre.entrees.filter(
+    const anomalies = this.treeAnomalies(tree.truncated);
+    const relevant = tree.entries.filter(
       (e) =>
         e.type === "blob" &&
         e.path.endsWith(".md") &&
-        this.isInKnownRepertoire(e.path),
+        this.isInKnownDirectory(e.path),
     );
-    const config = arbre.entrees.find((e) => e.path === NOM_CONFIG);
-    const aCharger: EntreeArbre[] = config
-      ? [config, ...pertinents]
-      : [...pertinents];
+    const config = tree.entries.find((e) => e.path === CONFIG_NAME);
+    const toLoad: TreeEntry[] = config ? [config, ...relevant] : [...relevant];
 
     // Les contenus manquants sont lus au commit que l'arborescence vient de
     // résoudre, non au nom de la branche. `raw` sert avec `max-age: 300` :
@@ -188,46 +187,46 @@ export class RepoLoader {
     // C'est ce qui rend une relecture immédiatement fidèle à ce qu'on vient
     // d'enregistrer ; le cache, rangé par empreinte de fichier, n'y change
     // rien, puisqu'un fichier écrit a une empreinte neuve.
-    const fige: RefDepot = { ...depot, ref: arbre.sha };
-    const connu = await enAttente;
-    let prive = connu?.prive ?? false;
+    const pinned: RepoRef = { ...repoRef, ref: tree.sha };
+    const known = await waiting;
+    let isPrivate = known?.private ?? false;
 
-    let faits = 0;
-    const fichiers = await Promise.all(
-      aCharger.map(async (e) => {
-        let contenu = await this.cache.loadContenu(depot, e.sha);
-        if (contenu === null) {
-          contenu = await this.github.loadContenu(fige, e.path, e.sha);
+    let done = 0;
+    const files = await Promise.all(
+      toLoad.map(async (e) => {
+        let content = await this.cache.loadContent(repoRef, e.sha);
+        if (content === null) {
+          content = await this.github.loadContent(pinned, e.path, e.sha);
           // Lu par l'API : le canal public ne dessert pas ce dépôt, il est privé.
-          prive ||= this.github.contenusParApi();
-          await this.cache.saveContenu(depot, e.sha, contenu, {
-            prive,
-            persister: this.isPersistable(prive),
+          isPrivate ||= this.github.contentsViaApi();
+          await this.cache.saveContent(repoRef, e.sha, content, {
+            private: isPrivate,
+            persist: this.isPersistable(isPrivate),
           });
         }
-        options.progression?.(++faits, aCharger.length);
-        return { chemin: e.path, contenu };
+        options.progression?.(++done, toLoad.length);
+        return { path: e.path, content: content };
       }),
     );
 
-    if (options.memoriser) {
-      const etat: EtatConnu = {
-        commit: arbre.sha,
-        etag: arbre.etag,
-        lu: new Date().toISOString(),
-        entrees: aCharger,
-        tronque: arbre.tronque,
-        prive,
+    if (options.remember) {
+      const state: KnownState = {
+        commit: tree.sha,
+        etag: tree.etag,
+        readAt: new Date().toISOString(),
+        entries: toLoad,
+        truncated: tree.truncated,
+        private: isPrivate,
       };
-      await this.cache.saveEtat(depot, ref, etat, {
-        persister: this.isPersistable(prive),
+      await this.cache.saveState(repoRef, ref, state, {
+        persist: this.isPersistable(isPrivate),
       });
     }
 
     return {
-      referentiel: this.buildReferentiel(fichiers, anomalies),
-      empreintes: new Set(aCharger.map((e) => e.sha)),
-      nonConfirme: null,
+      specification: this.buildSpecification(files, anomalies),
+      fingerprints: new Set(toLoad.map((e) => e.sha)),
+      unconfirmed: null,
     };
   }
 
@@ -236,75 +235,74 @@ export class RepoLoader {
    * sous un accès temporaire, ils restent dans l'onglet, comme lui.
    * Voir RG-contenus-prives-au-repos.
    */
-  private isPersistable(prive: boolean): boolean {
-    return !prive || this.tokens.source() !== "identite_tierce";
+  private isPersistable(isPrivate: boolean): boolean {
+    return !isPrivate || this.tokens.source() !== "identite_tierce";
   }
 
   /** Les contenus d'une arborescence connue, s'ils sont tous encore détenus. */
-  private async readDepuisCache(
-    depot: RefDepot,
-    entrees: readonly EntreeArbre[],
-  ): Promise<LoadedFichier[] | null> {
-    const fichiers: LoadedFichier[] = [];
-    for (const e of entrees) {
-      const contenu = await this.cache.loadContenu(depot, e.sha);
+  private async readFromCache(
+    repoRef: RepoRef,
+    entries: readonly TreeEntry[],
+  ): Promise<LoadedFile[] | null> {
+    const files: LoadedFile[] = [];
+    for (const e of entries) {
+      const content = await this.cache.loadContent(repoRef, e.sha);
       // Un état partiel se présenterait comme complet : mieux vaut l'échec.
-      if (contenu === null) return null;
-      fichiers.push({ chemin: e.path, contenu });
+      if (content === null) return null;
+      files.push({ path: e.path, content });
     }
-    return fichiers;
+    return files;
   }
 
-  private anomaliesArbre(tronque: boolean): string[] {
-    return tronque
+  private treeAnomalies(truncated: boolean): string[] {
+    return truncated
       ? [
           "L’arborescence du dépôt a été tronquée par GitHub : le référentiel est incomplet.",
         ]
       : [];
   }
 
-  private isInKnownRepertoire(chemin: string): boolean {
-    const premier = chemin.split("/")[0];
+  private isInKnownDirectory(path: string): boolean {
+    const first = path.split("/")[0];
     return (
-      (REPERTOIRES as readonly string[]).includes(premier) &&
-      chemin.includes("/")
+      (DIRECTORIES as readonly string[]).includes(first) && path.includes("/")
     );
   }
 
-  private buildReferentiel(
-    fichiers: readonly LoadedFichier[],
+  private buildSpecification(
+    files: readonly LoadedFile[],
     anomalies: string[],
-  ): Referentiel {
-    const domaines = new Map<string, Domaine>();
-    const fonctionnalites = new Map<string, Fonctionnalite>();
-    const regles = new Map<string, Regle>();
-    const decisions = new Map<string, DecisionArchitecture>();
-    const architecture = new Map<string, DocumentArchitecture>();
-    const cadragesBruts = new Map<
+  ): Specification {
+    const domains = new Map<string, Domain>();
+    const features = new Map<string, Feature>();
+    const rules = new Map<string, Rule>();
+    const decisions = new Map<string, ArchitectureDecision>();
+    const architecture = new Map<string, ArchitectureDocument>();
+    const rawScopings = new Map<
       string,
-      { data: Record<string, unknown>; corps: string }
+      { data: Record<string, unknown>; body: string }
     >();
-    const decisionsParCadrage = new Map<string, Decision[]>();
-    const pjParCadrage = new Map<string, PieceJointe[]>();
+    const decisionsByScoping = new Map<string, Decision[]>();
+    const attachmentsByScoping = new Map<string, Attachment[]>();
 
-    let projet = {
-      nom: "Projet",
+    let project = {
+      name: "Projet",
       description: "",
-      depotsCode: [] as readonly DepotCode[],
-      prefixe: null as string | null,
+      codeRepos: [] as readonly CodeRepo[],
+      prefix: null as string | null,
     };
-    let reglages: ReglagesProjet = {
-      acces: "jeton_personnel",
-      identite: null,
-      protectionDuJeton: "proposee",
-      tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+    let settings: ProjectSettings = {
+      access: "jeton_personnel",
+      identity: null,
+      tokenProtection: "proposee",
+      linkTags: DEFAULT_LINK_TAGS,
     };
 
-    for (const f of fichiers) {
-      if (f.chemin === NOM_CONFIG) {
-        const config = this.parseConfig(f.contenu, projet);
-        projet = config.projet;
-        reglages = config.reglages;
+    for (const f of files) {
+      if (f.path === CONFIG_NAME) {
+        const config = this.parseConfig(f.content, project);
+        project = config.project;
+        settings = config.settings;
         anomalies.push(...config.anomalies);
         continue;
       }
@@ -313,60 +311,60 @@ export class RepoLoader {
       // explique ce que le répertoire attend, à qui ouvre le dépôt sur la
       // plateforme. Le signaler comme mal formé encombrerait le chargement de
       // documentation parfaitement valide.
-      if (f.chemin.endsWith("/README.md")) continue;
+      if (f.path.endsWith("/README.md")) continue;
 
-      const parse = splitFrontmatter(f.contenu);
+      const parse = splitFrontmatter(f.content);
       if (!parse) {
-        anomalies.push(`${f.chemin} : frontmatter absent.`);
+        anomalies.push(`${f.path} : frontmatter absent.`);
         continue;
       }
       // Un fichier illisible est écarté et signalé, sans interrompre les
       // autres : un référentiel amputé d'une entité reste consultable, alors
       // qu'un chargement interrompu ne montre rien du tout.
-      if (estIllisible(parse)) {
-        anomalies.push(`${f.chemin} : ${parse.erreur}.`);
+      if (isUnreadable(parse)) {
+        anomalies.push(`${f.path} : ${parse.error}.`);
         continue;
       }
 
       const { data, body } = parse;
-      const segments = f.chemin.split("/");
+      const segments = f.path.split("/");
 
       switch (segments[0]) {
         case "domains":
-          domaines.set(str(data["id"]), {
+          domains.set(str(data["id"]), {
             id: str(data["id"]),
-            nom: str(data["nom"]) || str(data["id"]),
+            name: str(data["nom"]) || str(data["id"]),
             description: body.trim(),
           });
           break;
 
         case "features":
-          fonctionnalites.set(str(data["id"]), {
+          features.set(str(data["id"]), {
             id: str(data["id"]),
-            nom: str(data["nom"]) || str(data["id"]),
-            domaines: toList(data["domaines"]),
+            name: str(data["nom"]) || str(data["id"]),
+            domains: toList(data["domaines"]),
             description: body.trim(),
           });
           break;
 
         case "rules":
-          regles.set(str(data["id"]), {
+          rules.set(str(data["id"]), {
             id: str(data["id"]),
-            statut: (str(data["statut"]) || "actif") as StatutRegle,
-            fonctionnalites: toList(data["fonctionnalites"]),
-            enonce: body.trim(),
-            creePar: data["cree_par"] ? str(data["cree_par"]) : null,
-            modifiePar: toList(data["modifie_par"]),
+            status: (str(data["statut"]) || "actif") as RuleStatus,
+            features: toList(data["fonctionnalites"]),
+            statement: body.trim(),
+            createdBy: data["cree_par"] ? str(data["cree_par"]) : null,
+            modifiedBy: toList(data["modifie_par"]),
           });
           break;
 
         case "decisions":
           decisions.set(str(data["id"]), {
             id: str(data["id"]),
-            statut: (str(data["statut"]) || "actif") as StatutRegle,
-            enonce: body.trim(),
-            creePar: data["cree_par"] ? str(data["cree_par"]) : null,
-            modifiePar: toList(data["modifie_par"]),
+            status: (str(data["statut"]) || "actif") as RuleStatus,
+            statement: body.trim(),
+            createdBy: data["cree_par"] ? str(data["cree_par"]) : null,
+            modifiedBy: toList(data["modifie_par"]),
           });
           break;
 
@@ -376,72 +374,72 @@ export class RepoLoader {
             // Un document sans nature déclarée est un composant : c'est la
             // nature qui n'a rien à relier, donc la seule qui se devine sans
             // risque de se tromper sur ce que le document décrit.
-            nature: (str(data["nature"]) || "composant") as NatureDocument,
-            statut: (str(data["statut"]) || "actif") as StatutRegle,
-            composants: toList(data["composants"]),
-            enonce: body.trim(),
-            creePar: data["cree_par"] ? str(data["cree_par"]) : null,
-            modifiePar: toList(data["modifie_par"]),
+            kind: (str(data["nature"]) || "composant") as DocumentKind,
+            status: (str(data["statut"]) || "actif") as RuleStatus,
+            components: toList(data["composants"]),
+            statement: body.trim(),
+            createdBy: data["cree_par"] ? str(data["cree_par"]) : null,
+            modifiedBy: toList(data["modifie_par"]),
           });
           break;
 
         case "cadrages": {
-          const idCadrage = segments[1];
+          const scopingId = segments[1];
           if (segments[2] === "cadrage.md") {
             // Le vérificateur de l'Action refuse un statut déclaré. Le signaler
             // ici fait voir depuis l'application ce qui, sinon, ne se découvre
             // qu'en intégration continue, une fois la demande ouverte.
             if (data["statut"] !== undefined) {
               anomalies.push(
-                `${f.chemin} : le statut ne se déclare pas, il se déduit de l’état du dépôt.`,
+                `${f.path} : le statut ne se déclare pas, il se déduit de l’état du dépôt.`,
               );
             }
-            cadragesBruts.set(idCadrage, { data, corps: body });
+            rawScopings.set(scopingId, { data, body: body });
           } else if (segments[2] === "decisions") {
-            const decisions = decisionsParCadrage.get(idCadrage) ?? [];
+            const decisions = decisionsByScoping.get(scopingId) ?? [];
             decisions.push(this.parseDecision(data, body));
-            decisionsParCadrage.set(idCadrage, decisions);
+            decisionsByScoping.set(scopingId, decisions);
           } else if (segments[2] === "attachments.md") {
-            pjParCadrage.set(idCadrage, this.parsePiecesJointes(data));
+            attachmentsByScoping.set(scopingId, this.parseAttachments(data));
           }
           break;
         }
       }
     }
 
-    const cadrages = new Map<string, Cadrage>();
-    for (const [id, { data, corps }] of cadragesBruts) {
-      cadrages.set(id, {
+    const scopings = new Map<string, Scoping>();
+    for (const [id, { data, body }] of rawScopings) {
+      scopings.set(id, {
         id: str(data["id"]) || id,
-        titre: str(data["titre"]) || id,
+        title: str(data["titre"]) || id,
         // Pas de statut ici : il se déduit de l'état du dépôt, non du fichier.
         // Le chargeur lit une référence sans savoir laquelle ; c'est le store,
         // qui sait d'où vient chaque cadrage, qui tranche. « livree » est donc
         // le statut de ce qu'on lit, et la provenance le corrige si besoin.
-        statut: "livree" as StatutCadrage,
-        domaines: toList(data["domaines"]),
-        liens: this.parseLiens(data["liens"]),
+        status: "livree" as ScopingStatus,
+        domains: toList(data["domaines"]),
+        links: this.parseLinks(data["liens"]),
         impacts: this.parseImpacts(data["impacts"]),
-        objectif: extractSection(corps, "Objectif"),
-        parcours: extractSection(corps, "Parcours utilisateur"),
-        enonces: extractEnonces(corps),
-        decisions: (decisionsParCadrage.get(id) ?? []).sort((a, b) =>
+        goal: extractSection(body, "Objectif"),
+        journey: extractSection(body, "Parcours utilisateur"),
+        statements: extractStatements(body),
+        decisions: (decisionsByScoping.get(id) ?? []).sort((a, b) =>
           a.id.localeCompare(b.id),
         ),
-        piecesJointes: pjParCadrage.get(id) ?? [],
-        divers: extractSectionsLibres(corps, SECTIONS_CONNUES),
+        attachments: attachmentsByScoping.get(id) ?? [],
+        misc: extractFreeSections(body, KNOWN_SECTIONS),
       });
     }
 
     return {
-      projet,
-      reglages,
-      domaines,
-      fonctionnalites,
-      regles,
+      project: project,
+      settings,
+      domains,
+      features,
+      rules,
       decisions,
       architecture,
-      cadrages,
+      scopings,
       anomalies,
     };
   }
@@ -454,21 +452,21 @@ export class RepoLoader {
    * consulte même sans configuration valide.
    */
   private parseConfig(
-    contenu: string,
-    defautProjet: {
-      nom: string;
+    content: string,
+    defaultProject: {
+      name: string;
       description: string;
-      depotsCode: readonly DepotCode[];
-      prefixe: string | null;
+      codeRepos: readonly CodeRepo[];
+      prefix: string | null;
     },
   ) {
-    const defaut = {
-      projet: defautProjet,
-      reglages: {
-        acces: "jeton_personnel" as ModeAcces,
-        identite: null,
-        protectionDuJeton: "proposee" as ProtectionDuJeton,
-        tagsLiens: TAGS_LIENS_PAR_DEFAUT,
+    const defaults = {
+      project: defaultProject,
+      settings: {
+        access: "jeton_personnel" as AccessMode,
+        identity: null,
+        tokenProtection: "proposee" as TokenProtection,
+        linkTags: DEFAULT_LINK_TAGS,
       },
       anomalies: [] as string[],
     };
@@ -476,126 +474,124 @@ export class RepoLoader {
     let data: Record<string, unknown> | undefined;
     try {
       // le fichier n'a pas de frontmatter : c'est du YAML nu
-      data = load(contenu) as Record<string, unknown> | undefined;
+      data = load(content) as Record<string, unknown> | undefined;
     } catch (e) {
       return {
-        ...defaut,
+        ...defaults,
         anomalies: [
-          `${NOM_CONFIG} : illisible — ${(e as Error).message.split("\n")[0]}.`,
+          `${CONFIG_NAME} : illisible — ${(e as Error).message.split("\n")[0]}.`,
         ],
       };
     }
 
-    const projetBrut = (data?.["projet"] ?? {}) as Record<string, unknown>;
+    const rawProject = (data?.["projet"] ?? {}) as Record<string, unknown>;
     // `transitions` et `reflet_demande_fusion` ne se lisent plus : le cycle
     // n'est plus réglable (2026-045). Un projet qui les déclare encore les voit
     // ignorés sans anomalie — ce sont des réglages devenus sans objet, non des
     // réglages faux.
     const anomalies: string[] = [];
-    const depotsLus = parseDepotsCode(data?.["depots_code"]);
-    anomalies.push(...depotsLus.anomalies);
-    const { acces, anomalie } = parseModeAcces(data?.["acces"]);
-    if (anomalie) anomalies.push(anomalie);
+    const readRepos = parseCodeRepos(data?.["depots_code"]);
+    anomalies.push(...readRepos.anomalies);
+    const { access, anomaly } = parseAccessMode(data?.["acces"]);
+    if (anomaly) anomalies.push(anomaly);
 
-    const protectionLue = parseProtectionDuJeton(data?.["protection_du_jeton"]);
-    if (protectionLue.anomalie) anomalies.push(protectionLue.anomalie);
+    const readProtection = parseTokenProtection(data?.["protection_du_jeton"]);
+    if (readProtection.anomaly) anomalies.push(readProtection.anomaly);
 
-    const identiteLue = parseIdentite(data?.["identite"]);
-    anomalies.push(...identiteLue.anomalies);
-    if (acces === "identite_tierce" && !identiteLue.identite) {
+    const readIdentity = parseIdentity(data?.["identite"]);
+    anomalies.push(...readIdentity.anomalies);
+    if (access === "identite_tierce" && !readIdentity.identity) {
       anomalies.push(
-        `${NOM_CONFIG} : le mode « identite_tierce » demande un bloc « identite » ` +
+        `${CONFIG_NAME} : le mode « identite_tierce » demande un bloc « identite » ` +
           "complet — émetteur, client et échange.",
       );
     }
 
     return {
-      projet: {
-        nom: str(projetBrut["nom"]) || defautProjet.nom,
-        description: str(projetBrut["description"]) || defautProjet.description,
-        depotsCode: depotsLus.depots,
-        prefixe: str(projetBrut["prefixe"]) || null,
+      project: {
+        name: str(rawProject["nom"]) || defaultProject.name,
+        description:
+          str(rawProject["description"]) || defaultProject.description,
+        codeRepos: readRepos.repos,
+        prefix: str(rawProject["prefixe"]) || null,
       },
-      reglages: {
-        acces,
-        identite: identiteLue.identite,
-        protectionDuJeton: protectionLue.protection,
-        tagsLiens: parseTagsLiens(data?.["tags_liens"]),
+      settings: {
+        access: access,
+        identity: readIdentity.identity,
+        tokenProtection: readProtection.protection,
+        linkTags: parseLinkTags(data?.["tags_liens"]),
       },
       anomalies,
     };
   }
 
-  private parseDecision(
-    data: Record<string, unknown>,
-    corps: string,
-  ): Decision {
-    const retenue = data["option_retenue"] ? str(data["option_retenue"]) : null;
-    const sousSections = extractSousSections(corps, "Options");
+  private parseDecision(data: Record<string, unknown>, body: string): Decision {
+    const chosen = data["option_retenue"] ? str(data["option_retenue"]) : null;
+    const subsections = extractSubsections(body, "Options");
 
-    const options: Option[] = [...sousSections].map(([titre, texte]) => ({
-      id: titre,
-      titre,
-      retenue: retenue !== null && titre === retenue,
-      corps: texte,
+    const options: Option[] = [...subsections].map(([title, text]) => ({
+      id: title,
+      title: title,
+      chosen: chosen !== null && title === chosen,
+      body: text,
     }));
 
     return {
       id: str(data["id"]),
-      titre: str(data["titre"]) || str(data["id"]),
-      statut: (str(data["statut"]) || "ouverte") as StatutDecision,
-      optionRetenue: retenue,
-      description: extractSection(corps, "Description"),
+      title: str(data["titre"]) || str(data["id"]),
+      status: (str(data["statut"]) || "ouverte") as DecisionStatus,
+      chosenOption: chosen,
+      description: extractSection(body, "Description"),
       options,
-      corps,
+      body,
     };
   }
 
-  private parseLiens(brut: unknown): LienExterne[] {
-    if (!Array.isArray(brut)) return [];
-    return brut
+  private parseLinks(raw: unknown): ExternalLink[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
       .filter((l): l is Record<string, unknown> => !!l && typeof l === "object")
       .map((l) => ({
         tag: str(l["tag"]),
         url: str(l["url"]),
-        nom: str(l["nom"]),
+        name: str(l["nom"]),
       }))
       .filter((l) => l.url);
   }
 
-  private parseImpacts(brut: unknown): Impact[] {
-    if (!Array.isArray(brut)) return [];
-    return brut
+  private parseImpacts(raw: unknown): Impact[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
       .filter((i): i is Record<string, unknown> => !!i && typeof i === "object")
       .map((i) => {
         // L'ordre suit celui de CIBLES dans le vérificateur partagé : un impact
         // ne déclare qu'une cible, et c'est la première trouvée qui vaut.
-        const nature = NATURES_CIBLE.find((n) => i[n] !== undefined) ?? "regle";
-        const cible = str(i[nature]);
+        const kind = TARGET_KINDS.find((n) => i[n] !== undefined) ?? "regle";
+        const target = str(i[kind]);
         // `regle` reste renseigné pour les appelants qui le lisent encore ; il
         // ne porte que les impacts de cette nature, jamais un identifiant
         // d'architecture qu'ils traiteraient alors comme une règle.
         return {
-          cible,
-          nature,
+          target: target,
+          kind: kind,
           operation: str(i["operation"]) as Impact["operation"],
-          regle: nature === "regle" ? cible : "",
+          rule: kind === "regle" ? target : "",
         };
       })
-      .filter((i) => i.cible);
+      .filter((i) => i.target);
   }
 
-  private parsePiecesJointes(data: Record<string, unknown>): PieceJointe[] {
-    const brut = data["attachments"];
-    if (!Array.isArray(brut)) return [];
-    return brut
+  private parseAttachments(data: Record<string, unknown>): Attachment[] {
+    const raw = data["attachments"];
+    if (!Array.isArray(raw)) return [];
+    return raw
       .filter((a): a is Record<string, unknown> => !!a && typeof a === "object")
       .map((a) => ({
-        nom: str(a["nom"]),
+        name: str(a["nom"]),
         sha256: str(a["sha256"]),
-        taille: Number(a["taille"]) || 0,
+        size: Number(a["taille"]) || 0,
         type: str(a["type"]),
-        ajouteLe: a["ajoute_le"] ? str(a["ajoute_le"]) : null,
+        addedAt: a["ajoute_le"] ? str(a["ajoute_le"]) : null,
       }));
   }
 }
@@ -616,42 +612,42 @@ function toList(v: unknown): string[] {
  * liste sert à se situer, et une entrée douteuse ne doit pas rendre le
  * référentiel illisible.
  */
-export function parseDepotsCode(brut: unknown): {
-  depots: readonly DepotCode[];
+export function parseCodeRepos(raw: unknown): {
+  repos: readonly CodeRepo[];
   anomalies: string[];
 } {
-  if (brut === undefined || brut === null) return { depots: [], anomalies: [] };
-  if (!Array.isArray(brut)) {
+  if (raw === undefined || raw === null) return { repos: [], anomalies: [] };
+  if (!Array.isArray(raw)) {
     return {
-      depots: [],
-      anomalies: [`${NOM_CONFIG} : « depots_code » doit être une liste.`],
+      repos: [],
+      anomalies: [`${CONFIG_NAME} : « depots_code » doit être une liste.`],
     };
   }
 
-  const depots: DepotCode[] = [];
+  const repos: CodeRepo[] = [];
   const anomalies: string[] = [];
-  for (const entree of brut) {
+  for (const entry of raw) {
     // La forme courte — juste le nom du dépôt — est admise : le rôle n'apprend
     // rien quand le projet n'en compte qu'un.
     const repo =
-      typeof entree === "string"
-        ? entree
-        : str((entree as Record<string, unknown>)?.["repo"]);
+      typeof entry === "string"
+        ? entry
+        : str((entry as Record<string, unknown>)?.["repo"]);
     const role =
-      typeof entree === "string"
+      typeof entry === "string"
         ? ""
-        : str((entree as Record<string, unknown>)?.["role"]);
+        : str((entry as Record<string, unknown>)?.["role"]);
 
     if (!/^[^/\s]+\/[^/\s]+$/.test(repo)) {
       anomalies.push(
-        `${NOM_CONFIG} : dépôt de code « ${repo || "(vide)"} » ignoré — ` +
+        `${CONFIG_NAME} : dépôt de code « ${repo || "(vide)"} » ignoré — ` +
           "attendu « organisation/depot ».",
       );
       continue;
     }
-    depots.push({ repo, role });
+    repos.push({ repo, role });
   }
-  return { depots, anomalies };
+  return { repos, anomalies };
 }
 
 /**
@@ -661,10 +657,10 @@ export function parseDepotsCode(brut: unknown): {
  * prononcé doit pouvoir référencer quelque chose, sinon la saisie d'un lien
  * n'offrirait aucun choix.
  */
-export function parseTagsLiens(brut: unknown): readonly string[] {
-  if (!Array.isArray(brut)) return TAGS_LIENS_PAR_DEFAUT;
-  const tags = brut.map((t) => str(t).trim()).filter(Boolean);
-  return tags.length ? tags : TAGS_LIENS_PAR_DEFAUT;
+export function parseLinkTags(raw: unknown): readonly string[] {
+  if (!Array.isArray(raw)) return DEFAULT_LINK_TAGS;
+  const tags = raw.map((t) => str(t).trim()).filter(Boolean);
+  return tags.length ? tags : DEFAULT_LINK_TAGS;
 }
 
 /**
@@ -677,22 +673,22 @@ export function parseTagsLiens(brut: unknown): readonly string[] {
  * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
  * l'éprouver ne doit pas demander de construire un chargeur.
  */
-export function parseModeAcces(brut: unknown): {
-  acces: ModeAcces;
-  anomalie: string | null;
+export function parseAccessMode(raw: unknown): {
+  access: AccessMode;
+  anomaly: string | null;
 } {
-  if (brut === undefined || brut === null)
-    return { acces: "jeton_personnel", anomalie: null };
+  if (raw === undefined || raw === null)
+    return { access: "jeton_personnel", anomaly: null };
 
-  const valeur = str(brut);
-  if (MODES_ACCES.has(valeur as ModeAcces)) {
-    return { acces: valeur as ModeAcces, anomalie: null };
+  const value = str(raw);
+  if (ACCESS_MODES.has(value as AccessMode)) {
+    return { access: value as AccessMode, anomaly: null };
   }
   return {
-    acces: "jeton_personnel",
-    anomalie:
-      `${NOM_CONFIG} : mode d'accès inconnu « ${valeur} » — ` +
-      `attendu ${[...MODES_ACCES].join(", ")}. Le jeton personnel s'applique.`,
+    access: "jeton_personnel",
+    anomaly:
+      `${CONFIG_NAME} : mode d'accès inconnu « ${value} » — ` +
+      `attendu ${[...ACCESS_MODES].join(", ")}. Le jeton personnel s'applique.`,
   };
 }
 
@@ -701,27 +697,27 @@ export function parseModeAcces(brut: unknown): {
  *
  * Une valeur inconnue est écartée et signalée, comme un mode d'accès inconnu : la subir laisserait croire au projet qu'il exige une protection qu'il n'exige pas (RG-protection-du-jeton-par-projet).
  */
-export function parseProtectionDuJeton(brut: unknown): {
-  protection: ProtectionDuJeton;
-  anomalie: string | null;
+export function parseTokenProtection(raw: unknown): {
+  protection: TokenProtection;
+  anomaly: string | null;
 } {
-  if (brut === undefined || brut === null)
-    return { protection: "proposee", anomalie: null };
+  if (raw === undefined || raw === null)
+    return { protection: "proposee", anomaly: null };
 
-  const valeur = str(brut);
-  if (PROTECTIONS_DU_JETON.has(valeur as ProtectionDuJeton)) {
-    return { protection: valeur as ProtectionDuJeton, anomalie: null };
+  const value = str(raw);
+  if (TOKEN_PROTECTIONS.has(value as TokenProtection)) {
+    return { protection: value as TokenProtection, anomaly: null };
   }
   return {
     protection: "proposee",
-    anomalie:
-      `${NOM_CONFIG} : protection du jeton inconnue « ${valeur} » — ` +
-      `attendu ${[...PROTECTIONS_DU_JETON].join(", ")}. La passkey est proposée, non exigée.`,
+    anomaly:
+      `${CONFIG_NAME} : protection du jeton inconnue « ${value} » — ` +
+      `attendu ${[...TOKEN_PROTECTIONS].join(", ")}. La passkey est proposée, non exigée.`,
   };
 }
 
 /** Champs attendus d'un bloc `identite`, et ce qu'ils désignent. */
-const CHAMPS_IDENTITE = ["emetteur", "client", "echange"] as const;
+const IDENTITY_FIELDS = ["emetteur", "client", "echange"] as const;
 
 /**
  * Paramètres du mode « identité tierce », s'ils sont déclarés et complets.
@@ -733,45 +729,44 @@ const CHAMPS_IDENTITE = ["emetteur", "client", "echange"] as const;
  * Fonction libre plutôt que méthode : elle ne dépend d'aucune injection, et
  * l'éprouver ne doit pas demander de construire un chargeur.
  */
-export function parseIdentite(brut: unknown): {
-  identite: ReglagesIdentite | null;
+export function parseIdentity(raw: unknown): {
+  identity: IdentitySettings | null;
   anomalies: string[];
 } {
-  if (!brut || typeof brut !== "object")
-    return { identite: null, anomalies: [] };
+  if (!raw || typeof raw !== "object") return { identity: null, anomalies: [] };
 
-  const data = brut as Record<string, unknown>;
+  const data = raw as Record<string, unknown>;
   const anomalies: string[] = [];
-  const valeurs: Record<string, string> = {};
+  const values: Record<string, string> = {};
 
-  for (const champ of CHAMPS_IDENTITE) {
-    const valeur = str(data[champ]).trim();
-    if (!valeur) {
-      anomalies.push(`${NOM_CONFIG} : identite.${champ} manquant.`);
+  for (const field of IDENTITY_FIELDS) {
+    const value = str(data[field]).trim();
+    if (!value) {
+      anomalies.push(`${CONFIG_NAME} : identite.${field} manquant.`);
       continue;
     }
     // Une adresse mal formée se découvrirait sinon au moment de la connexion,
     // loin de sa cause.
-    if (champ !== "client") {
+    if (field !== "client") {
       try {
-        new URL(valeur);
+        new URL(value);
       } catch {
         anomalies.push(
-          `${NOM_CONFIG} : identite.${champ} n'est pas une adresse valide.`,
+          `${CONFIG_NAME} : identite.${field} n'est pas une adresse valide.`,
         );
         continue;
       }
     }
-    valeurs[champ] = valeur;
+    values[field] = value;
   }
 
-  if (anomalies.length) return { identite: null, anomalies };
+  if (anomalies.length) return { identity: null, anomalies };
   return {
-    identite: {
+    identity: {
       // une barre finale doublerait les séparateurs des adresses construites
-      emetteur: valeurs["emetteur"].replace(/\/+$/, ""),
-      client: valeurs["client"],
-      echange: valeurs["echange"].replace(/\/+$/, ""),
+      issuer: values["emetteur"].replace(/\/+$/, ""),
+      client: values["client"],
+      exchange: values["echange"].replace(/\/+$/, ""),
     },
     anomalies: [],
   };
@@ -781,13 +776,15 @@ export function parseIdentite(brut: unknown): {
  * La plateforme refuse l'accès : jeton refusé, droit manquant, dépôt hors de
  * portée. Une limite atteinte n'en est pas un — elle se lève d'elle-même.
  */
-function estRefus(e: GithubError): boolean {
+function isDenial(e: GithubError): boolean {
   return (
-    e.statut === 401 || e.statut === 404 || (e.statut === 403 && !e.quotaEpuise)
+    e.status === 401 ||
+    e.status === 404 ||
+    (e.status === 403 && !e.quotaExhausted)
   );
 }
 
 /** Le dépôt ne répond pas, sans rien dire de l'accès : réseau, limite, panne. */
-function estInjoignable(e: GithubError): boolean {
-  return e.statut === 0 || e.quotaEpuise || e.statut >= 500;
+function isUnreachable(e: GithubError): boolean {
+  return e.status === 0 || e.quotaExhausted || e.status >= 500;
 }

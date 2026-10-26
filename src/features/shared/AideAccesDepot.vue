@@ -2,35 +2,35 @@
 import { computed } from "vue";
 import { TokenService } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
-import LienExterne from "../../ui/LienExterne.vue";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiIcone from "../../ui/UiIcone.vue";
+import ExternalLink from "../../ui/LienExterne.vue";
+import UiButton from "../../ui/UiBouton.vue";
+import UiIcon from "../../ui/UiIcone.vue";
 
 /**
  * Comment donner à un jeton l'accès au dépôt qu'il n'ouvre pas.
  *
  * Montré là où l'échec se constate plutôt que dans l'aide à la création : celui qui le lit a déjà un jeton, et c'est ce jeton-là qu'il faut corriger. Le corriger sur la plateforme garde sa valeur — rien à ressaisir ici, sauf lorsque le dépôt appartient à un autre propriétaire que celui du jeton.
  */
-const props = defineProps<{ depot: { owner: string; repo: string } }>();
+const props = defineProps<{ repoRef: { owner: string; repo: string } }>();
 
 /** Demande d'ouvrir la saisie d'un jeton. */
-const emit = defineEmits<{ remplacer: [] }>();
+const emit = defineEmits<{ replace: [] }>();
 
 const tokens = inject(TokenService);
 
-const nomComplet = computed(() => `${props.depot.owner}/${props.depot.repo}`);
+const fullName = computed(() => `${props.repoRef.owner}/${props.repoRef.repo}`);
 
 /**
  * Un jeton classique n'a ni sélection de dépôts ni propriétaire : les étapes d'un jeton à portée fine n'y trouveraient rien à régler.
  */
-const classique = computed(() => tokens.valeur()?.startsWith("ghp_") ?? false);
+const classic = computed(() => tokens.value()?.startsWith("ghp_") ?? false);
 </script>
 
 <template>
   <section class="aide-acces-depot aide">
-    <h3>Donner au jeton l’accès à {{ nomComplet }}</h3>
+    <h3>Donner au jeton l’accès à {{ fullName }}</h3>
 
-    <template v-if="classique">
+    <template v-if="classic">
       <p class="intro">
         Le jeton enregistré est un jeton classique : il ouvre d’emblée tous les
         dépôts auxquels votre compte GitHub a accès.
@@ -38,17 +38,17 @@ const classique = computed(() => tokens.valeur()?.startsWith("ghp_") ?? false);
       <ol class="etapes">
         <li>
           Vérifier que votre compte GitHub voit bien
-          <strong>{{ nomComplet }}</strong> en l’ouvrant sur github.com. Sinon,
+          <strong>{{ fullName }}</strong> en l’ouvrant sur github.com. Sinon,
           demander l’accès à un administrateur de
-          <strong>{{ depot.owner }}</strong
+          <strong>{{ repoRef.owner }}</strong
           >.
         </li>
         <li>
-          Si <strong>{{ depot.owner }}</strong> impose une authentification
+          Si <strong>{{ repoRef.owner }}</strong> impose une authentification
           unique, ouvrir
-          <LienExterne href="https://github.com/settings/tokens"
+          <ExternalLink href="https://github.com/settings/tokens"
             >la page des jetons classiques
-            <UiIcone nom="open_in_new" /></LienExterne
+            <UiIcon name="open_in_new" /></ExternalLink
           >, puis <strong>Configure SSO</strong> en regard du jeton, et
           <strong>Authorize</strong> pour cette organisation.
         </li>
@@ -59,19 +59,20 @@ const classique = computed(() => tokens.valeur()?.startsWith("ghp_") ?? false);
       <ol class="etapes">
         <li>
           Ouvrir
-          <LienExterne href="https://github.com/settings/personal-access-tokens"
-            >la page des jetons d’accès <UiIcone nom="open_in_new"
-          /></LienExterne>
+          <ExternalLink
+            href="https://github.com/settings/personal-access-tokens"
+            >la page des jetons d’accès <UiIcon name="open_in_new"
+          /></ExternalLink>
           sur GitHub, et cliquer sur le jeton utilisé ici — « Skanon » s’il a
           été nommé comme le conseille l’aide à la création. S’il est marqué
           <strong>Expired</strong>, en créer un nouveau.
         </li>
         <li>
           Vérifier son <strong>Resource owner</strong> : ce doit être
-          <strong>{{ depot.owner }}</strong
+          <strong>{{ repoRef.owner }}</strong
           >. Un jeton ne couvre qu’un seul propriétaire, qui ne se change plus
           après la création. Si c’en est un autre, créer un nouveau jeton pour
-          <strong>{{ depot.owner }}</strong>
+          <strong>{{ repoRef.owner }}</strong>
           et le déclarer ici pour cette organisation : l’ancien reste valable
           pour ses propres dépôts.
         </li>
@@ -79,7 +80,7 @@ const classique = computed(() => tokens.valeur()?.startsWith("ghp_") ?? false);
           Cliquer sur <strong>Edit</strong>. Sous
           <strong>Repository access</strong>, si
           <strong>Only select repositories</strong> est coché, ajouter
-          <strong>{{ nomComplet }}</strong> à la liste. Ne pas basculer sur
+          <strong>{{ fullName }}</strong> à la liste. Ne pas basculer sur
           <strong>All repositories</strong> pour autant : le jeton ouvrirait
           tout le reste.
         </li>
@@ -98,20 +99,20 @@ const classique = computed(() => tokens.valeur()?.startsWith("ghp_") ?? false);
       </ol>
 
       <div class="note">
-        <UiIcone nom="schedule" />
+        <UiIcon name="schedule" />
         <p>
-          Si <strong>{{ depot.owner }}</strong> soumet les jetons à approbation,
-          la page des jetons l’indique par <strong>Pending</strong> en regard de
-          l’organisation. Le jeton n’ouvre rien avant qu’un de ses
-          administrateurs l’ait approuvé.
+          Si <strong>{{ repoRef.owner }}</strong> soumet les jetons à
+          approbation, la page des jetons l’indique par
+          <strong>Pending</strong> en regard de l’organisation. Le jeton n’ouvre
+          rien avant qu’un de ses administrateurs l’ait approuvé.
         </p>
       </div>
     </template>
 
-    <UiBouton @click="emit('remplacer')">
-      <UiIcone nom="key" />
+    <UiButton @click="emit('replace')">
+      <UiIcon name="key" />
       Enregistrer un autre jeton
-    </UiBouton>
+    </UiButton>
   </section>
 </template>
 

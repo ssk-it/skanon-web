@@ -8,8 +8,8 @@ import { marked } from "marked";
  *
  * Partagé avec le composant qui dessine les diagrammes : deux rendus pour un même contenu finiraient par différer, et un diagramme s'afficherait autrement selon le chemin emprunté.
  */
-export function rendreMarkdown(valeur: string): string {
-  const html = marked.parse(valeur, { async: false, gfm: true, breaks: false });
+export function renderMarkdownSync(value: string): string {
+  const html = marked.parse(value, { async: false, gfm: true, breaks: false });
   return DOMPurify.sanitize(html, {
     ADD_ATTR: ["target", "rel"],
     FORBID_TAGS: ["style", "form", "input"],
@@ -19,7 +19,7 @@ export function rendreMarkdown(valeur: string): string {
 /**
  * Ce qu'un gabarit affiche : rien pour un texte vide ou absent, le HTML assaini sinon. `<div class="md" v-html="renderMarkdown(r.enonce)" />` remplace `[innerHTML]="r.enonce | markdown"`.
  */
-export function renderMarkdown(valeur: string | null | undefined): string {
-  if (!valeur?.trim()) return "";
-  return rendreMarkdown(valeur);
+export function renderMarkdown(value: string | null | undefined): string {
+  if (!value?.trim()) return "";
+  return renderMarkdownSync(value);
 }

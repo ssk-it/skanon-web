@@ -19,7 +19,7 @@ const PALETTE = ".ui-dialog-panneau > .palette-recherche";
 
 const MAC = /Mac|iPhone|iPad/.test(navigator.platform);
 
-function raccourci(): KeyboardEvent {
+function shortcut(): KeyboardEvent {
   return new KeyboardEvent("keydown", {
     key: "k",
     metaKey: MAC,
@@ -30,7 +30,7 @@ function raccourci(): KeyboardEvent {
 }
 
 /** Laisse le temps à l'import différé de la palette d'aboutir. */
-async function attendreOuverture(): Promise<void> {
+async function waitForOpen(): Promise<void> {
   for (let i = 0; i < 20 && !document.querySelector(PALETTE); i++) {
     await new Promise((r) => setTimeout(r, 10));
   }
@@ -38,7 +38,7 @@ async function attendreOuverture(): Promise<void> {
 
 describe("Accès à la recherche", () => {
   let router: Router;
-  let vue: VueWrapper | null = null;
+  let view: VueWrapper | null = null;
 
   beforeEach(() => {
     provideHttpTesting();
@@ -53,35 +53,35 @@ describe("Accès à la recherche", () => {
 
   afterEach(() => {
     inject(DialogService).closeAll();
-    vue?.unmount();
-    vue = null;
+    view?.unmount();
+    view = null;
   });
 
-  async function monter(url: string): Promise<VueWrapper> {
+  async function mountView(url: string): Promise<VueWrapper> {
     await router.push(url);
     await router.isReady();
-    vue = mount(App, { global: { plugins: [router] } });
-    return vue;
+    view = mount(App, { global: { plugins: [router] } });
+    return view;
   }
 
   it("propose une icône de recherche dans un projet", async () => {
-    const f = await monter("/test/test/referentiel");
+    const f = await mountView("/test/test/referentiel");
 
     // La coquille a plusieurs racines : `find` les parcourt toutes.
-    const bouton = f.find<HTMLButtonElement>("button.recherche");
-    expect(bouton.exists()).toBe(true);
+    const button = f.find<HTMLButtonElement>("button.recherche");
+    expect(button.exists()).toBe(true);
 
-    bouton.element.click();
-    await attendreOuverture();
+    button.element.click();
+    await waitForOpen();
     expect(document.querySelector(PALETTE)).not.toBeNull();
   });
 
   it("s’ouvre au raccourci clavier", async () => {
-    await monter("/test/test/cadrages");
+    await mountView("/test/test/cadrages");
 
-    const e = raccourci();
+    const e = shortcut();
     document.dispatchEvent(e);
-    await attendreOuverture();
+    await waitForOpen();
 
     expect(document.querySelector(PALETTE)).not.toBeNull();
     // le navigateur ne doit pas en faire autre chose
@@ -89,30 +89,30 @@ describe("Accès à la recherche", () => {
   });
 
   it("ne s’ouvre qu’une fois, même au raccourci répété", async () => {
-    await monter("/test/test/cadrages");
+    await mountView("/test/test/cadrages");
 
-    document.dispatchEvent(raccourci());
-    document.dispatchEvent(raccourci());
-    await attendreOuverture();
+    document.dispatchEvent(shortcut());
+    document.dispatchEvent(shortcut());
+    await waitForOpen();
     await new Promise((r) => setTimeout(r, 30));
 
     expect(document.querySelectorAll(PALETTE).length).toBe(1);
   });
 
   it("n’est pas proposée hors d’un projet", async () => {
-    const f = await monter("/");
+    const f = await mountView("/");
 
     expect(f.find("button.recherche").exists()).toBe(false);
-    document.dispatchEvent(raccourci());
+    document.dispatchEvent(shortcut());
     await new Promise((r) => setTimeout(r, 50));
     expect(document.querySelector(PALETTE)).toBeNull();
   });
 
   it("prévient que la recherche porte sur aujourd’hui depuis la vue d’évolution", async () => {
-    await monter("/test/test/evolution");
+    await mountView("/test/test/evolution");
 
-    document.dispatchEvent(raccourci());
-    await attendreOuverture();
+    document.dispatchEvent(shortcut());
+    await waitForOpen();
 
     expect(document.querySelector(`${PALETTE} .etat-courant`)).not.toBeNull();
   });

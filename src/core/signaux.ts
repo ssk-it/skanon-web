@@ -19,22 +19,22 @@ export interface Signal<T> {
 }
 
 export interface WritableSignal<T> extends Signal<T> {
-  set(valeur: T): void;
-  update(fn: (valeur: T) => T): void;
+  set(value: T): void;
+  update(fn: (value: T) => T): void;
   asReadonly(): Signal<T>;
 }
 
-export function signal<T>(initiale: T): WritableSignal<T> {
-  const ref = shallowRef(initiale);
-  const lire = (() => ref.value) as WritableSignal<T>;
-  lire.set = (valeur) => {
-    ref.value = valeur;
+export function signal<T>(initialValue: T): WritableSignal<T> {
+  const ref = shallowRef(initialValue);
+  const read = (() => ref.value) as WritableSignal<T>;
+  read.set = (value) => {
+    ref.value = value;
   };
-  lire.update = (fn) => {
+  read.update = (fn) => {
     ref.value = fn(ref.value);
   };
-  lire.asReadonly = () => () => ref.value;
-  return lire;
+  read.asReadonly = () => () => ref.value;
+  return read;
 }
 
 export function computed<T>(fn: () => T): Signal<T> {
@@ -62,9 +62,9 @@ export interface EffectRef {
  * Créé dans le `setup` d'un composant, l'effet s'arrête avec lui ; ailleurs, il vit jusqu'à `destroy`.
  */
 export function effect(fn: () => void): EffectRef {
-  const portee = effectScope();
-  portee.run(() => vueEffect(fn));
-  return { destroy: () => portee.stop() };
+  const scope = effectScope();
+  scope.run(() => vueEffect(fn));
+  return { destroy: () => scope.stop() };
 }
 
 /**
@@ -75,7 +75,7 @@ export function linkedSignal<S, T = S>(
     | (() => T)
     | {
         source: () => S;
-        computation: (source: S, precedent?: { source: S; value: T }) => T;
+        computation: (source: S, previous?: { source: S; value: T }) => T;
       },
 ): WritableSignal<T> {
   const { source, computation } =
@@ -85,26 +85,26 @@ export function linkedSignal<S, T = S>(
           computation: (s: S) => s as unknown as T,
         }
       : options;
-  let precedent: { source: S; value: T } | undefined;
+  let previous: { source: S; value: T } | undefined;
   // Chaque recalcul rend un objet neuf : une valeur posée à la main ne vaut que pour l'objet qu'elle a vu, et tombe d'elle-même quand la source change.
-  const derive = vueComputed(() => {
+  const derived = vueComputed(() => {
     const s = source();
-    const value = untracked(() => computation(s, precedent));
-    precedent = { source: s, value };
+    const value = untracked(() => computation(s, previous));
+    previous = { source: s, value };
     return { source: s, value };
   });
-  const local = shallowRef<{ pour: object; valeur: T } | null>(null);
-  const lire = (() => {
-    const d = derive.value;
+  const local = shallowRef<{ basis: object; value: T } | null>(null);
+  const read = (() => {
+    const d = derived.value;
     const l = local.value;
-    return l && l.pour === d ? l.valeur : d.value;
+    return l && l.basis === d ? l.value : d.value;
   }) as WritableSignal<T>;
-  lire.set = (valeur) => {
-    const d = derive.value;
-    local.value = { pour: d, valeur };
-    precedent = { source: d.source, value: valeur };
+  read.set = (value) => {
+    const d = derived.value;
+    local.value = { basis: d, value };
+    previous = { source: d.source, value: value };
   };
-  lire.update = (fn) => lire.set(fn(lire()));
-  lire.asReadonly = () => () => lire();
-  return lire;
+  read.update = (fn) => read.set(fn(read()));
+  read.asReadonly = () => () => read();
+  return read;
 }

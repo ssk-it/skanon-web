@@ -2,16 +2,16 @@
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { inject } from "../../core/injection";
-import { LiensService } from "../../core/repo/liens.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
-import UiIcone from "../../ui/UiIcone.vue";
-import EtatVue from "../shared/EtatVue.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
+import { LinksService } from "../../core/repo/liens.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
+import UiIcon from "../../ui/UiIcone.vue";
+import ViewState from "../shared/EtatVue.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
 
-const LIBELLE_NATURE: Record<string, string> = {
-  composant: "Composant",
-  flux: "Flux",
-  contexte: "Contexte",
+const KIND_LABEL: Record<string, string> = {
+  component: "Composant",
+  flows: "Flux",
+  context: "Contexte",
 };
 
 /**
@@ -20,64 +20,64 @@ const LIBELLE_NATURE: Record<string, string> = {
  * Les deux relations présentées ici se calculent : un flux dit les composants qu'il relie, un composant apprend quels flux le touchent sans qu'aucune liste ne soit tenue sur lui. C'est la propriété qui distingue ces documents d'un wiki, où la même information aurait à être maintenue des deux côtés.
  */
 const route = useRoute();
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
 
 const id = computed(() => String(route.params["id"]));
-const document = computed(() => store.findDocumentArchitecture(id.value));
-const fluxTouchants = computed(() => store.listFluxByComposant(id.value));
-const cadrages = computed(() =>
-  store.listCadragesImpactantCible(id.value, "architecture"),
+const document = computed(() => store.findArchitectureDocument(id.value));
+const touchingFlows = computed(() => store.listFlowsByComponent(id.value));
+const scopings = computed(() =>
+  store.listScopingsImpactingTarget(id.value, "architecture"),
 );
 
-function libelle(nature: string): string {
-  return LIBELLE_NATURE[nature] ?? nature;
+function label(kind: string): string {
+  return KIND_LABEL[kind] ?? kind;
 }
 </script>
 
 <template>
   <div class="page-document-architecture">
-    <EtatVue v-if="store.etat() !== 'pret'" />
+    <ViewState v-if="store.state() !== 'pret'" />
     <template v-else-if="document">
-      <RouterLink class="retour" :to="liens.chemin('architecture')">
-        <UiIcone nom="arrow_back" /> Architecture
+      <RouterLink class="retour" :to="links.path('architecture')">
+        <UiIcon name="arrow_back" /> Architecture
       </RouterLink>
 
       <header class="entete">
-        <p class="type">{{ libelle(document.nature) }}</p>
+        <p class="type">{{ label(document.kind) }}</p>
         <h1>{{ document.id }}</h1>
-        <p v-if="document.statut === 'abroge'" class="abroge">
+        <p v-if="document.status === 'abroge'" class="abroge">
           Ce document ne s’applique plus.
         </p>
       </header>
 
-      <MarkdownRendu class="md" :texte="document.enonce" />
+      <RenderedMarkdown class="md" :text="document.statement" />
 
-      <template v-if="document.composants.length">
+      <template v-if="document.components.length">
         <h2 class="section">Composants reliés</h2>
         <div class="liste">
           <RouterLink
-            v-for="c in document.composants"
+            v-for="c in document.components"
             :key="c"
             class="ligne"
-            :to="liens.chemin('architecture', 'document', c)"
+            :to="links.path('architecture', 'document', c)"
           >
             <span class="nom">{{ c }}</span>
-            <span v-if="!store.findDocumentArchitecture(c)" class="compte"
+            <span v-if="!store.findArchitectureDocument(c)" class="compte"
               >non décrit</span
             >
           </RouterLink>
         </div>
       </template>
 
-      <template v-if="fluxTouchants.length">
+      <template v-if="touchingFlows.length">
         <h2 class="section">Flux qui le touchent</h2>
         <div class="liste">
           <RouterLink
-            v-for="f in fluxTouchants"
+            v-for="f in touchingFlows"
             :key="f.id"
             class="ligne"
-            :to="liens.chemin('architecture', 'document', f.id)"
+            :to="links.path('architecture', 'document', f.id)"
           >
             <span class="nom">{{ f.id }}</span>
           </RouterLink>
@@ -87,15 +87,15 @@ function libelle(nature: string): string {
       <h2 class="section">Cadrages</h2>
       <div class="liste">
         <RouterLink
-          v-for="c in cadrages"
-          :key="c.cadrage.id"
+          v-for="c in scopings"
+          :key="c.scoping.id"
           class="ligne"
-          :to="liens.chemin('cadrages', c.cadrage.id)"
+          :to="links.path('cadrages', c.scoping.id)"
         >
-          <span class="nom">{{ c.cadrage.id }}</span>
+          <span class="nom">{{ c.scoping.id }}</span>
           <span class="compte">{{ c.operation }}</span>
         </RouterLink>
-        <p v-if="!cadrages.length" class="vide">
+        <p v-if="!scopings.length" class="vide">
           Aucun cadrage ne le déclare — voir la vérification d’intégrité.
         </p>
       </div>

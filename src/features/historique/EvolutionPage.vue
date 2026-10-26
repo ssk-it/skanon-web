@@ -5,17 +5,17 @@ import { GithubClient, GithubError } from "../../core/github/github-client";
 import { TokenService } from "../../core/github/token.service";
 import { inject } from "../../core/injection";
 import {
-  ComparaisonService,
-  type Comparaison,
+  ComparisonService,
+  type Comparison,
   type Evolution,
 } from "../../core/repo/comparaison.service";
-import { LiensService } from "../../core/repo/liens.service";
-import { ReferentielStore } from "../../core/repo/referentiel.store";
+import { LinksService } from "../../core/repo/liens.service";
+import { SpecificationStore } from "../../core/repo/referentiel.store";
 import { DialogService } from "../../ui/dialog.service";
-import UiBouton from "../../ui/UiBouton.vue";
-import UiIcone from "../../ui/UiIcone.vue";
-import MarkdownRendu from "../shared/MarkdownRendu.vue";
-import { DerniereVisite, debutPeriode, type Periode } from "./periodes";
+import UiButton from "../../ui/UiBouton.vue";
+import UiIcon from "../../ui/UiIcone.vue";
+import RenderedMarkdown from "../shared/MarkdownRendu.vue";
+import { LastVisit, periodStart, type Period } from "./periodes";
 
 /**
  * Ce qui a changé dans le référentiel entre deux dates.
@@ -23,7 +23,7 @@ import { DerniereVisite, debutPeriode, type Periode } from "./periodes";
  * La question posée n'est pas « qu'existe-t-il ? » — le référentiel y répond — mais « qu'a-t-on décidé depuis la dernière fois ? ». C'est celle d'un client qui revient après un trimestre, et à laquelle ni Git ni un wiki ne répondent sans une archéologie manuelle.
  */
 
-const LIBELLE: Record<Evolution, string> = {
+const LABEL: Record<Evolution, string> = {
   ajoutee: "ajoutée",
   modifiee: "modifiée",
   abrogee: "abrogée",
@@ -35,105 +35,105 @@ const LIBELLE: Record<Evolution, string> = {
  *
  * Un dépôt jeune, ou une semaine où plusieurs cadrages sont livrés, tient entièrement dans une journée : une granularité au jour n'y montrerait rien. Le format attendu par le champ est `AAAA-MM-JJThh:mm`, en heure locale.
  */
-function instantLocal(d: Date): string {
-  const decalage = d.getTimezoneOffset() * 60_000;
-  return new Date(d.getTime() - decalage).toISOString().slice(0, 16);
+function localInstant(d: Date): string {
+  const offset = d.getTimezoneOffset() * 60_000;
+  return new Date(d.getTime() - offset).toISOString().slice(0, 16);
 }
 
 /**
  * Les formats `d MMMM y, HH:mm` et `d MMM, HH:mm` du pipe `date` d'Angular, en locale fr. `Intl` seul écrirait « 6 octobre 2026 à 12:00 » : les parties se réassemblent donc au format de SSK Canon.
  */
 function formatDate(
-  valeur: string | Date | null,
-  mois: "long" | "short",
-  annee: boolean,
+  value: string | Date | null,
+  month: "long" | "short",
+  year: boolean,
 ): string {
   // Comme le pipe `date`, une date absente ne s'écrit pas.
-  if (valeur === null) return "";
-  const parties = new Intl.DateTimeFormat("fr-FR", {
+  if (value === null) return "";
+  const parts = new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
-    month: mois,
-    year: annee ? "numeric" : undefined,
+    month: month,
+    year: year ? "numeric" : undefined,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  }).formatToParts(new Date(valeur));
-  const partie = (type: Intl.DateTimeFormatPartTypes) =>
-    parties.find((p) => p.type === type)?.value ?? "";
-  const jour = `${partie("day")} ${partie("month")}${annee ? ` ${partie("year")}` : ""}`;
-  return `${jour}, ${partie("hour")}:${partie("minute")}`;
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  const day = `${part("day")} ${part("month")}${year ? ` ${part("year")}` : ""}`;
+  return `${day}, ${part("hour")}:${part("minute")}`;
 }
-const dateLongue = (v: string | Date | null) => formatDate(v, "long", true);
-const dateCourte = (v: string | Date | null) => formatDate(v, "short", false);
+const longDate = (v: string | Date | null) => formatDate(v, "long", true);
+const shortDate = (v: string | Date | null) => formatDate(v, "short", false);
 
 /** Les périodes proposées d'un geste, dans l'ordre où elles s'affichent. */
-const PERIODES: ReadonlyArray<{
-  readonly periode: Periode;
-  readonly libelle: string;
+const PERIODS: ReadonlyArray<{
+  readonly period: Period;
+  readonly label: string;
 }> = [
-  { periode: "7-jours", libelle: "7 jours" },
-  { periode: "visite", libelle: "Depuis ma dernière visite" },
-  { periode: "30-jours", libelle: "30 jours" },
-  { periode: "3-mois", libelle: "3 mois" },
-  { periode: "libre", libelle: "Choisir les dates…" },
+  { period: "7-jours", label: "7 jours" },
+  { period: "visite", label: "Depuis ma dernière visite" },
+  { period: "30-jours", label: "30 jours" },
+  { period: "3-mois", label: "3 mois" },
+  { period: "libre", label: "Choisir les dates…" },
 ];
 
-const store = inject(ReferentielStore);
-const liens = inject(LiensService);
-const comparaison = inject(ComparaisonService);
+const store = inject(SpecificationStore);
+const links = inject(LinksService);
+const comparison = inject(ComparisonService);
 const github = inject(GithubClient);
 const tokens = inject(TokenService);
 const dialog = inject(DialogService);
 
-const aujourdhui = instantLocal(new Date());
+const today = localInstant(new Date());
 
 /** La visite précédente sur ce projet, lue une fois pour la session. */
-const visite = inject(DerniereVisite).consulter(store.depot());
+const visit = inject(LastVisit).visit(store.repoRef());
 
 /** Depuis la dernière visite, ou trente jours à défaut — 2026-044, décision 04. */
-const periode = ref<Periode>(visite ? "visite" : "30-jours");
+const period = ref<Period>(visit ? "visite" : "30-jours");
 
 /** La dernière visite n'est proposée que si elle est connue. */
-const periodes = computed(() =>
-  PERIODES.filter((p) => p.periode !== "visite" || visite),
+const periods = computed(() =>
+  PERIODS.filter((p) => p.period !== "visite" || visit),
 );
 
-const depart = ref(
-  instantLocal(debutPeriode(periode.value, new Date(), visite) ?? new Date()),
+const departure = ref(
+  localInstant(periodStart(period.value, new Date(), visit) ?? new Date()),
 );
-const arrivee = ref(aujourdhui);
+const arrival = ref(today);
 
 /**
  * Premier enregistrement du dépôt, borne basse de toute consultation datée.
  *
  * Chargée à l'ouverture : sans elle, le lecteur découvre qu'une date est trop ancienne après avoir lancé une comparaison, alors que le champ pouvait le lui dire d'emblée. Reste `null` si l'appel échoue — la saisie est alors seulement moins guidée.
  */
-const borneMin = ref<string | null>(null);
+const lowerBound = ref<string | null>(null);
 
-const chargement = ref(false);
-const erreur = ref<string | null>(null);
-const resultat = ref<Comparaison | null>(null);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const result = ref<Comparison | null>(null);
 
-void demarrer();
+void start();
 
 /**
  * La borne basse d'abord : un dépôt plus jeune que la période retenue la relève, et comparer avant ferait échouer la première réponse de la vue.
  */
-async function demarrer(): Promise<void> {
-  await loadBorneMin();
-  await lancer();
+async function start(): Promise<void> {
+  await loadLowerBound();
+  await launch();
 }
 
 /** Une période toute faite compare aussitôt ; les dates libres attendent. */
-function choisir(p: Periode): void {
-  periode.value = p;
-  const debut = debutPeriode(p, new Date(), visite);
-  if (!debut) return;
-  const min = borneMin.value;
-  const d = instantLocal(debut);
-  depart.value = min && d < min ? min : d;
-  arrivee.value = instantLocal(new Date());
-  void lancer();
+function choose(p: Period): void {
+  period.value = p;
+  const begin = periodStart(p, new Date(), visit);
+  if (!begin) return;
+  const min = lowerBound.value;
+  const d = localInstant(begin);
+  departure.value = min && d < min ? min : d;
+  arrival.value = localInstant(new Date());
+  void launch();
 }
 
 /** Le même dialogue que la barre : la connexion lève la limite anonyme. */
@@ -143,75 +143,75 @@ function openTokenDialog(): void {
       const change = await dialog.open<boolean>(TokenDialog, {
         focus: "dialogue",
       });
-      if (change) void lancer();
+      if (change) void launch();
     },
   );
 }
 
-async function loadBorneMin(): Promise<void> {
-  const date = await github.dateDuPremierCommit(store.depot());
+async function loadLowerBound(): Promise<void> {
+  const date = await github.firstCommitDate(store.repoRef());
   if (!date) return;
 
   // Le champ ne descend pas sous la minute : tronquer la date du premier enregistrement placerait la borne juste avant lui, et la comparaison à cette borne ne trouverait rien. On arrondit donc à la minute supérieure.
-  const premier = new Date(date);
-  if (premier.getSeconds() || premier.getMilliseconds()) {
-    premier.setSeconds(60, 0);
+  const first = new Date(date);
+  if (first.getSeconds() || first.getMilliseconds()) {
+    first.setSeconds(60, 0);
   }
-  const min = instantLocal(premier);
-  borneMin.value = min;
+  const min = localInstant(first);
+  lowerBound.value = min;
   // Un dépôt plus jeune que le recul par défaut rendrait la borne de départ antérieure à son premier enregistrement, donc invalide dès l'ouverture.
-  if (depart.value < min) depart.value = min;
+  if (departure.value < min) departure.value = min;
 }
 
-const libelle = (e: Evolution) => LIBELLE[e];
+const label = (e: Evolution) => LABEL[e];
 
 /**
  * Écarts regroupés par nature, dans l'ordre de leur portée.
  *
  * À plat, les quelques règles modifiées — ce qu'on vient chercher — se perdent entre des dizaines d'ajouts. L'ordre place d'abord ce qui retire ou change du comportement existant, et laisse les ajouts en fin : une règle nouvelle ne contredit rien de ce que le lecteur croyait savoir.
  */
-const groupes = computed(() => {
-  const c = resultat.value;
+const groups = computed(() => {
+  const c = result.value;
   if (!c) return [];
-  const ordre: Evolution[] = ["abrogee", "retiree", "modifiee", "ajoutee"];
-  return ordre
+  const order: Evolution[] = ["abrogee", "retiree", "modifiee", "ajoutee"];
+  return order
     .map((evolution) => ({
       evolution,
-      regles: c.regles.filter((r) => r.evolution === evolution),
+      rules: c.rules.filter((r) => r.evolution === evolution),
     }))
-    .filter((g) => g.regles.length > 0);
+    .filter((g) => g.rules.length > 0);
 });
 
 /** Titre d'un cadrage tel qu'il était à la borne d'arrivée. */
-function titreCadrage(c: Comparaison, id: string): string {
-  return c.arrivee.referentiel.cadrages.get(id)?.titre ?? "";
+function scopingTitle(c: Comparison, id: string): string {
+  return c.arrival.specification.scopings.get(id)?.title ?? "";
 }
 
-const bornesValides = computed(() => depart.value < arrivee.value);
+const validBounds = computed(() => departure.value < arrival.value);
 
-async function lancer(): Promise<void> {
-  if (chargement.value) return;
-  if (!bornesValides.value) {
-    erreur.value = "La date de départ doit précéder celle d’arrivée.";
+async function launch(): Promise<void> {
+  if (loading.value) return;
+  if (!validBounds.value) {
+    error.value = "La date de départ doit précéder celle d’arrivée.";
     return;
   }
 
-  chargement.value = true;
-  erreur.value = null;
+  loading.value = true;
+  error.value = null;
   try {
-    resultat.value = await comparaison.comparer(
-      store.depot(),
-      new Date(depart.value),
-      new Date(arrivee.value),
+    result.value = await comparison.compare(
+      store.repoRef(),
+      new Date(departure.value),
+      new Date(arrival.value),
     );
   } catch (e) {
-    resultat.value = null;
-    erreur.value =
+    result.value = null;
+    error.value =
       e instanceof GithubError || e instanceof Error
         ? e.message
         : "La comparaison a échoué.";
   } finally {
-    chargement.value = false;
+    loading.value = false;
   }
 }
 </script>
@@ -229,58 +229,58 @@ async function lancer(): Promise<void> {
     <!-- RG-periode-par-defaut : la question qu'on pose ici est presque toujours la même, et la vue y répond dès l'ouverture. Les dates libres restent, sur demande. -->
     <div class="periodes" role="group" aria-label="Période">
       <button
-        v-for="p of periodes"
-        :key="p.periode"
+        v-for="p of periods"
+        :key="p.period"
         type="button"
-        :aria-pressed="periode === p.periode"
-        @click="choisir(p.periode)"
+        :aria-pressed="period === p.period"
+        @click="choose(p.period)"
       >
-        {{ p.libelle }}
+        {{ p.label }}
       </button>
     </div>
 
-    <p v-if="periode === 'visite' && visite" class="periode-retenue">
-      Depuis votre dernière visite, le {{ dateLongue(visite) }}.
+    <p v-if="period === 'visite' && visit" class="periode-retenue">
+      Depuis votre dernière visite, le {{ longDate(visit) }}.
     </p>
-    <p v-else-if="periode === '30-jours' && !visite" class="periode-retenue">
+    <p v-else-if="period === '30-jours' && !visit" class="periode-retenue">
       Les 30 derniers jours : aucune visite précédente n’est connue sur ce
       poste.
     </p>
 
-    <form v-if="periode === 'libre'" class="bornes" @submit.prevent="lancer()">
+    <form v-if="period === 'libre'" class="bornes" @submit.prevent="launch()">
       <label>
         <span>Du</span>
         <input
-          v-model="depart"
+          v-model="departure"
           type="datetime-local"
           name="depart"
-          :min="borneMin ?? undefined"
-          :max="arrivee"
+          :min="lowerBound ?? undefined"
+          :max="arrival"
         />
       </label>
       <label>
         <span>au</span>
         <input
-          v-model="arrivee"
+          v-model="arrival"
           type="datetime-local"
           name="arrivee"
-          :min="borneMin ?? undefined"
-          :max="aujourdhui"
+          :min="lowerBound ?? undefined"
+          :max="today"
         />
       </label>
-      <UiBouton variante="filled" type="submit" :disabled="chargement">
-        {{ chargement ? "Chargement…" : "Comparer" }}
-      </UiBouton>
+      <UiButton variant="filled" type="submit" :disabled="loading">
+        {{ loading ? "Chargement…" : "Comparer" }}
+      </UiButton>
     </form>
 
-    <p v-if="chargement && periode !== 'libre'" class="periode-retenue">
+    <p v-if="loading && period !== 'libre'" class="periode-retenue">
       Comparaison en cours…
     </p>
 
-    <p v-if="erreur" class="erreur">
-      <UiIcone nom="error_outline" />
+    <p v-if="error" class="erreur">
+      <UiIcon name="error_outline" />
       <span>
-        {{ erreur }}
+        {{ error }}
         <!-- Sans jeton, l'échec le plus probable est le quota anonyme : la connexion le lève. -->
         <button
           v-if="!tokens.present()"
@@ -293,82 +293,81 @@ async function lancer(): Promise<void> {
       </span>
     </p>
 
-    <template v-if="resultat">
+    <template v-if="result">
       <section class="bornes-resolues">
         <p>
           Comparaison entre l’état du
-          <strong>{{ dateLongue(resultat.depart.commit.date) }}</strong> et
-          celui du
-          <strong>{{ dateLongue(resultat.arrivee.commit.date) }}</strong
+          <strong>{{ longDate(result.departure.commit.date) }}</strong> et celui
+          du <strong>{{ longDate(result.arrival.commit.date) }}</strong
           >.
         </p>
         <p class="detail">
           <!-- La date affichée est celle du dernier enregistrement antérieur à la borne demandée, et non la borne elle-même : c'est l'état qui a réellement existé. -->
           Derniers enregistrements avant les bornes demandées :
-          <code>{{ resultat.depart.commit.sha.slice(0, 7) }}</code> et
-          <code>{{ resultat.arrivee.commit.sha.slice(0, 7) }}</code
+          <code>{{ result.departure.commit.sha.slice(0, 7) }}</code> et
+          <code>{{ result.arrival.commit.sha.slice(0, 7) }}</code
           >.
         </p>
       </section>
 
-      <section v-if="resultat.cadragesLivres.length" class="bloc">
+      <section v-if="result.deliveredScopings.length" class="bloc">
         <h2 class="section">Cadrages livrés dans l’intervalle</h2>
         <div class="cadrages">
           <RouterLink
-            v-for="id of resultat.cadragesLivres"
+            v-for="id of result.deliveredScopings"
             :key="id"
             class="cadrage"
-            :to="liens.chemin('cadrages', id)"
+            :to="links.path('cadrages', id)"
           >
             <span class="cid">{{ id }}</span>
-            <span class="titre">{{ titreCadrage(resultat, id) }}</span>
+            <span class="titre">{{ scopingTitle(result, id) }}</span>
           </RouterLink>
         </div>
       </section>
 
       <section class="bloc">
-        <h2 class="section">Règles ({{ resultat.regles.length }})</h2>
+        <h2 class="section">Règles ({{ result.rules.length }})</h2>
 
-        <template v-if="resultat.regles.length">
-          <template v-for="groupe of groupes" :key="groupe.evolution">
+        <template v-if="result.rules.length">
+          <template v-for="groupe of groups" :key="groupe.evolution">
             <h3 class="groupe">
               <span class="marque" :class="groupe.evolution">{{
-                libelle(groupe.evolution)
+                label(groupe.evolution)
               }}</span>
-              <span class="nb">{{ groupe.regles.length }}</span>
+              <span class="nb">{{ groupe.rules.length }}</span>
             </h3>
             <ol class="ecarts">
-              <li v-for="e of groupe.regles" :key="e.id">
+              <li v-for="e of groupe.rules" :key="e.id">
                 <div class="tete">
                   <RouterLink
                     class="rid"
-                    :to="liens.chemin('referentiel', 'regle', e.id)"
+                    :to="links.path('referentiel', 'regle', e.id)"
                     >{{ e.id }}</RouterLink
                   >
                 </div>
 
                 <details
-                  v-if="e.evolution === 'modifiee' && e.avant && e.apres"
+                  v-if="e.evolution === 'modifiee' && e.before && e.after"
                 >
                   <summary>Comparer les deux énoncés</summary>
                   <div class="cote-a-cote">
                     <div class="version">
                       <p class="quand">
-                        Au {{ dateCourte(resultat.depart.commit.date) }}
+                        Au {{ shortDate(result.departure.commit.date) }}
                       </p>
-                      <MarkdownRendu class="md" :texte="e.avant.enonce" />
+                      <RenderedMarkdown class="md" :text="e.before.statement" />
                     </div>
                     <div class="version">
                       <p class="quand">
-                        Au {{ dateCourte(resultat.arrivee.commit.date) }}
+                        Au {{ shortDate(result.arrival.commit.date) }}
                       </p>
-                      <MarkdownRendu class="md" :texte="e.apres.enonce" />
+                      <RenderedMarkdown class="md" :text="e.after.statement" />
                     </div>
                   </div>
                 </details>
-                <details v-else-if="e.apres">
+                <details v-else-if="e.after">
                   <summary>Voir l’énoncé</summary>
-                  <MarkdownRendu class="md" :texte="e.apres.enonce" />
+                  <RenderedMarkdown class="md" :text="e.after.statement" />
                 </details>
               </li>
             </ol>

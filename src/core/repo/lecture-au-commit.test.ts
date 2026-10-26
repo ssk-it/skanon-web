@@ -24,16 +24,16 @@ describe("lecture des contenus au commit", () => {
 
   it("demande le fichier au commit résolu, non au nom de la branche", async () => {
     const loader = inject(RepoLoader);
-    const attendu = loader.loadReferentiel({
+    const expected = loader.loadSpecification({
       owner: "org",
       repo: "projet",
       ref: "cadrage-2026-006",
     });
 
-    const arbre = httpMock.expectOne(
+    const tree = httpMock.expectOne(
       "https://api.github.com/repos/org/projet/git/trees/cadrage-2026-006?recursive=1",
     );
-    arbre.flush({
+    tree.flush({
       sha: "c0mm17",
       truncated: false,
       tree: [{ path: "rules/RG-exemple.md", sha: "b10b", type: "blob" }],
@@ -43,13 +43,13 @@ describe("lecture des contenus au commit", () => {
     // laisser tourner la file d'attente avant de réclamer la requête suivante.
     await new Promise((r) => setTimeout(r, 0));
 
-    const contenu = httpMock.expectOne(
+    const content = httpMock.expectOne(
       "https://raw.githubusercontent.com/org/projet/c0mm17/rules/RG-exemple.md",
     );
-    contenu.flush("---\nid: RG-exemple\nstatut: actif\n---\n\nUn énoncé.\n");
+    content.flush("---\nid: RG-exemple\nstatut: actif\n---\n\nUn énoncé.\n");
 
-    const referentiel = await attendu;
-    expect(referentiel.regles.get("RG-exemple")).toBeTruthy();
+    const specification = await expected;
+    expect(specification.rules.get("RG-exemple")).toBeTruthy();
     httpMock.verify();
   });
 });

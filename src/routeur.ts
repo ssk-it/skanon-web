@@ -6,18 +6,18 @@ import {
   type Router,
   type RouterHistory,
 } from "vue-router";
-import { depotGuard } from "./core/repo/depot.guard";
-import { lienCanonRoute } from "./core/repo/lien-canon";
+import { repoGuard } from "./core/repo/depot.guard";
+import { deepLinkRoute } from "./core/repo/lien-canon";
 import { APPLICATION } from "./core/repo/titre.strategy";
 
 function page(
   path: string,
-  intitule: string,
+  heading: string,
   component:
     | RouteComponent
     | (() => Promise<RouteComponent | { default: RouteComponent }>),
 ): RouteRecordRaw {
-  return { path, component, meta: { title: `${intitule} — ${APPLICATION}` } };
+  return { path, component, meta: { title: `${heading} — ${APPLICATION}` } };
 }
 
 /**
@@ -30,7 +30,7 @@ export const routes: RouteRecordRaw[] = [
     () => import("./features/accueil/AccueilPage.vue"),
   ),
   // L'adresse de réception des liens d'ouverture (RG-ouverture-par-protocole). Un seul segment : elle ne peut pas être prise pour un projet.
-  lienCanonRoute,
+  deepLinkRoute,
   // Le fonctionnement de l'application, hors de tout projet comme l'accueil (RG-aide-a-portee). Un seul segment, comme ci-dessus.
   page("/aide", "Fonctionnement", () => import("./features/aide/AidePage.vue")),
   // L'éditeur, hors de tout projet comme l'aide, et atteint depuis la barre du bas.
@@ -41,7 +41,7 @@ export const routes: RouteRecordRaw[] = [
   ),
   {
     path: "/:owner/:repo",
-    beforeEnter: depotGuard,
+    beforeEnter: repoGuard,
     children: [
       {
         path: "",
@@ -124,7 +124,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/:autre(.*)*", redirect: "/" },
 ];
 
-export function createRouteur(
+export function createAppRouter(
   history: RouterHistory = createWebHistory(),
 ): Router {
   return createRouter({

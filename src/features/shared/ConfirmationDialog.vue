@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import UiBouton from "../../ui/UiBouton.vue";
-import UiDialogue from "../../ui/UiDialogue.vue";
+import UiButton from "../../ui/UiBouton.vue";
+import UiDialog from "../../ui/UiDialogue.vue";
 
 /** Ce que l'écran demande, et sous quel libellé il l'engage. */
-export interface DemandeConfirmation {
-  readonly titre: string;
+export interface ConfirmationRequest {
+  readonly title: string;
   readonly message: string;
   /** Le libellé du bouton qui engage — un verbe, pas « OK ». */
   readonly action: string;
@@ -22,23 +22,23 @@ export interface DemandeConfirmation {
  * });
  * ```
  */
-defineProps<{ data: DemandeConfirmation }>();
+defineProps<{ data: ConfirmationRequest }>();
 
-const emit = defineEmits<{ fermer: [confirme?: boolean] }>();
+const emit = defineEmits<{ close: [confirme?: boolean] }>();
 </script>
 
 <template>
-  <UiDialogue class="confirmation-dialog" :titre="data.titre">
+  <UiDialog class="confirmation-dialog" :title="data.title">
     <p class="message">{{ data.message }}</p>
     <template #actions>
-      <UiBouton data-focus-initial @click="emit('fermer', false)"
-        >Annuler</UiBouton
+      <UiButton data-focus-initial @click="emit('close', false)"
+        >Annuler</UiButton
       >
-      <UiBouton variante="filled" @click="emit('fermer', true)">{{
+      <UiButton variant="filled" @click="emit('close', true)">{{
         data.action
-      }}</UiBouton>
+      }}</UiButton>
     </template>
-  </UiDialogue>
+  </UiDialog>
 </template>
 
 <style scoped>

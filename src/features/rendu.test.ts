@@ -8,20 +8,20 @@ import {
   type HttpTestingController,
 } from "../core/http/http-testing";
 import { inject } from "../core/injection";
-import { ReferentielStore } from "../core/repo/referentiel.store";
-import { createRouteur } from "../routeur";
-import CadragePage from "./cadrages/CadragePage.vue";
-import CadragesPage from "./cadrages/CadragesPage.vue";
-import DomainePage from "./referentiel/DomainePage.vue";
-import ReferentielPage from "./referentiel/ReferentielPage.vue";
-import ReglePage from "./referentiel/ReglePage.vue";
+import { SpecificationStore } from "../core/repo/referentiel.store";
+import { createAppRouter } from "../routeur";
+import ScopingPage from "./cadrages/CadragePage.vue";
+import ScopingsPage from "./cadrages/CadragesPage.vue";
+import DomainPage from "./referentiel/DomainePage.vue";
+import SpecificationPage from "./referentiel/ReferentielPage.vue";
+import RulePage from "./referentiel/ReglePage.vue";
 
 /**
  * Monte les écrans avec un référentiel réaliste et inspecte le DOM produit.
  *
  * Ce qui est vérifié ici est ce qu'un coup d'œil au navigateur montrerait : que les données arrivent à l'écran, et que les deux cas subtils du modèle — la divergence d'énoncé et l'abrogation — sont visibles et expliqués.
  */
-const ARBRE = {
+const TREE = {
   sha: "racine",
   truncated: false,
   tree: [
@@ -33,7 +33,7 @@ const ARBRE = {
   ],
 };
 
-const FICHIERS: Record<string, string> = {
+const FILES: Record<string, string> = {
   "domains/facturation.md": `---
 id: facturation
 nom: Facturation
@@ -108,38 +108,38 @@ Une facture fait l'objet de **trois** relances au maximum.
 
 let http: HttpTestingController;
 
-async function chargerReferentiel(): Promise<void> {
-  const store = inject(ReferentielStore);
-  const p = store.loadReferentiel({ owner: "test", repo: "test" });
+async function loadTestSpecification(): Promise<void> {
+  const store = inject(SpecificationStore);
+  const p = store.loadSpecification({ owner: "test", repo: "test" });
   await settle();
 
-  http.expectOne((r) => r.url.includes("/git/trees/")).flush(ARBRE);
+  http.expectOne((r) => r.url.includes("/git/trees/")).flush(TREE);
 
   // Les requêtes de contenu partent après résolution de l'arborescence, à travers plusieurs micro-tâches et une file à concurrence bornée : on répond à ce qui est en vol jusqu'à épuisement plutôt que de supposer un timing.
-  const restants = new Set(Object.keys(FICHIERS));
+  const remaining = new Set(Object.keys(FILES));
   // Un tour de la boucle d'événements à chaque fois, non une micro-tâche : sous la charge de toute la suite, une étape de la lecture peut attendre plus que les micro-tâches d'un tour.
-  for (let tour = 0; tour < 50 && restants.size; tour++) {
+  for (let round = 0; round < 50 && remaining.size; round++) {
     await new Promise((r) => setTimeout(r, 0));
-    for (const chemin of [...restants]) {
-      const enVol = http.match((r) => r.url.endsWith(chemin));
-      if (enVol.length) {
-        enVol[0].flush(FICHIERS[chemin]);
-        restants.delete(chemin);
+    for (const path of [...remaining]) {
+      const inFlight = http.match((r) => r.url.endsWith(path));
+      if (inFlight.length) {
+        inFlight[0].flush(FILES[path]);
+        remaining.delete(path);
       }
     }
   }
-  expect([...restants]).toEqual([]);
+  expect([...remaining]).toEqual([]);
   await p;
 }
 
 /** Monte `page` à l'adresse `chemin` du dépôt de test, le référentiel déjà chargé. */
-async function monter(page: Component, chemin: string): Promise<HTMLElement> {
-  const routeur = createRouteur(createMemoryHistory());
-  await routeur.push(`/test/test/${chemin}`);
-  await routeur.isReady();
-  const vue = mount(page, { global: { plugins: [routeur] } });
+async function mountView(page: Component, path: string): Promise<HTMLElement> {
+  const router = createAppRouter(createMemoryHistory());
+  await router.push(`/test/test/${path}`);
+  await router.isReady();
+  const view = mount(page, { global: { plugins: [router] } });
   await flushPromises();
-  return vue.element.parentElement ?? (vue.element as HTMLElement);
+  return view.element.parentElement ?? (view.element as HTMLElement);
 }
 
 // Mermaid pèse plusieurs mégaoctets, et `MarkdownRendu` le charge à la demande : sous la charge de toute la suite, ce premier chargement dépassait à lui seul le délai d'un test (constaté une fois sur six). Le charger avant, avec son propre délai, laisse aux tests le seul comportement à éprouver.
@@ -153,30 +153,30 @@ describe("rendu des écrans", () => {
   });
 
   it("la page référentiel liste les domaines avec leur compte", async () => {
-    await chargerReferentiel();
-    const el = await monter(ReferentielPage, "referentiel");
+    await loadTestSpecification();
+    const el = await mountView(SpecificationPage, "referentiel");
 
-    const texte = el.textContent ?? "";
-    expect(texte).toContain("Facturation");
-    expect(texte).toContain("1 fonctionnalités");
+    const text = el.textContent ?? "";
+    expect(text).toContain("Facturation");
+    expect(text).toContain("1 fonctionnalités");
     // le compte n'inclut pas la règle abrogée
-    expect(texte).toContain("1 règles actives");
+    expect(text).toContain("1 règles actives");
   });
 
   it("la fiche domaine liste les cadrages qui s’y rattachent", async () => {
-    await chargerReferentiel();
-    const el = await monter(DomainePage, "referentiel/domaine/facturation");
+    await loadTestSpecification();
+    const el = await mountView(DomainPage, "referentiel/domaine/facturation");
 
     // Le rattachement est celui que le cadrage déclare : il peut ne toucher aucune règle du domaine — n'en décrire que l'architecture — et devoir s'y lire tout de même.
-    const lien = el.querySelector('a[href$="/cadrages/2026-001"]');
-    expect(lien).not.toBeNull();
-    expect(lien?.textContent).toContain("Relance automatique");
-    expect(lien?.querySelector(".statut-chip")).not.toBeNull();
+    const link = el.querySelector('a[href$="/cadrages/2026-001"]');
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toContain("Relance automatique");
+    expect(link?.querySelector(".statut-chip")).not.toBeNull();
   });
 
   it("la fiche domaine dessine le diagramme au lieu d’en montrer la source", async () => {
-    await chargerReferentiel();
-    const el = await monter(DomainePage, "referentiel/domaine/facturation");
+    await loadTestSpecification();
+    const el = await mountView(DomainPage, "referentiel/domaine/facturation");
     await new Promise((r) => setTimeout(r, 300));
     await flushPromises();
 
@@ -191,31 +191,31 @@ describe("rendu des écrans", () => {
   });
 
   it("la fiche règle remonte au cadrage responsable", async () => {
-    await chargerReferentiel();
-    const el = await monter(ReglePage, "referentiel/regle/RG-limite");
+    await loadTestSpecification();
+    const el = await mountView(RulePage, "referentiel/regle/RG-limite");
 
-    const texte = el.textContent ?? "";
-    expect(texte).toContain("RG-limite");
-    expect(texte).toContain("Relance automatique");
-    expect(texte).toContain("quatorze");
+    const text = el.textContent ?? "";
+    expect(text).toContain("RG-limite");
+    expect(text).toContain("Relance automatique");
+    expect(text).toContain("quatorze");
     expect(el.querySelector(".operation-chip")?.textContent).toContain("crée");
   });
 
   it("la fiche règle signale une règle abrogée", async () => {
-    await chargerReferentiel();
-    const el = await monter(ReglePage, "referentiel/regle/RG-obsolete");
+    await loadTestSpecification();
+    const el = await mountView(RulePage, "referentiel/regle/RG-obsolete");
 
     expect(el.querySelector(".bandeau-abrogee")).not.toBeNull();
     expect(el.textContent).toContain("ne s’applique plus");
   });
 
   it("la fiche cadrage rend objectif, liens et impacts", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragePage, "cadrages/2026-001");
+    await loadTestSpecification();
+    const el = await mountView(ScopingPage, "cadrages/2026-001");
 
-    const texte = el.textContent ?? "";
-    expect(texte).toContain("Relance automatique");
-    expect(texte).toContain("Réduire le délai d'encaissement");
+    const text = el.textContent ?? "";
+    expect(text).toContain("Relance automatique");
+    expect(text).toContain("Réduire le délai d'encaissement");
     expect(
       el.querySelector('a[href="https://trello.com/c/xyz"]'),
     ).not.toBeNull();
@@ -223,36 +223,36 @@ describe("rendu des écrans", () => {
   });
 
   it("la fiche cadrage rassemble sous « Divers » ce que le gabarit ignore", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragePage, "cadrages/2026-001");
+    await loadTestSpecification();
+    const el = await mountView(ScopingPage, "cadrages/2026-001");
 
-    const bloc = el.querySelector("#divers");
-    expect(bloc).not.toBeNull();
+    const block = el.querySelector("#divers");
+    expect(block).not.toBeNull();
     // le titre d'origine, seul à dire de quoi la section parle
-    expect(bloc?.querySelector("h3")?.textContent?.trim()).toBe(
+    expect(block?.querySelector("h3")?.textContent?.trim()).toBe(
       "Ce que la mesure a montré",
     );
-    expect(bloc?.textContent).toContain("partent le week-end");
+    expect(block?.textContent).toContain("partent le week-end");
     // et sa sous-section, qui n'a pas d'autre endroit où se lire
-    expect(bloc?.textContent).toContain("Une observation, hors périmètre");
-    expect(bloc?.textContent).toContain("ne sont pas conservés");
+    expect(block?.textContent).toContain("Une observation, hors périmètre");
+    expect(block?.textContent).toContain("ne sont pas conservés");
   });
 
   it("le sommaire nomme chaque section rassemblée sous « Divers »", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragePage, "cadrages/2026-001");
+    await loadTestSpecification();
+    const el = await mountView(ScopingPage, "cadrages/2026-001");
 
-    const liens = el.querySelectorAll(".sommaire a");
-    const libelles = [...liens].map((a) => a.textContent?.trim() ?? "");
-    expect(libelles.some((l) => l.startsWith("Divers"))).toBe(true);
-    expect(libelles.some((l) => l.includes("Ce que la mesure a montré"))).toBe(
+    const links = el.querySelectorAll(".sommaire a");
+    const labels = [...links].map((a) => a.textContent?.trim() ?? "");
+    expect(labels.some((l) => l.startsWith("Divers"))).toBe(true);
+    expect(labels.some((l) => l.includes("Ce que la mesure a montré"))).toBe(
       true,
     );
   });
 
   it("la fiche cadrage signale un énoncé divergent de l’énoncé courant", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragePage, "cadrages/2026-001");
+    await loadTestSpecification();
+    const el = await mountView(ScopingPage, "cadrages/2026-001");
 
     // le cadrage dit « trois », la règle dit « quatorze » : l'écart doit être expliqué, sinon le lecteur y voit une incohérence
     const divergence = el.querySelector(".i-divergence");
@@ -264,47 +264,47 @@ describe("rendu des écrans", () => {
   });
 
   it("le sommaire liste les sections, les décisions et les impacts", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragePage, "cadrages/2026-001");
+    await loadTestSpecification();
+    const el = await mountView(ScopingPage, "cadrages/2026-001");
 
-    const liens = el.querySelectorAll(".sommaire a");
-    const libelles = [...liens].map((a) => a.textContent?.trim() ?? "");
+    const links = el.querySelectorAll(".sommaire a");
+    const labels = [...links].map((a) => a.textContent?.trim() ?? "");
 
     // les sections présentes, et chaque impact nommément — c'est ce qu'on cherche en revenant sur une fiche
-    expect(libelles.some((l) => l.startsWith("Objectif"))).toBe(true);
-    expect(libelles.some((l) => l.includes("Impacts"))).toBe(true);
-    expect(libelles.some((l) => l.includes("RG-limite"))).toBe(true);
-    expect(libelles.some((l) => l.includes("RG-obsolete"))).toBe(true);
+    expect(labels.some((l) => l.startsWith("Objectif"))).toBe(true);
+    expect(labels.some((l) => l.includes("Impacts"))).toBe(true);
+    expect(labels.some((l) => l.includes("RG-limite"))).toBe(true);
+    expect(labels.some((l) => l.includes("RG-obsolete"))).toBe(true);
   });
 
   it("le sommaire marque l’opération de chaque impact", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragePage, "cadrages/2026-001");
+    await loadTestSpecification();
+    const el = await mountView(ScopingPage, "cadrages/2026-001");
 
-    const ligne = [...el.querySelectorAll(".sommaire a")].find((a) =>
+    const line = [...el.querySelectorAll(".sommaire a")].find((a) =>
       a.textContent?.includes("RG-obsolete"),
     );
-    expect(ligne?.querySelector(".marque")?.textContent?.trim()).toBe("abroge");
+    expect(line?.querySelector(".marque")?.textContent?.trim()).toBe("abroge");
   });
 
   it("les ancres du sommaire correspondent à des éléments de la fiche", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragePage, "cadrages/2026-001");
+    await loadTestSpecification();
+    const el = await mountView(ScopingPage, "cadrages/2026-001");
 
-    const ancres = [...el.querySelectorAll(".sommaire a")].map((a) =>
+    const anchors = [...el.querySelectorAll(".sommaire a")].map((a) =>
       (a.getAttribute("href") ?? "").replace("#", ""),
     );
-    expect(ancres.length).toBeGreaterThan(0);
+    expect(anchors.length).toBeGreaterThan(0);
     // un sommaire dont les liens ne mènent nulle part est pire qu'aucun sommaire
     const ids = new Set([...el.querySelectorAll("[id]")].map((n) => n.id));
-    for (const ancre of ancres) {
-      expect(ids.has(ancre)).toBe(true);
+    for (const anchor of anchors) {
+      expect(ids.has(anchor)).toBe(true);
     }
   });
 
   it("la liste des cadrages suit le cycle de vie puis l’identifiant", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragesPage, "cadrages");
+    await loadTestSpecification();
+    const el = await mountView(ScopingsPage, "cadrages");
 
     const ids = [...el.querySelectorAll(".ligne .cid")].map(
       (n) => n.textContent?.trim() ?? "",
@@ -314,10 +314,10 @@ describe("rendu des écrans", () => {
   });
 
   it("la liste n’affiche pas « 0 impact » pour un cadrage sans impact", async () => {
-    await chargerReferentiel();
-    const el = await monter(CadragesPage, "cadrages");
+    await loadTestSpecification();
+    const el = await mountView(ScopingsPage, "cadrages");
 
-    const texte = el.textContent ?? "";
-    expect(texte).not.toContain("0 impact");
+    const text = el.textContent ?? "";
+    expect(text).not.toContain("0 impact");
   });
 });

@@ -1,7 +1,7 @@
 import { inject } from "../injection";
 import type { NavigationGuard } from "vue-router";
-import { ReferentielStore } from "./referentiel.store";
-import { RepoConfig, memeDepot } from "./repo-config";
+import { SpecificationStore } from "./referentiel.store";
+import { RepoConfig, sameRepo } from "./repo-config";
 
 /**
  * Ouvre le dépôt que porte l'adresse.
@@ -11,7 +11,7 @@ import { RepoConfig, memeDepot } from "./repo-config";
  * attendu — les vues savent afficher leur état — mais il est lancé avant elles,
  * sans quoi chaque page devrait le déclencher elle-même.
  */
-export const depotGuard: NavigationGuard = (to) => {
+export const repoGuard: NavigationGuard = (to) => {
   const owner =
     typeof to.params["owner"] === "string" ? to.params["owner"] : null;
   const repo = typeof to.params["repo"] === "string" ? to.params["repo"] : null;
@@ -19,13 +19,13 @@ export const depotGuard: NavigationGuard = (to) => {
   if (!owner || !repo) return "/";
 
   const config = inject(RepoConfig);
-  const store = inject(ReferentielStore);
-  const demande = { owner, repo };
+  const store = inject(SpecificationStore);
+  const request = { owner, repo };
 
   // Rechargé seulement si le dépôt change : sans ce contrôle, naviguer d'une
   // vue à l'autre du même projet rejouerait cinquante-huit lectures.
-  if (!memeDepot(config.depot(), demande) || store.etat() === "vide") {
-    void store.loadReferentiel(demande);
+  if (!sameRepo(config.repoRef(), request) || store.state() === "vide") {
+    void store.loadSpecification(request);
   }
 
   return true;

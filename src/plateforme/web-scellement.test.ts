@@ -1,173 +1,173 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { JetonsStockes } from "./ports";
-import { CoffreScelleDuNavigateur } from "./web-scellement";
-import { FauxAuthentificateur } from "./authentificateur-testing";
+import type { StoredTokens } from "./ports";
+import {
+  BrowserSealedVault,
+  readSealedText,
+  writeSealedText,
+} from "./web-scellement";
+import { FakeAuthenticator } from "./authentificateur-testing";
 
-const JETON = "github_pat_11AAAAAAA0secretdurouge";
-const AUTRE = "ghp_autrejetondelorganisationacme";
+const TOKEN = "github_pat_11AAAAAAA0secretdurouge";
+const OTHER = "ghp_autrejetondelorganisationacme";
 
-const JETONS: JetonsStockes = {
-  general: JETON,
-  parPortee: [["acme", AUTRE]],
+const TOKENS: StoredTokens = {
+  general: TOKEN,
+  byScope: [["acme", OTHER]],
 };
 
 /** Tout ce que le navigateur garde pour l'origine, d'un bloc. */
-function stockage(): string {
+function storage(): string {
   return Object.keys(localStorage)
     .map((k) => `${k}=${localStorage.getItem(k)}`)
     .join("\n");
 }
 
 describe("le coffre du navigateur scellé par une passkey", () => {
-  let auth: FauxAuthentificateur;
+  let auth: FakeAuthenticator;
 
   beforeEach(() => {
     localStorage.clear();
-    auth = new FauxAuthentificateur();
+    auth = new FakeAuthenticator();
   });
 
   it("garde les jetons en clair tant que rien n’est scellé", async () => {
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    expect(coffre.etat).toBe("aucun");
-    expect(await coffre.saveJetons(JETONS)).toBe("faite");
-    expect(await new CoffreScelleDuNavigateur(auth).loadJetons()).toEqual(
-      JETONS,
-    );
+    const vault = new BrowserSealedVault(auth);
+    expect(vault.state).toBe("aucun");
+    expect(await vault.saveTokens(TOKENS)).toBe("faite");
+    expect(await new BrowserSealedVault(auth).loadTokens()).toEqual(TOKENS);
   });
 
   it("ne laisse dans le navigateur que le chiffré, une fois scellé", async () => {
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    await coffre.saveJetons(JETONS);
-    expect(await coffre.sealJetons(JETONS)).toBe("scelle");
-    expect(coffre.etat).toBe("ouvert");
+    const vault = new BrowserSealedVault(auth);
+    await vault.saveTokens(TOKENS);
+    expect(await vault.sealTokens(TOKENS)).toBe("scelle");
+    expect(vault.state).toBe("ouvert");
     // ni le jeton, ni sa fin, ni l'autre jeton : RG-secret-conserve-localement
-    expect(stockage()).not.toContain(JETON);
-    expect(stockage()).not.toContain(JETON.slice(-8));
-    expect(stockage()).not.toContain(AUTRE);
+    expect(storage()).not.toContain(TOKEN);
+    expect(storage()).not.toContain(TOKEN.slice(-8));
+    expect(storage()).not.toContain(OTHER);
   });
 
   it("se retrouve verrouillé au chargement suivant, et s’ouvre par la passkey", async () => {
-    await new CoffreScelleDuNavigateur(auth).sealJetons(JETONS);
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
 
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    expect(await recharge.loadJetons()).toEqual({
+    const reloaded = new BrowserSealedVault(auth);
+    expect(await reloaded.loadTokens()).toEqual({
       general: null,
-      parPortee: [],
+      byScope: [],
     });
-    expect(recharge.etat).toBe("verrouille");
+    expect(reloaded.state).toBe("verrouille");
 
-    const ouvert = await recharge.unlockJetons();
-    expect(ouvert).toEqual({ issue: "ouvert", jetons: JETONS });
-    expect(recharge.etat).toBe("ouvert");
+    const opened = await reloaded.unlockTokens();
+    expect(opened).toEqual({ issue: "ouvert", tokens: TOKENS });
+    expect(reloaded.state).toBe("ouvert");
   });
 
   it("rescelle ce qu’on y écrit une fois ouvert", async () => {
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    await coffre.sealJetons(JETONS);
-    const suivants = { general: AUTRE, parPortee: [] };
-    expect(await coffre.saveJetons(suivants)).toBe("faite");
-    expect(stockage()).not.toContain(AUTRE);
+    const vault = new BrowserSealedVault(auth);
+    await vault.sealTokens(TOKENS);
+    const following = { general: OTHER, byScope: [] };
+    expect(await vault.saveTokens(following)).toBe("faite");
+    expect(storage()).not.toContain(OTHER);
 
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    await recharge.loadJetons();
-    expect(await recharge.unlockJetons()).toEqual({
+    const reloaded = new BrowserSealedVault(auth);
+    await reloaded.loadTokens();
+    expect(await reloaded.unlockTokens()).toEqual({
       issue: "ouvert",
-      jetons: suivants,
+      tokens: following,
     });
   });
 
   it("refuse d’écrire tant qu’il est verrouillé, sans toucher au scellé", async () => {
     // écrire en clair à côté du scellé défairait la protection ; l'écraser perdrait les jetons scellés
-    await new CoffreScelleDuNavigateur(auth).sealJetons(JETONS);
-    const avant = stockage();
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    await recharge.loadJetons();
-    expect(await recharge.saveJetons({ general: AUTRE, parPortee: [] })).toBe(
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
+    const before = storage();
+    const reloaded = new BrowserSealedVault(auth);
+    await reloaded.loadTokens();
+    expect(await reloaded.saveTokens({ general: OTHER, byScope: [] })).toBe(
       "refusee",
     );
-    expect(stockage()).toBe(avant);
+    expect(storage()).toBe(before);
   });
 
   it("reste verrouillé quand le déverrouillage est annulé", async () => {
-    await new CoffreScelleDuNavigateur(auth).sealJetons(JETONS);
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    await recharge.loadJetons();
-    auth.annuler = true;
-    expect(await recharge.unlockJetons()).toEqual({ issue: "annule" });
-    expect(recharge.etat).toBe("verrouille");
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
+    const reloaded = new BrowserSealedVault(auth);
+    await reloaded.loadTokens();
+    auth.cancel = true;
+    expect(await reloaded.unlockTokens()).toEqual({ issue: "annule" });
+    expect(reloaded.state).toBe("verrouille");
   });
 
   it("dit illisible un scellé que la clé rendue n’ouvre pas", async () => {
-    await new CoffreScelleDuNavigateur(auth).sealJetons(JETONS);
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    await recharge.loadJetons();
-    auth.substituer = true;
-    expect(await recharge.unlockJetons()).toEqual({ issue: "illisible" });
-    expect(recharge.etat).toBe("verrouille");
+    await new BrowserSealedVault(auth).sealTokens(TOKENS);
+    const reloaded = new BrowserSealedVault(auth);
+    await reloaded.loadTokens();
+    auth.substitute = true;
+    expect(await reloaded.unlockTokens()).toEqual({ issue: "illisible" });
+    expect(reloaded.state).toBe("verrouille");
   });
 
   it("ne change rien quand l’appareil ne rend pas de clé", async () => {
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    await coffre.saveJetons(JETONS);
-    auth.prfALaCreation = "absente";
-    expect(await coffre.sealJetons(JETONS)).toBe("impossible");
-    expect(coffre.etat).toBe("aucun");
-    expect(await new CoffreScelleDuNavigateur(auth).loadJetons()).toEqual(
-      JETONS,
-    );
+    const vault = new BrowserSealedVault(auth);
+    await vault.saveTokens(TOKENS);
+    auth.prfAtCreation = "absente";
+    expect(await vault.sealTokens(TOKENS)).toBe("impossible");
+    expect(vault.state).toBe("aucun");
+    expect(await new BrowserSealedVault(auth).loadTokens()).toEqual(TOKENS);
   });
 
   it("ne change rien quand la création est annulée", async () => {
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    await coffre.saveJetons(JETONS);
-    auth.annuler = true;
-    expect(await coffre.sealJetons(JETONS)).toBe("annule");
-    expect(coffre.etat).toBe("aucun");
-    expect(stockage()).toContain(JETON);
+    const vault = new BrowserSealedVault(auth);
+    await vault.saveTokens(TOKENS);
+    auth.cancel = true;
+    expect(await vault.sealTokens(TOKENS)).toBe("annule");
+    expect(vault.state).toBe("aucun");
+    expect(storage()).toContain(TOKEN);
   });
 
   it("demande la clé après coup au navigateur qui ne la rend pas à la création", async () => {
-    auth.prfALaCreation = "differee";
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    expect(await coffre.sealJetons(JETONS)).toBe("scelle");
+    auth.prfAtCreation = "differee";
+    const vault = new BrowserSealedVault(auth);
+    expect(await vault.sealTokens(TOKENS)).toBe("scelle");
     expect(auth.evaluations).toBe(1);
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    await recharge.loadJetons();
-    expect(await recharge.unlockJetons()).toEqual({
+    const reloaded = new BrowserSealedVault(auth);
+    await reloaded.loadTokens();
+    expect(await reloaded.unlockTokens()).toEqual({
       issue: "ouvert",
-      jetons: JETONS,
+      tokens: TOKENS,
     });
   });
 
   it("efface le scellé comme le clair, et reprend la même passkey ensuite", async () => {
     // une passkey par scellement encombrerait le trousseau de l'utilisateur
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    await coffre.sealJetons(JETONS);
-    expect(await coffre.deleteJetons()).toBe("faite");
-    expect(coffre.etat).toBe("aucun");
+    const vault = new BrowserSealedVault(auth);
+    await vault.sealTokens(TOKENS);
+    expect(await vault.deleteTokens()).toBe("faite");
+    expect(vault.state).toBe("aucun");
     expect(localStorage.getItem("skanon.jetons-scelles")).toBeNull();
-    expect(await new CoffreScelleDuNavigateur(auth).loadJetons()).toEqual({
+    expect(await new BrowserSealedVault(auth).loadTokens()).toEqual({
       general: null,
-      parPortee: [],
+      byScope: [],
     });
 
-    expect(await coffre.sealJetons(JETONS)).toBe("scelle");
+    expect(await vault.sealTokens(TOKENS)).toBe("scelle");
     expect(auth.creations).toBe(1);
   });
 
   it("crée une passkey neuve quand l’ancienne a disparu du trousseau", async () => {
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    await coffre.sealJetons(JETONS);
-    await coffre.deleteJetons();
+    const vault = new BrowserSealedVault(auth);
+    await vault.sealTokens(TOKENS);
+    await vault.deleteTokens();
     auth.secrets.clear();
-    expect(await coffre.sealJetons(JETONS)).toBe("scelle");
+    expect(await vault.sealTokens(TOKENS)).toBe("scelle");
     expect(auth.creations).toBe(2);
   });
 
   it("ne dit le scellement possible que si le navigateur le permet", async () => {
-    expect(await new CoffreScelleDuNavigateur(auth).isPossible()).toBe(true);
+    expect(await new BrowserSealedVault(auth).isPossible()).toBe(true);
     auth.possible = false;
-    expect(await new CoffreScelleDuNavigateur(auth).isPossible()).toBe(false);
+    expect(await new BrowserSealedVault(auth).isPossible()).toBe(false);
   });
 });
 
@@ -175,41 +175,63 @@ describe("le chiffreur des contenus privés", () => {
   beforeEach(() => localStorage.clear());
 
   it("n’existe que tant que les jetons sont ouverts", async () => {
-    const auth = new FauxAuthentificateur();
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    expect(coffre.findChiffreur()).toBeNull();
-    await coffre.sealJetons(JETONS);
-    expect(coffre.findChiffreur()).not.toBeNull();
+    const auth = new FakeAuthenticator();
+    const vault = new BrowserSealedVault(auth);
+    expect(vault.findCipher()).toBeNull();
+    await vault.sealTokens(TOKENS);
+    expect(vault.findCipher()).not.toBeNull();
 
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    await recharge.loadJetons();
-    expect(recharge.findChiffreur()).toBeNull();
+    const reloaded = new BrowserSealedVault(auth);
+    await reloaded.loadTokens();
+    expect(reloaded.findCipher()).toBeNull();
   });
 
   it("rouvre ce qu’il a scellé, d’un chargement à l’autre", async () => {
-    const auth = new FauxAuthentificateur();
-    const coffre = new CoffreScelleDuNavigateur(auth);
-    await coffre.sealJetons(JETONS);
-    const scelle = await coffre.findChiffreur()!.seal("règle privée");
-    expect(scelle).not.toContain("règle");
+    const auth = new FakeAuthenticator();
+    const vault = new BrowserSealedVault(auth);
+    await vault.sealTokens(TOKENS);
+    const sealed = await vault.findCipher()!.seal("règle privée");
+    expect(sealed).not.toContain("règle");
 
-    const recharge = new CoffreScelleDuNavigateur(auth);
-    await recharge.loadJetons();
-    await recharge.unlockJetons();
-    expect(await recharge.findChiffreur()!.open(scelle)).toBe("règle privée");
+    const reloaded = new BrowserSealedVault(auth);
+    await reloaded.loadTokens();
+    await reloaded.unlockTokens();
+    expect(await reloaded.findCipher()!.open(sealed)).toBe("règle privée");
   });
 
   it("rend null pour un scellé qu’il n’ouvre pas", async () => {
-    const coffre = new CoffreScelleDuNavigateur(new FauxAuthentificateur());
-    await coffre.sealJetons(JETONS);
-    const chiffreur = coffre.findChiffreur()!;
-    expect(await chiffreur.open("pas un scellé")).toBeNull();
+    const vault = new BrowserSealedVault(new FakeAuthenticator());
+    await vault.sealTokens(TOKENS);
+    const cipher = vault.findCipher()!;
+    expect(await cipher.open("pas un scellé")).toBeNull();
 
     localStorage.clear();
-    const autre = new CoffreScelleDuNavigateur(new FauxAuthentificateur());
-    await autre.sealJetons(JETONS);
-    expect(await chiffreur.open(await autre.findChiffreur()!.seal("x"))).toBe(
-      null,
-    );
+    const other = new BrowserSealedVault(new FakeAuthenticator());
+    await other.sealTokens(TOKENS);
+    expect(await cipher.open(await other.findCipher()!.seal("x"))).toBe(null);
+  });
+});
+
+/**
+ * Le texte qu'on scelle est un format stocké sur le poste : ses champs gardent les noms qu'il avait quand ils ont été écrits, quel que soit le nom des champs dans le code. Sinon, un rédacteur perdrait ses jetons scellés à la mise à jour.
+ */
+describe("le texte des jetons scellés", () => {
+  it("relit ce que la version précédente a scellé", () => {
+    expect(
+      readSealedText(
+        JSON.stringify({ general: TOKEN, parPortee: [["acme", OTHER]] }),
+      ),
+    ).toEqual(TOKENS);
+  });
+
+  it("écrit sous les mêmes noms qu'il relit", () => {
+    expect(JSON.parse(writeSealedText(TOKENS))).toEqual({
+      general: TOKEN,
+      parPortee: [["acme", OTHER]],
+    });
+  });
+
+  it("rend null sur un texte illisible", () => {
+    expect(readSealedText("{")).toBeNull();
   });
 });

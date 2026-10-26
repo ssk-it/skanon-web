@@ -8,8 +8,8 @@ import {
   type VNode,
 } from "vue";
 import { RouterLink, type RouteLocationRaw } from "vue-router";
-import LienExterne from "./LienExterne.vue";
-import UiIcone from "./UiIcone.vue";
+import ExternalLink from "./LienExterne.vue";
+import UiIcon from "./UiIcone.vue";
 
 /**
  * Le bouton de Material 3, sans Material.
@@ -35,14 +35,14 @@ import UiIcone from "./UiIcone.vue";
  */
 const props = withDefaults(
   defineProps<{
-    variante?: "text" | "filled" | "tonal" | "outlined" | "icon";
+    variant?: "text" | "filled" | "tonal" | "outlined" | "icon";
     type?: "button" | "submit" | "reset";
     disabled?: boolean;
     to?: RouteLocationRaw;
     href?: string;
   }>(),
   {
-    variante: "text",
+    variant: "text",
     type: "button",
     disabled: false,
     to: undefined,
@@ -53,32 +53,32 @@ const props = withDefaults(
 const slots = useSlots();
 
 /** Les nœuds d'un emplacement, sans les fragments que `v-if` et `v-for` y laissent. */
-function aplatir(noeuds: readonly VNode[]): VNode[] {
-  return noeuds.flatMap((n) =>
+function flatten(nodes: readonly VNode[]): VNode[] {
+  return nodes.flatMap((n) =>
     n.type === Fragment && Array.isArray(n.children)
-      ? aplatir(n.children as VNode[])
+      ? flatten(n.children as VNode[])
       : n.type === Comment
         ? []
         : [n],
   );
 }
 
-function parties(): { icones: VNode[]; reste: VNode[] } {
-  const tout = aplatir(slots.default?.() ?? []);
-  if (props.variante === "icon") return { icones: [], reste: tout };
+function parts(): { icons: VNode[]; rest: VNode[] } {
+  const everything = flatten(slots.default?.() ?? []);
+  if (props.variant === "icon") return { icons: [], rest: everything };
   return {
-    icones: tout.filter((n) => n.type === UiIcone),
-    reste: tout.filter((n) => n.type !== UiIcone),
+    icons: everything.filter((n) => n.type === UiIcon),
+    rest: everything.filter((n) => n.type !== UiIcon),
   };
 }
 
-const Noeuds: FunctionalComponent<{ n: VNode[] }> = (p) => p.n;
+const Nodes: FunctionalComponent<{ n: VNode[] }> = (p) => p.n;
 
 const element = computed(() =>
-  props.to !== undefined ? RouterLink : props.href ? LienExterne : "button",
+  props.to !== undefined ? RouterLink : props.href ? ExternalLink : "button",
 );
 
-const liaisons = computed(() => {
+const bindings = computed(() => {
   if (props.to !== undefined)
     return {
       to: props.to,
@@ -100,18 +100,18 @@ const liaisons = computed(() => {
     :is="element"
     class="ui-bouton"
     :class="[
-      `ui-bouton--${variante}`,
+      `ui-bouton--${variant}`,
       {
         'ui-bouton--desactive': disabled,
-        'ui-bouton--avec-icone': parties().icones.length > 0,
+        'ui-bouton--avec-icone': parts().icons.length > 0,
       },
     ]"
-    v-bind="liaisons"
+    v-bind="bindings"
   >
-    <template v-if="variante === 'icon'"><slot /></template>
+    <template v-if="variant === 'icon'"><slot /></template>
     <template v-else>
-      <Noeuds :n="parties().icones" />
-      <span class="ui-bouton__libelle"><Noeuds :n="parties().reste" /></span>
+      <Nodes :n="parts().icons" />
+      <span class="ui-bouton__libelle"><Nodes :n="parts().rest" /></span>
     </template>
   </component>
 </template>

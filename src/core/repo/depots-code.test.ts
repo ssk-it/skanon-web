@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDepotsCode } from "./repo-loader";
+import { parseCodeRepos } from "./repo-loader";
 
 /**
  * Les dépôts de code viennent du fichier de configuration, donc d'un texte
@@ -8,39 +8,39 @@ import { parseDepotsCode } from "./repo-loader";
  */
 describe("dépôts de code déclarés par le projet", () => {
   it("rend une liste vide quand rien n’est déclaré", () => {
-    expect(parseDepotsCode(undefined)).toEqual({ depots: [], anomalies: [] });
-    expect(parseDepotsCode(null).depots).toEqual([]);
+    expect(parseCodeRepos(undefined)).toEqual({ repos: [], anomalies: [] });
+    expect(parseCodeRepos(null).repos).toEqual([]);
   });
 
   it("lit un dépôt avec son rôle", () => {
-    const { depots, anomalies } = parseDepotsCode([
+    const { repos, anomalies } = parseCodeRepos([
       { repo: "Wayne-Corp/wayne-front", role: "Application web" },
     ]);
-    expect(depots).toEqual([
+    expect(repos).toEqual([
       { repo: "Wayne-Corp/wayne-front", role: "Application web" },
     ]);
     expect(anomalies).toEqual([]);
   });
 
   it("admet la forme courte, le rôle n’apprenant rien sur un projet à un seul dépôt", () => {
-    expect(parseDepotsCode(["ssk-it/ssk-canon-pwa"]).depots).toEqual([
+    expect(parseCodeRepos(["ssk-it/ssk-canon-pwa"]).repos).toEqual([
       { repo: "ssk-it/ssk-canon-pwa", role: "" },
     ]);
   });
 
   it("écarte un dépôt mal nommé, et dit lequel", () => {
-    const { depots, anomalies } = parseDepotsCode([
+    const { repos, anomalies } = parseCodeRepos([
       "sans-organisation",
       { repo: "ssk-it/ssk-canon-pwa" },
     ]);
-    expect(depots).toEqual([{ repo: "ssk-it/ssk-canon-pwa", role: "" }]);
+    expect(repos).toEqual([{ repo: "ssk-it/ssk-canon-pwa", role: "" }]);
     expect(anomalies.length).toBe(1);
     expect(anomalies[0]).toContain("sans-organisation");
   });
 
   it("signale une valeur qui n’est pas une liste, sans rien retenir", () => {
-    const { depots, anomalies } = parseDepotsCode("ssk-it/ssk-canon-pwa");
-    expect(depots).toEqual([]);
+    const { repos, anomalies } = parseCodeRepos("ssk-it/ssk-canon-pwa");
+    expect(repos).toEqual([]);
     expect(anomalies.length).toBe(1);
   });
 });
