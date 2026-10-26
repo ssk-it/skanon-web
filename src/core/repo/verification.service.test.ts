@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { LocaleService } from "../i18n/locale.service";
 import { inject, resetInjection } from "../injection";
 import type { Rule, Specification } from "../model/model";
 import { VerificationService, type ScopingInput } from "./verification.service";
@@ -100,5 +101,54 @@ describe("verifying a scoping being authored", () => {
       SPECIFICATION,
     );
     expect(warnings.join("\n")).toContain("RG-abrogee");
+  });
+
+  // RG-verification-a-la-saisie: the same anomalies as the final check, by their code, said in the interface's language by the library.
+  it("says the anomalies in French, word for word as the pull request's check", () => {
+    const { errors } = service.checkScoping(
+      input({
+        impacts: [
+          { target: "RG-absente", kind: "regle", operation: "modifie" },
+        ],
+      }),
+      SPECIFICATION,
+    );
+    expect(errors).toContain("cadrage 2026-070 → règle inconnue : RG-absente");
+  });
+
+  it("says them in English when the interface is in English", () => {
+    inject(LocaleService).choice.set("en");
+    const { errors, warnings } = service.checkScoping(
+      input({
+        domains: ["d-inconnu"],
+        impacts: [
+          { target: "RG-absente", kind: "regle", operation: "modifie" },
+          { target: "RG-abrogee", kind: "regle", operation: "modifie" },
+        ],
+        statements: new Map([
+          ["RG-absente", "Texte."],
+          ["RG-abrogee", "Texte."],
+        ]),
+      }),
+      SPECIFICATION,
+    );
+    expect(errors).toContain("scoping 2026-070 → unknown domain: d-inconnu");
+    expect(errors).toContain("scoping 2026-070 → unknown rule: RG-absente");
+    expect(warnings).toContain(
+      "scoping 2026-070: operates on RG-abrogee, which is repealed",
+    );
+    expect([...errors, ...warnings].join("\n")).not.toMatch(/cadrage|inconnue/);
+  });
+
+  it("keeps the coded anomalies, to be said again in another language", () => {
+    const { anomalies } = service.checkScoping(
+      input({
+        impacts: [
+          { target: "RG-absente", kind: "regle", operation: "modifie" },
+        ],
+      }),
+      SPECIFICATION,
+    );
+    expect(anomalies.map((a) => a.code)).toContain("cible-inconnue");
   });
 });
