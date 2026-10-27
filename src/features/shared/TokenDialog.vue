@@ -15,6 +15,8 @@ import UiSelect from "../../ui/UiSelect.vue";
 
 // Where the token lives is not the same depending on the target (INV-8): the text says so, without promising more than what each one does.
 const onDesktop = inject(PLATFORM).target === "bureau";
+/** Where the platform keeps its own copy of the repos, contents go through neither channel: there is no choice to offer (2026-067, decision 08). */
+const channelChoice = inject(PLATFORM).contentSource === null;
 import RichText from "./RichText.vue";
 import { tokenDialogMessages } from "./token-dialog.messages";
 import TokenHelp from "./TokenHelp.vue";
@@ -343,8 +345,12 @@ function signOut(): void {
         </ul>
       </details>
 
-      <UiCheckbox v-model="viaApi" class="option">{{ t().viaApi }}</UiCheckbox>
-      <p class="option-aide">{{ t().viaApiHelp }}</p>
+      <template v-if="channelChoice">
+        <UiCheckbox v-model="viaApi" class="option">{{
+          t().viaApi
+        }}</UiCheckbox>
+        <p class="option-aide">{{ t().viaApiHelp }}</p>
+      </template>
     </template>
 
     <template #actions>

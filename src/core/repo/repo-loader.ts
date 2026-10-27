@@ -7,6 +7,12 @@ import {
   TreeEntry,
 } from "../github/github-client";
 import { TokenService } from "../github/token.service";
+import { PLATFORM } from "../../platform/platform-token";
+import type {
+  ContentSource,
+  SourceEntry,
+  SourceSnapshot,
+} from "../../platform/ports";
 import { ContentCache, KnownState } from "./content-cache";
 import { repoText } from "./repo.messages";
 import {
@@ -125,6 +131,7 @@ export class RepoLoader {
   private readonly github = inject(GithubClient);
   private readonly tokens = inject(TokenService);
   private readonly cache = inject(ContentCache);
+  private readonly source = inject(PLATFORM).contentSource;
 
   async loadSpecification(
     repoRef: RepoRef,
@@ -138,6 +145,7 @@ export class RepoLoader {
     repoRef: RepoRef,
     options: ReadOptions = {},
   ): Promise<SpecificationRead> {
+    if (this.source) return this.readFromSource(this.source, repoRef, options);
     const ref = repoRef.ref ?? "HEAD";
     const waiting =
       options.remember || options.lastKnownState
@@ -214,12 +222,7 @@ export class RepoLoader {
     // (RG-noms-declares), and nothing else can be chosen before it is read.
     const configFile = config ? await loadEntry(config) : null;
     const names = this.namesOf(configFile?.content ?? null);
-    const relevant = tree.entries.filter(
-      (e) =>
-        e.type === "blob" &&
-        e.path.endsWith(".md") &&
-        this.collectionOf(e.path, names) !== null,
-    );
+    const relevant = this.relevantEntries(tree.entries, names);
     const toLoad: TreeEntry[] = config ? [config, ...relevant] : [...relevant];
     total = toLoad.length;
     const files = [
@@ -248,6 +251,90 @@ export class RepoLoader {
       fingerprints: new Set(toLoad.map((e) => e.sha)),
       unconfirmed: null,
     };
+  }
+
+  /**
+   * Reads the repo from the copy the system keeps (RG-chargement-hors-quota):
+   * the source brings it up to date, then serves the tree and the contents of
+   * the commit it received. Nothing goes through the API, nor through the
+   * page's cache: the copy is the cache (RG-contenus-par-empreinte).
+   */
+  private async readFromSource(
+    source: ContentSource,
+    repoRef: RepoRef,
+    options: ReadOptions,
+  ): Promise<SpecificationRead> {
+    const outcome = await source.update(
+      repoRef,
+      repoRef.ref ?? "HEAD",
+      this.tokens.valueFor(repoRef),
+    );
+    if (outcome.issue === "recu")
+      return this.readSnapshot(source, repoRef, outcome.snapshot, null);
+
+    const e = this.github.sourceError(outcome.status);
+    if (!options.lastKnownState) throw e;
+    // What the repo no longer shows to someone, the application does not show
+    // them either — not even as last known state.
+    if (isDenial(e)) {
+      await source.forgetRepo(repoRef);
+      throw e;
+    }
+    if (!outcome.known || !isUnreachable(e)) throw e;
+    return this.readSnapshot(source, repoRef, outcome.known, {
+      readAt: outcome.known.receivedAt,
+      cause: e.message,
+    });
+  }
+
+  private async readSnapshot(
+    source: ContentSource,
+    repoRef: RepoRef,
+    snapshot: SourceSnapshot,
+    unconfirmed: UnconfirmedState | null,
+  ): Promise<SpecificationRead> {
+    const coordinates = { owner: repoRef.owner, repo: repoRef.repo };
+    const read = async (
+      entries: readonly SourceEntry[],
+    ): Promise<LoadedFile[]> => {
+      const contents = await source.read(
+        coordinates,
+        entries.map((e) => e.sha),
+      );
+      return entries.map((e, i) => ({ path: e.path, content: contents[i] }));
+    };
+
+    // The configuration first, as on the other channel: it names the
+    // directories that carry entities (RG-noms-declares).
+    const config = snapshot.entries.find((e) => e.path === CONFIG_NAME);
+    const configFiles = config ? await read([config]) : [];
+    const names = this.namesOf(configFiles[0]?.content ?? null);
+    const relevant = this.relevantEntries(snapshot.entries, names);
+    const files = [...configFiles, ...(await read(relevant))];
+    return {
+      specification: this.buildSpecification(
+        files,
+        [],
+        snapshot.entries.filter((e) => e.type === "blob").map((e) => e.path),
+      ),
+      fingerprints: new Set(
+        [...(config ? [config] : []), ...relevant].map((e) => e.sha),
+      ),
+      unconfirmed,
+    };
+  }
+
+  /** The Markdown files of the directories that carry entities, under the declared names. */
+  private relevantEntries<E extends SourceEntry>(
+    entries: readonly E[],
+    names: RepoNames,
+  ): E[] {
+    return entries.filter(
+      (e) =>
+        e.type === "blob" &&
+        e.path.endsWith(".md") &&
+        this.collectionOf(e.path, names) !== null,
+    );
   }
 
   /** The contents of a known tree, if they are all still held. */

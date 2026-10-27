@@ -124,11 +124,65 @@ export interface VersionAnnouncer {
   activate(): Promise<void>;
 }
 
+/** A repo, by its owner and its name. */
+export interface RepoCoordinates {
+  readonly owner: string;
+  readonly repo: string;
+}
+
+/** An entry of a repo at a commit: its path, and the fingerprint of its content. */
+export interface SourceEntry {
+  readonly path: string;
+  readonly sha: string;
+  readonly type: "blob" | "tree";
+}
+
+/** A repo at a commit, as a content source holds it. */
+export interface SourceSnapshot {
+  readonly commit: string;
+  readonly entries: readonly SourceEntry[];
+  /** When the source last heard from the repo, in ISO format. */
+  readonly receivedAt: string;
+}
+
+/**
+ * What an update returned. `echec`: the repo did not answer as hoped — `status` is the platform's, 0 when the network fails —, and `known` is the last state the source received, if it holds one.
+ */
+export type SourceUpdate =
+  | { readonly issue: "recu"; readonly snapshot: SourceSnapshot }
+  | {
+      readonly issue: "echec";
+      readonly status: number;
+      readonly known: SourceSnapshot | null;
+    };
+
+/**
+ * A copy of each opened repo that the system keeps and brings up to date itself, outside the API quota (RG-chargement-hors-quota). The interface reads the tree and the contents from it, and still writes through the API.
+ *
+ * The web version has none: the page reads through the API and keeps contents in its own cache (RG-contenus-par-empreinte).
+ */
+export interface ContentSource {
+  /** Brings the copy up to date with the repo, then describes it at `ref` — a branch, a commit, or `HEAD`. `token` serves this exchange only: the source keeps it nowhere. */
+  update(
+    repo: RepoCoordinates,
+    ref: string,
+    token: string | null,
+  ): Promise<SourceUpdate>;
+  /** The contents with these fingerprints, from the copy, in the same order. */
+  read(repo: RepoCoordinates, shas: readonly string[]): Promise<string[]>;
+  /** Erases the copy of a repo. */
+  forgetRepo(repo: RepoCoordinates): Promise<void>;
+  /** Erases the copies read under a token, within a scope — an organisation or a repo —, or all of them (RG-contenus-prives-au-repos). */
+  forgetReadUnderToken(scope: string | null): Promise<void>;
+}
+
 export interface Platform {
   readonly target: "bureau" | "web";
   readonly vault: TokenVault;
   /** Token sealing by passkey; `null` on the desktop, where the system vault is enough. */
   readonly sealing: TokenSealing | null;
+  /** The copy of the repos the system keeps; `null` in the web version, which reads through the API. */
+  readonly contentSource: ContentSource | null;
   readonly opener: ExternalOpener;
   readonly links: LinkReceiver;
   readonly version: VersionAnnouncer;
