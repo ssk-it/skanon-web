@@ -2,9 +2,8 @@
  * Queue with bounded concurrency.
  *
  * The GitHub API's secondary limits — 100 concurrent requests, 900
- * points per minute — apply to the token, hence to the whole installation:
- * all users share the same budget. The proxy being stateless, it
- * cannot regulate. Regulation therefore lives here. See RG-regulation-appels.
+ * points per minute — apply to the token: regulation therefore lives here,
+ * on the side of whoever presents it. See RG-regulation-appels.
  *
  * The default value is deliberately cautious: exceeding the secondary
  * limits costs a 403 with `Retry-After`, well before the hourly quota

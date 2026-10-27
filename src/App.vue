@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import { GithubClient, type RepoRef } from "./core/github/github-client";
-import { IdentityService } from "./core/github/identity.service";
 import { TokenService } from "./core/github/token.service";
 import { LANGUAGES, type Language, type Localized } from "./core/i18n/language";
 import { LocaleService, type LanguageChoice } from "./core/i18n/locale.service";
@@ -42,7 +41,6 @@ const MAC =
 const store = inject(SpecificationStore);
 const tokens = inject(TokenService);
 const github = inject(GithubClient);
-const identity = inject(IdentityService);
 const theme = inject(ThemeService);
 const links = inject(LinksService);
 const dialog = inject(DialogService);
@@ -92,22 +90,6 @@ function isActive(path: string): boolean {
   const current = segmentsOf(route.path);
   return link.every((s, i) => current[i] === s);
 }
-
-/**
- * Completes a pending sign-in.
- *
- * The specification is not loaded here: the address says which repo to open, and the route guard takes care of it. But identity settings live in the specification, hence the wait before handling the issuer's return.
- */
-async function start(): Promise<void> {
-  await store.waitReady();
-
-  if (await identity.completeReturn()) {
-    // The address still carries the code: leaving it would replay the return on the slightest reload, with an already consumed code.
-    history.replaceState(null, "", location.pathname);
-    if (!identity.error()) await store.loadSpecification();
-  }
-}
-void start();
 
 /**
  * The icon shows the current state, not the action to come.
@@ -524,9 +506,6 @@ function reloadVersion(): void {
       </template>
       <template v-if="onInput">
         {{ t().version.saveFirst }}
-      </template>
-      <template v-if="tokens.source() === 'identite_tierce'">
-        {{ t().version.endsAccess(version.relaunches) }}
       </template>
     </p>
   </div>

@@ -152,7 +152,7 @@ describe("« Ouvrir un projet » screen", () => {
     expect(texts(others, ".organisation h2")).toEqual(["Globex", "ssk-it"]);
   });
 
-  /** RG-connexion-optionnelle, RG-modes-acces: the help offers itself without posing as a prerequisite. */
+  /** RG-connexion-optionnelle: the help offers itself without posing as a prerequisite. */
   it("offers sign-in, optional, with how to create a token, as long as no access is in place", async () => {
     const page = await mountView([known("ssk-it/skift-cadrage", true, true)]);
 
@@ -161,6 +161,7 @@ describe("« Ouvrir un projet » screen", () => {
       "facultative",
     );
     expect(signInBlock.textContent).toContain("dépôts publics se lisent sans");
+    expect(signInBlock.textContent).not.toContain("fournisseur");
     expect(signInBlock.querySelector(".aide-jeton h3")?.textContent).toBe(
       "Créer un jeton",
     );
@@ -233,6 +234,7 @@ describe("« Ouvrir un projet » screen", () => {
       expect(signInBlock.textContent).toContain(
         "Public repos are read without signing in.",
       );
+      expect(signInBlock.textContent).not.toContain("provider");
       expect(signInBlock.textContent).toContain("Enter a token");
     });
 

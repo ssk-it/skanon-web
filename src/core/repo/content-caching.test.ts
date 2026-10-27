@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import { RepoLoader } from "./repo-loader";
 import { INDEXEDDB_FACTORY } from "./content-cache";
-import { GithubClient, GithubError } from "../github/github-client";
+import { GithubError } from "../github/github-client";
 import { TokenService } from "../github/token.service";
 
 /**
@@ -242,43 +242,6 @@ describe("content cache on loading", () => {
     tree("c1", { "rules/RG-a.md": "a1" });
     await waitFor();
     http.expectOne(`${RAW}/c1/rules/RG-a.md`).flush(RULE("RG-a"));
-    await read;
-    http.verify();
-  });
-
-  it("does not keep beyond the tab a private repo read under a temporary access", async () => {
-    const readPrivate = async () => {
-      const loader = newVisit();
-      inject(TokenService).setAccess({
-        token: "ghs_accesTemporaire",
-        validUntil: new Date(Date.now() + 3_600_000).toISOString(),
-        repos: ["org/projet"],
-        identity: { identifier: "u", name: "U", email: null },
-      });
-      inject(GithubClient).useApiForContents(true);
-      // Wrapped: returning the promise itself would make it wait here.
-      const inProgress = { read: readAll(loader) };
-      await waitFor();
-      return inProgress;
-    };
-
-    let { read } = await readPrivate();
-    tree("c1", { "rules/RG-a.md": "a1" });
-    await waitFor();
-    http.expectOne(`${API}/git/blobs/a1`).flush(RULE("RG-a"));
-    await read;
-
-    ({ read: read } = await readPrivate());
-    // No known state, hence no condition; no content, hence requested again.
-    const query = http.expectOne(`${API}/git/trees/HEAD?recursive=1`);
-    expect(query.request.headers.has("If-None-Match")).toBe(false);
-    query.flush({
-      sha: "c1",
-      truncated: false,
-      tree: [{ path: "rules/RG-a.md", sha: "a1", type: "blob" }],
-    });
-    await waitFor();
-    http.expectOne(`${API}/git/blobs/a1`).flush(RULE("RG-a"));
     await read;
     http.verify();
   });

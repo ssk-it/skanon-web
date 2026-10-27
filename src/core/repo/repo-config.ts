@@ -27,8 +27,7 @@ export const DEFAULT_REPO: RepoRef = {
  * The project repo currently open.
  *
  * Remembered in the browser to avoid typing it again, and changeable without
- * rebuilding. In phase 7, the choice will be restricted to repos on which the
- * user has rights.
+ * rebuilding.
  */
 export class RepoConfig {
   readonly repoRef = signal<RepoRef>(this.readRepo());

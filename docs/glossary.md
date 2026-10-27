@@ -63,17 +63,15 @@ Where a value is still written in French in the code, it is a value of the forma
 
 ## Access, tokens, machine
 
-| Format term                                               | Code term                                    | Definition                                                                                                                                      |
-| --------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| jeton                                                     | `token`                                      | A GitHub access token (`INV-8`). The injection-container key is `ProviderToken`, never `token`.                                                 |
-| portée (d'un jeton)                                       | `scope` (`ScopedToken`, `byScope`)           | What a token applies to: an organisation, or one repo.                                                                                          |
-| mode d'accès : jeton personnel / identité tierce / relais | `AccessMode`                                 | How authors obtain access; values stay `"jeton_personnel"`, `"identite_tierce"`, `"relais"`.                                                    |
-| identité tierce, émetteur, échange                        | third-party identity, `issuer`, `exchange`   | Sign-in with an outside identity provider, its issuer URL, and the component that trades a verified identity for repo access (`INV-5`).         |
-| protection du jeton : proposée / exigée                   | `TokenProtection`                            | Whether a project offers or requires the passkey; values stay `"proposee"` / `"exigee"`.                                                        |
-| coffre                                                    | `vault` (`TokenVault`)                       | Where the target keeps tokens: the system keychain on desktop, local storage on the web.                                                        |
-| scellement, sceller, scellé                               | `sealing`, `seal`, `sealed` (`TokenSealing`) | Encrypting stored tokens under a key a passkey yields; _unlock_ opens them for the open tabs, which hand the key to the tabs opened afterwards. |
-| passkey                                                   | `passkey`                                    | A WebAuthn credential whose PRF output derives the sealing key.                                                                                 |
-| chiffreur                                                 | `cipher` (`Cipher`)                          | The object that seals and opens private contents with the passkey key.                                                                          |
+| Format term                             | Code term                                    | Definition                                                                                                                                      |
+| --------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| jeton                                   | `token`                                      | A GitHub access token (`INV-8`). The injection-container key is `ProviderToken`, never `token`.                                                 |
+| portée (d'un jeton)                     | `scope` (`ScopedToken`, `byScope`)           | What a token applies to: an organisation, or one repo.                                                                                          |
+| protection du jeton : proposée / exigée | `TokenProtection`                            | Whether a project offers or requires the passkey; values stay `"proposee"` / `"exigee"`.                                                        |
+| coffre                                  | `vault` (`TokenVault`)                       | Where the target keeps tokens: the system keychain on desktop, local storage on the web.                                                        |
+| scellement, sceller, scellé             | `sealing`, `seal`, `sealed` (`TokenSealing`) | Encrypting stored tokens under a key a passkey yields; _unlock_ opens them for the open tabs, which hand the key to the tabs opened afterwards. |
+| passkey                                 | `passkey`                                    | A WebAuthn credential whose PRF output derives the sealing key.                                                                                 |
+| chiffreur                               | `cipher` (`Cipher`)                          | The object that seals and opens private contents with the passkey key.                                                                          |
 
 ## Application architecture
 

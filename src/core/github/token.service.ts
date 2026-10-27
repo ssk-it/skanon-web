@@ -43,21 +43,8 @@ export function repoKeys(repoRef: { owner: string; repo: string }): {
   return { organization: org, exact: `${org}/${repoRef.repo.toLowerCase()}` };
 }
 
-/** An access obtained in exchange for a verified identity, and what it opens. */
-export interface TemporaryAccess {
-  readonly token: string;
-  /** Instant beyond which it must no longer be presented. */
-  readonly validUntil: string;
-  readonly repos: readonly string[];
-  readonly identity: {
-    readonly identifier: string;
-    readonly name: string;
-    readonly email: string | null;
-  };
-}
-
 /** Where the current token comes from. */
-export type TokenSource = "aucune" | "personnel" | "identite_tierce";
+export type TokenSource = "aucune" | "personnel";
 
 /**
  * In what form tokens are kept on the machine, so that the interface says so (RG-secret-conserve-localement): in the system vault (desktop), in plain text in the browser, sealed by a passkey, or for the tab only — a project in the tab requires the passkey, and they are not sealed (RG-protection-du-jeton-par-projet).
@@ -68,11 +55,8 @@ export type TokenForm = "systeme" | "en-clair" | "scelle" | "session";
 export type PasskeyFailure = "annule" | "impossible" | "illisible";
 
 /**
- * The GitHub access token.
- *
- * Single substitution point for phase 7: the proxy will replace manual
- * input by providing an installation token, and nothing else will change
- * in the application — `GithubClient` queries this service, not the storage.
+ * The GitHub access token: `GithubClient` queries this service, not the
+ * storage.
  *
  * Tokens are kept in the target's vault — see `platform/ports.ts`
  * for what that is worth. Hence the advice, which prevails here: grant only a
@@ -195,41 +179,21 @@ export class TokenService {
     return this.token();
   }
 
-  /**
-   * Access obtained in exchange for a verified identity.
-   *
-   * It does not go into browser storage: it expires within an hour, and
-   * finding it the next day would only produce authorisation errors whose
-   * cause would be invisible. Losing it on reload is the right behaviour —
-   * a new verified identity gives it back at once.
-   */
-  private readonly access = signal<TemporaryAccess | null>(null);
-
   /** True if a token is available, whatever its source. */
   readonly present = computed(() => this.value() !== null);
 
   /**
-   * True if nothing is saved: no general token, no scoped token, no temporary access.
+   * True if nothing is saved: no general token, no scoped token.
    *
    * `present` only answers for the targeted repo: a token saved for another organisation counts for nothing there, even though it is indeed in place (RG-acces-par-portee).
    */
   readonly noAccess = computed(
-    () =>
-      this.token() === null &&
-      this.byScope().size === 0 &&
-      this.access() === null,
+    () => this.token() === null && this.byScope().size === 0,
   );
 
-  readonly source = computed<TokenSource>(() => {
-    if (this.access() !== null) return "identite_tierce";
-    return this.applicableToken() === null ? "aucune" : "personnel";
-  });
-
-  /** Who obtained the current access, if it comes from a verified identity. */
-  readonly identity = computed(() => this.access()?.identity ?? null);
-
-  /** Projects this access reaches, if it comes from a verified identity. */
-  readonly repos = computed(() => this.access()?.repos ?? null);
+  readonly source = computed<TokenSource>(() =>
+    this.applicableToken() === null ? "aucune" : "personnel",
+  );
 
   /** The last four characters, to identify the token without exposing it. */
   readonly fingerprint = computed(() => {
@@ -253,16 +217,7 @@ export class TokenService {
     return this.token() ? "" : null;
   });
 
-  /**
-   * The token to present to the platform.
-   *
-   * Temporary access takes precedence over the personal token: someone who has just
-   * identified expects to write under that identity, not under a token they
-   * had entered the day before.
-   *
-   * An expired access is not returned — presenting it would produce a refusal whose
-   * cause would be invisible to the author.
-   */
+  /** The token to present to the platform. */
   value(): string | null {
     return this.valueFor(this.currentRepo());
   }
@@ -275,30 +230,7 @@ export class TokenService {
    * check, repo by repo, which one carries a specification.
    */
   valueFor(repoRef: { owner: string; repo: string } | null): string | null {
-    const a = this.access();
-    if (a) {
-      if (Date.parse(a.validUntil) > Date.now()) return a.token;
-      // expired: we forget it, so that the source stops announcing it
-      this.access.set(null);
-    }
     return this.applicableToken(repoRef);
-  }
-
-  /** Saves an access obtained in exchange for a verified identity. */
-  setAccess(access: TemporaryAccess): void {
-    this.access.set(access);
-  }
-
-  /**
-   * Forgets the temporary access, without touching the personal token.
-   *
-   * Private contents are all erased: nothing distinguishes those this
-   * access read from those of a personal token, and erasing too much only costs
-   * a download, whereas keeping too much would outlive the access.
-   */
-  eraseAccess(): void {
-    this.access.set(null);
-    void this.cache.clearPrivate();
   }
 
   /**
@@ -493,10 +425,9 @@ export class TokenService {
     this.byScope.set(next);
   }
 
-  /** Erases everything: stored tokens, those in memory, and the temporary access. */
+  /** Erases everything: stored tokens, and those in memory. */
   erase(): void {
     this.token.set(null);
-    this.access.set(null);
     this.byScope.set(new Map());
     void this.vault.deleteTokens().then((writing) => {
       this.recordWrite(writing, "effacement");

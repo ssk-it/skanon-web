@@ -6,7 +6,6 @@ import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
-  type AccessMode,
   type TokenProtection,
   type Specification,
 } from "../../core/model/model";
@@ -16,18 +15,10 @@ import { RepoConfig } from "../../core/repo/repo-config";
 import { createAppRouter } from "../../router";
 import SettingsPage from "./SettingsPage.vue";
 
-function specification(
-  tokenProtection: TokenProtection,
-  access: AccessMode = "jeton_personnel",
-): Specification {
+function specification(tokenProtection: TokenProtection): Specification {
   return {
     project: { name: "Test", description: "", codeRepos: [], prefix: null },
     settings: {
-      access,
-      identity:
-        access === "identite_tierce"
-          ? { issuer: "https://e", client: "c", exchange: "https://x" }
-          : null,
       tokenProtection,
       linkTags: DEFAULT_LINK_TAGS,
     },
@@ -41,12 +32,9 @@ function specification(
   };
 }
 
-async function mountView(
-  protection: TokenProtection = "proposee",
-  access: AccessMode = "jeton_personnel",
-) {
+async function mountView(protection: TokenProtection = "proposee") {
   const store = inject(SpecificationStore);
-  store.specification.set(specification(protection, access));
+  store.specification.set(specification(protection));
   store.state.set("pret");
   const router = createAppRouter(createMemoryHistory());
   await router.push("/org/depot/reglages");
@@ -125,26 +113,32 @@ describe("Settings: token protection", () => {
     );
   });
 
-  it("does not show under a third-party identity, whose access lasts only the session", async () => {
-    const view = await mountView("proposee", "identite_tierce");
-    expect(section(view).exists()).toBe(false);
+  // Only the personal token opens a repo: its protection is the first thing the page sets, and no access mode is offered any more.
+  it("opens on the token protection, without an access mode", async () => {
+    const view = await mountView();
+    expect(view.find("h2.section").text()).toBe(
+      "Protection du jeton dans la version web",
+    );
+    expect(view.find('input[name="acces"]').exists()).toBe(false);
+    expect(view.text()).not.toContain("Mode d’accès");
+    expect(view.text()).not.toContain("identité tierce");
   });
 
   // RG-textes-traduits: the page explains in the reader's language; what it writes into the repo stays French.
   describe("in English", () => {
     beforeEach(() => inject(LocaleService).choice.set("en"));
 
-    it("names the settings and the access modes in English", async () => {
+    it("names the settings in English, starting with the token protection", async () => {
       const view = await mountView();
       const text = view.text();
       expect(view.find("h1").text()).toBe("Project settings");
-      expect(text).toContain("Access mode");
-      expect(text).toContain("Personal token");
-      expect(text).toContain("Third-party identity");
-      expect(text).toContain("not yet available");
+      expect(view.find("h2.section").text()).toBe(
+        "Token protection in the web version",
+      );
       expect(text).toContain("Code repos");
+      expect(text).not.toContain("Access mode");
+      expect(text).not.toContain("third-party identity");
       expect(text).not.toContain("Réglages du projet");
-      expect(text).not.toContain("Jeton personnel");
     });
 
     it("describes each way of keeping the token, in English", async () => {

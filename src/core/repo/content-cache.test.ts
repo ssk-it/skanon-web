@@ -69,7 +69,6 @@ describe("content cache", () => {
     expect(await cache.loadContent(PUBLIC, "a1")).toBeNull();
     await cache.saveContent(PUBLIC, "a1", "un énoncé", {
       private: false,
-      persist: true,
     });
     expect(await newVisit().loadContent(PUBLIC, "a1")).toBe("un énoncé");
   });
@@ -93,7 +92,6 @@ describe("content cache", () => {
     expect(await second.loadState(PUBLIC, "HEAD")).toBeNull();
     await second.saveContent(PUBLIC, "a1", "un énoncé", {
       private: false,
-      persist: true,
     });
     expect(await second.loadContent(PUBLIC, "a1")).toBe("un énoncé");
   });
@@ -103,7 +101,6 @@ describe("content cache", () => {
     const cache = newVisit();
     await cache.saveContent(PUBLIC, "a1", "un énoncé", {
       private: false,
-      persist: true,
     });
 
     const events = await new Promise<string[]>((resolve) => {
@@ -122,7 +119,6 @@ describe("content cache", () => {
   it("serves a content again on the next visit, under its fingerprint", async () => {
     await newVisit().saveContent(PUBLIC, "a1", "un énoncé", {
       private: false,
-      persist: true,
     });
 
     const next = newVisit();
@@ -134,7 +130,6 @@ describe("content cache", () => {
     const cache = newVisit();
     await cache.saveContent(PUBLIC, "a1", "public", {
       private: false,
-      persist: true,
     });
 
     expect(
@@ -143,21 +138,8 @@ describe("content cache", () => {
     expect(await newVisit().loadContent(PRIVATE, "a1")).toBeNull();
   });
 
-  it("keeps in memory only what must not outlive the session", async () => {
-    const cache = newVisit();
-    await cache.saveContent(PRIVATE, "a1", "secret", {
-      private: true,
-      persist: false,
-    });
-
-    expect(await cache.loadContent(PRIVATE, "a1")).toBe("secret");
-    expect(await newVisit().loadContent(PRIVATE, "a1")).toBeNull();
-  });
-
   it("keeps the last read state of each branch", async () => {
-    await newVisit().saveState(PUBLIC, "HEAD", state(false), {
-      persist: true,
-    });
+    await newVisit().saveState(PUBLIC, "HEAD", state(false));
 
     const reread = await newVisit().loadState(PUBLIC, "HEAD");
     expect(reread?.commit).toBe("c0mm17");
@@ -170,17 +152,13 @@ describe("content cache", () => {
     for (const sha of ["a1", "b2", "c3"]) {
       await cache.saveContent(PUBLIC, sha, sha, {
         private: false,
-        persist: true,
       });
     }
     await cache.saveContent(PRIVATE, "c3", "autre dépôt", {
       private: true,
-      persist: true,
     });
-    await cache.saveState(PUBLIC, "HEAD", state(false), { persist: true });
-    await cache.saveState(PUBLIC, "cadrage-2026-001", state(false), {
-      persist: true,
-    });
+    await cache.saveState(PUBLIC, "HEAD", state(false));
+    await cache.saveState(PUBLIC, "cadrage-2026-001", state(false));
 
     await cache.pruneRepo(PUBLIC, new Set(["a1", "b2"]), new Set(["HEAD"]));
 
@@ -197,16 +175,13 @@ describe("content cache", () => {
     const cache = newVisit();
     await cache.saveContent(PUBLIC, "a1", "public", {
       private: false,
-      persist: true,
     });
     await cache.saveContent(PRIVATE, "a1", "privé", {
       private: true,
-      persist: true,
     });
-    await cache.saveState(PRIVATE, "HEAD", state(true), { persist: true });
+    await cache.saveState(PRIVATE, "HEAD", state(true));
     await cache.saveContent(ELSEWHERE, "a1", "autre organisation", {
       private: true,
-      persist: true,
     });
 
     await cache.clearPrivate((repoRef) => repoRef.startsWith("org/"));
@@ -225,9 +200,8 @@ describe("content cache", () => {
     const cache = newVisit();
     await cache.saveContent(PRIVATE, "a1", "privé", {
       private: true,
-      persist: true,
     });
-    await cache.saveState(PRIVATE, "HEAD", state(true), { persist: true });
+    await cache.saveState(PRIVATE, "HEAD", state(true));
 
     await cache.clearRepo(PRIVATE);
 
@@ -240,7 +214,6 @@ describe("content cache", () => {
     const cache = newVisit();
     await cache.saveContent(PUBLIC, "a1", "mémoire", {
       private: false,
-      persist: true,
     });
 
     expect(await cache.loadContent(PUBLIC, "a1")).toBe("mémoire");

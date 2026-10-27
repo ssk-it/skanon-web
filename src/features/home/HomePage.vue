@@ -177,7 +177,7 @@ function validateRepo(): void {
 
     <CreateSpecification class="nouveau" />
 
-    <!-- RG-connexion-optionnelle, RG-modes-acces: the help offers itself, below the list, without posing as a prerequisite — a public repo is read without a token, and a project under third-party identity asks for none. -->
+    <!-- RG-connexion-optionnelle: the help offers itself, below the list, without posing as a prerequisite — a public repo is read without a token. -->
     <section v-if="tokens.noAccess()" class="connexion">
       <h2>{{ t().signInTitle }}</h2>
       <p class="aide">{{ t().signInHelp }}</p>

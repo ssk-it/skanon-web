@@ -5,7 +5,7 @@ import { LocaleService } from "../i18n/locale.service";
 /**
  * What the reading and writing of a repo report to the user: the anomalies Skanon itself finds, and why an action is refused. What is written into the repo — commit messages, pull requests, section headings, `ssk-canon.yml` comments — never comes from here (RG-textes-traduits), nor do the messages of the shared checker.
  *
- * The format's keys and values (`depots_code`, `identite_tierce`…) are quoted as the file writes them, in both languages.
+ * The format's keys and values (`depots_code`, `protection_du_jeton`…) are quoted as the file writes them, in both languages.
  */
 export const repoMessages = defineMessages({
   fr: {
@@ -18,24 +18,14 @@ export const repoMessages = defineMessages({
       `${path} : le statut ne se déclare pas, il se déduit de l’état du dépôt.`,
     configUnreadable: (config: string, cause: string) =>
       `${config} : illisible — ${cause}.`,
-    identityBlockRequired: (config: string) =>
-      `${config} : le mode « identite_tierce » demande un bloc « identite » ` +
-      "complet — émetteur, client et échange.",
     codeReposNotList: (config: string) =>
       `${config} : « depots_code » doit être une liste.`,
     codeRepoIgnored: (config: string, repo: string) =>
       `${config} : dépôt de code « ${repo || "(vide)"} » ignoré — ` +
       "attendu « organisation/depot ».",
-    unknownAccessMode: (config: string, value: string, expected: string) =>
-      `${config} : mode d'accès inconnu « ${value} » — ` +
-      `attendu ${expected}. Le jeton personnel s'applique.`,
     unknownTokenProtection: (config: string, value: string, expected: string) =>
       `${config} : protection du jeton inconnue « ${value} » — ` +
       `attendu ${expected}. La passkey est proposée, non exigée.`,
-    identityFieldMissing: (config: string, field: string) =>
-      `${config} : identite.${field} manquant.`,
-    identityFieldNotAddress: (config: string, field: string) =>
-      `${config} : identite.${field} n'est pas une adresse valide.`,
 
     // Loading and listing
     repoNotAnswering:
@@ -73,24 +63,14 @@ export const repoMessages = defineMessages({
       `${path}: the status is not declared, it is derived from the repo’s state.`,
     configUnreadable: (config: string, cause: string) =>
       `${config}: unreadable — ${cause}.`,
-    identityBlockRequired: (config: string) =>
-      `${config}: the “identite_tierce” mode requires a complete “identite” ` +
-      "block — issuer, client and exchange.",
     codeReposNotList: (config: string) =>
       `${config}: “depots_code” must be a list.`,
     codeRepoIgnored: (config: string, repo: string) =>
       `${config}: code repo “${repo || "(empty)"}” ignored — ` +
       "expected “organisation/repo”.",
-    unknownAccessMode: (config: string, value: string, expected: string) =>
-      `${config}: unknown access mode “${value}” — ` +
-      `expected ${expected}. The personal token applies.`,
     unknownTokenProtection: (config: string, value: string, expected: string) =>
       `${config}: unknown token protection “${value}” — ` +
       `expected ${expected}. The passkey is offered, not required.`,
-    identityFieldMissing: (config: string, field: string) =>
-      `${config}: identite.${field} missing.`,
-    identityFieldNotAddress: (config: string, field: string) =>
-      `${config}: identite.${field} is not a valid address.`,
 
     repoNotAnswering:
       "The repo is not answering: the state shown is the last one read, and " +

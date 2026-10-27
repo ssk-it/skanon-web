@@ -89,21 +89,6 @@ describe("repo not found under a token", () => {
     ).toBeNull();
   });
 
-  it("does not mention it under temporary access: it is not set in one's tokens", async () => {
-    tokens.setAccess({
-      token: "ghs_accesTemporaire",
-      validUntil: new Date(Date.now() + 3_600_000).toISOString(),
-      repos: [],
-      identity: { identifier: "u", name: "U", email: null },
-    });
-    await loadNotFound();
-
-    expect(
-      render().querySelector('a[href*="personal-access-tokens"]'),
-    ).toBeNull();
-    tokens.eraseAccess();
-  });
-
   it("does not mention it for another failure", async () => {
     tokens.set("github_pat_jetonDeTestSuffisammentLong");
     const pending = store.loadSpecification(REPO);

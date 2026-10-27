@@ -59,14 +59,6 @@ export const githubMessages = defineMessages({
     triedTokenStatus: (status: number) =>
       `GitHub a répondu ${status} à ce jeton.`,
 
-    identityNotDeclared:
-      "Ce projet ne déclare pas où vérifier les identités. Voir ses réglages.",
-    signInStateMismatch: "La réponse ne correspond pas à la demande.",
-    signInFailed: "La connexion n’a pas abouti.",
-    issuerRefused: "L’émetteur d’identité a refusé la connexion.",
-    issuerNoIdentity: "L’émetteur n’a rendu aucune identité.",
-    accessRefused: "L’accès au dépôt a été refusé.",
-
     tokenEmpty: "Saisir un jeton.",
     tokenWithSpace: "Un jeton ne contient pas d’espace.",
     tokenPrefix: "Un jeton GitHub commence par ghp_ ou github_pat_.",
@@ -122,14 +114,6 @@ export const githubMessages = defineMessages({
     triedTokenRefused: "GitHub refuses this token — expired, or miscopied.",
     triedTokenStatus: (status: number) =>
       `GitHub answered ${status} to this token.`,
-
-    identityNotDeclared:
-      "This project does not declare where to verify identities. See its settings.",
-    signInStateMismatch: "The response does not match the request.",
-    signInFailed: "Signing in did not succeed.",
-    issuerRefused: "The identity issuer refused the sign-in.",
-    issuerNoIdentity: "The issuer returned no identity.",
-    accessRefused: "Access to the repo was refused.",
 
     tokenEmpty: "Enter a token.",
     tokenWithSpace: "A token contains no space.",

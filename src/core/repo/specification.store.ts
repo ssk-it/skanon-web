@@ -28,8 +28,6 @@ export type LoadState = "vide" | "chargement" | "pret" | "erreur";
 const EMPTY: Specification = {
   project: { name: "", description: "", codeRepos: [], prefix: null },
   settings: {
-    access: "jeton_personnel",
-    identity: null,
     tokenProtection: "proposee",
     linkTags: DEFAULT_LINK_TAGS,
   },
@@ -149,8 +147,7 @@ export class SpecificationStore {
    * The platform responds this way, with no other reason, to a token that does
    * not cover the repo — the common case of a token restricted to a selection
    * of repos. It is fixed in the token's settings, which the error screen then
-   * points to. Not under a temporary access: that one is not set in one's
-   * tokens, but in the installation of the registered application.
+   * points to.
    */
   readonly tokenWithoutAccess = signal(false);
 

@@ -23,15 +23,12 @@ describe("forgetting an access and private contents", () => {
     cache = inject(ContentCache);
     await cache.saveContent(PRIVATE, "a1", "privé", {
       private: true,
-      persist: true,
     });
     await cache.saveContent(OTHER, "a1", "autre", {
       private: true,
-      persist: true,
     });
     await cache.saveContent(PUBLIC, "a1", "public", {
       private: false,
-      persist: true,
     });
   });
 

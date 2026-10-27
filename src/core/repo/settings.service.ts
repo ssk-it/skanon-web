@@ -79,7 +79,7 @@ export class SettingsService {
         branch,
         base,
         "Modifie les réglages du projet",
-        "Mode d’accès, protection du jeton et dépôts de code du projet.\n\nCes réglages valent " +
+        "Protection du jeton et dépôts de code du projet.\n\nCes réglages valent " +
           "pour tous ceux qui travaillent sur le projet.",
       ));
 

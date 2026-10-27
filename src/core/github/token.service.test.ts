@@ -56,22 +56,13 @@ describe("TokenService", () => {
     expect(storage.has("ssk-canon.token")).toBe(false);
   });
 
-  /** RG-acces-par-portee, RG-acces-temporaire: a token for a single organisation, or a temporary access, is already an access in place. */
-  it("reports no access in place only without a token, of any scope, nor temporary access", () => {
+  /** RG-acces-par-portee: a token for a single organisation is already an access in place. */
+  it("reports no access in place only without a token, of any scope", () => {
     expect(service.noAccess()).toBe(true);
 
     service.setForScope("ssk-it", "ghp_abcdefghijklmnopqrst1234");
     service.targetRepo({ owner: "Wayne-Corp", repo: "wayne-devis-cadrage" });
     expect(service.present()).toBe(false);
-    expect(service.noAccess()).toBe(false);
-
-    service.erase();
-    service.setAccess({
-      token: "ghs_temporaire",
-      validUntil: new Date(Date.now() + 3_600_000).toISOString(),
-      repos: ["ssk-it/ssk-canon"],
-      identity: { identifier: "ssk", name: "SSK", email: null },
-    });
     expect(service.noAccess()).toBe(false);
   });
 

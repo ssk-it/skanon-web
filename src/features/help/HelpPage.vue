@@ -59,7 +59,6 @@ const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
           >{{ t().tokens.sentOnlyTo.after }}
         </li>
         <li>{{ t().tokens.scope }}</li>
-        <li>{{ t().tokens.verifiedIdentity }}</li>
         <li>{{ t().tokens.signOut }}</li>
         <li v-for="phrase in help.jetons" :key="phrase">{{ phrase }}</li>
       </ul>
@@ -109,7 +108,6 @@ const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
           <code>avatars.githubusercontent.com</code
           >{{ t().communications.avatars }}
         </li>
-        <li>{{ t().communications.identity }}</li>
         <li v-for="phrase in help.communications" :key="phrase">
           {{ phrase }}
         </li>
