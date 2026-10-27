@@ -168,5 +168,7 @@ export function createWebPlatform(): Platform {
     version: ServiceWorkerAnnouncer.register(serviceWorkerAvailable()),
     // The site is redeployed on every merge, without a number: the built commit designates it (`vite.config.ts`).
     loadVersion: async () => import.meta.env.VITE_VERSION,
+    // The browser draws its own window around the page.
+    titleBar: null,
   };
 }

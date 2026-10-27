@@ -281,14 +281,38 @@ function clearOfBar(event: FocusEvent): void {
   if (top < below) window.scrollBy(0, top - below);
 }
 
+/**
+ * Where the system draws the window's controls over the bar — macOS, on the desktop —, the room they take is published on the root (`--pc-retrait-fenetre`): the brand starts after them, and so does the skip link, whose focus they would otherwise hide (RG-accessibilite-aa, 2.4.11). The bar's background moves the window, as the title bar it replaces did.
+ */
+const stopTitleBar: (() => void)[] = [];
+/** True while the controls take room at the bar's start; not in full screen, where the system hides them. */
+const underControls = ref(false);
+
+function leaveRoomForControls(): void {
+  const titleBar = platform.titleBar;
+  if (!titleBar || !bar.value) return;
+  stopTitleBar.push(
+    titleBar.listenControlsWidth((width) => {
+      underControls.value = width > 0;
+      document.documentElement.style.setProperty(
+        "--pc-retrait-fenetre",
+        `${width}px`,
+      );
+    }),
+    titleBar.makeDraggable(bar.value),
+  );
+}
+
 onMounted(() => {
   if (bar.value) barObserver?.observe(bar.value);
+  leaveRoomForControls();
   document.addEventListener("focusin", clearOfBar);
   document.addEventListener("keydown", onKeydown);
   window.addEventListener("popstate", onHistory);
 });
 onBeforeUnmount(() => {
   barObserver?.disconnect();
+  for (const stop of stopTitleBar.splice(0)) stop();
   document.removeEventListener("focusin", clearOfBar);
   document.removeEventListener("keydown", onKeydown);
   window.removeEventListener("popstate", onHistory);
@@ -349,7 +373,7 @@ function skipToContent(): void {
   <a class="evitement" href="#contenu" @click.prevent="skipToContent">{{
     t().skipToContent
   }}</a>
-  <header ref="bar" class="barre">
+  <header ref="bar" class="barre" :class="{ 'sous-commandes': underControls }">
     <RouterLink class="marque" to="/">
       <!-- The chevron takes the bar's text colour; only the axis keeps its hue, to stay recognisable in both themes. -->
       <svg
@@ -752,7 +776,9 @@ function skipToContent(): void {
   color: #f2f6ff;
   align-self: stretch;
   margin: 0 12px 0 calc(-1 * var(--pc-barre-padding));
-  padding: 0 18px 0 var(--pc-barre-padding);
+  /* The window's controls, where the system draws them over the bar, sit on the dark block: the logo starts after them. */
+  padding: 0 18px 0
+    calc(var(--pc-barre-padding) + var(--pc-retrait-fenetre, 0px));
 
   /* The block does not shrink: shrunk, it slid under its own text, which then overflowed in light onto the bar's blue. The tabs are the ones that give way, their overflow being already handled. */
   flex: none;
@@ -851,7 +877,7 @@ function skipToContent(): void {
 .evitement {
   position: absolute;
   top: 8px;
-  left: 8px;
+  left: calc(8px + var(--pc-retrait-fenetre, 0px));
   z-index: 20;
   padding: 10px 16px;
   border-radius: 6px;
@@ -1014,6 +1040,18 @@ function skipToContent(): void {
   /* The tabs do not shrink (see `.onglets`): under 430 px, they wrap rather than widen the page — RG-accessibilite-aa, 320 px. */
   .onglets {
     flex-wrap: wrap;
+  }
+}
+
+/* Under the window's controls, a narrow window no longer holds the brand's name with the buttons: one of them went alone to the next line. The name gives way to the eye and the symbol stays, as on a phone (RG-identite-affichee, RG-aide-a-portee). */
+@media (max-width: 800px) {
+  .sous-commandes .marque .nom {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
