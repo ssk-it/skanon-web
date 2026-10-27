@@ -5,8 +5,8 @@ import { LocaleService } from "../../core/i18n/locale.service";
 import { inject, resetInjection } from "../../core/injection";
 import TokenDialog from "./TokenDialog.vue";
 
-/** The token input, whether the browser masks it in a text field or in a password field. */
-const TOKEN_FIELD = "input.ui-champ__saisie--secret";
+/** The token input. */
+const TOKEN_FIELD = "input[type=password]";
 
 /**
  * Sign-in to GitHub, in personal token mode: the creation help is read at the moment of input — RG-secret-conserve-localement.
@@ -38,34 +38,14 @@ describe("TokenDialog", () => {
     expect(guide(view).attributes("open")).toBeDefined();
   });
 
-  // 2026-055 decision 01 rejected the browser's password manager: a password field would make it offer to save the token.
-  it("masks the token in a field no password manager takes for a password", async () => {
+  // RG-accessibilite-aa: the author's password manager may fill the token. 2026-055 decision 01 only rejected Skanon keeping it there itself.
+  it("takes the token in a password field, even where a text field could be masked", async () => {
     vi.spyOn(CSS, "supports").mockReturnValue(true);
     const view = mount(TokenDialog);
     await flushPromises();
     const field = view.find(TOKEN_FIELD);
-    expect(field.attributes("type")).toBe("text");
-    expect(field.attributes("autocomplete")).toBe("off");
+    expect(field.attributes("type")).toBe("password");
     expect(field.attributes("spellcheck")).toBe("false");
-    expect(field.attributes("autocapitalize")).toBe("off");
-  });
-
-  it("falls back to a password field where the browser cannot mask a text field", async () => {
-    vi.spyOn(CSS, "supports").mockReturnValue(false);
-    const view = mount(TokenDialog);
-    await flushPromises();
-    expect(view.find(TOKEN_FIELD).attributes("type")).toBe("password");
-  });
-
-  it("does not let the masked token be copied out", async () => {
-    vi.spyOn(CSS, "supports").mockReturnValue(true);
-    const view = mount(TokenDialog);
-    await flushPromises();
-    for (const type of ["copy", "cut"]) {
-      const event = new Event(type, { cancelable: true });
-      view.find(TOKEN_FIELD).element.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(true);
-    }
   });
 
   it("keeps it collapsed for those who already have a token, of whatever scope", async () => {

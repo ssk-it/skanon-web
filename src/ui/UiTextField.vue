@@ -8,13 +8,12 @@ import UiFieldFrame from "./UiFieldFrame.vue";
  * ```vue
  * <UiTextField v-model="title" label="Titre" hint="Ce que ce cadrage change, en une ligne." />
  * <UiTextField v-model="goal" label="Objectif" multiline :rows="5" />
- * <UiTextField v-model="input" label="Jeton" secret :error="error" @keyup.enter="validate()" />
+ * <UiTextField v-model="input" label="Jeton" type="password" :error="error" @keyup.enter="validate()" />
  * ```
  *
  * - The label floats when the field has focus or a value, as in Material; `fixed-label` keeps it floating by default. The `placeholder` only shows with the label floating.
  * - `error` (a text) puts the field in error and replaces the hint; the `#indice` slot replaces the plain hint when it must carry its own style.
  * - `class` and `style` go to the frame; any other attribute and any listener (`@keyup.enter`, `@blur`, `aria-*`, `name`, `autocomplete`, `spellcheck`, `data-focus-initial`…) go to the `<input>` or the `<textarea>`.
- * - `secret` masks the input without making it a password field, which the browser's password manager would offer to save: a text field drawn in discs, that cannot be copied out. Where the browser cannot draw a text field in discs, a password field still masks it.
  * - Width: 212 px by default, like `mat-form-field`; a view that wants it full width gives it `width: 100%`.
  */
 defineOptions({ inheritAttrs: false });
@@ -32,14 +31,12 @@ const props = withDefaults(
     error?: string | null;
     disabled?: boolean;
     fixedLabel?: boolean;
-    secret?: boolean;
   }>(),
   {
     type: "text",
     multiline: false,
     rows: 2,
     disabled: false,
-    secret: false,
     label: undefined,
     placeholder: undefined,
     hint: null,
@@ -56,20 +53,6 @@ const controlAttrs = computed(() => {
   const { class: _c, style: _s, ...rest } = attrs;
   return rest;
 });
-
-/** Discs drawn over a text field: `-webkit-text-security`, which Chrome, Safari and Firefox (114+) read. */
-const masksText =
-  typeof CSS !== "undefined" && CSS.supports("-webkit-text-security", "disc");
-
-const inputType = computed(() => {
-  if (!props.secret) return props.type;
-  return masksText ? "text" : "password";
-});
-
-/** A masked token is not copied out, as a password field would not let it be. */
-function holdBack(event: ClipboardEvent): void {
-  if (props.secret) event.preventDefault();
-}
 
 const floating = computed(
   () => props.fixedLabel || focus.value || model.value !== "",
@@ -124,21 +107,15 @@ defineExpose({
       :id="id"
       ref="control"
       class="ui-champ__saisie"
-      :class="{ 'ui-champ__saisie--secret': secret }"
-      :type="inputType"
+      :type="type"
       :value="model"
       :placeholder="placeholder"
       :disabled="disabled"
       :aria-invalid="!!error || undefined"
-      :autocomplete="secret ? 'off' : undefined"
-      :spellcheck="secret ? 'false' : undefined"
-      :autocapitalize="secret ? 'off' : undefined"
       v-bind="controlAttrs"
       @input="enter"
       @focus="focus = true"
       @blur="focus = false"
-      @copy="holdBack"
-      @cut="holdBack"
     />
     <!-- What accompanies the input in the frame: the panel of UiAutocomplete. -->
     <slot />

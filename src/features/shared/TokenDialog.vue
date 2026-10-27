@@ -304,13 +304,15 @@ function signOut(): void {
       </div>
     </div>
     <template v-else>
-      <!-- Not a password field: the browser would offer to keep the token in its password manager, which 2026-055 decision 01 rejected. -->
+      <!-- A password field, which the author's password manager may fill (RG-accessibilite-aa); 2026-055 decision 01 only rejected Skanon keeping the token there itself. -->
       <UiTextField
         :model-value="input"
         class="champ"
         :label="t().tokenLabel"
-        secret
+        type="password"
         placeholder="ghp_…"
+        autocomplete="off"
+        spellcheck="false"
         data-focus-initial
         :error="error"
         :hint="t().tokenHint(whereKept)"
