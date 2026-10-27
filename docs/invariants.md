@@ -28,11 +28,11 @@ The application has no rights of its own: every call carries the user's personal
 
 ## INV-6 — Calls to GitHub are throttled by the client
 
-The API's secondary limits — one hundred concurrent requests, five hundred writes per hour — apply to the account that holds the token, whatever project is open, and only the client sees its own calls. Two bounded queues in the access layer: six concurrent requests to the API, twenty-four to raw contents, which have no quota.
+The API's secondary limits — one hundred concurrent requests, five hundred writes per hour — apply to the account that holds the token, whatever project is open, and only the client sees its own calls. Two bounded queues in the access layer: six concurrent requests to the API, twenty-four to raw contents, which have no quota. Where the platform keeps its own copy of the repos (`ContentSource`, scoping 2026-067), reading goes through neither queue: the platform updates one repo at a time, and the interface still throttles its API calls.
 
 ## INV-7 — Format reading is written once, in `@ssk-it/canon-check`
 
-Frontmatter splitting, the format rules and their verification live in the library shared by the application and the automation (RG-parseur-partage). The native core of the desktop application neither reads nor verifies the format: it keeps secrets and talks to the system. Without this rule, two implementations diverge, and a repo the application accepts is rejected by the verification — or the reverse —, without either one being at fault.
+Frontmatter splitting, the format rules and their verification live in the library shared by the application and the automation (RG-parseur-partage). The native core of the desktop application neither reads nor verifies the format: it keeps secrets, keeps a copy of the repos, and talks to the system — it hands files over as they are, and the interface reads them. Without this rule, two implementations diverge, and a repo the application accepts is rejected by the verification — or the reverse —, without either one being at fault.
 
 ## INV-8 — A token leaves the machine only towards GitHub
 

@@ -6,22 +6,29 @@ import { provideHttpTesting } from "./core/http/http-testing";
 import { inject, provide } from "./core/injection";
 import { COMPOSITION, compose } from "./extension/composer";
 import type { Extension } from "./extension/extension";
+import type { Platform } from "./platform/ports";
 import { PLATFORM } from "./platform/platform-token";
 import { createWebPlatform } from "./platform/web";
 import { createAppRouter } from "./router";
 
 /**
- * A page outside any project — help, the legal notice —, as a deliverable shows it: its target, its extensions, the displayed language (French by default). For the extensions' tests, which exercise their contributions in the page that renders them, in each language (RG-textes-traduits).
+ * What a deliverable's platform changes in a page, besides its target: the adapters the page reads to choose what it says — `contentSource`, for instance.
+ */
+export type PlatformTraits = Partial<Pick<Platform, "contentSource">>;
+
+/**
+ * A page outside any project — help, the legal notice —, as a deliverable shows it: its target, its extensions, the displayed language (French by default), and what its platform provides. For the extensions' tests, which exercise their contributions in the page that renders them, in each language (RG-textes-traduits).
  */
 export async function mountPage(
   address: string,
   target: "web" | "bureau",
   extensions: readonly Extension[],
   language: Language = "fr",
+  traits: PlatformTraits = {},
 ): Promise<VueWrapper> {
   provideHttpTesting();
   inject(LocaleService).choice.set(language);
-  provide(PLATFORM, { ...createWebPlatform(), target });
+  provide(PLATFORM, { ...createWebPlatform(), target, ...traits });
   provide(COMPOSITION, compose(extensions));
   const router = createAppRouter(createMemoryHistory());
   await router.push(address);
@@ -37,6 +44,9 @@ export async function pageText(
   target: "web" | "bureau",
   extensions: readonly Extension[],
   language: Language = "fr",
+  traits: PlatformTraits = {},
 ): Promise<string> {
-  return (await mountPage(address, target, extensions, language)).text();
+  return (
+    await mountPage(address, target, extensions, language, traits)
+  ).text();
 }

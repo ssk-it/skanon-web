@@ -353,6 +353,16 @@ export class GithubClient {
     });
   }
 
+  /**
+   * The error a content source's failure stands for, worded as the API's
+   * would be: the source reports the platform's status, 0 for the network.
+   */
+  sourceError(status: number): GithubError {
+    return this.toGithubError(
+      new HttpErrorResponse(status, "", new HttpHeaders(), null, ""),
+    );
+  }
+
   private recordQuota(remaining: string | null): void {
     if (remaining !== null) this.quotaRemaining.set(Number(remaining));
   }

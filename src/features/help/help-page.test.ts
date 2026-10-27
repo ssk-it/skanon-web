@@ -9,6 +9,7 @@ import { COMPOSITION, compose } from "../../extension/composer";
 import type { Extension } from "../../extension/extension";
 import { PLATFORM } from "../../platform/platform-token";
 import { createWebPlatform } from "../../platform/web";
+import type { ContentSource } from "../../platform/ports";
 import { createAppRouter } from "../../router";
 
 /**
@@ -22,8 +23,9 @@ describe("« Fonctionnement de Skanon » page", () => {
   async function mountView(
     target: "web" | "bureau",
     extensions: readonly Extension[] = [],
+    contentSource: ContentSource | null = null,
   ): Promise<string> {
-    provide(PLATFORM, { ...createWebPlatform(), target });
+    provide(PLATFORM, { ...createWebPlatform(), target, contentSource });
     provide(COMPOSITION, compose(extensions));
     const router = createAppRouter(createMemoryHistory());
     await router.push("/aide");
@@ -117,6 +119,16 @@ describe("« Fonctionnement de Skanon » page", () => {
       "avatars.githubusercontent.com",
     ])
       expect(text).toContain(host);
+  });
+
+  // 2026-067: where the platform keeps its own copy of the repos, the tree, the contents and the token's destination are its own; the deliverable says what they are.
+  it("leaves out the reading channels where the platform keeps its own copy of the repos", async () => {
+    const text = await mountView("bureau", [], {} as ContentSource);
+    expect(text).not.toContain("raw.githubusercontent.com");
+    expect(text).not.toContain("un seul appel compté");
+    expect(text).not.toContain("Il n’est envoyé qu’à");
+    expect(text).not.toContain("Ce qu’aucune branche ne cite plus est retiré");
+    expect(text).toContain("le dernier état lu s’affiche");
   });
 
   // ADR-extensions-commerciales: what belongs to the deliverable comes from its extension; the page does not know what it renders.

@@ -2,7 +2,10 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TokenService } from "../../core/github/token.service";
 import { LocaleService } from "../../core/i18n/locale.service";
-import { inject, resetInjection } from "../../core/injection";
+import { inject, provide, resetInjection } from "../../core/injection";
+import { PLATFORM } from "../../platform/platform-token";
+import { createWebPlatform } from "../../platform/web";
+import type { ContentSource } from "../../platform/ports";
 import TokenDialog from "./TokenDialog.vue";
 
 /** The token input. */
@@ -47,6 +50,24 @@ describe("TokenDialog", () => {
     expect(field.attributes("type")).toBe("password");
     expect(field.attributes("autocomplete")).toBe("on");
     expect(field.attributes("spellcheck")).toBe("false");
+  });
+
+  // 2026-067 decision 08: on the web, the choice still spares a first attempt on raw for a repo known to be private.
+  it("offers to load contents through the API in the web version", async () => {
+    const view = mount(TokenDialog);
+    await flushPromises();
+    expect(view.text()).toContain("Charger les contenus par l’API");
+  });
+
+  // 2026-067 decision 08: the platform's copy goes through neither channel, so the choice would command nothing.
+  it("does not offer it where the platform keeps its own copy of the repos", async () => {
+    provide(PLATFORM, {
+      ...createWebPlatform(),
+      contentSource: {} as ContentSource,
+    });
+    const view = mount(TokenDialog);
+    await flushPromises();
+    expect(view.text()).not.toContain("Charger les contenus par l’API");
   });
 
   it("keeps it collapsed for those who already have a token, of whatever scope", async () => {
