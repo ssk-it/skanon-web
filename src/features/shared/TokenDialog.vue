@@ -311,7 +311,7 @@ function signOut(): void {
         :label="t().tokenLabel"
         type="password"
         placeholder="ghp_…"
-        autocomplete="off"
+        autocomplete="on"
         spellcheck="false"
         data-focus-initial
         :error="error"

@@ -45,6 +45,7 @@ describe("TokenDialog", () => {
     await flushPromises();
     const field = view.find(TOKEN_FIELD);
     expect(field.attributes("type")).toBe("password");
+    expect(field.attributes("autocomplete")).toBe("on");
     expect(field.attributes("spellcheck")).toBe("false");
   });
 
