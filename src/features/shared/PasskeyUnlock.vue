@@ -9,32 +9,25 @@ import { passkeyUnlockMessages } from "./passkey-unlock.messages";
 /**
  * How locked tokens are opened, without any window forced on load (2026-065, decision 02).
  *
- * Where the browser returns the passkey's key through its autofill, a field marked `webauthn` waits for the author: focusing it lists the passkey, picking it opens the tokens; nothing can be typed in it. Elsewhere, and always next to it, the « Unlock » button of 2026-055. A browser accepts one passkey request at a time: the button withdraws the offer before asking, and offers again if asking did not succeed.
+ * Where the browser returns the passkey's key through its autofill, a field marked `webauthn` waits for the author: focusing it lists the passkey, picking it opens the tokens; nothing can be typed in it. Elsewhere, and always next to it, the « Unlock » button of 2026-055. The button opens the browser's window, which lists the site's passkeys; so does opening a project.
  */
 const tokens = inject(TokenService);
 const t = useMessages(passkeyUnlockMessages);
 
 /** Null until the browser said whether its autofill can offer the passkey. */
 const offered = ref<boolean | null>(null);
-let withdraw: AbortController | null = null;
-
-function offer(): void {
-  withdraw = new AbortController();
-  void tokens.offerUnlock(withdraw.signal);
-}
+const withdraw = new AbortController();
 
 onMounted(async () => {
   offered.value = await tokens.canOffer();
-  if (offered.value) offer();
+  if (offered.value) void tokens.offerUnlock(withdraw.signal);
 });
 
-onBeforeUnmount(() => withdraw?.abort());
+onBeforeUnmount(() => withdraw.abort());
 
-async function unlock(): Promise<void> {
-  withdraw?.abort();
-  withdraw = null;
-  const issue = await tokens.unlock();
-  if (issue !== "ouvert" && offered.value) offer();
+/** The service sets the offer aside while the browser's window asks, and offers it again if asking did not succeed. */
+function unlock(): void {
+  void tokens.unlock();
 }
 
 /** The field only lists the passkey: what the browser inserts without a cancellable `beforeinput` — a composition, an autofill — is emptied at once. */

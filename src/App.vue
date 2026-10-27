@@ -168,7 +168,10 @@ function openRepoDialog(): void {
       const repoRef = await dialog.open<RepoRef>(RepoDialog, {
         focus: "dialogue",
       });
-      if (repoRef) void router.push(sameViewElsewhere(repoRef));
+      if (!repoRef) return;
+      // Opening a repo asks for the passkey when the tokens are locked (2026-065, decision 02).
+      if (tokens.locked()) void tokens.unlock();
+      void router.push(sameViewElsewhere(repoRef));
     },
   );
 }

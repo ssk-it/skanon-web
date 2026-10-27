@@ -135,6 +135,46 @@ describe("the token kept under a passkey", () => {
     expect(tab.locked()).toBe(false);
   });
 
+  // 2026-065 decision 02: the browser's window lists the site's passkeys, as an identity provider's does — nothing to type.
+  it("opens through the passkey the author picks in the browser's window", async () => {
+    service.set(TOKEN);
+    await flushPromises();
+    await service.protect();
+    const tab = await reopen(auth);
+    const evaluations = auth.evaluations;
+    expect(await tab.unlock()).toBe("ouvert");
+    expect(auth.choices).toBe(1);
+    expect(auth.evaluations).toBe(evaluations);
+    expect(tab.value()).toBe(TOKEN);
+  });
+
+  // A browser answers one passkey request at a time.
+  it("withdraws the autofill offer while the window asks, and offers it again if asking failed", async () => {
+    service.set(TOKEN);
+    await flushPromises();
+    await service.protect();
+    const tab = await reopen(auth);
+    void tab.offerUnlock(new AbortController().signal);
+    auth.cancel = true;
+    const asking = tab.unlock();
+    expect(auth.offering).toBe(false);
+    expect(await asking).toBe("annule");
+    expect(auth.offering).toBe(true);
+  });
+
+  it("does not offer again an offer its owner withdrew", async () => {
+    service.set(TOKEN);
+    await flushPromises();
+    await service.protect();
+    const tab = await reopen(auth);
+    const abort = new AbortController();
+    void tab.offerUnlock(abort.signal);
+    abort.abort();
+    auth.cancel = true;
+    await tab.unlock();
+    expect(auth.offering).toBe(false);
+  });
+
   it("says nothing of an offer withdrawn before anyone picked the passkey", async () => {
     service.set(TOKEN);
     await flushPromises();

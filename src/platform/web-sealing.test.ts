@@ -398,14 +398,20 @@ describe("the sealed tokens text", () => {
  */
 describe("the passkey the browser creates", () => {
   let created: CredentialCreationOptions | undefined;
+  let requested: CredentialRequestOptions | undefined;
 
   beforeEach(() => {
     created = undefined;
+    requested = undefined;
     vi.stubGlobal("PublicKeyCredential", function PublicKeyCredential() {});
     vi.stubGlobal("navigator", {
       credentials: {
         create: (options: CredentialCreationOptions) => {
           created = options;
+          return Promise.resolve(null);
+        },
+        get: (options: CredentialRequestOptions) => {
+          requested = options;
           return Promise.resolve(null);
         },
       },
@@ -426,5 +432,15 @@ describe("the passkey the browser creates", () => {
     expect(created?.publicKey?.authenticatorSelection?.residentKey).toBe(
       "required",
     );
+  });
+
+  // Without naming the passkey, the browser shows its window listing the site's passkeys, as for an identity provider.
+  it("asks the author to pick among the site's passkeys, in the browser's window", async () => {
+    const salt = new Uint8Array(32);
+    await new BrowserAuthenticator().choose(salt);
+    expect(requested?.mediation).toBeUndefined();
+    expect(requested?.publicKey?.allowCredentials).toBeUndefined();
+    expect(requested?.publicKey?.userVerification).toBe("required");
+    expect(requested?.publicKey?.extensions?.prf?.eval?.first).toBe(salt);
   });
 });

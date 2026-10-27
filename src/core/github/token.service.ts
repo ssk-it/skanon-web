@@ -311,12 +311,23 @@ export class TokenService {
     this.passkeyFailure.set(null);
   }
 
-  /** Opens the sealed tokens. To be called from a user gesture. */
+  /** The autofill offer waiting for the author: `signal`, its owner's; `withdraw`, how this service sets it aside while the window asks. */
+  private offer: { signal: AbortSignal; withdraw: AbortController } | null =
+    null;
+
+  /**
+   * Opens the sealed tokens through the browser's window, which lists the site's passkeys. To be called from a user gesture: « Unlock », or opening a project (2026-065, decision 02). A browser answers one passkey request at a time: the autofill offer is withdrawn while the window asks, and offered again if asking did not succeed.
+   */
   async unlock(): Promise<"ouvert" | PasskeyFailure> {
     if (!this.sealing) return "impossible";
+    const offer = this.offer;
+    offer?.withdraw.abort();
     const opened = await this.sealing.unlockTokens();
     this.passkeyFailure.set(opened.issue === "ouvert" ? null : opened.issue);
-    if (opened.issue !== "ouvert") return opened.issue;
+    if (opened.issue !== "ouvert") {
+      if (offer && !offer.signal.aborted) void this.offerUnlock(offer.signal);
+      return opened.issue;
+    }
     this.adopt(opened.tokens);
     return "ouvert";
   }
@@ -331,7 +342,12 @@ export class TokenService {
    */
   async offerUnlock(signal: AbortSignal): Promise<"ouvert" | PasskeyFailure> {
     if (!this.sealing) return "impossible";
-    const opened = await this.sealing.offerUnlock(signal);
+    const offer = { signal, withdraw: new AbortController() };
+    this.offer = offer;
+    const opened = await this.sealing.offerUnlock(
+      AbortSignal.any([signal, offer.withdraw.signal]),
+    );
+    if (this.offer === offer) this.offer = null;
     if (opened.issue === "annule") return "annule";
     this.passkeyFailure.set(opened.issue === "ouvert" ? null : opened.issue);
     if (opened.issue !== "ouvert") return opened.issue;
