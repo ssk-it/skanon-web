@@ -124,6 +124,16 @@ export interface VersionAnnouncer {
   activate(): Promise<void>;
 }
 
+/**
+ * The window's title bar, when the system draws its controls over the application's top bar rather than above it: on the desktop under macOS. The shell then leaves those controls room at the bar's start, and lets the window be moved from the bar's background.
+ */
+export interface TitleBar {
+  /** The width the window's controls take from the window's left edge, in pixels, at once then at each change; 0 when the system hides them, in full screen. Returns a way to stop listening. */
+  listenControlsWidth(onWidth: (width: number) => void): () => void;
+  /** Lets the user move the window by pressing on this element's background, never on a control it holds. Returns a way to stop. */
+  makeDraggable(bar: HTMLElement): () => void;
+}
+
 export interface Platform {
   readonly target: "bureau" | "web";
   readonly vault: TokenVault;
@@ -134,6 +144,8 @@ export interface Platform {
   readonly version: VersionAnnouncer;
   /** The version this window runs, as the bottom bar shows it: the published number on the desktop, the built commit on the web. */
   readonly loadVersion: () => Promise<string>;
+  /** `null` where the system draws its own title bar, above the application: on the web, and on the desktop outside macOS. */
+  readonly titleBar: TitleBar | null;
 }
 
 /** The deep link scheme: `skanon:ssk-it/ssk-canon/cadrages/2026-047`. */

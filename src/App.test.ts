@@ -1,5 +1,5 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createMemoryHistory } from "vue-router";
 import App from "./App.vue";
@@ -376,6 +376,77 @@ describe("Desktop shell", () => {
     expect(view.find(".bandeau-coffre").text()).toContain(
       "The system vault did not keep your token",
     );
+  });
+});
+
+/**
+ * The window's controls drawn over the bar, as macOS lays them on the desktop: the shell makes room for them at the bar's start, and lets the window be moved from the bar's background. The title bar is simulated: what the system does with it is tested in the desktop application's repo.
+ */
+describe("Window controls over the bar", () => {
+  let publish: (width: number) => void;
+  let stopListening: ReturnType<typeof vi.fn>;
+  let makeDraggable: ReturnType<typeof vi.fn>;
+  let stopDragging: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    provideHttpTesting();
+    stopListening = vi.fn();
+    stopDragging = vi.fn();
+    makeDraggable = vi.fn(() => stopDragging);
+    provide(PLATFORM, {
+      ...createWebPlatform(),
+      target: "bureau",
+      titleBar: {
+        listenControlsWidth: (onWidth: (width: number) => void) => {
+          publish = onWidth;
+          return stopListening;
+        },
+        makeDraggable,
+      },
+    });
+  });
+
+  afterEach(() => {
+    document.documentElement.style.removeProperty("--pc-retrait-fenetre");
+  });
+
+  async function mountView(): Promise<VueWrapper> {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/");
+    await router.isReady();
+    const view = mount(App, { global: { plugins: [router] } });
+    await nextTick();
+    return view;
+  }
+
+  function inset(): string {
+    return document.documentElement.style.getPropertyValue(
+      "--pc-retrait-fenetre",
+    );
+  }
+
+  it("leaves the controls' width free at the bar's start, and gives it back in full screen", async () => {
+    await mountView();
+    publish(72);
+    expect(inset()).toBe("72px");
+    publish(0);
+    expect(inset()).toBe("0px");
+  });
+
+  it("lets the window be moved from the bar, and stops when unmounted", async () => {
+    const view = await mountView();
+    expect(makeDraggable).toHaveBeenCalledWith(
+      view.find("header.barre").element,
+    );
+    view.unmount();
+    expect(stopDragging).toHaveBeenCalledOnce();
+    expect(stopListening).toHaveBeenCalledOnce();
+  });
+
+  it("leaves nothing free where the system draws its own title bar", async () => {
+    provide(PLATFORM, createWebPlatform());
+    await mountView();
+    expect(inset()).toBe("");
   });
 });
 
