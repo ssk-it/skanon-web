@@ -2,6 +2,7 @@ import { inject, provide, resetInjection } from "../injection";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GithubClient, GithubError, RepoRef } from "../github/github-client";
 import { SpecificationStore } from "./specification.store";
+import { load } from "js-yaml";
 import {
   AutomationRefused,
   AutomationService,
@@ -18,6 +19,22 @@ import {
  */
 
 const REPO = { owner: "org", repo: "projet" };
+
+/** What these tests read of an installed workflow. */
+interface Workflow {
+  readonly on: Record<string, unknown>;
+  readonly permissions?: Record<string, string>;
+  readonly jobs: Record<
+    string,
+    {
+      readonly "runs-on": unknown;
+      readonly steps: ReadonlyArray<{
+        readonly uses?: string;
+        readonly with?: Record<string, unknown>;
+      }>;
+    }
+  >;
+}
 
 let files: Record<string, string>;
 let treeFails: boolean;
@@ -115,6 +132,30 @@ describe("Installing the automation", () => {
       expect(c.content).toContain("ssk-it/ssk-canon-action");
     expect(automation.installed()).toBe(true);
     expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  // 2026-10-27: a private repo's minutes on GitHub's runners are paid, and a propagation pull request opened by the workflow token triggers no verification on its own.
+  it("writes the workflows the action ships: the private runner, a verification the propagation can start, a propagation that commits", async () => {
+    await inject(AutomationService).install();
+    const [verification, propagation] = commits.map(
+      (c) => load(c.content) as Workflow,
+    );
+    const runner =
+      "${{ vars.SSK_RUNNER_PRIVE && fromJSON(vars.SSK_RUNNER_PRIVE) || 'ubuntu-latest' }}";
+
+    for (const workflow of [verification, propagation])
+      for (const job of Object.values(workflow.jobs))
+        expect(job["runs-on"]).toBe(runner);
+    expect(Object.keys(verification.on)).toContain("workflow_dispatch");
+    expect(propagation.permissions).toMatchObject({
+      contents: "write",
+      "pull-requests": "write",
+      actions: "write",
+    });
+    const step = propagation.jobs.propager.steps.find((s) =>
+      String(s.uses).startsWith("ssk-it/ssk-canon-action"),
+    );
+    expect(step?.with).toMatchObject({ appliquer: "true", commiter: "true" });
   });
 
   it("names the missing workflow permission on a 403", async () => {
