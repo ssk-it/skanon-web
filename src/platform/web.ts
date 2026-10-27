@@ -156,6 +156,8 @@ export function createWebPlatform(): Platform {
     target: "web",
     vault,
     sealing: vault,
+    // The page cannot talk Git to the platform: it reads through the API.
+    contentSource: null,
     opener: {
       async open(url) {
         window.open(url, "_blank", "noopener");

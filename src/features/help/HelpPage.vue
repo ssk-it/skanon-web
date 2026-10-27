@@ -16,6 +16,8 @@ import { helpMessages } from "./help.messages";
 const locale = inject(LocaleService);
 const t = locale.messages(helpMessages);
 const onDesktop = inject(PLATFORM).target === "bureau";
+/** Where the platform keeps its own copy of the repos, how it reads them, and where the token goes for it, are the deliverable's to say: the page leaves out what describes its own channels (2026-067). */
+const ownCopy = inject(PLATFORM).contentSource !== null;
 /** What the deliverable says about itself — its hosting, its updates, its licence —, which the page renders without knowing it (ADR-extensions-commerciales), in the displayed language. */
 const brought = inject(COMPOSITION).help;
 const help = computed(() => {
@@ -54,7 +56,7 @@ const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
           <li>{{ t().tokens.optOut }}</li>
         </template>
         <li v-if="!onDesktop">{{ t().tokens.preferLimited }}</li>
-        <li>
+        <li v-if="!ownCopy">
           {{ t().tokens.sentOnlyTo.before }}<code>api.github.com</code
           >{{ t().tokens.sentOnlyTo.after }}
         </li>
@@ -67,15 +69,17 @@ const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
     <section>
       <h2><UiIcon name="cached" />{{ t().cache.title }}</h2>
       <ul>
-        <li>{{ t().cache.byHash }}</li>
-        <li>{{ t().cache.tree }}</li>
-        <li>
-          {{ t().cache.publicFiles.before
-          }}<code>raw.githubusercontent.com</code
-          >{{ t().cache.publicFiles.after }}
-        </li>
+        <template v-if="!ownCopy">
+          <li>{{ t().cache.byHash }}</li>
+          <li>{{ t().cache.tree }}</li>
+          <li>
+            {{ t().cache.publicFiles.before
+            }}<code>raw.githubusercontent.com</code
+            >{{ t().cache.publicFiles.after }}
+          </li>
+        </template>
         <li>{{ t().cache.offline }}</li>
-        <li>{{ t().cache.eviction }}</li>
+        <li v-if="!ownCopy">{{ t().cache.eviction }}</li>
         <li v-if="!onDesktop && sealedTokens">
           {{ t().cache.sealedContents }}
         </li>
@@ -101,7 +105,7 @@ const sealedTokens = computed(() => inject(TokenService).form() === "scelle");
       <h2><UiIcon name="lan" />{{ t().communications.title }}</h2>
       <ul>
         <li><code>api.github.com</code>{{ t().communications.api }}</li>
-        <li>
+        <li v-if="!ownCopy">
           <code>raw.githubusercontent.com</code>{{ t().communications.raw }}
         </li>
         <li>

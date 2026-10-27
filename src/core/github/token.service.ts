@@ -77,6 +77,7 @@ export class TokenService {
 
   /** The web version's passkey sealing; `null` on the desktop, whose system vault is enough. */
   private readonly sealing = inject(PLATFORM).sealing;
+  private readonly contentSource = inject(PLATFORM).contentSource;
 
   /** The sealed store's state, read after each gesture: the vault holds it, but does not report it. */
   private readonly sealingState = signal<SealingState>("aucun");
@@ -454,6 +455,7 @@ export class TokenService {
     this.passkeyFailure.set(null);
     this.cache.encryptWith(null);
     void this.cache.clearPrivate();
+    void this.contentSource?.forgetReadUnderToken(null);
   }
 
   /** Saves a token for a scope — an organisation, or a repo. */
@@ -477,6 +479,7 @@ export class TokenService {
     void this.cache.clearPrivate(
       (repoRef) => repoRef === scope || repoRef.startsWith(`${scope}/`),
     );
+    void this.contentSource?.forgetReadUnderToken(scope);
   }
 
   /**
