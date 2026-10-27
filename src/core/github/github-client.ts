@@ -102,11 +102,7 @@ export class GithubError extends Error {
 }
 
 /**
- * Access to the GitHub API.
- *
- * Single, isolated entry point: in phase 7, only `buildHeaders()` will change to
- * relay through the proxy with the installation token. The rest of the
- * application will know nothing of it.
+ * Access to the GitHub API, through a single entry point.
  */
 export class GithubClient {
   private readonly http = inject(HttpClient);
@@ -114,7 +110,7 @@ export class GithubClient {
   /**
    * Two distinct queues, because the two routes do not have the same
    * constraints. The API is subject to secondary limits — a hundred concurrent
-   * requests for the whole installation — hence a cautious value.
+   * requests per token — hence a cautious value.
    * `raw.githubusercontent` has no quota: throttling it amounted to slowing the
    * load without protecting anything. Measured: going from 6 to 24 halves the
    * load time on a repo of sixty files.
@@ -159,9 +155,7 @@ export class GithubClient {
   }
 
   private buildHeaders(repoRef?: RepoRef): HttpHeaders {
-    // The token comes from the dedicated service, never from storage directly: in
-    // phase 7, the proxy will provide an installation token and this method will
-    // not change by a single line.
+    // The token comes from the dedicated service, never from storage directly.
     let headers = new HttpHeaders({
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
@@ -377,7 +371,7 @@ export class GithubClient {
    *
    * The anonymous quota being sixty requests per hour and per IP address, the
    * first route is what makes reading a real repo practicable without
-   * authentication. In phase 7, private repos will switch to the second.
+   * authentication.
    */
   async loadContent(
     repoRef: RepoRef,
@@ -812,7 +806,6 @@ export class GithubClient {
       content: this.toBase64(content),
       branch: branch,
       ...(currentSha ? { sha: currentSha } : {}),
-      ...this.commitAuthor(),
     });
 
     // The write already returns the file's new SHA, the one the next write
@@ -876,7 +869,7 @@ export class GithubClient {
     const commit = await this.send<{ sha: string }>(
       `${repoUrl}/git/commits`,
       "POST",
-      { message, tree: tree.sha, parents: [], ...this.commitAuthor() },
+      { message, tree: tree.sha, parents: [] },
     );
     await this.send(
       `${repoUrl}/git/refs/heads/${encodeURIComponent(branch)}`,
@@ -907,7 +900,6 @@ export class GithubClient {
       message,
       sha: currentSha,
       branch: branch,
-      ...this.commitAuthor(),
     });
   }
 
@@ -926,23 +918,6 @@ export class GithubClient {
       { title: title, body: body, head: branch, base, draft: draft },
     );
     return pr.number;
-  }
-
-  /**
-   * Author to put on the commit, when an identity is known.
-   *
-   * Without it, every save would appear signed by the application
-   * installed on the repo, and traceability — which is the product's
-   * reason for being — would disappear. See RG-auteur-reel-commit.
-   *
-   * The platform accepts an email without an account with it: this is what makes
-   * attribution possible for someone who has no account there. The
-   * application then only appears as committer, not as author.
-   */
-  private commitAuthor(): { author?: { name: string; email: string } } {
-    const who = this.tokens.identity();
-    if (!who?.email) return {};
-    return { author: { name: who.name, email: who.email } };
   }
 
   /**
@@ -1210,11 +1185,6 @@ export class GithubClient {
   /**
    * The repos the current access grants rights to.
    *
-   * Two endpoints depending on the kind of access: a personal token
-   * belongs to someone and answers about their repos; an access obtained by
-   * identity exchange has no user and answers about those of the
-   * installation.
-   *
    * `affiliation` is mandatory and its default misleading: without it, organisation
    * repos are omitted even though the access grants rights to them. An
    * incomplete list is worse than no list — it leads to concluding that a repo is
@@ -1271,24 +1241,7 @@ export class GithubClient {
       throw new Error(githubText().triedTokenRefused);
     }
     if (!response.ok) {
-      // An installation token has no user: the other endpoint
-      // answers then, and it is a legitimate use.
-      const installation = await fetch(
-        `${this.base}/installation/repositories?per_page=100`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github+json",
-          },
-        },
-      );
-      if (!installation.ok) {
-        throw new Error(githubText().triedTokenStatus(response.status));
-      }
-      const raw = (await installation.json()) as {
-        repositories: Array<{ full_name: string }>;
-      };
-      return raw.repositories.map((d) => d.full_name);
+      throw new Error(githubText().triedTokenStatus(response.status));
     }
 
     const raw = (await response.json()) as Array<{ full_name: string }>;
@@ -1319,28 +1272,12 @@ export class GithubClient {
   }
 
   private async reposPage(page: number): Promise<RepoRef[]> {
-    const shared = `per_page=100&page=${page}`;
-    try {
-      const raw = await this.call<
-        Array<{ owner: { login: string }; name: string }>
-      >(
-        `${this.base}/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&${shared}`,
-      );
-      return raw.map((d) => ({ owner: d.owner.login, repo: d.name }));
-    } catch (e) {
-      // An installation access has no user: the platform refuses
-      // the previous call, and the other endpoint is the one that answers.
-      if (e instanceof GithubError && (e.status === 403 || e.status === 401)) {
-        const raw = await this.call<{
-          repositories: Array<{ owner: { login: string }; name: string }>;
-        }>(`${this.base}/installation/repositories?${shared}`);
-        return raw.repositories.map((d) => ({
-          owner: d.owner.login,
-          repo: d.name,
-        }));
-      }
-      throw e;
-    }
+    const raw = await this.call<
+      Array<{ owner: { login: string }; name: string }>
+    >(
+      `${this.base}/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=100&page=${page}`,
+    );
+    return raw.map((d) => ({ owner: d.owner.login, repo: d.name }));
   }
 
   /**

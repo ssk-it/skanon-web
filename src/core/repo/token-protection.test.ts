@@ -11,7 +11,7 @@ import { SpecificationStore } from "./specification.store";
 import { writeSettings } from "./config-writer";
 
 /**
- * A project sets whether it requires the token that opens it to be kept under a passkey (RG-protection-du-jeton-par-projet). The setting lives in `ssk-canon.yml`, like the access mode.
+ * A project sets whether it requires the token that opens it to be kept under a passkey (RG-protection-du-jeton-par-projet). The setting lives in `ssk-canon.yml`.
  */
 describe("token protection declared by the project", () => {
   it("offers the passkey when nothing is declared", () => {
@@ -36,12 +36,9 @@ describe("token protection declared by the project", () => {
 });
 
 const FILE = `schema_version: 1
-
-# Comment les rédacteurs obtiennent l'accès au dépôt.
-acces: jeton_personnel
 `;
 
-const BASE = { access: "jeton_personnel" as const, identity: null };
+const BASE = {};
 
 describe("writing the token protection", () => {
   it("writes the requirement, and reads it back", () => {

@@ -11,8 +11,6 @@ import {
 } from "../model/model";
 
 const SETTINGS: ProjectSettings = {
-  access: "jeton_personnel",
-  identity: null,
   tokenProtection: "proposee",
   linkTags: DEFAULT_LINK_TAGS,
 };

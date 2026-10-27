@@ -18,7 +18,7 @@ export const homeMessages = defineMessages({
     open: "Ouvrir",
     signInTitle: "Connexion à GitHub, facultative",
     signInHelp:
-      "Les dépôts publics se lisent sans connexion. Un jeton personnel ouvre vos dépôts privés, dit lesquels vous sont autorisés, et porte la limite de GitHub de 60 à 5 000 requêtes par heure. Un projet qui fait vérifier les identités auprès de son propre fournisseur n’en demande aucun : sa connexion se propose une fois le projet ouvert.",
+      "Les dépôts publics se lisent sans connexion. Un jeton personnel ouvre vos dépôts privés, dit lesquels vous sont autorisés, et porte la limite de GitHub de 60 à 5 000 requêtes par heure.",
     enterToken: "Saisir un jeton",
     pasteWhere: "par « Saisir un jeton », ci-dessus",
   },
@@ -39,7 +39,7 @@ export const homeMessages = defineMessages({
     open: "Open",
     signInTitle: "Sign in to GitHub, optional",
     signInHelp:
-      "Public repos are read without signing in. A personal token opens your private repos, tells which ones you are authorised on, and raises GitHub’s limit from 60 to 5,000 requests per hour. A project that has identities verified by its own provider asks for none: its sign-in is offered once the project is open.",
+      "Public repos are read without signing in. A personal token opens your private repos, tells which ones you are authorised on, and raises GitHub’s limit from 60 to 5,000 requests per hour.",
     enterToken: "Enter a token",
     pasteWhere: "through “Enter a token”, above",
   },

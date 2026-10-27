@@ -71,9 +71,8 @@ describe("private contents under the passkey's key", () => {
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
       private: true,
-      persist: true,
     });
-    await cache.saveState(PRIVATE, "HEAD", state(), { persist: true });
+    await cache.saveState(PRIVATE, "HEAD", state());
     const stored = await raw(factory);
     expect(stored).not.toContain("confidentiel");
     expect(stored).not.toContain("RG-secrete");
@@ -84,9 +83,8 @@ describe("private contents under the passkey's key", () => {
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
       private: true,
-      persist: true,
     });
-    await cache.saveState(PRIVATE, "HEAD", state(), { persist: true });
+    await cache.saveState(PRIVATE, "HEAD", state());
 
     const next = newVisit();
     next.encryptWith(cipher("k1"));
@@ -99,7 +97,6 @@ describe("private contents under the passkey's key", () => {
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
       private: true,
-      persist: true,
     });
 
     const next = newVisit();
@@ -113,7 +110,6 @@ describe("private contents under the passkey's key", () => {
     cache.lock();
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
       private: true,
-      persist: true,
     });
     expect(await raw(factory)).not.toContain("confidentiel");
     expect(await cache.loadContent(PRIVATE, "a1")).toBe("énoncé confidentiel");
@@ -124,7 +120,6 @@ describe("private contents under the passkey's key", () => {
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
       private: true,
-      persist: true,
     });
     const next = newVisit();
     next.encryptWith(cipher("k2"));
@@ -137,7 +132,6 @@ describe("private contents under the passkey's key", () => {
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PUBLIC, "b2", "énoncé public", {
       private: false,
-      persist: true,
     });
     expect(await raw(factory)).toContain("énoncé public");
     expect(await newVisit().loadContent(PUBLIC, "b2")).toBe("énoncé public");
@@ -148,7 +142,6 @@ describe("private contents under the passkey's key", () => {
     cache.encryptWith(cipher("k1"));
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
       private: true,
-      persist: true,
     });
     await cache.clearPrivate();
     const next = newVisit();
@@ -162,7 +155,6 @@ describe("private contents under the passkey's key", () => {
     cache.encryptWith(null);
     await cache.saveContent(PRIVATE, "a1", "énoncé confidentiel", {
       private: true,
-      persist: true,
     });
     expect(await raw(factory)).toContain("confidentiel");
   });

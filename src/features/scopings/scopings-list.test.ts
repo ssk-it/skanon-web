@@ -95,8 +95,6 @@ function specification(): Specification {
   return {
     project: { name: "Test", description: "", codeRepos: [], prefix: null },
     settings: {
-      access: "jeton_personnel",
-      identity: null,
       tokenProtection: "proposee",
       linkTags: DEFAULT_LINK_TAGS,
     },

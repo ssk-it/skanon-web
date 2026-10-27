@@ -42,8 +42,6 @@ export const appMessages = defineMessages({
       retry: "Réessayez, ou relancez Skanon vous-même.",
       saveFirst:
         "Enregistrez d’abord : une saisie non enregistrée serait perdue.",
-      endsAccess: (relaunches: boolean) =>
-        `${relaunches ? "La relance" : "Le rechargement"} mettra fin à l’accès obtenu par votre identité vérifiée.`,
     },
     vault: {
       eraseRefused: (onDesktop: boolean) =>
@@ -117,8 +115,6 @@ export const appMessages = defineMessages({
       toUse: "to use it.",
       retry: "Try again, or relaunch Skanon yourself.",
       saveFirst: "Save first: unsaved input would be lost.",
-      endsAccess: (relaunches: boolean) =>
-        `${relaunches ? "Relaunching" : "Reloading"} will end the access obtained through your verified identity.`,
     },
     vault: {
       eraseRefused: (onDesktop: boolean) =>

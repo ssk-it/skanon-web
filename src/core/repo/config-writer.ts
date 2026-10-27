@@ -1,9 +1,4 @@
-import {
-  CodeRepo,
-  AccessMode,
-  TokenProtection,
-  IdentitySettings,
-} from "../model/model";
+import { CodeRepo, TokenProtection } from "../model/model";
 
 /** What the settings page can modify. */
 const CODE_REPOS_COMMENT = [
@@ -13,30 +8,15 @@ const CODE_REPOS_COMMENT = [
 ].join("\n");
 
 export interface EditableSettings {
-  readonly access: AccessMode;
-  /** Absent in the modes that have no use for it. */
-  readonly identity: IdentitySettings | null;
   /** Optional: a project that declares none is an ordinary case. */
   readonly codeRepos?: readonly CodeRepo[];
   /** Optional: when absent, the file keeps what it declared. */
   readonly tokenProtection?: TokenProtection;
 }
 
-const ACCESS_COMMENT = [
-  "# Comment les rédacteurs obtiennent l'accès au dépôt.",
-  "# jeton_personnel : chacun apporte le sien — rien à héberger.",
-  "# identite_tierce : un composant échange une identité contre un accès temporaire.",
-  "# relais : chaque requête passe par un composant qui la vérifie.",
-].join("\n");
-
 const PROTECTION_COMMENT = [
   "# Dans la version web, le jeton qui ouvre ce projet doit être gardé sous passkey.",
   "# Sans cette ligne, la passkey est proposée à chaque rédacteur, sans être exigée.",
-].join("\n");
-
-const IDENTITY_COMMENT = [
-  "# Où les identités sont vérifiées. Rien de secret ici : ce sont les valeurs",
-  "# que porte toute application s'exécutant dans un navigateur.",
 ].join("\n");
 
 /**
@@ -120,13 +100,18 @@ export function writeSettings(
   source: string,
   settings: EditableSettings,
 ): string {
-  // The two lifecycle settings are gone (2026-045): the first
-  // save removes them, comments included, rather than leaving in
-  // the file keys that no longer configure anything. That save goes through
-  // a review: the removal shows there.
-  let out = replaceBlock(source, "transitions", null, "");
-  out = replaceBlock(out, "reflet_demande_fusion", null, "");
-  out = replaceBlock(out, "acces", `acces: ${settings.access}`, ACCESS_COMMENT);
+  // The two lifecycle settings are gone (2026-045), and so are the access
+  // mode and the third-party identity: the first save removes them, comments
+  // included, rather than leaving in the file keys that no longer configure
+  // anything. That save goes through a review: the removal shows there.
+  let out = source;
+  for (const key of [
+    "transitions",
+    "reflet_demande_fusion",
+    "acces",
+    "identite",
+  ])
+    out = replaceBlock(out, key, null, "");
 
   // Only the requirement is written: the proposal is the default, which a silent file already means.
   if (settings.tokenProtection) {
@@ -140,22 +125,6 @@ export function writeSettings(
     );
   }
 
-  // The block is only written if the mode uses it: leaving it behind
-  // would describe a configuration the project no longer applies.
-  const i = settings.identity;
-  out = replaceBlock(
-    out,
-    "identite",
-    i
-      ? [
-          "identite:",
-          `  emetteur: ${i.issuer}`,
-          `  client: ${i.client}`,
-          `  echange: ${i.exchange}`,
-        ].join("\n")
-      : null,
-    IDENTITY_COMMENT,
-  );
   // Code repos: the block disappears when the list is empty, rather than
   // staying in place and describing a project that no longer declares any.
   out = replaceBlock(

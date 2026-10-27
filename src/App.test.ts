@@ -239,18 +239,6 @@ describe("Version banner", () => {
     expect(banner(view)!.textContent).not.toContain("saisie");
   });
 
-  it("warns that temporary access will end — RG-acces-temporaire", async () => {
-    inject(TokenService).setAccess({
-      token: "ghs_temporaire",
-      validUntil: new Date(Date.now() + 3_600_000).toISOString(),
-      repos: ["ssk-it/ssk-canon"],
-      identity: { identifier: "ssk", name: "SSK", email: null },
-    });
-    const view = await mountView();
-    await announce();
-    expect(banner(view)!.textContent).toContain("identité vérifiée");
-  });
-
   it("names a lost version, with its own cause", async () => {
     const view = await mountView();
     await announce("perdue");

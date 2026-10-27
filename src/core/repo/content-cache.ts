@@ -129,9 +129,8 @@ const PLAIN: Protection = { mode: "clair" };
  * the tree, re-read at each load, which says which fingerprints are
  * current. See RG-contenus-par-empreinte.
  *
- * Two levels: the tab's memory, always, and the browser storage
- * when the caller allows it. What is not persisted — a private repo read under
- * a temporary access — lives and dies with the tab, like the access itself
+ * Two levels: the tab's memory, and the browser storage. What a private repo
+ * leaves there is sealed like the token, when it is
  * (RG-contenus-prives-au-repos).
  *
  * The cache is a derived copy, never a source: any storage failure is
@@ -182,7 +181,7 @@ export class ContentCache {
     repoRef: RepoRef,
     sha: string,
     content: string,
-    options: { private: boolean; persist: boolean },
+    options: { private: boolean },
   ): Promise<void> {
     const entry: StoredContent = {
       repoRef: repoKey(repoRef),
@@ -191,11 +190,10 @@ export class ContentCache {
       private: options.private,
     };
     this.contents.set(contentKey(repoRef, sha), entry);
-    if (options.persist)
-      await this.writeProtected(CONTENTS, entry, {
-        repoRef: entry.repoRef,
-        sha,
-      });
+    await this.writeProtected(CONTENTS, entry, {
+      repoRef: entry.repoRef,
+      sha,
+    });
   }
 
   async loadState(repoRef: RepoRef, ref: string): Promise<KnownState | null> {
@@ -215,12 +213,10 @@ export class ContentCache {
     repoRef: RepoRef,
     ref: string,
     state: KnownState,
-    options: { persist: boolean },
   ): Promise<void> {
     const entry: StoredState = { ...state, repoRef: repoKey(repoRef), ref };
     this.states.set(stateKey(repoRef, ref), entry);
-    if (options.persist)
-      await this.writeProtected(STATES, entry, { repoRef: entry.repoRef, ref });
+    await this.writeProtected(STATES, entry, { repoRef: entry.repoRef, ref });
   }
 
   async loadIdentity(repoRef: RepoRef): Promise<KnownProjectIdentity | null> {
@@ -239,15 +235,13 @@ export class ContentCache {
   async saveIdentity(
     repoRef: RepoRef,
     identity: KnownProjectIdentity,
-    options: { persist: boolean },
   ): Promise<void> {
     const entry: StoredProjectIdentity = {
       ...identity,
       repoRef: repoKey(repoRef),
     };
     this.identities.set(entry.repoRef, entry);
-    if (options.persist)
-      await this.writeProtected(IDENTITIES, entry, { repoRef: entry.repoRef });
+    await this.writeProtected(IDENTITIES, entry, { repoRef: entry.repoRef });
   }
 
   /** Forgets a repo's identity — refused, or gone. */

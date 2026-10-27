@@ -34,10 +34,8 @@ export const helpMessages = defineMessages({
       },
       scope:
         "Un jeton peut valoir pour une organisation ou pour un seul dépôt : le plus précis l’emporte, puis le jeton général.",
-      verifiedIdentity:
-        "Quand un projet le prévoit, on peut aussi entrer par son identité vérifiée. L’accès obtenu ne vit qu’en mémoire, pour une heure environ, et prend fin au rechargement.",
       signOut:
-        "Se déconnecter efface les jetons, l’accès temporaire, et les contenus privés gardés en cache.",
+        "Se déconnecter efface les jetons, et les contenus privés gardés en cache.",
     },
     cache: {
       title: "Mise en cache",
@@ -52,7 +50,7 @@ export const helpMessages = defineMessages({
       offline:
         "Quand GitHub ne répond pas — hors ligne, limite atteinte, panne —, le dernier état lu s’affiche, avec sa date et la cause. Rien ne s’enregistre tant qu’il n’a pas été relu.",
       eviction:
-        "Ce qu’aucune branche ne cite plus est retiré. Les contenus privés durent autant que l’accès qui les a lus ; ceux qu’une identité vérifiée a lus ne sont pas gardés du tout.",
+        "Ce qu’aucune branche ne cite plus est retiré. Les contenus privés durent autant que le jeton qui les a lus.",
       sealedContents:
         "Les contenus privés sont gardés sous la même clé que les jetons, et ne se lisent que dans les onglets ouverts après le déverrouillage, tant que l’un d’eux le reste.",
       recent:
@@ -77,8 +75,6 @@ export const helpMessages = defineMessages({
       api: " — lecture, écriture et découverte, avec votre jeton.",
       raw: " — les fichiers publics, sans jeton.",
       avatars: " — l’avatar des organisations, sans jeton.",
-      identity:
-        "L’émetteur d’identité et le service d’échange qu’un projet déclare — seulement pour ce projet, et seulement si l’on entre par son identité vérifiée.",
       nothingElse:
         "Aucune mesure d’audience, aucun rapport d’erreur. Les polices sont embarquées. Un lien externe s’ouvre dans votre navigateur.",
     },
@@ -113,10 +109,8 @@ export const helpMessages = defineMessages({
       },
       scope:
         "A token can apply to an organisation or to a single repository: the most specific one wins, then the general token.",
-      verifiedIdentity:
-        "When a project provides for it, you can also sign in with your verified identity. The access obtained lives only in memory, for about an hour, and ends on reload.",
       signOut:
-        "Signing out erases the tokens, the temporary access, and the private contents kept in cache.",
+        "Signing out erases the tokens, and the private contents kept in cache.",
     },
     cache: {
       title: "Caching",
@@ -131,7 +125,7 @@ export const helpMessages = defineMessages({
       offline:
         "When GitHub does not respond — offline, limit reached, outage —, the last state read is displayed, with its date and the cause. Nothing is saved until it has been read again.",
       eviction:
-        "What no branch refers to any more is removed. Private contents last as long as the access that read them; those read through a verified identity are not kept at all.",
+        "What no branch refers to any more is removed. Private contents last as long as the token that read them.",
       sealedContents:
         "Private contents are kept under the same key as the tokens, and can be read only in the tabs opened after unlocking, while one of them stays open.",
       recent:
@@ -156,8 +150,6 @@ export const helpMessages = defineMessages({
       api: " — reading, writing and discovery, with your token.",
       raw: " — public files, without a token.",
       avatars: " — organisations’ avatars, without a token.",
-      identity:
-        "The identity issuer and the exchange service a project declares — only for that project, and only if you sign in with your verified identity.",
       nothingElse:
         "No audience measurement, no error reporting. Fonts are embedded. An external link opens in your browser.",
     },

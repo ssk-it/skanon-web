@@ -138,9 +138,7 @@ export class ProjectIdentityService {
       // An access withdrawn during the read: what the read obtained under it must
       // not outlive it.
       if (this.cache.erasures() !== erasures) return;
-      await this.cache.saveIdentity(repoRef, next, {
-        persist: this.isPersistable(next.private),
-      });
+      await this.cache.saveIdentity(repoRef, next);
       this.publish(
         repoRef,
         variant,
@@ -350,11 +348,6 @@ export class ProjectIdentityService {
         erasures,
       }),
     );
-  }
-
-  /** Like contents: under a temporary access, nothing outlives the tab. */
-  private isPersistable(isPrivate: boolean): boolean {
-    return !isPrivate || this.tokens.source() !== "identite_tierce";
   }
 }
 

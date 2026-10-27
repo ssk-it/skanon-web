@@ -51,6 +51,15 @@ describe("« Fonctionnement de Skanon » page", () => {
       expect(text).toContain(title);
   });
 
+  it("speaks of no entry other than the personal token", async () => {
+    for (const target of ["web", "bureau"] as const) {
+      const text = await mountView(target);
+      expect(text).not.toContain("identité vérifiée");
+      expect(text).not.toContain("accès temporaire");
+      expect(text).not.toContain("émetteur");
+    }
+  });
+
   it("says, in the browser, that the token is kept there in clear", async () => {
     const text = await mountView("web");
     expect(text).toContain("gardé dans ce navigateur, en clair");
@@ -189,6 +198,15 @@ describe("« Fonctionnement de Skanon » page", () => {
       const text = await mountView("web");
       expect(text).toContain("keeps only their ciphertext");
       expect(text).toContain("under the same key as the tokens");
+    });
+
+    it("speaks of no entry other than the personal token", async () => {
+      for (const target of ["web", "bureau"] as const) {
+        const text = await mountView(target);
+        expect(text).not.toContain("verified identity");
+        expect(text).not.toContain("temporary access");
+        expect(text).not.toContain("issuer");
+      }
     });
 
     it("says, on the desktop, that the token is in the system keychain", async () => {
