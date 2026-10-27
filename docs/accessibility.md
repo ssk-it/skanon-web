@@ -10,13 +10,13 @@ The commitment is a product decision, recorded in the specification by [ssk-cano
 
 Before writing a component, check whether `src/ui/` provides it: its components already carry what follows, and a view that uses them inherits it.
 
-| Component                          | What it guarantees                                                                                                          |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `UiIcon`                           | `aria-hidden` by default: the icon is decorative, and a button that has only the icon carries its name in `aria-label`      |
-| `UiDialogHost`, `UiDialog`         | focus placed in the dialog on opening, trapped while it is open, then returned to the element that had it; the rest `inert` |
-| `UiButton`, `UiMenu`, `UiCheckbox` | a focus indicator on `:focus-visible`, distinct from hover                                                                  |
-| `UiSpinner`                        | `role="progressbar"`, and the animation suspended under `prefers-reduced-motion`                                            |
-| `LocaleService`                    | the document's `lang`, that of the displayed language (`fr` in `index.html` until it is chosen)                             |
+| Component                          | What it guarantees                                                                                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UiIcon`                           | `aria-hidden` by default: the icon is decorative, and a button that has only the icon carries its name in `aria-label`                                                |
+| `UiDialogHost`, `UiDialog`         | focus placed in the dialog on opening, trapped while it is open, then returned to the element that had it; the rest `inert`                                           |
+| `UiButton`, `UiMenu`, `UiCheckbox` | a focus indicator on `:focus-visible`, distinct from hover                                                                                                            |
+| `UiSpinner`                        | `role="progressbar"` named by its `label` (« Chargement en cours » by default, in the displayed language), and the animation suspended under `prefers-reduced-motion` |
+| `LocaleService`                    | the document's `lang`, that of the displayed language (`fr` in `index.html` until it is chosen)                                                                       |
 
 A badly dressed native component is better than a well dressed `div`: `<button>`, `<a href>`, `<input>`, `<select>`, `<details>` bring their role, their focus and their keyboard without a line of code.
 
@@ -76,11 +76,21 @@ A badly dressed native component is better than a well dressed `div`: `<button>`
 
 ## Checking
 
-**In the tests, without a window** ([practices.md](practices.md#tests)):
+**The automatic checks**, on every pull request:
+
+| Check          | File                                                  | What it enforces                                                                                                                                                                                                                       |
+| -------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Token contrast | `src/styles.test.ts` (jsdom)                          | 4.5:1 for each text colour on each of its backgrounds, 3:1 for `--mat-sys-outline`, in both themes; a domain's colour at every hue it can take; and that no source writes text with a colour outside this list                         |
+| axe-core       | `src/accessibility.browser.test.ts` (headless WebKit) | the WCAG 2.2 A and AA criteria axe can see, on the whole application — shell included — at each page of the test specification (`src/features/test-specification.ts`), in both themes; contrast is measured there on the rendered page |
+| Reflow         | same file                                             | at 320 px wide, no element exceeds the page outside a frame that scrolls; the failure names the overflowing elements                                                                                                                   |
+
+A new page is added to `PAGES` in `src/accessibility.browser.test.ts`, a new text colour to `TEXTS` in `src/styles.test.ts` with the backgrounds it is written on. axe sees neither focus order, nor what a screen reader announces, nor the meaning of a text alternative: the rest of this section covers that.
+
+**In the behaviour tests** ([practices.md](practices.md#tests)):
 
 - in jsdom, find elements by their role and accessible name rather than by a class: a test that finds `getByRole("button", { name: "Recharger depuis GitHub" })` also checks the name;
 - exercise the keyboard: Tab, Shift+Tab, Escape, Enter and a menu's arrows, focus returned when a dialog closes;
-- in the headless browser (`*.browser.test.ts`), what jsdom does not see: reflow at 320 px, target size, focus hidden under a sticky bar.
+- in the headless browser (`*.browser.test.ts`), what jsdom does not see and axe does not check: target size, focus hidden under a sticky bar.
 
 **By hand, before merging a new or reworked view:**
 

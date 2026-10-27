@@ -130,11 +130,13 @@ h3 {
   font-weight: 600;
 }
 .etapes li::marker {
-  color: var(--mat-sys-outline);
+  color: var(--mat-sys-on-surface-variant);
 }
+/* Underlined: in a sentence, a link told apart only by its colour escapes whoever does not perceive it (1.4.1). */
 .aide-jeton :deep(a) {
   color: var(--mat-sys-primary);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   white-space: nowrap;
 }
 .aide-jeton :deep(a:hover) {

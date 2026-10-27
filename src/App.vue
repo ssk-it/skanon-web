@@ -611,7 +611,7 @@ function reloadVersion(): void {
           type="button"
           class="langue"
           v-bind="attributs"
-          :aria-label="t().language.label"
+          :aria-label="t().language.trigger(LANGUAGE_NAMES[locale.language()])"
           :title="t().language.label"
         >
           <UiIcon name="translate" />{{ LANGUAGE_NAMES[locale.language()] }}
@@ -925,9 +925,23 @@ function reloadVersion(): void {
  *
  * Help adds a seventh (RG-aide-a-portee), and settings went off alone below 390 px: the reload gives way in turn. It is the only one with an equivalent on a phone — reloading the page rereads the tree, as it does —, whereas the GitHub link, the sign-in, the theme, the settings and help have no other door. */
 @media (max-width: 430px) {
-  .marque .nom,
   .recharger {
     display: none;
+  }
+
+  /* The name disappears to the eye, not to the screen reader: without it, the brand link would have no name left. */
+  .marque .nom {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The tabs do not shrink (see `.onglets`): under 430 px, they wrap rather than widen the page — RG-accessibilite-aa, 320 px. */
+  .onglets {
+    flex-wrap: wrap;
   }
 }
 

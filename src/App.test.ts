@@ -513,7 +513,7 @@ describe("Display language", () => {
 
   it("offers the three choices in the bottom bar, and applies one without reloading", async () => {
     const view = await mountView();
-    const trigger = view.find('.pied [aria-label="Langue"]');
+    const trigger = view.find('.pied [aria-label="Langue : Français"]');
     expect(trigger.exists()).toBe(true);
     expect(trigger.text()).toContain("Français");
     await trigger.trigger("click");
@@ -528,9 +528,9 @@ describe("Display language", () => {
     await flushPromises();
     expect(inject(LocaleService).choice()).toBe("en");
     expect(view.find(".pied").text()).toContain("Legal notice");
-    expect(view.find('.pied [aria-label="Language"]').text()).toContain(
-      "English",
-    );
+    expect(
+      view.find('.pied [aria-label="Language: English"]').text(),
+    ).toContain("English");
     view.unmount();
   });
 });

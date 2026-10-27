@@ -73,6 +73,8 @@ export const appMessages = defineMessages({
     legalNotice: "Mentions légales",
     language: {
       label: "Langue",
+      // The trigger's accessible name holds the language it shows: a name without its visible text fails whoever speaks to the screen (2.5.3, RG-accessibilite-aa).
+      trigger: (current: string) => `Langue : ${current}`,
       browser: (current: string) => `Langue du navigateur (${current})`,
     },
   },
@@ -146,6 +148,7 @@ export const appMessages = defineMessages({
     legalNotice: "Legal notice",
     language: {
       label: "Language",
+      trigger: (current: string) => `Language: ${current}`,
       browser: (current: string) => `Browser language (${current})`,
     },
   },
