@@ -90,7 +90,8 @@ describe("authoring forms, signed in — RG-accessibilite-aa", () => {
   it("announces the missing fields of a new scoping, without violation", async () => {
     const root = await open("/test/test/cadrages/nouveau", author);
     const create = [...document.querySelectorAll("button")].find((b) =>
-      /créer|enregistrer/i.test(b.textContent ?? ""),
+      // The button reads in the displayed language, which follows the browser's: English on CI's runners.
+      /créer|enregistrer|create|save/i.test(b.textContent ?? ""),
     );
     if (!create) throw new Error("Create button not found");
     create.click();
