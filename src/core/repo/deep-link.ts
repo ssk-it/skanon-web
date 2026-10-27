@@ -79,6 +79,11 @@ export function toLinkAddress(link: string | null): RouteLocationRaw {
   };
 }
 
+/** The reception address carrying a received link, in the parameter `deepLinkRoute` reads. */
+export function deepLinkLocation(link: string): RouteLocationRaw {
+  return { path: deepLinkRoute.path, query: { lien: link } };
+}
+
 /**
  * The reception address of opening links: the one where the desktop application leads each link the system hands it (`main.ts`), and which the web version receives as is.
  *

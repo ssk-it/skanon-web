@@ -6,6 +6,7 @@ import "@fontsource/material-symbols-outlined/400.css";
 import App from "./App.vue";
 import { TokenService } from "./core/github/token.service";
 import { inject, provide } from "./core/injection";
+import { deepLinkLocation } from "./core/repo/deep-link";
 import { TitleStrategy } from "./core/repo/title.strategy";
 import { COMPOSITION, compose } from "./extension/composer";
 import type { Extension } from "./extension/extension";
@@ -38,7 +39,7 @@ export async function start(root: Root): Promise<void> {
   // The title carries the project and the item being viewed: without them, history lines up identical entries for different pages.
   inject(TitleStrategy).attach(router);
   await inject(PLATFORM).links.listen(
-    (link) => void router.push({ path: "/ouvrir", query: { link: link } }),
+    (link) => void router.push(deepLinkLocation(link)),
   );
 
   createApp(App).use(router).mount("#app");
