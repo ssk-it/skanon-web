@@ -18,6 +18,7 @@ import { PLATFORM } from "./platform/platform-token";
 import type { VersionAnnouncement } from "./platform/ports";
 import { createWebPlatform } from "./platform/web";
 import { createAppRouter } from "./router";
+import { DialogService } from "./ui/dialog.service";
 
 /**
  * Loading is triggered by the route guard, not by the bar: the address says which repo to open. These cases therefore target the store, called the way the guard calls it.
@@ -625,6 +626,29 @@ describe("Passkey banner", () => {
     // What the browser inserts without a cancellable `beforeinput` — a composition, an autofill — is emptied at once.
     await field.setValue("ghp_");
     expect(field.element.value).toBe("");
+  });
+
+  // 2026-065 decision 02: opening another repo is the gesture that asks for the passkey.
+  it("asks for the passkey when another repo is opened with the tokens locked", async () => {
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    vi.spyOn(tokens, "canOffer").mockResolvedValue(false);
+    const unlock = vi.spyOn(tokens, "unlock").mockResolvedValue("ouvert");
+    vi.spyOn(inject(DialogService), "open").mockResolvedValue({
+      owner: "wayne",
+      repo: "mnesisk",
+    });
+    vi.spyOn(
+      inject(SpecificationStore),
+      "loadSpecification",
+    ).mockResolvedValue();
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/acme/cadrage/referentiel");
+    await router.isReady();
+    const view = mount(App, { global: { plugins: [router] } });
+    await flushPromises();
+    await view.find(`button.depot[title="Changer de dépôt"]`).trigger("click");
+    // The dialog is loaded when opened.
+    await vi.waitFor(() => expect(unlock).toHaveBeenCalledOnce());
   });
 
   it("keeps only the button where the autofill cannot offer the passkey", async () => {

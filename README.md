@@ -92,7 +92,7 @@ Served on `http://localhost:1430`. `pnpm build:web` builds it into `dist-web/`, 
 
 ## Access to repos
 
-A public repo can be read without signing in. A personal GitHub token — read-only as long as writing is not needed — raises the rate limits and opens private repos. Skanon keeps it in the browser's local storage, in clear or sealed by a passkey — which a project can require. Sealed tokens are unlocked once while a Skanon tab stays open, through the passkey the browser offers.
+A public repo can be read without signing in. A personal GitHub token — read-only as long as writing is not needed — raises the rate limits and opens private repos. Skanon keeps it in the browser's local storage, in clear or sealed by a passkey — which a project can require. Sealed tokens are unlocked once while a Skanon tab stays open: opening a project, or « Unlock », brings up the browser's passkey window, and the field marked for passkeys offers it too.
 
 ## Licence
 

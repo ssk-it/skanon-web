@@ -52,7 +52,9 @@ void known.refresh();
 // Coming back home asks again for each identity, conditionally: this is where one looks for the project to open.
 inject(ProjectIdentityService).reread();
 
+/** Opening a project is the gesture that asks for the passkey when the tokens are locked, as signing in does with an identity provider (2026-065, decision 02): the repo is read again once they open. */
 function open(repoRef: RepoRef): void {
+  if (tokens.locked()) void tokens.unlock();
   void router.push(
     `/${encodeURIComponent(repoRef.owner)}/${encodeURIComponent(repoRef.repo)}/referentiel`,
   );

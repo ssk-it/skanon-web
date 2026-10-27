@@ -127,6 +127,24 @@ describe("« Ouvrir un projet » screen", () => {
     ).toBe("folder");
   });
 
+  // 2026-065 decision 02: opening a project is the gesture that asks for the passkey, as signing in does with an identity provider.
+  it("asks for the passkey when a project is opened with the tokens locked", async () => {
+    const tokens = inject(TokenService);
+    vi.spyOn(tokens, "locked").mockReturnValue(true);
+    const unlock = vi.spyOn(tokens, "unlock").mockResolvedValue("ouvert");
+    const page = await mountView([known("wayne/mnesisk", true)]);
+    (page.querySelector(".cadres .depot") as HTMLElement).click();
+    expect(unlock).toHaveBeenCalledOnce();
+  });
+
+  it("asks for nothing when a project is opened with the tokens open", async () => {
+    const tokens = inject(TokenService);
+    const unlock = vi.spyOn(tokens, "unlock");
+    const page = await mountView([known("wayne/mnesisk", true)]);
+    (page.querySelector(".cadres .depot") as HTMLElement).click();
+    expect(unlock).not.toHaveBeenCalled();
+  });
+
   it("asks for identities again on each return, without reading any for repos without a specification", async () => {
     withSymbol = [];
     await mountView([

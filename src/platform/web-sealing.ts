@@ -48,6 +48,8 @@ export interface Authenticator {
     id: Uint8Array<ArrayBuffer>,
     salt: Uint8Array<ArrayBuffer>,
   ): Promise<ArrayBuffer | null>;
+  /** The output of the passkey the user picks among this site's, in the browser's window; `null` if the user cancels. */
+  choose(salt: Uint8Array<ArrayBuffer>): Promise<ArrayBuffer | null>;
   /** False when the browser surely cannot offer a passkey through its autofill. */
   isConditionalPossible(): Promise<boolean>;
   /** The output of the passkey the user picks in the browser's autofill; `null` if the offer is withdrawn, cancelled, or returns no output. */
@@ -165,11 +167,11 @@ export class BrowserSealedVault implements TokenVault, TokenSealing {
   }
 
   async unlockTokens(): Promise<UnlockOutcome> {
-    const id = readId();
-    if (!read(SEALED_KEY) || !id) return { issue: "illisible" };
+    if (!read(SEALED_KEY) || !readId()) return { issue: "illisible" };
     let output: ArrayBuffer | null;
     try {
-      output = await this.auth.evaluate(id, SALT);
+      // The window lists the site's passkeys, as an identity provider's does (2026-065, decision 02): naming the passkey would skip it.
+      output = await this.auth.choose(SALT);
     } catch {
       return { issue: "annule" };
     }
@@ -447,10 +449,11 @@ export class BrowserAuthenticator implements Authenticator {
       navigator.credentials.create({
         publicKey: {
           rp: { name: "Skanon" },
+          // Chrome lists, next to the passkey, the passwords it keeps for the site — the GitHub token among them: the name tells them apart.
           user: {
             id,
-            name: "Jeton GitHub",
-            displayName: "Jeton GitHub de Skanon",
+            name: "Skanon passkey",
+            displayName: "Skanon passkey",
           },
           challenge: crypto.getRandomValues(new Uint8Array(32)),
           pubKeyCredParams: [
@@ -458,7 +461,8 @@ export class BrowserAuthenticator implements Authenticator {
             { type: "public-key", alg: -257 },
           ],
           authenticatorSelection: {
-            residentKey: "preferred",
+            // The browser's autofill only lists discoverable passkeys (2026-065, decision 02).
+            residentKey: "required",
             userVerification: "required",
           },
           extensions: { prf: { eval: { first: salt } } },
@@ -484,6 +488,20 @@ export class BrowserAuthenticator implements Authenticator {
           // No server checks this response: the challenge is only there because WebAuthn requires it.
           challenge: crypto.getRandomValues(new Uint8Array(32)),
           allowCredentials: [{ type: "public-key", id }],
+          userVerification: "required",
+          extensions: { prf: { eval: { first: salt } } },
+        },
+      }),
+    );
+    if (!(assertion instanceof PublicKeyCredential)) return null;
+    return copy(assertion.getClientExtensionResults().prf?.results?.first);
+  }
+
+  async choose(salt: Uint8Array<ArrayBuffer>): Promise<ArrayBuffer | null> {
+    const assertion = await gesture(() =>
+      navigator.credentials.get({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
           userVerification: "required",
           extensions: { prf: { eval: { first: salt } } },
         },

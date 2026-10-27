@@ -13,6 +13,8 @@ export class FakeAuthenticator implements Authenticator {
   readonly secrets = new Map<string, Uint8Array>();
   creations = 0;
   evaluations = 0;
+  /** The times the browser's window asked to pick a passkey. */
+  choices = 0;
 
   async isPossible(): Promise<boolean> {
     return this.possible;
@@ -37,6 +39,14 @@ export class FakeAuthenticator implements Authenticator {
     if (this.cancel || !this.secrets.has(key(id))) return null;
     this.evaluations++;
     return this.output(id, salt);
+  }
+
+  /** The user picks the site's passkey in the browser's window, and confirms with Touch ID. */
+  async choose(salt: Uint8Array): Promise<ArrayBuffer | null> {
+    const [id] = [...this.secrets.keys()];
+    if (this.cancel || id === undefined) return null;
+    this.choices++;
+    return this.output(Uint8Array.from(id.split(","), Number), salt);
   }
 
   /** Whether the browser offers passkeys through autofill, and returns PRF that way. */
