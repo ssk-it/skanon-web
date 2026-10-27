@@ -447,10 +447,11 @@ export class BrowserAuthenticator implements Authenticator {
       navigator.credentials.create({
         publicKey: {
           rp: { name: "Skanon" },
+          // Chrome lists, next to the passkey, the passwords it keeps for the site — the GitHub token among them: the name tells them apart.
           user: {
             id,
-            name: "Jeton GitHub",
-            displayName: "Jeton GitHub de Skanon",
+            name: "Skanon passkey",
+            displayName: "Skanon passkey",
           },
           challenge: crypto.getRandomValues(new Uint8Array(32)),
           pubKeyCredParams: [
@@ -458,7 +459,8 @@ export class BrowserAuthenticator implements Authenticator {
             { type: "public-key", alg: -257 },
           ],
           authenticatorSelection: {
-            residentKey: "preferred",
+            // The browser's autofill only lists discoverable passkeys (2026-065, decision 02).
+            residentKey: "required",
             userVerification: "required",
           },
           extensions: { prf: { eval: { first: salt } } },
