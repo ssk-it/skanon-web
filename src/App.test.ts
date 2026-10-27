@@ -87,6 +87,30 @@ describe("App", () => {
     expect(view.find(".barre").text()).toContain("Skanon");
   });
 
+  // RG-accessibilite-aa, 2.4.1: whoever navigates by keyboard skips the bar rather than going through it on every page.
+  it("opens the page on a skip link that leads to the content", async () => {
+    const router = createAppRouter(createMemoryHistory());
+    await router.push("/ssk-it/ssk-canon/referentiel");
+    await router.isReady();
+
+    const view = mount(App, {
+      global: { plugins: [router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    const first = view.find("a, button");
+    expect(first.text()).toBe("Aller au contenu");
+    const content = view.find("main");
+    expect(first.attributes("href")).toBe(`#${content.attributes("id")}`);
+    // A `<main>` that does not take focus would leave the next Tab at the top of the page.
+    expect(content.attributes("tabindex")).toBe("-1");
+
+    await first.trigger("click");
+    expect(document.activeElement).toBe(content.element);
+    view.unmount();
+  });
+
   // RG-aide-a-portee: help is not a view of a project, its door is everywhere.
   it.each([["/"], ["/ssk-it/ssk-canon/referentiel"]])(
     "leads to help from the bar, on %s",
@@ -237,18 +261,6 @@ describe("Version banner", () => {
     const view = await mountView("/ssk-it/ssk-canon/cadrages/2026-049");
     await announce();
     expect(banner(view)!.textContent).not.toContain("saisie");
-  });
-
-  it("warns that temporary access will end — RG-acces-temporaire", async () => {
-    inject(TokenService).setAccess({
-      token: "ghs_temporaire",
-      validUntil: new Date(Date.now() + 3_600_000).toISOString(),
-      repos: ["ssk-it/ssk-canon"],
-      identity: { identifier: "ssk", name: "SSK", email: null },
-    });
-    const view = await mountView();
-    await announce();
-    expect(banner(view)!.textContent).toContain("identité vérifiée");
   });
 
   it("names a lost version, with its own cause", async () => {
@@ -525,7 +537,7 @@ describe("Display language", () => {
 
   it("offers the three choices in the bottom bar, and applies one without reloading", async () => {
     const view = await mountView();
-    const trigger = view.find('.pied [aria-label="Langue"]');
+    const trigger = view.find('.pied [aria-label="Langue : Français"]');
     expect(trigger.exists()).toBe(true);
     expect(trigger.text()).toContain("Français");
     await trigger.trigger("click");
@@ -540,9 +552,9 @@ describe("Display language", () => {
     await flushPromises();
     expect(inject(LocaleService).choice()).toBe("en");
     expect(view.find(".pied").text()).toContain("Legal notice");
-    expect(view.find('.pied [aria-label="Language"]').text()).toContain(
-      "English",
-    );
+    expect(
+      view.find('.pied [aria-label="Language: English"]').text(),
+    ).toContain("English");
     view.unmount();
   });
 });

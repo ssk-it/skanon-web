@@ -58,6 +58,17 @@ describe("TokenDialog", () => {
     await flushPromises();
     expect(guide(view).attributes("open")).toBeUndefined();
   });
+
+  // RG-garanties-annoncees: only the personal token opens a repo, and the dialog still says what it guarantees — without naming an access mode.
+  it("announces what the personal token guarantees, without an access mode", async () => {
+    const view = mount(TokenDialog);
+    await flushPromises();
+    const guarantees = view.find(".garanties").text();
+    expect(guarantees).toContain("L’autorisation s’arrête au dépôt");
+    expect(guarantees).toContain("déclaré par l’application");
+    expect(guarantees).not.toContain("mode");
+    expect(view.text()).not.toContain("Se connecter");
+  });
 });
 
 /**

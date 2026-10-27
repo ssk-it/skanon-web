@@ -47,7 +47,7 @@ export function isInputUrl(url: string): boolean {
  *
  * The service worker downloads a new version by itself, but only looks for it when a page loads, and only serves it on the next one. A window of the installed application, never reloaded, would therefore know nothing of it: this service asks for it, and says what it found. It asks the platform's announcer (`platform/ports.ts`): the service worker on the web, the native core on the desktop, which says why it announces nothing.
  *
- * It never reloads or relaunches by itself. A reload wipes the input in progress and the access obtained through a verified identity: only the author knows whether they can afford it now (2026-049, decision 01).
+ * It never reloads or relaunches by itself. A reload wipes the input in progress: only the author knows whether they can afford it now (2026-049, decision 01).
  */
 export class VersionService {
   private readonly announcer = inject(PLATFORM).version;

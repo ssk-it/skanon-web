@@ -224,47 +224,6 @@ export interface Scoping {
 }
 
 /**
- * How a project's authors obtain access to the repo.
- *
- * The three modes stack: each removes an obstacle the previous one left,
- * without cancelling what it brought. Moving from one to the other requires
- * reworking neither the specification nor the scopings — only the way of obtaining access
- * changes. See RG-modes-acces.
- */
-export type AccessMode = "jeton_personnel" | "identite_tierce" | "relais";
-
-/**
- * What each mode guarantees, and what it does not.
- *
- * These limits are imposed by the platform, not chosen: an installation
- * token is restricted to repos and permissions, never to paths.
- * Announcing them is what RG-garanties-annoncees requires — an absent guarantee
- * kept quiet would make people stop being wary where they should be.
- */
-export interface AccessGuarantees {
-  /** How far down authorisation goes. */
-  readonly scope: "depot" | "chemin";
-  /** Whether a commit's author is verified, or only declared by the client. */
-  readonly authorVerified: boolean;
-  /** Whether the author must have an account on the repo platform. */
-  readonly accountRequired: boolean;
-}
-
-export const GUARANTEES: Record<AccessMode, AccessGuarantees> = {
-  jeton_personnel: {
-    scope: "depot",
-    authorVerified: false,
-    accountRequired: true,
-  },
-  identite_tierce: {
-    scope: "depot",
-    authorVerified: false,
-    accountRequired: false,
-  },
-  relais: { scope: "chemin", authorVerified: true, accountRequired: false },
-};
-
-/**
  * What a project asks of the token that opens it, in the web version: the passkey offered to the author, or required of them (RG-protection-du-jeton-par-projet). Offered is the default: a project that sets nothing works as before.
  */
 export type TokenProtection = "proposee" | "exigee";
@@ -272,42 +231,6 @@ export type TokenProtection = "proposee" | "exigee";
 /** The values a project can declare, to validate what is read. */
 export const TOKEN_PROTECTIONS: ReadonlySet<TokenProtection> =
   new Set<TokenProtection>(["proposee", "exigee"]);
-
-/** The modes a project can declare, to validate what is read. */
-export const ACCESS_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>([
-  "jeton_personnel",
-  "identite_tierce",
-  "relais",
-]);
-
-export const ACCESS_MODE_LABEL = defineMessages<Record<AccessMode, string>>({
-  fr: {
-    jeton_personnel: "Jeton personnel",
-    identite_tierce: "Identité tierce",
-    relais: "Relais",
-  },
-  en: {
-    jeton_personnel: "Personal token",
-    identite_tierce: "Third-party identity",
-    relais: "Relay",
-  },
-});
-
-/**
- * Where the project has its authors' identity verified.
- *
- * Nothing secret here: the issuer and the client identifier are public by
- * nature, as in any application that runs in a browser. The
- * client has no secret — the one-time-secret exchange is what protects it.
- */
-export interface IdentitySettings {
-  /** Root of the identity server, up to and including the project's domain. */
-  readonly issuer: string;
-  /** Identifier of the public client declared with this issuer. */
-  readonly client: string;
-  /** Component that exchanges a verified identity for access to the repo. */
-  readonly exchange: string;
-}
 
 /**
  * What a project sets for itself, in its configuration file.
@@ -318,19 +241,6 @@ export interface IdentitySettings {
  * machine to another would settle nothing.
  */
 export interface ProjectSettings {
-  /**
-   * How authors obtain access to the repo.
-   *
-   * The personal token is the default: a project that declares nothing works,
-   * and has nothing to host.
-   */
-  readonly access: AccessMode;
-  /**
-   * Parameters of the « identité tierce » mode. Absent in the other modes, and
-   * also absent from a project that declares this mode without providing them — in which case
-   * the application reports it rather than failing at sign-in.
-   */
-  readonly identity: IdentitySettings | null;
   /** Whether the token that opens this project must be kept under a passkey in the web version. */
   readonly tokenProtection: TokenProtection;
   /**

@@ -103,7 +103,7 @@ h3 {
   font-weight: 600;
 }
 .etapes li::marker {
-  color: var(--mat-sys-outline);
+  color: var(--mat-sys-on-surface-variant);
 }
 .aide-acces-depot :deep(a) {
   color: var(--mat-sys-primary);

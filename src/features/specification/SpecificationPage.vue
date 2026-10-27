@@ -226,12 +226,13 @@ h1 {
 }
 .grille {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  /* `min(…, 100%)`: on a screen narrower than the column, it takes the width instead of exceeding it — RG-accessibilite-aa, 320 px. */
+  grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr));
   gap: 16px;
 }
 .bouge {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 16px;
   margin-bottom: 28px;
 }

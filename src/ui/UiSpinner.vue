@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useMessages } from "../core/i18n/locale.service";
+import { spinnerMessages } from "./spinner.messages";
 
 /**
  * The circular wait indicator: `mat-spinner`, indeterminate.
@@ -8,11 +10,16 @@ import { computed } from "vue";
  * <UiSpinner :diameter="16" />
  * ```
  *
+ * Its `label` is what a screen reader announces — « Chargement en cours » by default, in the displayed language: a progress bar without a name does not say what it waits for.
+ *
  * The proportions are Material's: a stroke a tenth of the diameter, on a circle of radius `(diameter − 10) / 2` in a box of `diameter − 10 + stroke`.
  */
-const props = withDefaults(defineProps<{ diameter?: number }>(), {
-  diameter: 48,
-});
+const props = withDefaults(
+  defineProps<{ diameter?: number; label?: string }>(),
+  { diameter: 48, label: undefined },
+);
+
+const t = useMessages(spinnerMessages);
 
 const geometry = computed(() => {
   const stroke = props.diameter / 10;
@@ -32,6 +39,7 @@ const geometry = computed(() => {
   <span
     class="ui-spinner"
     role="progressbar"
+    :aria-label="label ?? t().loading"
     aria-valuemin="0"
     aria-valuemax="100"
     :style="{ width: `${diameter}px`, height: `${diameter}px` }"

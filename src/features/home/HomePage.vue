@@ -177,7 +177,7 @@ function validateRepo(): void {
 
     <CreateSpecification class="nouveau" />
 
-    <!-- RG-connexion-optionnelle, RG-modes-acces: the help offers itself, below the list, without posing as a prerequisite — a public repo is read without a token, and a project under third-party identity asks for none. -->
+    <!-- RG-connexion-optionnelle: the help offers itself, below the list, without posing as a prerequisite — a public repo is read without a token. -->
     <section v-if="tokens.noAccess()" class="connexion">
       <h2>{{ t().signInTitle }}</h2>
       <p class="aide">{{ t().signInHelp }}</p>
@@ -220,7 +220,8 @@ function validateRepo(): void {
 .groupes {
   container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  /* `min(…, 100%)`: narrower than 20rem, the screen takes one full column instead of being overrun — RG-accessibilite-aa, 320 px. */
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
   grid-auto-flow: row dense;
   align-items: start;
   gap: 16px;

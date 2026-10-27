@@ -88,4 +88,11 @@ defineProps<{ value?: number | null }>();
     transform: translateX(105%) scaleX(0.1);
   }
 }
+/* Slower rather than stopped: still, the bar would no longer say that something is awaited. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-barre__primaire,
+  .ui-barre__secondaire {
+    animation-duration: 6s;
+  }
+}
 </style>

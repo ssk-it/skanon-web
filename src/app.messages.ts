@@ -16,6 +16,7 @@ export const appMessages = defineMessages({
     },
     search: (shortcut: string) => `Rechercher (${shortcut})`,
     searchSpecification: "Rechercher dans le référentiel",
+    skipToContent: "Aller au contenu",
     changeRepo: "Changer de dépôt",
     openOnGithub: (repo: string) => `Ouvrir ${repo} sur GitHub`,
     reloadFromGithub: "Recharger depuis GitHub",
@@ -42,8 +43,6 @@ export const appMessages = defineMessages({
       retry: "Réessayez, ou relancez Skanon vous-même.",
       saveFirst:
         "Enregistrez d’abord : une saisie non enregistrée serait perdue.",
-      endsAccess: (relaunches: boolean) =>
-        `${relaunches ? "La relance" : "Le rechargement"} mettra fin à l’accès obtenu par votre identité vérifiée.`,
     },
     vault: {
       eraseRefused: (onDesktop: boolean) =>
@@ -75,6 +74,8 @@ export const appMessages = defineMessages({
     legalNotice: "Mentions légales",
     language: {
       label: "Langue",
+      // The trigger's accessible name holds the language it shows: a name without its visible text fails whoever speaks to the screen (2.5.3, RG-accessibilite-aa).
+      trigger: (current: string) => `Langue : ${current}`,
       browser: (current: string) => `Langue du navigateur (${current})`,
     },
   },
@@ -92,6 +93,7 @@ export const appMessages = defineMessages({
     },
     search: (shortcut: string) => `Search (${shortcut})`,
     searchSpecification: "Search the specification",
+    skipToContent: "Skip to content",
     changeRepo: "Change repo",
     openOnGithub: (repo: string) => `Open ${repo} on GitHub`,
     reloadFromGithub: "Reload from GitHub",
@@ -117,8 +119,6 @@ export const appMessages = defineMessages({
       toUse: "to use it.",
       retry: "Try again, or relaunch Skanon yourself.",
       saveFirst: "Save first: unsaved input would be lost.",
-      endsAccess: (relaunches: boolean) =>
-        `${relaunches ? "Relaunching" : "Reloading"} will end the access obtained through your verified identity.`,
     },
     vault: {
       eraseRefused: (onDesktop: boolean) =>
@@ -150,6 +150,7 @@ export const appMessages = defineMessages({
     legalNotice: "Legal notice",
     language: {
       label: "Language",
+      trigger: (current: string) => `Language: ${current}`,
       browser: (current: string) => `Browser language (${current})`,
     },
   },

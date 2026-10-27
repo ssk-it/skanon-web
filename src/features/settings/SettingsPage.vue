@@ -1,15 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watchEffect } from "vue";
 import { GithubError } from "../../core/github/github-client";
-import { LocaleService, useMessages } from "../../core/i18n/locale.service";
+import { useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
-import {
-  GUARANTEES,
-  ACCESS_MODE_LABEL,
-  type CodeRepo,
-  type AccessMode,
-  type TokenProtection,
-} from "../../core/model/model";
+import { type CodeRepo, type TokenProtection } from "../../core/model/model";
 import { AutomationService } from "../../core/repo/automation.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import { SettingsService } from "../../core/repo/settings.service";
@@ -32,47 +26,13 @@ import { settingsMessages } from "./settings.messages";
  * They live in the repo, not in the browser: they hold for everyone working on the project. Changing them therefore follows the same path as any other change — a branch, a pull request — rather than taking effect without anyone having reviewed it.
  */
 
-const MODES: AccessMode[] = ["jeton_personnel", "identite_tierce", "relais"];
-
-/**
- * Modes the application can honour today.
- *
- * The others are shown with their guarantees, but cannot be chosen: a project declaring one would believe it applies a setting with no effect. The range is visible, and so is its progress.
- */
-const IMPLEMENTED_MODES: ReadonlySet<AccessMode> = new Set<AccessMode>([
-  "jeton_personnel",
-  "identite_tierce",
-]);
-
 const store = inject(SpecificationStore);
 const settings = inject(SettingsService);
 const automation = inject(AutomationService);
-const locale = inject(LocaleService);
 const t = useMessages(settingsMessages);
 
-const modes = MODES;
-const modeLabel = (m: AccessMode) => ACCESS_MODE_LABEL[locale.language()][m];
-/** The model's values are technical: what the user reads is not. */
-const guarantees = (m: AccessMode) => t().guarantees(GUARANTEES[m]);
-const implemented = (m: AccessMode) => IMPLEMENTED_MODES.has(m);
-
-const access = ref<AccessMode>("jeton_personnel");
 /** What the project requires of the personal token in the web version (RG-protection-du-jeton-par-projet). */
 const tokenProtection = ref<TokenProtection>("proposee");
-const issuer = ref("");
-const client = ref("");
-const exchange = ref("");
-
-/**
- * True if the mode requires parameters that are missing.
- *
- * Offering incomplete settings would write a mode no one could use: refusal is better than discovery at the first sign-in.
- */
-const incompleteIdentity = computed(
-  () =>
-    access.value === "identite_tierce" &&
-    !(issuer.value.trim() && client.value.trim() && exchange.value.trim()),
-);
 
 const sending = ref(false);
 /** A failure's own message, or `null` for the page's generic one — read at display time, so that it follows a language switch. */
@@ -166,45 +126,24 @@ watchEffect(() => {
 watchEffect(() => {
   if (store.state() !== "pret") return;
   const r = store.specification().settings;
-  access.value = r.access;
   tokenProtection.value = r.tokenProtection;
-  issuer.value = r.identity?.issuer ?? "";
-  client.value = r.identity?.client ?? "";
-  exchange.value = r.identity?.exchange ?? "";
   codeRepos.value = [...store.specification().project.codeRepos];
   // captured after applying, so that « modifié » compares against the loaded state
   queueMicrotask(() => (initial.value = fingerprint()));
 });
 
-function chooseMode(m: AccessMode): void {
-  if (!IMPLEMENTED_MODES.has(m)) return;
-  access.value = m;
-  proposed.value = null;
-}
-
 async function proposeSettings(): Promise<void> {
-  if (sending.value || incompleteIdentity.value) return;
+  if (sending.value) return;
   sending.value = true;
   error.value = null;
   proposed.value = null;
   try {
     const p = await settings.proposeSettings({
-      access: access.value,
-      // Only the personal token is kept on the machine: another mode removes the requirement, which no longer applies.
-      tokenProtection:
-        access.value === "jeton_personnel" ? tokenProtection.value : "proposee",
+      tokenProtection: tokenProtection.value,
       // Empty entries are dropped: a line added then left as is describes no repo.
       codeRepos: codeRepos.value
         .filter((d) => d.repo.trim())
         .map((d) => ({ repo: d.repo.trim(), role: d.role.trim() })),
-      identity:
-        access.value === "identite_tierce"
-          ? {
-              issuer: issuer.value.trim(),
-              client: client.value.trim(),
-              exchange: exchange.value.trim(),
-            }
-          : null,
     });
     proposed.value = p;
     initial.value = fingerprint();
@@ -221,7 +160,7 @@ async function proposeSettings(): Promise<void> {
 /** Stable representation of the input, to detect a difference. */
 function fingerprint(): string {
   const d = codeRepos.value.map((x) => `${x.repo}~${x.role}`).join(",");
-  return `${access.value}#${tokenProtection.value}#${issuer.value}#${client.value}#${exchange.value}#${d}`;
+  return `${tokenProtection.value}#${d}`;
 }
 </script>
 
@@ -235,39 +174,9 @@ function fingerprint(): string {
       </header>
 
       <section class="bloc">
-        <h2 class="section">{{ t().accessMode }}</h2>
-        <p class="explication">{{ t().accessModeHelp }}</p>
-
-        <div class="modes">
-          <label
-            v-for="m of modes"
-            :key="m"
-            class="mode"
-            :class="{ indisponible: !implemented(m) }"
-          >
-            <input
-              type="radio"
-              name="acces"
-              :value="m"
-              :checked="access === m"
-              :disabled="!implemented(m) || sending"
-              @change="chooseMode(m)"
-            />
-            <span class="mode-corps">
-              <span class="mode-tete">
-                <strong>{{ modeLabel(m) }}</strong>
-                <span v-if="!implemented(m)" class="a-venir">{{
-                  t().notYetAvailable
-                }}</span>
-              </span>
-              <span class="mode-garanties">{{ guarantees(m) }}</span>
-            </span>
-          </label>
-        </div>
-
+        <h2 class="section">{{ t().tokenProtection }}</h2>
         <!-- RG-protection-du-jeton-par-projet, RG-garanties-annoncees: each way of keeping the token says what it protects and what it leaves exposed, and the requirement does not pass itself off as GitHub's. -->
-        <div v-if="access === 'jeton_personnel'" class="protection-du-jeton">
-          <h3 class="sous-section">{{ t().tokenProtection }}</h3>
+        <div class="protection-du-jeton">
           <p class="explication">{{ t().tokenProtectionHelp }}</p>
 
           <div class="modes">
@@ -314,41 +223,6 @@ function fingerprint(): string {
 
           <p class="explication">{{ t().tokenInClear }}</p>
           <p class="explication">{{ t().skanonRequirement }}</p>
-        </div>
-
-        <div v-if="access === 'identite_tierce'" class="identite">
-          <p class="explication">{{ t().identityHelp }}</p>
-
-          <UiTextField
-            v-model="issuer"
-            :label="t().issuer"
-            name="emetteur"
-            :disabled="sending"
-            :placeholder="t().issuerPlaceholder"
-            :hint="t().issuerHint"
-          />
-
-          <UiTextField
-            v-model="client"
-            :label="t().client"
-            name="client"
-            :disabled="sending"
-            :placeholder="t().clientPlaceholder"
-            :hint="t().clientHint"
-          />
-
-          <UiTextField
-            v-model="exchange"
-            :label="t().exchange"
-            name="echange"
-            :disabled="sending"
-            :placeholder="t().exchangePlaceholder"
-            :hint="t().exchangeHint"
-          />
-
-          <p v-if="incompleteIdentity" class="manque">
-            {{ t().incompleteIdentity }}
-          </p>
         </div>
       </section>
 
@@ -478,7 +352,7 @@ function fingerprint(): string {
       <div class="actions">
         <UiButton
           variant="filled"
-          :disabled="sending || !modified || incompleteIdentity"
+          :disabled="sending || !modified"
           @click="proposeSettings()"
         >
           {{ sending ? t().sending : t().propose }}
@@ -619,14 +493,6 @@ h1 {
   &:hover {
     background: var(--mat-sys-surface-container);
   }
-  /* What cannot be chosen must not look like it can: the cursor and the opacity say so before the click finds out. */
-  &.indisponible {
-    cursor: default;
-    opacity: 0.62;
-  }
-  &.indisponible:hover {
-    background: none;
-  }
 
   input {
     margin-top: 3px;
@@ -642,24 +508,10 @@ h1 {
   align-items: baseline;
   gap: 9px;
 }
-.a-venir {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--mat-sys-on-surface-variant);
-}
 .mode-garanties {
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--mat-sys-on-surface-variant);
-}
-.protection-du-jeton {
-  margin-top: 20px;
-}
-.sous-section {
-  margin: 0 0 6px;
-  font-size: 14px;
-  font-weight: 600;
 }
 .formes {
   margin: 12px 0;
@@ -674,25 +526,6 @@ h1 {
     color: var(--mat-sys-on-surface-variant);
     max-width: 75ch;
   }
-}
-.identite {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 14px;
-  padding: 14px 16px 4px;
-  border-radius: 9px;
-  background: var(--mat-sys-surface-container);
-
-  .explication {
-    margin: 0 0 10px;
-  }
-}
-.manque {
-  margin: 0 0 12px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--pc-statut-relecture);
 }
 .erreur,
 .succes {

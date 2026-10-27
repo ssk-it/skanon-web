@@ -51,8 +51,6 @@ function scoping(id: string, status: ScopingStatus): Scoping {
  * and each field added to `ProjectSettings` broke them one by one.
  */
 const MINIMAL_SETTINGS = {
-  access: "jeton_personnel",
-  identity: null,
   tokenProtection: "proposee",
   linkTags: DEFAULT_LINK_TAGS,
 } as const;

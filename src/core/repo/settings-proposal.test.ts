@@ -17,13 +17,9 @@ import { EditableSettings } from "./config-writer";
 const REPO = { owner: "org", repo: "projet" };
 const BRANCH = "reglages";
 
-const ON_MAIN =
-  "schema_version: 1\nprojet:\n  nom: Essai\nacces: jeton_personnel\n";
+const ON_MAIN = "schema_version: 1\nprojet:\n  nom: Essai\n";
 
-const SETTINGS: EditableSettings = {
-  access: "identite_tierce",
-  identity: null,
-};
+const SETTINGS: EditableSettings = { tokenProtection: "exigee" };
 
 let branches: Record<string, Record<string, { content: string; sha: string }>>;
 let pullRequests: Record<string, number>;
@@ -105,7 +101,7 @@ describe("Proposing a change to the settings", () => {
         currentSha: "sha-main",
       }),
     ]);
-    expect(commits[0].content).toContain("acces: identite_tierce");
+    expect(commits[0].content).toContain("protection_du_jeton: exigee");
     expect(branches.main[CONFIG_NAME].content).toBe(ON_MAIN);
     expect(proposed).toEqual({
       branch: BRANCH,

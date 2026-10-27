@@ -105,8 +105,6 @@ function specification(content: {
       prefix: content.prefix ?? null,
     },
     settings: {
-      access: "jeton_personnel",
-      identity: null,
       tokenProtection: "proposee",
       linkTags: DEFAULT_LINK_TAGS,
     },

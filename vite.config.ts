@@ -59,6 +59,7 @@ export default defineConfig({
         "tools/**/*.test.ts",
         "src/test-setup.ts",
         "src/core/http/http-testing.ts",
+        "src/accessibility-testing.ts",
       ],
     },
     projects: [

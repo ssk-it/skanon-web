@@ -26,14 +26,11 @@ import {
   Feature,
   Impact,
   ExternalLink,
-  ACCESS_MODES,
-  AccessMode,
   Option,
   TOKEN_PROTECTIONS,
   TokenProtection,
   Attachment,
   Specification,
-  IdentitySettings,
   ProjectSettings,
   Rule,
   ArchitectureDecision,
@@ -50,7 +47,6 @@ import {
   checkDeclaredFolders,
   resolveNames,
 } from "./repo-names";
-import { trimTrailing } from "../text";
 
 /**
  * The key of `dossiers` naming each directory that carries entities, under
@@ -208,7 +204,6 @@ export class RepoLoader {
         isPrivate ||= this.github.contentsViaApi();
         await this.cache.saveContent(repoRef, e.sha, content, {
           private: isPrivate,
-          persist: this.isPersistable(isPrivate),
         });
       }
       options.progression?.(++done, total);
@@ -241,9 +236,7 @@ export class RepoLoader {
         truncated: tree.truncated,
         private: isPrivate,
       };
-      await this.cache.saveState(repoRef, ref, state, {
-        persist: this.isPersistable(isPrivate),
-      });
+      await this.cache.saveState(repoRef, ref, state);
     }
 
     return {
@@ -255,15 +248,6 @@ export class RepoLoader {
       fingerprints: new Set(toLoad.map((e) => e.sha)),
       unconfirmed: null,
     };
-  }
-
-  /**
-   * A private repo's contents do not outlive the access that read them: under
-   * a temporary access, they stay in the tab, like it.
-   * See RG-contenus-prives-au-repos.
-   */
-  private isPersistable(isPrivate: boolean): boolean {
-    return !isPrivate || this.tokens.source() !== "identite_tierce";
   }
 
   /** The contents of a known tree, if they are all still held. */
@@ -333,8 +317,6 @@ export class RepoLoader {
       prefix: null as string | null,
     };
     let settings: ProjectSettings = {
-      access: "jeton_personnel",
-      identity: null,
       tokenProtection: "proposee",
       linkTags: DEFAULT_LINK_TAGS,
     };
@@ -511,8 +493,6 @@ export class RepoLoader {
     const defaults = {
       project: defaultProject,
       settings: {
-        access: "jeton_personnel" as AccessMode,
-        identity: null,
         tokenProtection: "proposee" as TokenProtection,
         linkTags: DEFAULT_LINK_TAGS,
       },
@@ -537,27 +517,19 @@ export class RepoLoader {
 
     const rawProject = (data?.["projet"] ?? {}) as Record<string, unknown>;
     // `transitions` and `reflet_demande_fusion` are no longer read: the cycle
-    // is no longer configurable (2026-045). A project that still declares them
+    // is no longer configurable (2026-045). `acces` and `identite` neither:
+    // only the personal token opens a repo. A project that still declares them
     // sees them ignored without anomaly — they are settings that became
     // pointless, not wrong settings.
     const anomalies: string[] = [];
     const readRepos = parseCodeRepos(data?.["depots_code"]);
     anomalies.push(...readRepos.anomalies);
-    const { access, anomaly } = parseAccessMode(data?.["acces"]);
-    if (anomaly) anomalies.push(anomaly);
-
     const readProtection = parseTokenProtection(data?.["protection_du_jeton"]);
     if (readProtection.anomaly) anomalies.push(readProtection.anomaly);
 
     // The names of folders and files: a faulty entry keeps the format's name,
     // and is reported once, here (RG-noms-declares).
     anomalies.push(...resolveNames(data).anomalies);
-
-    const readIdentity = parseIdentity(data?.["identite"]);
-    anomalies.push(...readIdentity.anomalies);
-    if (access === "identite_tierce" && !readIdentity.identity) {
-      anomalies.push(repoText().identityBlockRequired(CONFIG_NAME));
-    }
 
     return {
       project: {
@@ -568,8 +540,6 @@ export class RepoLoader {
         prefix: str(rawProject["prefixe"]) || null,
       },
       settings: {
-        access: access,
-        identity: readIdentity.identity,
         tokenProtection: readProtection.protection,
         linkTags: parseLinkTags(data?.["tags_liens"]),
       },
@@ -713,40 +683,9 @@ export function parseLinkTags(raw: unknown): readonly string[] {
 }
 
 /**
- * Access mode declared by the project, or the default mode.
- *
- * An unknown mode is set aside and reported: putting up with it silently would
- * let the project believe it applies a setting it does not apply. The personal
- * token serves as fallback — it is the only mode that requires hosting nothing.
- *
- * A free function rather than a method: it depends on no injection, and
- * testing it must not require building a loader.
- */
-export function parseAccessMode(raw: unknown): {
-  access: AccessMode;
-  anomaly: string | null;
-} {
-  if (raw === undefined || raw === null)
-    return { access: "jeton_personnel", anomaly: null };
-
-  const value = str(raw);
-  if (ACCESS_MODES.has(value as AccessMode)) {
-    return { access: value as AccessMode, anomaly: null };
-  }
-  return {
-    access: "jeton_personnel",
-    anomaly: repoText().unknownAccessMode(
-      CONFIG_NAME,
-      value,
-      [...ACCESS_MODES].join(", "),
-    ),
-  };
-}
-
-/**
  * What the project requires of the token that opens it, or the default proposal.
  *
- * An unknown value is set aside and reported, like an unknown access mode: putting up with it would let the project believe it requires a protection it does not require (RG-protection-du-jeton-par-projet).
+ * An unknown value is set aside and reported: putting up with it would let the project believe it requires a protection it does not require (RG-protection-du-jeton-par-projet).
  */
 export function parseTokenProtection(raw: unknown): {
   protection: TokenProtection;
@@ -766,60 +705,6 @@ export function parseTokenProtection(raw: unknown): {
       value,
       [...TOKEN_PROTECTIONS].join(", "),
     ),
-  };
-}
-
-/** Fields expected in an `identite` block, and what they designate. */
-const IDENTITY_FIELDS = ["emetteur", "client", "echange"] as const;
-
-/**
- * Parameters of the « identité tierce » mode, if declared and complete.
- *
- * An incomplete block returns `null` rather than an object with holes: sign-in
- * would fail anyway, and failing at load at least leaves the specification
- * readable and the anomaly visible.
- *
- * A free function rather than a method: it depends on no injection, and
- * testing it must not require building a loader.
- */
-export function parseIdentity(raw: unknown): {
-  identity: IdentitySettings | null;
-  anomalies: string[];
-} {
-  if (!raw || typeof raw !== "object") return { identity: null, anomalies: [] };
-
-  const data = raw as Record<string, unknown>;
-  const anomalies: string[] = [];
-  const values: Record<string, string> = {};
-
-  for (const field of IDENTITY_FIELDS) {
-    const value = str(data[field]).trim();
-    if (!value) {
-      anomalies.push(repoText().identityFieldMissing(CONFIG_NAME, field));
-      continue;
-    }
-    // A malformed address would otherwise be discovered at sign-in time, far
-    // from its cause.
-    if (field !== "client") {
-      try {
-        new URL(value);
-      } catch {
-        anomalies.push(repoText().identityFieldNotAddress(CONFIG_NAME, field));
-        continue;
-      }
-    }
-    values[field] = value;
-  }
-
-  if (anomalies.length) return { identity: null, anomalies };
-  return {
-    identity: {
-      // a trailing slash would double the separators of built addresses
-      issuer: trimTrailing(values["emetteur"], "/"),
-      client: values["client"],
-      exchange: trimTrailing(values["echange"], "/"),
-    },
-    anomalies: [],
   };
 }
 

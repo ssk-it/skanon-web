@@ -22,13 +22,13 @@ An attachment is stored under the SHA-256 fingerprint of its content, and only t
 
 Content addressing makes consistency between Git and storage automatic, provided objects are immutable. Several scopings share the same object: reference counting for collection is global to the repo, never local to a scoping.
 
-## INV-5 — The exchange component is the only place where authorisations apply
+## INV-5 — Authorisations are the token's, and GitHub applies them
 
-The GitHub App has the same rights for everyone; if the exchange component merely relayed, anyone holding an identity could write to any project. A distributed binary changes nothing: the GitHub App's private key never lives on the machine.
+The application has no rights of its own: every call carries the user's personal token, and no component stands between the application and GitHub. It declares no commit author either — GitHub records the token's account (RG-auteur-reel-commit). A token is restricted to repositories and permissions, never to paths; the token dialog says so (RG-garanties-annoncees). Third-party identity and the relay were removed (2026-059/09): a hosted component, if one comes back, is designed outside this repo.
 
 ## INV-6 — Calls to GitHub are throttled by the client
 
-The API's secondary limits — one hundred concurrent requests, five hundred writes per hour — are shared by all users of an installation, and a stateless component cannot throttle. Two bounded queues in the access layer: six concurrent requests to the API, twenty-four to raw contents, which have no quota.
+The API's secondary limits — one hundred concurrent requests, five hundred writes per hour — apply to the account that holds the token, whatever project is open, and only the client sees its own calls. Two bounded queues in the access layer: six concurrent requests to the API, twenty-four to raw contents, which have no quota.
 
 ## INV-7 — Format reading is written once, in `@ssk-it/canon-check`
 

@@ -451,30 +451,28 @@ describe("The branches under a prefix", () => {
 describe("The repos a token reaches", () => {
   beforeEach(signIn);
 
-  it("are read from the installation when the token has no user", async () => {
+  it("are the token owner's, organisations included", async () => {
     const call = client.listAllowedRepos();
     await settle();
     http
-      .expectOne((r) => r.url.startsWith(`${API}/user/repos`))
-      .error(null, { status: 403 });
-    await settle();
-    http
-      .expectOne(`${API}/installation/repositories?per_page=100&page=1`)
-      .flush({
-        repositories: [{ owner: { login: "org" }, name: "projet" }],
-      });
+      .expectOne(
+        (r) =>
+          r.url.startsWith(`${API}/user/repos`) &&
+          r.url.includes("affiliation=owner,collaborator,organization_member"),
+      )
+      .flush([{ owner: { login: "org" }, name: "projet" }]);
 
     expect(await call).toEqual([REPO]);
   });
 
-  it("are not read from the installation on another failure", async () => {
+  it("are a failure when the token is refused, with no other endpoint tried", async () => {
     const call = failure(client.listAllowedRepos());
     await settle();
     http
       .expectOne((r) => r.url.startsWith(`${API}/user/repos`))
-      .error(null, { status: 500 });
+      .error(null, { status: 403 });
 
-    expect(((await call) as GithubError).status).toBe(500);
+    expect(((await call) as GithubError).status).toBe(403);
     await settle();
     http.verify();
   });
@@ -521,26 +519,12 @@ describe("Trying a token before saving it", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("lists an installation's repos when the token has no user", async () => {
-    fetchMock
-      .mockResolvedValueOnce(respond(403, {}))
-      .mockResolvedValueOnce(
-        respond(200, { repositories: [{ full_name: "org/projet" }] }),
-      );
-
-    expect(await client.tryToken("ghs_installation")).toEqual(["org/projet"]);
-    expect(String(fetchMock.mock.calls[1][0])).toContain(
-      "/installation/repositories",
-    );
-  });
-
-  it("gives the first status when neither endpoint answers", async () => {
-    fetchMock
-      .mockResolvedValueOnce(respond(403, {}))
-      .mockResolvedValueOnce(respond(404, {}));
+  it("gives GitHub's status on another refusal, with no other endpoint tried", async () => {
+    fetchMock.mockResolvedValueOnce(respond(403, {}));
 
     await expect(client.tryToken("ghp_essai")).rejects.toThrow(
       githubText().triedTokenStatus(403),
     );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -175,9 +175,10 @@ h1 {
 .ligne:hover {
   background: var(--mat-sys-surface-container);
 }
+/* A muted colour, not an opacity: at 55 %, the text fell below AA contrast (RG-accessibilite-aa). The « abrogée » badge states the status. */
 .ligne.abrogee .rid,
 .ligne.abrogee .extrait {
-  opacity: 0.55;
+  color: var(--mat-sys-on-surface-variant);
 }
 .principal {
   display: flex;

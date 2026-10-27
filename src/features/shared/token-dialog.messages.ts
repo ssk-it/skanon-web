@@ -3,37 +3,19 @@ import type { RichPart } from "./RichText.vue";
 
 export const tokenDialogMessages = defineMessages({
   fr: {
-    signIn: "Connexion",
     signInGithub: "Connexion à GitHub",
     whyToken:
       "Sans connexion, GitHub limite l’application à 60 requêtes par heure et par adresse. Un jeton personnel porte cette limite à 5 000, donne accès aux dépôts privés, et débloque l’historique des règles — dates, auteurs et pull requests, que GitHub refuse aux requêtes anonymes.",
-    mode: (label: string): readonly RichPart[] => [
-      "Ce projet emploie le mode ",
-      { strong: label },
-      ".",
-    ],
-    scopePath: [
-      "L’autorisation descend jusqu’au ",
-      { strong: "chemin" },
-      " : un rédacteur n’écrit que là où le projet l’y autorise.",
-    ] as readonly RichPart[],
     scopeRepo: [
       "L’autorisation s’arrête au ",
       { strong: "dépôt" },
       " : un rédacteur autorisé peut écrire partout dans ce projet.",
-    ] as readonly RichPart[],
-    authorVerified: [
-      "L’auteur d’un enregistrement est ",
-      { strong: "vérifié" },
-      " depuis l’identité connectée.",
     ] as readonly RichPart[],
     authorDeclared: [
       "L’auteur d’un enregistrement est ",
       { strong: "déclaré" },
       " par l’application, non vérifié à la source.",
     ] as readonly RichPart[],
-    privateInTab:
-      "Les contenus d’un dépôt privé restent dans cet onglet le temps de la session, comme l’accès qui les a lus.",
     privateSealed: [
       "Les contenus d’un dépôt privé sont ",
       { strong: "scellés comme le jeton" },
@@ -55,14 +37,7 @@ export const tokenDialogMessages = defineMessages({
     keptSealed: "dans ce navigateur, sous une passkey",
     keptForTab: "pour cet onglet seulement",
     keptInBrowser: "dans ce navigateur",
-    signedInAs: "Connecté en tant que ",
-    accessibleProjects: "Projets accessibles :",
-    noProject: "aucun",
     signOut: "Se déconnecter",
-    ownProvider:
-      "Ce projet fait vérifier les identités auprès de son propre fournisseur. Aucun compte GitHub n’est nécessaire.",
-    signingIn: "Connexion…",
-    doSignIn: "Se connecter",
     locked:
       "Vos jetons sont protégés par une passkey. Déverrouillez-les pour vous en servir, en ajouter ou en retirer un.",
     passkeyUnreadable:
@@ -112,33 +87,19 @@ export const tokenDialogMessages = defineMessages({
     save: "Enregistrer",
   },
   en: {
-    signIn: "Sign in",
     signInGithub: "Sign in to GitHub",
     whyToken:
       "Without signing in, GitHub limits the application to 60 requests per hour and per address. A personal token raises that limit to 5,000, gives access to private repos, and unlocks the history of rules — dates, authors and pull requests, which GitHub refuses to anonymous requests.",
-    mode: (label) => ["This project uses the ", { strong: label }, " mode."],
-    scopePath: [
-      "Authorisation goes down to the ",
-      { strong: "path" },
-      ": an author writes only where the project allows them to.",
-    ],
     scopeRepo: [
       "Authorisation stops at the ",
       { strong: "repo" },
       ": an authorised author can write anywhere in this project.",
-    ],
-    authorVerified: [
-      "The author of a change is ",
-      { strong: "verified" },
-      " from the signed-in identity.",
     ],
     authorDeclared: [
       "The author of a change is ",
       { strong: "declared" },
       " by the application, not verified at the source.",
     ],
-    privateInTab:
-      "A private repo's contents stay in this tab for the session, like the access that read them.",
     privateSealed: [
       "A private repo's contents are ",
       { strong: "sealed like the token" },
@@ -160,14 +121,7 @@ export const tokenDialogMessages = defineMessages({
     keptSealed: "in this browser, under a passkey",
     keptForTab: "for this tab only",
     keptInBrowser: "in this browser",
-    signedInAs: "Signed in as ",
-    accessibleProjects: "Accessible projects:",
-    noProject: "none",
     signOut: "Sign out",
-    ownProvider:
-      "This project has identities verified by its own provider. No GitHub account is needed.",
-    signingIn: "Signing in…",
-    doSignIn: "Sign in",
     locked:
       "Your tokens are protected by a passkey. Unlock them to use them, add one or remove one.",
     passkeyUnreadable:

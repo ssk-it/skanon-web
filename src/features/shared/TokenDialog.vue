@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { GithubClient } from "../../core/github/github-client";
-import { IdentityService } from "../../core/github/identity.service";
 import { TokenService, repoKeys } from "../../core/github/token.service";
 import { LocaleService } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
 import { PLATFORM } from "../../platform/platform-token";
-import { GUARANTEES, ACCESS_MODE_LABEL } from "../../core/model/model";
-import { SpecificationStore } from "../../core/repo/specification.store";
 import { RepoConfig } from "../../core/repo/repo-config";
 import UiButton from "../../ui/UiButton.vue";
 import UiCheckbox from "../../ui/UiCheckbox.vue";
@@ -23,34 +20,16 @@ import { tokenDialogMessages } from "./token-dialog.messages";
 import TokenHelp from "./TokenHelp.vue";
 
 /**
- * Sign-in to GitHub: the token, its scope, what the project's access mode guarantees — or, under a third-party identity, sign-in with the project's provider. Closes on `true` when access has changed and the repo must be read again.
+ * Sign-in to GitHub: the token, its scope, and what it guarantees. Closes on `true` when access has changed and the repo must be read again.
  */
 defineProps<{ data?: unknown }>();
 const emit = defineEmits<{ close: [change?: boolean] }>();
 
 const github = inject(GithubClient);
 const tokens = inject(TokenService);
-const store = inject(SpecificationStore);
-const identity = inject(IdentityService);
 const config = inject(RepoConfig);
 const locale = inject(LocaleService);
 const t = locale.messages(tokenDialogMessages);
-
-/** The project's access mode, and what it guarantees. */
-const mode = computed(() => store.specification().settings.access);
-const modeLabel = computed(
-  () => ACCESS_MODE_LABEL[locale.language()][mode.value],
-);
-const guarantees = computed(() => GUARANTEES[mode.value]);
-const viaThirdPartyIdentity = computed(() => mode.value === "identite_tierce");
-const who = computed(() => tokens.identity());
-
-/** Leads to the identity issuer — the page is left. */
-async function signIn(): Promise<void> {
-  // Close before leaving: on return, the application starts from scratch and a dialog left open would no longer make sense.
-  emit("close", false);
-  await identity.signIn();
-}
 
 /** What this browser knows of the passkey, learnt on opening: `null` until then. */
 const protectable = ref<boolean | null>(null);
@@ -216,39 +195,17 @@ function signOut(): void {
 </script>
 
 <template>
-  <UiDialog
-    class="token-dialog"
-    :title="viaThirdPartyIdentity ? t().signIn : t().signInGithub"
-  >
-    <p v-if="!viaThirdPartyIdentity" class="aide">{{ t().whyToken }}</p>
+  <UiDialog class="token-dialog" :title="t().signInGithub">
+    <p class="aide">{{ t().whyToken }}</p>
 
-    <!-- RG-garanties-annoncees: a mode that would suggest a protection it does not offer would be worse than its absence. -->
+    <!-- RG-garanties-annoncees: an access that would suggest a protection it does not offer would be worse than its absence. -->
     <div class="garanties">
-      <p class="mode"><RichText :parts="t().mode(modeLabel)" /></p>
       <ul>
-        <li>
-          <RichText
-            :parts="
-              guarantees.scope === 'chemin' ? t().scopePath : t().scopeRepo
-            "
-          />
-        </li>
-        <li>
-          <RichText
-            :parts="
-              guarantees.authorVerified
-                ? t().authorVerified
-                : t().authorDeclared
-            "
-          />
-        </li>
+        <li><RichText :parts="t().scopeRepo" /></li>
+        <li><RichText :parts="t().authorDeclared" /></li>
         <!-- RG-contenus-prives-au-repos: what the cache leaves on the machine is said, without claiming protection. -->
         <li>
-          <template v-if="viaThirdPartyIdentity">{{
-            t().privateInTab
-          }}</template>
           <RichText
-            v-else
             :parts="
               tokens.form() === 'scelle'
                 ? t().privateSealed
@@ -259,40 +216,12 @@ function signOut(): void {
       </ul>
     </div>
 
-    <div v-if="!viaThirdPartyIdentity" class="conseil">
+    <div class="conseil">
       <UiIcon name="lock" />
       <p><RichText :parts="t().readOnlyAdvice(whereKept)" /></p>
     </div>
 
-    <div v-if="viaThirdPartyIdentity" class="identite">
-      <template v-if="who">
-        <p class="connecte">
-          {{ t().signedInAs }}<strong>{{ who.name }}</strong>
-          <span v-if="who.email" class="courriel">{{ who.email }}</span>
-        </p>
-        <p class="portee">
-          {{ t().accessibleProjects }}
-          {{ (tokens.repos() ?? []).join(", ") || t().noProject }}
-        </p>
-        <UiButton variant="outlined" @click="signOut()">{{
-          t().signOut
-        }}</UiButton>
-      </template>
-      <template v-else>
-        <p class="invite">{{ t().ownProvider }}</p>
-        <p v-if="identity.error()" class="echec">
-          <UiIcon name="error_outline" /> <span>{{ identity.error() }}</span>
-        </p>
-        <UiButton
-          variant="filled"
-          :disabled="identity.inProgress()"
-          @click="signIn()"
-        >
-          {{ identity.inProgress() ? t().signingIn : t().doSignIn }}
-        </UiButton>
-      </template>
-    </div>
-    <div v-else-if="protection === 'verrouille'" class="protection verrou">
+    <div v-if="protection === 'verrouille'" class="protection verrou">
       <p>{{ t().locked }}</p>
       <p v-if="tokens.passkeyFailure() === 'illisible'" class="echec">
         <UiIcon name="error_outline" />
@@ -454,10 +383,6 @@ function signOut(): void {
   font-size: 13px;
   line-height: 1.55;
 
-  .mode {
-    margin: 0 0 6px;
-    color: var(--mat-sys-on-surface-variant);
-  }
   ul {
     margin: 0;
     padding-left: 18px;
@@ -465,48 +390,6 @@ function signOut(): void {
     flex-direction: column;
     gap: 5px;
     color: var(--mat-sys-on-surface-variant);
-  }
-}
-.identite {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 8px;
-
-  p {
-    margin: 0;
-    line-height: 1.55;
-  }
-  .invite {
-    color: var(--mat-sys-on-surface-variant);
-  }
-  .courriel {
-    /* Markup swallows the space between a conditional block and what precedes it: the separation therefore comes from the style. */
-    &::before {
-      content: " · ";
-    }
-    margin-left: 6px;
-    font-size: 13px;
-    color: var(--mat-sys-on-surface-variant);
-  }
-  .portee {
-    font-size: 13px;
-    color: var(--mat-sys-on-surface-variant);
-  }
-  .echec {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    font-size: 13.5px;
-    color: var(--pc-statut-relecture);
-
-    .material-symbols-outlined {
-      font-size: 19px;
-      width: 19px;
-      height: 19px;
-      flex: none;
-    }
   }
 }
 .conseil {

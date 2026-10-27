@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useAttrs, useId } from "vue";
+import { computed, ref, useAttrs, useId, useSlots } from "vue";
 import UiFieldFrame from "./UiFieldFrame.vue";
 
 /**
@@ -45,6 +45,7 @@ const props = withDefaults(
 );
 
 const attrs = useAttrs();
+const slots = useSlots();
 const id = useId();
 const focus = ref(false);
 const control = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
@@ -53,6 +54,11 @@ const controlAttrs = computed(() => {
   const { class: _c, style: _s, ...rest } = attrs;
   return rest;
 });
+
+/** The error or the hint below the field, which the screen reader reads with it (RG-accessibilite-aa). */
+const describedBy = computed(() =>
+  props.error || props.hint || slots["indice"] ? `${id}-indices` : undefined,
+);
 
 const floating = computed(
   () => props.fixedLabel || focus.value || model.value !== "",
@@ -97,6 +103,7 @@ defineExpose({
       :placeholder="placeholder"
       :disabled="disabled"
       :aria-invalid="!!error || undefined"
+      :aria-describedby="describedBy"
       v-bind="controlAttrs"
       @input="enter"
       @focus="focus = true"
@@ -112,6 +119,7 @@ defineExpose({
       :placeholder="placeholder"
       :disabled="disabled"
       :aria-invalid="!!error || undefined"
+      :aria-describedby="describedBy"
       v-bind="controlAttrs"
       @input="enter"
       @focus="focus = true"
