@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMemoryHistory, type Router } from "vue-router";
 import { createAppRouter } from "../../router";
-import { parseDeepLink } from "./deep-link";
+import { deepLinkLocation, parseDeepLink } from "./deep-link";
 
 /**
  * Opening through a protocol — RG-ouverture-par-protocole.
@@ -146,6 +146,15 @@ describe("reception address /ouvrir", () => {
     expect(
       await open("/ouvrir?lien=skanon%3Assk-it%2Fssk-canon%2Fcadrages"),
     ).toBe("/ssk-it/ssk-canon/cadrages");
+  });
+
+  // The desktop application hands each link it receives to this address (`startup.ts`): it must use the parameter the route reads.
+  it("opens the page of a link handed over by the desktop application", async () => {
+    router = createAppRouter(createMemoryHistory());
+    await router.push(deepLinkLocation("skanon:ssk-it/ssk-canon/referentiel"));
+    expect(router.currentRoute.value.fullPath).toBe(
+      "/ssk-it/ssk-canon/referentiel",
+    );
   });
 
   it("carries the anchor through to the page", async () => {
