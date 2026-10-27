@@ -250,11 +250,43 @@ function onHistory(): void {
   dialog.closeAll();
 }
 
+/**
+ * The sticky bar's height, published on the root (`--pc-hauteur-barre`): `scroll-padding-top` uses it so that an element taking focus does not end up under it (RG-accessibilite-aa, 2.4.11). It changes with the width — one line or two —, hence the observation rather than a written value.
+ */
+const bar = ref<HTMLElement | null>(null);
+const barObserver =
+  typeof ResizeObserver === "undefined"
+    ? null
+    : new ResizeObserver(([entry]) => {
+        const height = entry?.borderBoxSize[0]?.blockSize;
+        if (height !== undefined)
+          document.documentElement.style.setProperty(
+            "--pc-hauteur-barre",
+            `${height}px`,
+          );
+      });
+
+/**
+ * `scroll-padding-top` is not enough: WebKit — the desktop application's engine on macOS — does not scroll to an element it deems already visible, even when the bar covers it. Focus arriving underneath therefore scrolls the page down by what is missing. What lives in the bar or in a dialog, laid over the page, is not concerned.
+ */
+function clearOfBar(event: FocusEvent): void {
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || !bar.value) return;
+  if (target.closest(".barre, [role='dialog'], [role='alertdialog']")) return;
+  const below = bar.value.getBoundingClientRect().bottom + 8;
+  const top = target.getBoundingClientRect().top;
+  if (top < below) window.scrollBy(0, top - below);
+}
+
 onMounted(() => {
+  if (bar.value) barObserver?.observe(bar.value);
+  document.addEventListener("focusin", clearOfBar);
   document.addEventListener("keydown", onKeydown);
   window.addEventListener("popstate", onHistory);
 });
 onBeforeUnmount(() => {
+  barObserver?.disconnect();
+  document.removeEventListener("focusin", clearOfBar);
   document.removeEventListener("keydown", onKeydown);
   window.removeEventListener("popstate", onHistory);
 });
@@ -300,10 +332,21 @@ const onInput = computed(() => isInputUrl(route.fullPath));
 function reloadVersion(): void {
   void version.reloadVersion();
 }
+
+/** The page's content, which the skip link reaches without going through the bar (RG-accessibilite-aa, 2.4.1). */
+const content = ref<HTMLElement | null>(null);
+
+// Focus is set by hand: left to the browser, the link would change the address, which the router reads.
+function skipToContent(): void {
+  content.value?.focus();
+}
 </script>
 
 <template>
-  <header class="barre">
+  <a class="evitement" href="#contenu" @click.prevent="skipToContent">{{
+    t().skipToContent
+  }}</a>
+  <header ref="bar" class="barre">
     <RouterLink class="marque" to="/">
       <!-- The chevron takes the bar's text colour; only the axis keeps its hue, to stay recognisable in both themes. -->
       <svg
@@ -597,7 +640,7 @@ function reloadVersion(): void {
     :value="progression"
   />
 
-  <main class="contenu">
+  <main id="contenu" ref="content" class="contenu" tabindex="-1">
     <RouterView />
   </main>
 
@@ -611,7 +654,7 @@ function reloadVersion(): void {
           type="button"
           class="langue"
           v-bind="attributs"
-          :aria-label="t().language.label"
+          :aria-label="t().language.trigger(LANGUAGE_NAMES[locale.language()])"
           :title="t().language.label"
         >
           <UiIcon name="translate" />{{ LANGUAGE_NAMES[locale.language()] }}
@@ -801,6 +844,32 @@ function reloadVersion(): void {
   white-space: nowrap;
 }
 
+/* Off screen until it has focus, over the bar when it has it: the first Tab shows it. */
+.evitement {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 20;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+  font-weight: 500;
+  text-decoration: none;
+  transform: translateY(-200%);
+
+  &:focus-visible {
+    transform: none;
+    outline: 2px solid var(--mat-sys-on-surface);
+    outline-offset: 2px;
+  }
+}
+
+/* The content takes focus only for the skip link: it is not a control, it need not be outlined. */
+.contenu:focus {
+  outline: none;
+}
+
 .contenu {
   /* `#app` is a column (`src/styles.css`): the automatic margin would cancel the stretching there, and the page would size itself to its text. */
   width: 100%;
@@ -925,9 +994,23 @@ function reloadVersion(): void {
  *
  * Help adds a seventh (RG-aide-a-portee), and settings went off alone below 390 px: the reload gives way in turn. It is the only one with an equivalent on a phone — reloading the page rereads the tree, as it does —, whereas the GitHub link, the sign-in, the theme, the settings and help have no other door. */
 @media (max-width: 430px) {
-  .marque .nom,
   .recharger {
     display: none;
+  }
+
+  /* The name disappears to the eye, not to the screen reader: without it, the brand link would have no name left. */
+  .marque .nom {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The tabs do not shrink (see `.onglets`): under 430 px, they wrap rather than widen the page — RG-accessibilite-aa, 320 px. */
+  .onglets {
+    flex-wrap: wrap;
   }
 }
 

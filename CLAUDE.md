@@ -12,6 +12,7 @@ Skanon: the Vue 3 interface of SSK Canon and its static web version, source-avai
 | Talking to the system, creating a module or a test | [docs/practices.md](docs/practices.md)                                                                               |
 | Writing a function                                 | [docs/clean-code.md](docs/clean-code.md)                                                                             |
 | Naming anything                                    | [docs/conventions.md](docs/conventions.md), [docs/glossary.md](docs/glossary.md)                                     |
+| Creating or changing a view, a component, a style  | [docs/accessibility.md](docs/accessibility.md) — WCAG 2.2 AA                                                         |
 
 The full index: [docs/README.md](docs/README.md).
 

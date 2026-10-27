@@ -220,7 +220,8 @@ function validateRepo(): void {
 .groupes {
   container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  /* `min(…, 100%)`: narrower than 20rem, the screen takes one full column instead of being overrun — RG-accessibilite-aa, 320 px. */
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
   grid-auto-flow: row dense;
   align-items: start;
   gap: 16px;

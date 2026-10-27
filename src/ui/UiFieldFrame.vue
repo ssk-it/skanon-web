@@ -45,7 +45,8 @@ defineEmits<{ activate: [] }>();
       </div>
     </div>
     <div class="ui-champ__sous">
-      <div class="ui-champ__indices">
+      <!-- Its id is the control's followed by `-indices`: the control is described by it (`aria-describedby`), and the error or the hint is read with it. -->
+      <div :id="`${controlId}-indices`" class="ui-champ__indices">
         <span v-if="error" class="ui-champ__erreur" role="alert">{{
           error
         }}</span>

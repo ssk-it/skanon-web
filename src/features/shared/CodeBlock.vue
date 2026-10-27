@@ -118,9 +118,10 @@ const lines = computed(() =>
 );
 </script>
 
+<!-- Focusable: a block wider than its column scrolls, and without focus the keyboard would not scroll it (RG-accessibilite-aa, 2.1.1). -->
 <!-- prettier-ignore -->
 <template>
-  <pre class="bloc-code bloc"><code><span v-for="(l, i) in lines" :key="i" class="ligne"><span v-for="(f, j) in l" :key="j" :class="f.className">{{ f.text }}</span></span></code></pre>
+  <pre class="bloc-code bloc" tabindex="0"><code><span v-for="(l, i) in lines" :key="i" class="ligne"><span v-for="(f, j) in l" :key="j" :class="f.className">{{ f.text }}</span></span></code></pre>
 </template>
 
 <style scoped>
@@ -134,6 +135,10 @@ const lines = computed(() =>
   font-size: 12.5px;
   line-height: 1.65;
   overflow-x: auto;
+}
+.bloc:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 2px;
 }
 code {
   font: inherit;

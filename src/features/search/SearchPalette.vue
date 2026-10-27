@@ -157,8 +157,10 @@ function close(): void {
         :placeholder="t().placeholder"
         :aria-label="t().fieldLabel"
         role="combobox"
-        aria-expanded="true"
-        aria-controls="resultats-recherche"
+        :aria-expanded="!!query.trim() && !noResult"
+        :aria-controls="
+          query.trim() && !noResult ? 'resultats-recherche' : undefined
+        "
         :aria-activedescendant="active ? 'resultat-' + activeIndex : undefined"
         :value="query"
         @input="setQuery(($event.target as HTMLInputElement).value)"
@@ -172,14 +174,15 @@ function close(): void {
       {{ t().pastState }}
     </p>
 
-    <div
-      id="resultats-recherche"
-      class="resultats"
-      role="listbox"
-      :aria-label="t().results"
-    >
+    <!-- Only the results form the list of options: the help and the absence of results are text, which an empty list of options would silence (RG-accessibilite-aa). -->
+    <div class="resultats">
       <p v-if="!query.trim()" class="aide">{{ t().help }}</p>
-      <template v-else-if="!noResult">
+      <div
+        v-else-if="!noResult"
+        id="resultats-recherche"
+        role="listbox"
+        :aria-label="t().results"
+      >
         <section
           v-for="g of groups"
           :key="g.key"
@@ -188,7 +191,8 @@ function close(): void {
           role="group"
           :aria-label="g.title"
         >
-          <h3 class="groupe-titre">{{ g.title }}</h3>
+          <!-- The group already carries its name (`aria-label`); a heading has no place among a list's options. -->
+          <div class="groupe-titre" aria-hidden="true">{{ g.title }}</div>
           <p v-if="g.inProgress" class="groupe-note">
             <template v-if="store.loadingBranches()">
               {{ t().loadingBranches }}
@@ -218,7 +222,7 @@ function close(): void {
           </RouterLink>
           <p v-if="g.hidden" class="masques">{{ t().hidden(g.hidden) }}</p>
         </section>
-      </template>
+      </div>
       <p v-else class="vide">
         {{ t().noResult(query.trim()) }}
         <template v-if="store.loadingBranches()">
