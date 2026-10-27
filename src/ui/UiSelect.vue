@@ -192,6 +192,7 @@ defineExpose({ focus: () => trigger.value?.focus() });
       "
       :aria-disabled="disabled || undefined"
       :aria-label="label"
+      :aria-describedby="hint ? `${id}-indices` : undefined"
       v-bind="{ ...$attrs, class: undefined, style: undefined }"
       @keydown="onKey"
       @focus="focus = true"

@@ -253,3 +253,32 @@ describe("contrasts — RG-accessibilite-aa", () => {
     expect(gaps).toEqual([]);
   });
 });
+
+/**
+ * RG-accessibilite-aa: a person who asks the system to reduce motion sees animations suspended. A transition stops everywhere, through a shared rule; an animation that runs forever — a wait's — slows down in its component, which knows what it says.
+ */
+describe("reduced motion — RG-accessibilite-aa", () => {
+  it("stops every transition and smooth scrolling when the system asks", () => {
+    const reduced =
+      /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(
+        STYLES,
+      )?.[1];
+    expect(reduced).toBeDefined();
+    expect(reduced).toMatch(/transition-duration:\s*0s\s*!important/);
+    expect(reduced).toMatch(/scroll-behavior:\s*auto\s*!important/);
+  });
+
+  it("slows down in its component every animation that runs forever", () => {
+    const unreduced = listFiles(ROOT)
+      .filter((f) => /\.(vue|css)$/.test(f))
+      .filter((f) => {
+        const source = readFileSync(f, "utf8");
+        return (
+          /animation:[^;]*infinite/.test(source) &&
+          !source.includes("prefers-reduced-motion")
+        );
+      })
+      .map((f) => f.slice(ROOT.length + 1));
+    expect(unreduced).toEqual([]);
+  });
+});

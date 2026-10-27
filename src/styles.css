@@ -233,6 +233,11 @@ body {
   margin: 0;
 }
 
+/* What takes focus or an anchor reaches stops under the sticky bar, not beneath it (RG-accessibilite-aa, 2.4.11). `App.vue` publishes its height. */
+html {
+  scroll-padding-top: calc(var(--pc-hauteur-barre, 64px) + 8px);
+}
+
 /* A column, so that the bottom bar stays at the foot of the screen when the page is short. */
 #app {
   display: flex;
@@ -374,5 +379,15 @@ body {
     max-width: none !important;
     width: 100%;
     height: auto;
+  }
+}
+
+/* RG-accessibilite-aa: whoever asks the system to reduce motion sees no decorative animation any more. Transitions — a label that floats, a box that gets checked — reach their state at once; a wait that runs forever slows down in its component (`UiSpinner`, `UiProgressBar`), which knows what it says. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
   }
 }
