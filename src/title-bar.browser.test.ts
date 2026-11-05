@@ -74,3 +74,11 @@ it("shows the skip link clear of the controls when it takes focus", async () => 
   document.querySelector<HTMLElement>(".evitement")!.focus();
   expect(box(".evitement").left).toBeGreaterThanOrEqual(CONTROLS);
 });
+
+it("slides the brand to its place when the controls come or go, rather than making it jump", async () => {
+  await page.viewport(1280, 720);
+  await openWithControls("/");
+  const style = getComputedStyle(document.querySelector(".marque")!);
+  expect(style.transitionProperty).toContain("padding-left");
+  expect(parseFloat(style.transitionDuration)).toBeGreaterThan(0);
+});

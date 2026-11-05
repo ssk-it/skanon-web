@@ -779,6 +779,8 @@ function skipToContent(): void {
   /* The window's controls, where the system draws them over the bar, sit on the dark block: the logo starts after them. */
   padding: 0 18px 0
     calc(var(--pc-barre-padding) + var(--pc-retrait-fenetre, 0px));
+  /* The controls leave when the window goes to the background, and come back with it: the logo slides along rather than jumping. Reduced motion stops it (`styles.css`). */
+  transition: padding-left 200ms ease;
 
   /* The block does not shrink: shrunk, it slid under its own text, which then overflowed in light onto the bar's blue. The tabs are the ones that give way, their overflow being already handled. */
   flex: none;

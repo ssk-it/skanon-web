@@ -128,7 +128,7 @@ export interface VersionAnnouncer {
  * The window's title bar, when the system draws its controls over the application's top bar rather than above it: on the desktop under macOS. The shell then leaves those controls room at the bar's start, and lets the window be moved from the bar's background.
  */
 export interface TitleBar {
-  /** The width the window's controls take from the window's left edge, in pixels, at once then at each change; 0 when the system hides them, in full screen. Returns a way to stop listening. */
+  /** The width the window's controls take from the window's left edge, in pixels, at once then at each change; 0 when the system hides them — in full screen, or while the window is in the background. Returns a way to stop listening. */
   listenControlsWidth(onWidth: (width: number) => void): () => void;
   /** Lets the user move the window by pressing on this element's background, never on a control it holds. Returns a way to stop. */
   makeDraggable(bar: HTMLElement): () => void;
