@@ -8,6 +8,7 @@ export const appliedCitationsMessages = defineMessages({
     current: "À jour",
     modifiedSince: "Modifiée depuis, par",
     repealed: "Abrogée dans le référentiel cité",
+    by: ", par",
     missing: "Absente du référentiel cité",
     noAccess: (repo: string) =>
       `Non vérifiée : l’accès courant n’ouvre pas ${repo}.`,
@@ -22,6 +23,7 @@ export const appliedCitationsMessages = defineMessages({
     current: "Up to date",
     modifiedSince: "Modified since, by",
     repealed: "Repealed in the cited specification",
+    by: ", by",
     missing: "Missing from the cited specification",
     noAccess: (repo: string) =>
       `Unverified: the current access does not open ${repo}.`,

@@ -186,7 +186,23 @@ describe("the citations of a rule", () => {
     const view = await mountCitations([citation("RG-nommage-des-roles")]);
 
     expect(view.get(".etat").text()).toContain("Abrogée");
+    expect(view.find(".etat a").exists()).toBe(false);
     expect(view.find("a.cible").exists()).toBe(true);
+  });
+
+  it("names the scoping that repealed the target, and leads to it", async () => {
+    answer = cited([
+      {
+        id: "RG-nommage-des-roles",
+        status: "abroge",
+        modifiedBy: ["2026-020", "2026-040"],
+      },
+    ]);
+    const view = await mountCitations([citation("RG-nommage-des-roles")]);
+
+    const by = view.get(".etat a");
+    expect(by.text()).toBe("socle-2026-040");
+    expect(by.attributes("href")).toBe("/org/socle-cadrage/cadrages/2026-040");
   });
 
   it("says the target is missing, without a dead link", async () => {

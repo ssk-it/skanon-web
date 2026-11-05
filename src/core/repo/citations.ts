@@ -1,40 +1,36 @@
+import { formaterAnomalie } from "@ssk-it/canon-check";
+import { lireCitation, referentielsCites } from "@ssk-it/canon-check/citations";
+import { LocaleService } from "../i18n/locale.service";
+import { inject } from "../injection";
 import type { Citation, CitedRepo } from "../model/model";
 
 /*
- * Reading the citation fields of the format — RG-regle-du-socle-citee.
- *
- * Standing in for `@ssk-it/canon-check` until it reads them
- * (ssk-it/ssk-canon-action#64): format reading is written once, there (INV-7).
- * This module goes away as soon as the library exports its reader.
+ * The citation fields of the format — RG-regle-du-socle-citee —, read by
+ * `@ssk-it/canon-check`, which the check also applies (INV-7). Only the
+ * mapping to the model's names is done here.
  */
 
-/** `prefixe:IDENTIFIANT@AAAA-NNN`. */
-const CITATION = /^([\w.-]+):([A-Za-z][\w.-]*)@(\d{4}-\d{3,})$/;
-
-/** One entry of `applique`, or `null` when it is not a citation. */
-export function parseCitation(raw: unknown): Citation | null {
-  const m = typeof raw === "string" ? CITATION.exec(raw.trim()) : null;
-  return m ? { prefix: m[1], target: m[2], scoping: m[3] } : null;
-}
-
-/** The `applique` field of a rule or an architecture decision. */
+/** The `applique` field of a rule or an architecture decision. A malformed entry is left out: the check warns about it. */
 export function parseApplies(raw: unknown): Citation[] {
   if (!Array.isArray(raw)) return [];
-  return raw.map(parseCitation).filter((c) => c !== null);
+  return raw.flatMap((text) => {
+    const c = lireCitation(text);
+    return c ? [{ prefix: c.prefixe, target: c.id, scoping: c.cadrage }] : [];
+  });
 }
 
-/** The `referentiels_cites` block of `ssk-canon.yml`. */
-export function parseCitedRepos(raw: unknown): CitedRepo[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((entry) => {
-    const e = (entry ?? {}) as Record<string, unknown>;
-    const prefix = typeof e["prefixe"] === "string" ? e["prefixe"].trim() : "";
-    const repo =
-      typeof e["repo"] === "string"
-        ? /^([\w.-]+)\/([\w.-]+)$/.exec(e["repo"].trim())
-        : null;
-    return prefix && repo
-      ? [{ prefix, repo: { owner: repo[1], repo: repo[2] } }]
-      : [];
-  });
+/** The `referentiels_cites` block of `ssk-canon.yml`, and its faults in the displayed language. */
+export function parseCitedRepos(config: unknown): {
+  readonly citedRepos: CitedRepo[];
+  readonly anomalies: string[];
+} {
+  const { cites, anomalies } = referentielsCites(config);
+  const language = inject(LocaleService).language();
+  return {
+    citedRepos: [...cites].map(([prefix, repo]) => {
+      const [owner, name] = repo.split("/");
+      return { prefix, repo: { owner, repo: name } };
+    }),
+    anomalies: anomalies.map((a) => formaterAnomalie(a, language)),
+  };
 }

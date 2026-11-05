@@ -80,6 +80,15 @@ describe("loading citations", () => {
     expect(specification.project.citedRepos).toEqual([]);
   });
 
+  it("sets aside a faulty entry, and reports it", async () => {
+    const specification = await load(
+      "schema_version: 1\nprojet:\n  nom: A\nreferentiels_cites:\n  - { prefixe: socle }\n",
+    );
+
+    expect(specification.project.citedRepos).toEqual([]);
+    expect(specification.anomalies.join("\n")).toContain("referentiels_cites");
+  });
+
   it("reads what a rule applies", async () => {
     const specification = await load(CITING, [
       {

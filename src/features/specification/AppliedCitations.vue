@@ -118,7 +118,7 @@ function icon(s: CitationState | null): string {
   switch (s.kind) {
     case "a-jour":
       return "check_circle";
-    case "modifiee":
+    case "perimee":
       return "update";
     case "abrogee":
     case "absente":
@@ -162,13 +162,22 @@ function icon(s: CitationState | null): string {
           <UiIcon :name="icon(c.state)" />
           <span v-if="!c.state">{{ t().reading }}</span>
           <span v-else-if="c.state.kind === 'a-jour'">{{ t().current }}</span>
-          <span v-else-if="c.state.kind === 'modifiee'"
+          <span v-else-if="c.state.kind === 'perimee'"
             >{{ t().modifiedSince }}
             <RouterLink :to="inCited(c.repo!, 'cadrages', c.state.since)">{{
               scopingLabel(c.prefix, c.state.since)
             }}</RouterLink></span
           >
-          <span v-else-if="c.state.kind === 'abrogee'">{{ t().repealed }}</span>
+          <span v-else-if="c.state.kind === 'abrogee'"
+            >{{ t().repealed
+            }}<template v-if="c.state.repealedBy"
+              >{{ t().by }}
+              <RouterLink
+                :to="inCited(c.repo!, 'cadrages', c.state.repealedBy)"
+                >{{ scopingLabel(c.prefix, c.state.repealedBy) }}</RouterLink
+              ></template
+            ></span
+          >
           <span v-else-if="c.state.kind === 'absente'">{{ t().missing }}</span>
           <span v-else-if="c.state.reason === 'sans-acces'">{{
             t().noAccess(repoName(c))
@@ -235,7 +244,7 @@ a {
   width: 1.125rem;
   height: 1.125rem;
 }
-.e-modifiee .etat,
+.e-perimee .etat,
 .e-abrogee .etat,
 .e-absente .etat {
   color: var(--mat-sys-error);

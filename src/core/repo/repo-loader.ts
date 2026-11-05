@@ -623,6 +623,8 @@ export class RepoLoader {
     // The names of folders and files: a faulty entry keeps the format's name,
     // and is reported once, here (RG-noms-declares).
     anomalies.push(...resolveNames(data).anomalies);
+    const cited = parseCitedRepos(data);
+    anomalies.push(...cited.anomalies);
 
     return {
       project: {
@@ -631,7 +633,7 @@ export class RepoLoader {
           str(rawProject["description"]) || defaultProject.description,
         codeRepos: readRepos.repos,
         prefix: str(rawProject["prefixe"]) || null,
-        citedRepos: parseCitedRepos(data?.["referentiels_cites"]),
+        citedRepos: cited.citedRepos,
       },
       settings: {
         tokenProtection: readProtection.protection,

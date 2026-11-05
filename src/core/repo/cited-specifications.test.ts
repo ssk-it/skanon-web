@@ -145,7 +145,7 @@ describe("the state of a citation", () => {
     );
 
     expect(state).toEqual({
-      kind: "modifiee",
+      kind: "perimee",
       targetKind: "regle",
       since: "2026-031",
     });
@@ -159,14 +159,14 @@ describe("the state of a citation", () => {
           {
             id: "RG-nommage-des-roles",
             status: "actif",
-            createdBy: "2026-1000",
-            modifiedBy: [],
+            createdBy: "2026-001",
+            modifiedBy: ["2026-1000"],
           },
         ]),
       ),
     );
 
-    expect(state.kind).toBe("modifiee");
+    expect(state.kind).toBe("perimee");
   });
 
   it("reports a repealed target", () => {
@@ -184,7 +184,11 @@ describe("the state of a citation", () => {
       ),
     );
 
-    expect(state).toEqual({ kind: "abrogee", targetKind: "regle" });
+    expect(state).toEqual({
+      kind: "abrogee",
+      targetKind: "regle",
+      repealedBy: "2026-040",
+    });
   });
 
   it("reports a missing target", () => {

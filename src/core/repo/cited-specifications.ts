@@ -1,3 +1,4 @@
+import { comparerCadrages, etatDeCible } from "@ssk-it/canon-check/citations";
 import { GithubError, type RepoRef } from "../github/github-client";
 import { TokenService } from "../github/token.service";
 import { inject } from "../injection";
@@ -34,12 +35,18 @@ export type TargetKind = "regle" | "adr";
 export type CitationState =
   | { readonly kind: "a-jour"; readonly targetKind: TargetKind }
   | {
-      readonly kind: "modifiee";
+      /** Modified by a cited scoping more recent than the noted one. */
+      readonly kind: "perimee";
       readonly targetKind: TargetKind;
       /** The most recent cited scoping that modified the target. */
       readonly since: string;
     }
-  | { readonly kind: "abrogee"; readonly targetKind: TargetKind }
+  | {
+      readonly kind: "abrogee";
+      readonly targetKind: TargetKind;
+      /** The cited scoping that repealed it, when known. */
+      readonly repealedBy: string | null;
+    }
   | { readonly kind: "absente" }
   | { readonly kind: "non-verifiee"; readonly reason: UnreadableReason };
 
@@ -96,11 +103,9 @@ function isRefused(e: unknown): boolean {
 /**
  * The state of a citation, against the cited specification as it was read.
  *
- * `null` when the citation's prefix designates no cited specification.
- *
- * Standing in for `@ssk-it/canon-check` until it exports the comparison
- * (ssk-it/ssk-canon-action#64): the application must show the same state the
- * check warns about (INV-7).
+ * `null` when the citation's prefix designates no cited specification. The
+ * comparison is `@ssk-it/canon-check`'s, the one the check warns with (INV-7):
+ * the application shows the same state.
  */
 export function citationState(
   citation: Citation,
@@ -111,29 +116,22 @@ export function citationState(
     return { kind: "non-verifiee", reason: read.reason };
 
   const rule = read.specification.rules.get(citation.target);
-  const decision = rule
-    ? undefined
-    : read.specification.decisions.get(citation.target);
-  const target = rule ?? decision;
-  if (!target) return { kind: "absente" };
-
+  const target = rule ?? read.specification.decisions.get(citation.target);
   const targetKind: TargetKind = rule ? "regle" : "adr";
-  if (target.status === "abroge") return { kind: "abrogee", targetKind };
-
-  const latest = [target.createdBy, ...target.modifiedBy]
-    .filter((s): s is string => !!s)
-    .reduce<string | null>(
-      (a, b) => (a === null || compareScopings(b, a) > 0 ? b : a),
-      null,
-    );
-  return latest && compareScopings(latest, citation.scoping) > 0
-    ? { kind: "modifiee", targetKind, since: latest }
-    : { kind: "a-jour", targetKind };
-}
-
-/** Orders two `AAAA-NNN` identifiers by year, then by number. */
-function compareScopings(a: string, b: string): number {
-  const [ya, na] = a.split("-").map(Number);
-  const [yb, nb] = b.split("-").map(Number);
-  return ya - yb || na - nb;
+  const state = etatDeCible(
+    { cadrage: citation.scoping },
+    target ? { statut: target.status, modifie_par: target.modifiedBy } : null,
+  );
+  switch (state.etat) {
+    case "absente":
+      return { kind: "absente" };
+    case "abrogee":
+      return { kind: "abrogee", targetKind, repealedBy: state.cadrage ?? null };
+    case "perimee": {
+      const since = [...(state.recents ?? [])].sort(comparerCadrages).at(-1);
+      return { kind: "perimee", targetKind, since: since ?? citation.scoping };
+    }
+    default:
+      return { kind: "a-jour", targetKind };
+  }
 }

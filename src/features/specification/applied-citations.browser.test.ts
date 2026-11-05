@@ -32,7 +32,7 @@ const READABLE: CitedRead = {
       (
         [
           { id: "RG-a-jour", status: "actif", modifiedBy: ["2026-012"] },
-          { id: "RG-modifiee", status: "actif", modifiedBy: ["2026-031"] },
+          { id: "RG-perimee", status: "actif", modifiedBy: ["2026-031"] },
           { id: "RG-abrogee", status: "abroge", modifiedBy: [] },
         ] as Partial<Rule>[]
       ).map((r) => [r.id!, r as Rule]),
@@ -43,7 +43,7 @@ const READABLE: CitedRead = {
 
 const CITATIONS: Citation[] = [
   "RG-a-jour",
-  "RG-modifiee",
+  "RG-perimee",
   "RG-abrogee",
   "RG-une-regle-absente-au-nom-particulierement-long",
 ].map((target) => ({ prefix: "socle", target, scoping: "2026-012" }));
