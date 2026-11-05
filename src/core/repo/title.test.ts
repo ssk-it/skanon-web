@@ -1,6 +1,6 @@
 import { LocaleService } from "../i18n/locale.service";
 import { inject } from "../injection";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory, type Router } from "vue-router";
 import { createAppRouter } from "../../router";
 import { TitleStrategy } from "./title.strategy";
@@ -23,6 +23,15 @@ describe("Page title", () => {
     router = createAppRouter(createMemoryHistory());
     inject(TitleStrategy).attach(router);
     store = inject(SpecificationStore);
+    // The guard starts loading the repo it enters; the tests set the specification themselves (`loadTestSpecification`).
+    vi.spyOn(store, "loadSpecification").mockResolvedValue();
+    vi.spyOn(globalThis, "fetch");
+  });
+
+  // A read left running outside the test ends after it, once the page is gone: its error message then has no document to write the language in.
+  afterEach(() => {
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 
   /** Sets a loaded specification, without going through the network. */
