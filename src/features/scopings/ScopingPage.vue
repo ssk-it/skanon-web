@@ -56,8 +56,9 @@ import { LinksService } from "../../core/repo/links.service";
 import { AuthoringService } from "../../core/repo/authoring.service";
 import {
   displayIdentifier,
-  extractScopingIdentifier,
+  SCOPING_SHAPE,
 } from "../../core/repo/scoping-reference";
+import { useCitedAddress } from "../shared/cited-address";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import { domainStyle } from "../../core/ui/domain-color";
 import { DialogService } from "../../ui/dialog.service";
@@ -104,10 +105,13 @@ function show(scopingId: string): string {
 /**
  * The stored identifier behind what the address carries.
  *
- * The address accepts both forms: bare, as it was set in issues and pull requests, or prefixed with the project's prefix. A prefix that is not the project's own designates nothing here — the scoping will not be found, which is the intended behaviour.
+ * The address accepts both forms: bare, as it was set in issues and pull requests, or prefixed with the project's prefix. The prefix of a specification the project cites leads to the scoping there (scoping 2026-068). Any other prefix designates nothing here — the scoping will not be found, which is the intended behaviour.
  */
-const resolvedId = computed(() =>
-  extractScopingIdentifier(id.value, store.specification().project.prefix),
+const resolvedId = useCitedAddress(
+  () => id.value,
+  SCOPING_SHAPE,
+  () => false,
+  (c) => ["cadrages", c],
 );
 
 const scoping = computed(() => {

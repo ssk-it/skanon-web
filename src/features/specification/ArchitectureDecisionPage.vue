@@ -8,6 +8,9 @@ import { LinksService } from "../../core/repo/links.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
+import { useCitedAddress } from "../shared/cited-address";
+import { RULE_SHAPE } from "../../core/repo/scoping-reference";
+import AppliedCitations from "./AppliedCitations.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import { architectureMessages } from "./architecture.messages";
 
@@ -23,9 +26,20 @@ const locale = inject(LocaleService);
 const t = locale.messages(architectureMessages);
 
 const id = computed(() => String(route.params["id"]));
-const decision = computed(() => store.findArchitectureDecision(id.value));
+/** The decision the address designates here: its own prefix is accepted, a cited one leads to the cited specification. */
+const decisionId = useCitedAddress(
+  () => id.value,
+  RULE_SHAPE,
+  (raw) => !!store.findArchitectureDecision(raw),
+  (d) => ["architecture", "decision", d],
+);
+const decision = computed(() =>
+  decisionId.value ? store.findArchitectureDecision(decisionId.value) : null,
+);
 const scopings = computed(() =>
-  store.listScopingsImpactingTarget(id.value, "adr"),
+  decisionId.value
+    ? store.listScopingsImpactingTarget(decisionId.value, "adr")
+    : [],
 );
 </script>
 
@@ -46,6 +60,8 @@ const scopings = computed(() =>
       </header>
 
       <RenderedMarkdown class="md" :text="decision.statement" />
+
+      <AppliedCitations :citations="decision.applies" />
 
       <h2 class="section">{{ t().scopings }}</h2>
       <div class="liste">

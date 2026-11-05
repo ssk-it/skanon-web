@@ -68,7 +68,7 @@ export function resolveScopingReference(
 }
 
 /** A scoping identifier, as stored: `AAAA-NNN`. */
-const IDENTIFIER_SHAPE = /^\d{4}-\d{3,}$/;
+export const SCOPING_SHAPE = /^\d{4}-\d{3,}$/;
 
 /** A rule's or an architecture decision's identifier, as stored: `RG-…`, `ADR-…`. */
 export const RULE_SHAPE = /^[A-Za-z][\w.-]*$/;
@@ -115,7 +115,7 @@ function afterPrefix(reference: string, prefix: string): string | null {
 export function locateReference(
   reference: string,
   project: ProjectPrefixes,
-  shape: RegExp = IDENTIFIER_SHAPE,
+  shape: RegExp = SCOPING_SHAPE,
 ): LocatedReference | null {
   const own = reference.trim();
 
