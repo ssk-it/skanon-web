@@ -184,3 +184,9 @@ describe("the web version", () => {
     expect(version).toMatch(/^([0-9a-f]{7}|développement)$/);
   });
 });
+
+describe("the web platform", () => {
+  it("has no title bar of its own: the browser draws its window", () => {
+    expect(createWebPlatform().titleBar).toBeNull();
+  });
+});
