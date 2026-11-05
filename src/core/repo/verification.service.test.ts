@@ -16,6 +16,7 @@ describe("verifying a scoping being authored", () => {
       statement: `Énoncé de ${id}.`,
       createdBy: null,
       modifiedBy: [],
+      applies: [],
     };
   }
 

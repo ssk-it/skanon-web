@@ -44,7 +44,13 @@ function scoping(
 }
 
 const SPECIFICATION: Specification = {
-  project: { name: "Test", description: "", codeRepos: [], prefix: null },
+  project: {
+    name: "Test",
+    description: "",
+    codeRepos: [],
+    prefix: null,
+    citedRepos: [],
+  },
   settings: {
     tokenProtection: "proposee",
     linkTags: DEFAULT_LINK_TAGS,
@@ -61,6 +67,7 @@ const SPECIFICATION: Specification = {
         statement: "Le quota anonyme est de soixante appels.",
         createdBy: null,
         modifiedBy: [],
+        applies: [],
       },
     ],
   ]),

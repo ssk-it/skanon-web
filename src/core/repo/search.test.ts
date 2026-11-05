@@ -26,11 +26,19 @@ function rule(id: string, statement: string): Rule {
     statement,
     createdBy: null,
     modifiedBy: [],
+    applies: [],
   };
 }
 
 function adr(id: string, statement: string): ArchitectureDecision {
-  return { id, status: "actif", statement, createdBy: null, modifiedBy: [] };
+  return {
+    id,
+    status: "actif",
+    statement,
+    createdBy: null,
+    modifiedBy: [],
+    applies: [],
+  };
 }
 
 function document(id: string, statement: string): ArchitectureDocument {
@@ -103,6 +111,7 @@ function specification(content: {
       description: "",
       codeRepos: [],
       prefix: content.prefix ?? null,
+      citedRepos: [],
     },
     settings: {
       tokenProtection: "proposee",

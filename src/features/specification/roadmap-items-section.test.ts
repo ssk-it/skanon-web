@@ -60,7 +60,13 @@ let http: HttpTestingController;
 async function prepare() {
   const store = inject(SpecificationStore);
   store.specification.set({
-    project: { name: "Test", description: "", codeRepos: [], prefix: null },
+    project: {
+      name: "Test",
+      description: "",
+      codeRepos: [],
+      prefix: null,
+      citedRepos: [],
+    },
     settings: {
       tokenProtection: "proposee",
       linkTags: DEFAULT_LINK_TAGS,

@@ -38,12 +38,35 @@ export interface Feature {
   readonly description: string;
 }
 
+/**
+ * What a rule or an architecture decision applies from another specification —
+ * RG-regle-du-socle-citee.
+ *
+ * Written `socle:RG-nommage-des-roles@2026-012` in `applique`: the prefix the
+ * citing project gave the cited specification in `referentiels_cites`, the
+ * target's identifier there, and the cited scoping whose state was taken into
+ * account. The text is not copied: the citation is a datum the check compares.
+ */
+export interface Citation {
+  readonly prefix: string;
+  readonly target: string;
+  readonly scoping: string;
+}
+
+/** A specification the project cites, under the prefix it gave it — RG-regle-du-socle-citee. */
+export interface CitedRepo {
+  readonly prefix: string;
+  readonly repo: { readonly owner: string; readonly repo: string };
+}
+
 export interface Rule {
   readonly id: string;
   readonly status: RuleStatus;
   readonly features: readonly string[];
   /** The statement, in Markdown. It is the content that matters. */
   readonly statement: string;
+  /** What it applies from cited specifications. */
+  readonly applies: readonly Citation[];
   /**
    * Indexes derived from history, written by propagation.
    * Never a source of truth — see RG-histoire-derivee.
@@ -104,6 +127,8 @@ export interface ArchitectureDecision {
   readonly id: string;
   readonly status: RuleStatus;
   readonly statement: string;
+  /** What it applies from cited specifications. */
+  readonly applies: readonly Citation[];
   readonly createdBy: string | null;
   readonly modifiedBy: readonly string[];
 }
@@ -281,6 +306,11 @@ export interface Specification {
      * its identifiers are then shown bare, as they are stored.
      */
     readonly prefix: string | null;
+    /**
+     * The specifications it cites, each under the prefix it gave it —
+     * RG-regle-du-socle-citee. Empty by default.
+     */
+    readonly citedRepos: readonly CitedRepo[];
   };
   readonly settings: ProjectSettings;
   readonly domains: ReadonlyMap<string, Domain>;

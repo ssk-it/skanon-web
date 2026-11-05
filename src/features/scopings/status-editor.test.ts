@@ -59,7 +59,13 @@ function scoping(status: Scoping["status"]): Scoping {
 
 function specification(scopings: Scoping[]): Specification {
   return {
-    project: { name: "Essai", description: "", codeRepos: [], prefix: null },
+    project: {
+      name: "Essai",
+      description: "",
+      codeRepos: [],
+      prefix: null,
+      citedRepos: [],
+    },
     settings: {
       tokenProtection: "proposee",
       linkTags: DEFAULT_LINK_TAGS,
