@@ -38,6 +38,7 @@ function decision(id: string): ArchitectureDecision {
     statement: "",
     createdBy: null,
     modifiedBy: [],
+    applies: [],
   };
 }
 
@@ -61,7 +62,13 @@ function scoping(id: string, impacts: Scoping["impacts"]): Scoping {
 
 function specification(partial: Partial<Specification>): Specification {
   return {
-    project: { name: "test", description: "", codeRepos: [], prefix: null },
+    project: {
+      name: "test",
+      description: "",
+      codeRepos: [],
+      prefix: null,
+      citedRepos: [],
+    },
     settings: SETTINGS,
     domains: new Map(),
     features: new Map(),

@@ -75,7 +75,13 @@ const DECISION: EditableDecision = {
 
 function specification(): Specification {
   return {
-    project: { name: "Essai", description: "", codeRepos: [], prefix: null },
+    project: {
+      name: "Essai",
+      description: "",
+      codeRepos: [],
+      prefix: null,
+      citedRepos: [],
+    },
     settings: {
       tokenProtection: "proposee",
       linkTags: DEFAULT_LINK_TAGS,
@@ -93,6 +99,7 @@ function specification(): Specification {
           statement: "",
           createdBy: null,
           modifiedBy: [],
+          applies: [],
         },
       ],
     ]),

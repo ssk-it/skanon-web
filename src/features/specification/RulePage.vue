@@ -42,6 +42,9 @@ import { domainStyle } from "../../core/ui/domain-color";
 import ExternalLink from "../../ui/ExternalLink.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import ViewState from "../shared/ViewState.vue";
+import { useCitedAddress } from "../shared/cited-address";
+import { RULE_SHAPE } from "../../core/repo/scoping-reference";
+import AppliedCitations from "./AppliedCitations.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import OperationChip from "../shared/OperationChip.vue";
 import StatusChip from "../shared/StatusChip.vue";
@@ -65,7 +68,16 @@ const dateFormat = computed(
 );
 
 const id = computed(() => String(route.params["id"]));
-const rule = computed(() => store.findRule(id.value));
+/** The rule the address designates here: its own prefix is accepted, a cited one leads to the cited specification. */
+const resolvedId = useCitedAddress(
+  () => id.value,
+  RULE_SHAPE,
+  (raw) => !!store.findRule(raw),
+  (r) => ["referentiel", "regle", r],
+);
+const rule = computed(() =>
+  resolvedId.value ? store.findRule(resolvedId.value) : null,
+);
 
 const domainIds = computed(() => store.domains().map((d) => d.id));
 
@@ -108,7 +120,7 @@ const neighbors = computed(() => {
  * Scopings impacting this rule, delivered ones first and from most recent to oldest: one reads a story backwards, starting from the current state.
  */
 const impacts = computed(() =>
-  [...store.listScopingsImpactingRule(id.value)].sort((a, b) => {
+  [...store.listScopingsImpactingRule(resolvedId.value ?? "")].sort((a, b) => {
     const byStatus =
       HISTORY_ORDER[a.scoping.status] - HISTORY_ORDER[b.scoping.status];
     return byStatus !== 0 ? byStatus : b.scoping.id.localeCompare(a.scoping.id);
@@ -151,8 +163,8 @@ const history = computed(() => {
 
 // Loaded when the rule is displayed, not when the specification is loaded: the history costs one call per rule consulted, and most never will be.
 watchEffect(() => {
-  const ruleId = id.value;
-  if (store.state() !== "pret" || !store.findRule(ruleId)) return;
+  const ruleId = resolvedId.value;
+  if (store.state() !== "pret" || !ruleId || !store.findRule(ruleId)) return;
   void loadHistory(ruleId);
 });
 
@@ -201,15 +213,15 @@ async function loadHistory(ruleId: string): Promise<void> {
       store.names(),
     );
     // the rule may have changed during the call: do not overwrite with stale data
-    if (id.value === ruleId) commits.value = read;
+    if (resolvedId.value === ruleId) commits.value = read;
   } catch (e) {
-    if (id.value === ruleId) {
+    if (resolvedId.value === ruleId) {
       // A failure GitHub did not name is kept as a flag, not a phrase: its message then follows a language switch.
       if (e instanceof GithubError) gitError.value = e.message;
       else gitUnavailable.value = true;
     }
   } finally {
-    if (id.value === ruleId) gitLoading.value = false;
+    if (resolvedId.value === ruleId) gitLoading.value = false;
   }
 }
 </script>
@@ -269,6 +281,8 @@ async function loadHistory(ruleId: string): Promise<void> {
             <h2 class="section">{{ t().currentStatement }}</h2>
             <RenderedMarkdown class="enonce md" :text="rule.statement" />
           </section>
+
+          <AppliedCitations class="bloc" :citations="rule.applies" />
 
           <section class="bloc">
             <h2 class="section">{{ t().history }}</h2>

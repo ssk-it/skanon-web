@@ -12,52 +12,85 @@ export const WORKFLOW_PATHS: readonly string[] = [
 /** What marks an equipped repo, whatever name the files are given. */
 const ACTION = "ssk-it/ssk-canon-action";
 
-/** Where the workflows live, and what each one brings. */
+/**
+ * Where the workflows live, and what each one brings: the templates of
+ * ssk-it/ssk-canon-action (`modeles/`), copied as they are. Kept in step with
+ * them by hand — a template the action has moved past runs the propagation
+ * without committing, or on GitHub's paid runners for a private repo.
+ */
 const WORKFLOWS: ReadonlyArray<{ path: string; content: string }> = [
   {
     path: WORKFLOW_PATHS[0],
-    content: `# Vérifie qu'un cadrage est cohérent avant de pouvoir être livré.
-#
-# À configurer comme contrôle requis dans les règles de protection de la branche
-# principale, faute de quoi il signale sans bloquer.
+    content: `# Vérifie qu'un cadrage en cours de relecture est cohérent avant de pouvoir
+# être livré. À configurer comme contrôle requis dans les règles de protection
+# de la branche principale, faute de quoi il signale sans bloquer.
 #
 # Ce qu'il attrape, que le format seul ne garantit pas : un impact vers une
 # règle inexistante, un énoncé manquant pour une création ou une modification,
-# un rattachement vers une entité inconnue.
+# un rattachement vers une entité inconnue, une règle abrogée par un cadrage non
+# livré. Dès que la demande est proposée à la relecture, il contrôle en outre
+# l'état qu'aura le référentiel une fois fusionné — ce que la livraison exigera
+# est ainsi réclamé tant qu'il est encore temps de l'écrire.
 name: Vérification du référentiel
 
 on:
+  # \`ready_for_review\` ne fait pas partie des types par défaut : sans lui, un
+  # brouillon proposé à la relecture ne serait recontrôlé qu'à sa poussée
+  # suivante, et le contrôle de livraison manquerait le moment qui le déclenche.
   pull_request:
-  push:
-    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # La propagation la lance sur la demande de fusion qu'elle ouvre : le jeton
+  # de l'automatisation ne déclenche aucun autre événement. Elle se lance aussi
+  # à la main, sur une branche, et la juge alors telle qu'elle serait fusionnée.
+  workflow_dispatch:
+
+# Rien sur la branche principale : la propagation s'y déclenche déjà et vérifie
+# ce qu'elle vient d'écrire. Deux contrôles sur la même poussée se liraient à
+# contretemps — celui qui n'écrit pas rapporterait l'état d'avant l'autre, et
+# échouerait à chaque livraison d'un cadrage créant une règle.
 
 permissions:
   contents: read
 
 jobs:
   verifier:
-    runs-on: ubuntu-latest
+    # Les Mac auto-hébergés pour un dépôt privé, que la variable d'organisation
+    # SSK_RUNNER_PRIVE désigne (outillage/runner-prive-organisation.sh) : sur les
+    # runners de GitHub, chaque exécution d'un dépôt privé — une par heure pour la
+    # propagation planifiée — se décompte du forfait. Un dépôt public, que le
+    # groupe de runners refuse, et une organisation sans la variable restent sur
+    # ubuntu-latest, gratuit pour eux.
+    runs-on: \${{ vars.SSK_RUNNER_PRIVE && fromJSON(vars.SSK_RUNNER_PRIVE) || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Sans l'historique, \`origin/main\` est hors d'atteinte et le contrôle
+          # d'immuabilité ne peut pas avoir lieu — il le dit, plutôt que de
+          # laisser croire qu'il a eu lieu. Le statut se déduit de la même
+          # comparaison, si bien qu'aucun cadrage ne serait tenu pour livré.
+          fetch-depth: 0
 
       # \`appliquer: false\` — la vérification ne modifie jamais le référentiel.
-      #
-      # \`@main\` et non un tag : l'action ne publie plus d'alias de version, et
-      # nommer une release précise figerait le dépôt sur elle, corrections
-      # comprises.
+      # Elle échoue si le cadrage est incohérent, ou si le référentiel a dérivé
+      # de ses cadrages.
       - uses: ssk-it/ssk-canon-action@main
         with:
-          appliquer: false
+          referentiel: '.'
+          appliquer: 'false'
 `,
   },
   {
     path: WORKFLOW_PATHS[1],
-    content: `# Applique au référentiel les impacts des cadrages livrés, à chaque
-# arrivée sur la branche principale — donc à chaque merge de cadrage.
+    content: `# Il applique au référentiel les impacts des cadrages livrés, à chaque arrivée
+# sur la branche principale — donc à chaque merge de cadrage.
 #
 # Deux propriétés du propagateur rendent ce déclenchement systématique sûr :
 # il est idempotent, donc une exécution sans changement n'écrit rien ; et il est
 # tout-ou-rien, donc une incohérence l'arrête avant la première écriture.
+#
+# C'est aussi lui qui répond de la branche principale : il vérifie le référentiel
+# qu'il vient d'écrire, seul moment où l'état final peut l'être — l'enregistrement
+# qu'il pousse, fait par le jeton de l'automatisation, ne déclenche aucun workflow.
 name: Propagation des impacts
 
 on:
@@ -65,11 +98,23 @@ on:
     branches: [main]
   # permet de rejouer une propagation manquée sans attendre un merge
   workflow_dispatch:
+  # GitHub ne transmet pas toujours la poussée d'un merge : aucune exécution
+  # n'est alors créée, et le cadrage livré reste sans propagation jusqu'au
+  # suivant. À heure fixe, une propagation perdue se rattrape seule ; sans rien
+  # à propager, l'exécution n'écrit rien.
+  schedule:
+    - cron: '17 * * * *'
 
 # L'action commite sur la branche principale : sans cette permission, le
 # GITHUB_TOKEN est en lecture seule et le push échoue.
 permissions:
   contents: write
+  # Une branche protégée refuse le push direct de la propagation : elle ouvre
+  # alors une demande de fusion.
+  pull-requests: write
+  # Cette demande, ouverte par le jeton de l'automatisation, ne déclenche aucun
+  # workflow : la propagation y lance elle-même la vérification requise.
+  actions: write
 
 # Deux merges rapprochés ne doivent pas propager en parallèle : le second
 # écraserait le premier. On sérialise, sans annuler ce qui est en cours.
@@ -79,14 +124,24 @@ concurrency:
 
 jobs:
   propager:
-    runs-on: ubuntu-latest
+    # Les Mac auto-hébergés pour un dépôt privé, que la variable d'organisation
+    # SSK_RUNNER_PRIVE désigne (outillage/runner-prive-organisation.sh) : sur les
+    # runners de GitHub, chaque exécution d'un dépôt privé — une par heure pour la
+    # propagation planifiée — se décompte du forfait. Un dépôt public, que le
+    # groupe de runners refuse, et une organisation sans la variable restent sur
+    # ubuntu-latest, gratuit pour eux.
+    runs-on: \${{ vars.SSK_RUNNER_PRIVE && fromJSON(vars.SSK_RUNNER_PRIVE) || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # l'action a besoin de l'historique pour committer par-dessus
+          fetch-depth: 0
 
-      # Voir la vérification : l'action se consomme sur sa branche.
       - uses: ssk-it/ssk-canon-action@main
         with:
-          appliquer: true
+          referentiel: '.'
+          appliquer: 'true'
+          commiter: 'true'
 `,
   },
 ];
