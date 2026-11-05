@@ -1,4 +1,4 @@
-import type { Scoping } from "../model/model";
+import type { CitedRepo, Scoping } from "../model/model";
 
 /** The repo that carries the cited scoping. */
 export interface ShortRepoRef {
@@ -70,13 +70,70 @@ export function resolveScopingReference(
 /** A scoping identifier, as stored: `AAAA-NNN`. */
 const IDENTIFIER_SHAPE = /^\d{4}-\d{3,}$/;
 
+/** A rule's or an architecture decision's identifier, as stored: `RG-…`, `ADR-…`. */
+export const RULE_SHAPE = /^[A-Za-z][\w.-]*$/;
+
+/** What a project says about its prefixes: its own, and those of the specifications it cites. */
+export interface ProjectPrefixes {
+  readonly prefix: string | null;
+  readonly citedRepos: readonly CitedRepo[];
+}
+
+/** Where a reference leads: here, or to the specification a cited prefix designates. */
+export type LocatedReference =
+  | { readonly repo: null; readonly id: string }
+  | {
+      readonly repo: ShortRepoRef;
+      readonly prefix: string;
+      readonly id: string;
+    };
+
+/** The separators a prefix is written with: the hyphen it is displayed with, the colon a citation uses. */
+const SEPARATORS = ["-", ":"] as const;
+
+/** What follows `prefix` and a separator in `reference`, or `null`. */
+function afterPrefix(reference: string, prefix: string): string | null {
+  for (const separator of SEPARATORS) {
+    if (reference.startsWith(prefix + separator))
+      return reference.slice(prefix.length + 1);
+  }
+  return null;
+}
+
 /**
- * The identifier stored behind a reference, prefixed or not — RG-prefixe-projet.
+ * The stored identifier behind a reference, and the repo it lives in —
+ * RG-prefixe-projet.
  *
- * The prefix is an additional way in, not an identifier: the unprefixed form
- * stays accepted and stays the one that is recorded. A prefix that is not the
- * project's, on the other hand, designates a scoping that is not here — a
- * numerically valid identifier is not enough.
+ * A prefix designates either the project that declares it, or a specification
+ * it cites, under the alias it gave it in `referentiels_cites` (scoping
+ * 2026-068). The unprefixed form stays accepted and stays the one that is
+ * recorded. A prefix that is neither designates an unknown address: a
+ * well-formed identifier behind it is not enough.
+ *
+ * Returns `null` when the reference designates nothing.
+ */
+export function locateReference(
+  reference: string,
+  project: ProjectPrefixes,
+  shape: RegExp = IDENTIFIER_SHAPE,
+): LocatedReference | null {
+  const own = reference.trim();
+
+  if (project.prefix) {
+    const rest = afterPrefix(own, project.prefix);
+    if (rest !== null && shape.test(rest)) return { repo: null, id: rest };
+  }
+  for (const cited of project.citedRepos) {
+    const rest = afterPrefix(own, cited.prefix);
+    if (rest !== null && shape.test(rest))
+      return { repo: cited.repo, prefix: cited.prefix, id: rest };
+  }
+  return shape.test(own) ? { repo: null, id: own } : null;
+}
+
+/**
+ * The identifier stored behind a reference, when it designates this project —
+ * RG-prefixe-projet.
  *
  * Returns `null` when the reference designates nothing in this project.
  */
@@ -84,15 +141,8 @@ export function extractScopingIdentifier(
   reference: string,
   prefix: string | null,
 ): string | null {
-  const own = reference.trim();
-  if (IDENTIFIER_SHAPE.test(own)) return own;
-
-  if (!prefix) return null;
-  const expected = `${prefix}-`;
-  if (!own.startsWith(expected)) return null;
-
-  const rest = own.slice(expected.length);
-  return IDENTIFIER_SHAPE.test(rest) ? rest : null;
+  const located = locateReference(reference, { prefix, citedRepos: [] });
+  return located && located.repo === null ? located.id : null;
 }
 
 /**

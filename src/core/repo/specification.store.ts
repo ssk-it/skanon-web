@@ -26,7 +26,13 @@ import {
 export type LoadState = "vide" | "chargement" | "pret" | "erreur";
 
 const EMPTY: Specification = {
-  project: { name: "", description: "", codeRepos: [], prefix: null },
+  project: {
+    name: "",
+    description: "",
+    codeRepos: [],
+    prefix: null,
+    citedRepos: [],
+  },
   settings: {
     tokenProtection: "proposee",
     linkTags: DEFAULT_LINK_TAGS,

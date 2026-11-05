@@ -17,7 +17,13 @@ import SettingsPage from "./SettingsPage.vue";
 
 function specification(tokenProtection: TokenProtection): Specification {
   return {
-    project: { name: "Test", description: "", codeRepos: [], prefix: null },
+    project: {
+      name: "Test",
+      description: "",
+      codeRepos: [],
+      prefix: null,
+      citedRepos: [],
+    },
     settings: {
       tokenProtection,
       linkTags: DEFAULT_LINK_TAGS,

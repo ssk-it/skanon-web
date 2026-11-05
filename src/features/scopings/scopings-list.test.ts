@@ -93,7 +93,13 @@ function specification(): Specification {
   const domain = (id: string, name: string) =>
     [id, { id, name: name, description: "" }] as const;
   return {
-    project: { name: "Test", description: "", codeRepos: [], prefix: null },
+    project: {
+      name: "Test",
+      description: "",
+      codeRepos: [],
+      prefix: null,
+      citedRepos: [],
+    },
     settings: {
       tokenProtection: "proposee",
       linkTags: DEFAULT_LINK_TAGS,

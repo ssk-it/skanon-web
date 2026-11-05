@@ -32,6 +32,7 @@ function rule(
     statement,
     createdBy: null,
     modifiedBy: [],
+    applies: [],
   } as Rule;
 }
 
@@ -57,7 +58,13 @@ const MINIMAL_SETTINGS = {
 
 function specification(rules: Rule[], scopings: Scoping[] = []): Specification {
   return {
-    project: { name: "test", description: "", codeRepos: [], prefix: null },
+    project: {
+      name: "test",
+      description: "",
+      codeRepos: [],
+      prefix: null,
+      citedRepos: [],
+    },
     settings: MINIMAL_SETTINGS,
     domains: new Map(),
     features: new Map(),

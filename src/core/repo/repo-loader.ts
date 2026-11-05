@@ -27,6 +27,7 @@ import {
 import {
   Scoping,
   Decision,
+  CitedRepo,
   CodeRepo,
   Domain,
   Feature,
@@ -47,6 +48,7 @@ import {
   RuleStatus,
   DEFAULT_LINK_TAGS,
 } from "../model/model";
+import { parseApplies, parseCitedRepos } from "./citations";
 import {
   DEFAULT_NAMES,
   RepoNames,
@@ -402,6 +404,7 @@ export class RepoLoader {
       description: "",
       codeRepos: [] as readonly CodeRepo[],
       prefix: null as string | null,
+      citedRepos: [] as readonly CitedRepo[],
     };
     let settings: ProjectSettings = {
       tokenProtection: "proposee",
@@ -468,6 +471,7 @@ export class RepoLoader {
             status: (str(data["statut"]) || "actif") as RuleStatus,
             features: toList(data["fonctionnalites"]),
             statement: body.trim(),
+            applies: parseApplies(data["applique"]),
             createdBy: data["cree_par"] ? str(data["cree_par"]) : null,
             modifiedBy: toList(data["modifie_par"]),
           });
@@ -478,6 +482,7 @@ export class RepoLoader {
             id: str(data["id"]),
             status: (str(data["statut"]) || "actif") as RuleStatus,
             statement: body.trim(),
+            applies: parseApplies(data["applique"]),
             createdBy: data["cree_par"] ? str(data["cree_par"]) : null,
             modifiedBy: toList(data["modifie_par"]),
           });
@@ -575,6 +580,7 @@ export class RepoLoader {
       description: string;
       codeRepos: readonly CodeRepo[];
       prefix: string | null;
+      citedRepos: readonly CitedRepo[];
     },
   ) {
     const defaults = {
@@ -625,6 +631,7 @@ export class RepoLoader {
           str(rawProject["description"]) || defaultProject.description,
         codeRepos: readRepos.repos,
         prefix: str(rawProject["prefixe"]) || null,
+        citedRepos: parseCitedRepos(data?.["referentiels_cites"]),
       },
       settings: {
         tokenProtection: readProtection.protection,
