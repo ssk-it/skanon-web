@@ -456,14 +456,17 @@ export class RepoLoader {
           });
           break;
 
-        case "features":
-          features.set(str(data["id"]), {
-            id: str(data["id"]),
-            name: str(data["nom"]) || str(data["id"]),
-            domains: toList(data["domaines"]),
+        case "features": {
+          const { id, nom, domaines, ...unrecognisedKeys } = data;
+          features.set(str(id), {
+            id: str(id),
+            name: str(nom) || str(id),
+            domains: toList(domaines),
             description: body.trim(),
+            unrecognisedKeys,
           });
           break;
+        }
 
         case "rules":
           rules.set(str(data["id"]), {

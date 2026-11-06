@@ -82,6 +82,7 @@ async function prepare() {
           name: "Rédaction",
           domains: ["cadrage"],
           description: "",
+          unrecognisedKeys: {},
         },
       ],
     ]),

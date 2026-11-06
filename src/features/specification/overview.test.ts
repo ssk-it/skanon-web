@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { LocaleService } from "../../core/i18n/locale.service";
-import { inject } from "../../core/injection";
+import { inject, provide } from "../../core/injection";
 import {
   DEFAULT_LINK_TAGS,
   type Scoping,
@@ -12,6 +12,9 @@ import {
 } from "../../core/model/model";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import { RepoConfig } from "../../core/repo/repo-config";
+import { COMPOSITION, compose } from "../../extension/composer";
+import type { Extension, FeatureFilter } from "../../extension/extension";
+import { signal } from "../../core/signals";
 import { createAppRouter } from "../../router";
 import SpecificationPage from "./SpecificationPage.vue";
 
@@ -93,6 +96,7 @@ function specification(scopings: Scoping[]): Specification {
           name: "Relance des impayés",
           domains: ["facturation"],
           description: "",
+          unrecognisedKeys: { palier: "haut" },
         },
       ],
       [
@@ -102,6 +106,7 @@ function specification(scopings: Scoping[]): Specification {
           name: "Litiges",
           domains: ["facturation", "clients"],
           description: "",
+          unrecognisedKeys: {},
         },
       ],
     ]),
@@ -133,7 +138,11 @@ const IN_PROGRESS = scoping("2026-005", "Arbitrer les litiges", {
   },
 });
 
-async function mountView(scopings: Scoping[]): Promise<HTMLElement> {
+async function mountView(
+  scopings: Scoping[],
+  extensions: readonly Extension[] = [],
+): Promise<HTMLElement> {
+  provide(COMPOSITION, compose(extensions));
   const store = inject(SpecificationStore);
   store.specification.set(specification(scopings));
   store.state.set("pret");
@@ -254,6 +263,144 @@ describe("The specification overview", () => {
       expect(el.querySelector(".bouge")?.getAttribute("aria-label")).toBe(
         "What is moving",
       );
+    });
+  });
+
+  /**
+   * A filter an extension contributes above the list of features — ADR-extensions-commerciales, scoping 2026-069. The page gives its form and applies it; the extension alone knows which frontmatter key it reads and what it means.
+   */
+  describe("a contributed feature filter", () => {
+    const filterVisible = signal(true);
+
+    const tier: FeatureFilter = {
+      id: "filtre-factice",
+      label: { fr: "Palier", en: "Tier" },
+      visible: () => filterVisible(),
+      options: [
+        {
+          id: "haut",
+          label: { fr: "Haut", en: "High" },
+          matches: (f) => f.unrecognisedKeys["palier"] === "haut",
+        },
+        {
+          id: "sans",
+          label: { fr: "Sans palier", en: "No tier" },
+          matches: (f) => f.unrecognisedKeys["palier"] === undefined,
+        },
+      ],
+    };
+    const fake: Extension = {
+      id: "factice",
+      pages: { featureFilters: [tier] },
+    };
+
+    beforeEach(() => filterVisible.set(true));
+
+    function shownFeatures(el: HTMLElement): string[] {
+      return [...el.querySelectorAll(".fonctionnalites li a")].map(
+        (a) => a.textContent?.trim() ?? "",
+      );
+    }
+
+    function combobox(el: HTMLElement): HTMLElement {
+      return el.querySelector<HTMLElement>('.filtres [role="combobox"]')!;
+    }
+
+    async function press(el: HTMLElement, key: string) {
+      combobox(el).dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true }),
+      );
+      await flushPromises();
+    }
+
+    /** The choices, read from the list the keyboard opens. */
+    async function listOptions(el: HTMLElement): Promise<string[]> {
+      await press(el, "Enter");
+      const options = [...document.querySelectorAll('[role="option"]')].map(
+        (o) => o.textContent?.trim() ?? "",
+      );
+      await press(el, "Escape");
+      return options;
+    }
+
+    /** Moves the choice by the arrow keys, list closed, as a keyboard user does. */
+    async function move(el: HTMLElement, steps: number) {
+      for (let i = 0; i < Math.abs(steps); i++)
+        await press(el, steps > 0 ? "ArrowDown" : "ArrowUp");
+    }
+
+    function status(el: HTMLElement): string {
+      return (
+        el.querySelector('.filtres [role="status"]')?.textContent?.trim() ?? ""
+      );
+    }
+
+    it("is absent when no extension contributes one", async () => {
+      const el = await mountView(DELIVERED);
+      expect(el.querySelector(".filtres")).toBeNull();
+    });
+
+    it("is a labelled choice above the domains, which shows every feature at first", async () => {
+      const el = await mountView(DELIVERED, [fake]);
+
+      expect(combobox(el).getAttribute("aria-label")).toBe("Palier");
+      expect(combobox(el).textContent).toContain("Toutes");
+      expect(await listOptions(el)).toEqual(["Toutes", "Haut", "Sans palier"]);
+      expect(
+        el
+          .querySelector(".filtres")!
+          .compareDocumentPosition(el.querySelector(".grille")!) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(shownFeatures(el)).toEqual([
+        "Litiges",
+        "Litiges",
+        "Relance des impayés",
+      ]);
+    });
+
+    it("keeps only the features the chosen option matches, and says how many", async () => {
+      const el = await mountView(DELIVERED, [fake]);
+
+      await move(el, 1);
+      expect(shownFeatures(el)).toEqual(["Relance des impayés"]);
+      expect(status(el)).toBe("1 fonctionnalité sur 2");
+
+      await move(el, 1);
+      expect(shownFeatures(el)).toEqual(["Litiges", "Litiges"]);
+      expect(status(el)).toBe("1 fonctionnalité sur 2");
+
+      await move(el, -2);
+      expect(shownFeatures(el)).toEqual([
+        "Litiges",
+        "Litiges",
+        "Relance des impayés",
+      ]);
+      expect(status(el)).toBe("");
+    });
+
+    it("stops filtering once its extension hides it", async () => {
+      const el = await mountView(DELIVERED, [fake]);
+      await move(el, 1);
+
+      filterVisible.set(false);
+      await flushPromises();
+      expect(el.querySelector(".filtres")).toBeNull();
+      expect(shownFeatures(el)).toEqual([
+        "Litiges",
+        "Litiges",
+        "Relance des impayés",
+      ]);
+    });
+
+    it("speaks English", async () => {
+      inject(LocaleService).choice.set("en");
+      const el = await mountView(DELIVERED, [fake]);
+
+      expect(combobox(el).getAttribute("aria-label")).toBe("Tier");
+      expect(await listOptions(el)).toEqual(["All", "High", "No tier"]);
+      await move(el, 1);
+      expect(status(el)).toBe("1 feature of 2");
     });
   });
 });

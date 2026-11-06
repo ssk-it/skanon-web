@@ -1,4 +1,8 @@
 import type { Localized } from "../core/i18n/language";
+import type { Feature } from "../core/model/model";
+
+/** A feature as an extension reads it: its `unrecognisedKeys` carry the frontmatter keys the shared interface does not recognise, as they were read. The shared interface names none of them: the extension knows which ones exist and what they mean. */
+export type { Feature };
 
 /**
  * What a deliverable adds to the shared interface, and that the shared code must not know: what belongs to the deliverable — who hosts it, where its versions come from, under what licence they are obtained, what it sells. What belongs to the system goes through the ports (ADR-extensions-commerciales).
@@ -59,6 +63,39 @@ export interface PageContributions {
     Readonly<Record<HelpSection, readonly Localized<string>[]>>
   >;
   readonly legalNotice?: DeliverableNotice;
+  /** Sections of a feature's page, between its description and its rules. */
+  readonly featureSections?: readonly FeatureSection[];
+  /** Filters above the list of features, on the specification's overview. */
+  readonly featureFilters?: readonly FeatureFilter[];
+}
+
+/** A section of a feature's page: the extension gives its heading and what it says of the feature, the page its form. */
+export interface FeatureSection extends Contribution {
+  readonly heading: Localized<string>;
+  /** What the section says of this feature; it is only shown when visible and not empty. */
+  readonly notes: (feature: Feature) => readonly FeatureNote[];
+}
+
+export interface FeatureNote {
+  /** An icon before the text, such as a warning. */
+  readonly icon?: string;
+  readonly text: Localized<string>;
+}
+
+/** A filter of the list of features: the page shows it as a choice, which it opens on « all ». */
+export interface FeatureFilter extends Contribution {
+  /** The choice's visible label, and its accessible name. */
+  readonly label: Localized<string>;
+  /** The choices besides « all », in order. */
+  readonly options: readonly FeatureFilterOption[];
+}
+
+export interface FeatureFilterOption {
+  /** Unique among the filter's options. */
+  readonly id: string;
+  readonly label: Localized<string>;
+  /** True: the feature is kept when this option is chosen. */
+  readonly matches: (feature: Feature) => boolean;
 }
 
 /** What the legal notice says about the current deliverable (RG-mentions-legales). */
@@ -93,4 +130,6 @@ export interface Composition {
     readonly data: readonly Localized<string>[];
     readonly ownership: readonly NoticePhrase[];
   };
+  readonly featureSections: readonly FeatureSection[];
+  readonly featureFilters: readonly FeatureFilter[];
 }

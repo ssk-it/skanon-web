@@ -36,6 +36,10 @@ export interface Feature {
   readonly name: string;
   readonly domains: readonly string[];
   readonly description: string;
+  /**
+   * The frontmatter keys the interface does not recognise, as they were read: neither interpreted nor checked. An extension that understands one reads it here (RG-preservation-integrale, ADR-extensions-commerciales).
+   */
+  readonly unrecognisedKeys: Readonly<Record<string, unknown>>;
 }
 
 /**
