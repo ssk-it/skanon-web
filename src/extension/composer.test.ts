@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { inject } from "../core/injection";
 import { COMPOSITION, compose } from "./composer";
-import type { ToolbarAction, Extension } from "./extension";
+import type {
+  Extension,
+  FeatureFilter,
+  FeatureSection,
+  ToolbarAction,
+} from "./extension";
 
 /** A phrase in both languages, the English one marked so that a mix-up shows. */
 function both(text: string) {
@@ -30,6 +35,8 @@ describe("compose", () => {
       banners: [],
       help: { jetons: [], cache: [], communications: [] },
       legalNotice: { host: null, data: [], ownership: [] },
+      featureSections: [],
+      featureFilters: [],
     });
   });
 
@@ -85,6 +92,61 @@ describe("compose", () => {
       "b1",
       "a1",
     ]);
+  });
+
+  it("gathers the feature sections and filters by rank", () => {
+    const section = (id: string, rank?: number): FeatureSection => ({
+      id,
+      rank,
+      heading: both(id),
+      notes: () => [],
+    });
+    const filter = (id: string, rank?: number): FeatureFilter => ({
+      id,
+      rank,
+      label: both(id),
+      options: [{ id: "o", label: both("o"), matches: () => true }],
+    });
+    const composition = compose([
+      {
+        id: "a",
+        pages: {
+          featureSections: [section("s1")],
+          featureFilters: [filter("f1")],
+        },
+      },
+      {
+        id: "b",
+        pages: {
+          featureSections: [section("s2", -1)],
+          featureFilters: [filter("f2")],
+        },
+      },
+    ]);
+    expect(composition.featureSections.map((x) => x.id)).toEqual(["s2", "s1"]);
+    expect(composition.featureFilters.map((x) => x.id)).toEqual(["f1", "f2"]);
+  });
+
+  it("refuses two options with the same identifier in a filter", () => {
+    expect(() =>
+      compose([
+        {
+          id: "a",
+          pages: {
+            featureFilters: [
+              {
+                id: "f",
+                label: both("f"),
+                options: [
+                  { id: "o", label: both("o"), matches: () => true },
+                  { id: "o", label: both("o"), matches: () => false },
+                ],
+              },
+            ],
+          },
+        },
+      ]),
+    ).toThrow(/o/);
   });
 
   it("refuses two extensions with the same identifier", () => {

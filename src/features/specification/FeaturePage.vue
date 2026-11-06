@@ -20,8 +20,10 @@ export function buildExcerpt(statement: string): string {
 <script setup lang="ts">
 import { computed } from "vue";
 import { RouterLink, useRoute } from "vue-router";
-import { useMessages } from "../../core/i18n/locale.service";
+import type { Localized } from "../../core/i18n/language";
+import { LocaleService, useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
+import { COMPOSITION } from "../../extension/composer";
 import { LinksService } from "../../core/repo/links.service";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import UiIcon from "../../ui/UiIcon.vue";
@@ -34,10 +36,27 @@ const route = useRoute();
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
 const t = useMessages(featurePageMessages);
+const locale = inject(LocaleService);
+/** What the deliverable says of a feature, without the page knowing what it reads (ADR-extensions-commerciales). */
+const composition = inject(COMPOSITION);
 
 const id = computed(() => String(route.params["id"]));
 const feature = computed(() => store.findFeature(id.value));
 const rules = computed(() => store.listRulesByFeature(id.value));
+
+/** The contributed sections that have something to say of this feature, with what they say. */
+const contributedSections = computed(() => {
+  const current = feature.value;
+  if (!current) return [];
+  return composition.featureSections
+    .filter((s) => s.visible?.() ?? true)
+    .map((s) => ({ section: s, notes: s.notes(current) }))
+    .filter(({ notes }) => notes.length > 0);
+});
+
+function inLanguage(phrase: Localized<string>): string {
+  return phrase[locale.language()];
+}
 </script>
 
 <template>
@@ -63,6 +82,23 @@ const rules = computed(() => store.listRulesByFeature(id.value));
         </div>
         <RenderedMarkdown class="md" :text="feature.description" />
       </header>
+
+      <!-- The sections the deliverable contributes: it gives their heading and text, the page their form and place. -->
+      <section
+        v-for="{ section, notes } in contributedSections"
+        :key="section.id"
+        class="apport"
+        :data-apport="section.id"
+        :aria-labelledby="`apport-${section.id}`"
+      >
+        <h2 :id="`apport-${section.id}`" class="section">
+          {{ inLanguage(section.heading) }}
+        </h2>
+        <p v-for="(note, i) in notes" :key="i" class="note">
+          <UiIcon v-if="note.icon" :name="note.icon" />
+          <span>{{ inLanguage(note.text) }}</span>
+        </p>
+      </section>
 
       <h2 class="section">{{ t().rules }}</h2>
       <div class="liste">
@@ -208,6 +244,23 @@ h1 {
   white-space: nowrap;
 }
 .vide {
+  color: var(--mat-sys-on-surface-variant);
+}
+.apport {
+  margin-bottom: 36px;
+  max-width: var(--pc-mesure);
+}
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 8px;
+  line-height: 1.55;
+}
+.note .material-symbols-outlined {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
   color: var(--mat-sys-on-surface-variant);
 }
 </style>

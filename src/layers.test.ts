@@ -99,7 +99,7 @@ describe("the layers", () => {
 });
 
 /**
- * The desktop application and what is sold live in a private repo, which consumes this package through its `exports` field (ADR-extensions-commerciales). This repo carries none of its logic, not even its name: nothing here imports the native core, and no file — tests included, except this one, which has to write them — names the update service, the desktop licence or its causes.
+ * The desktop application and what is sold live in a private repo, which consumes this package through its `exports` field (ADR-extensions-commerciales). This repo carries none of its logic, not even its name: nothing here imports the native core, and no file — tests included, except this one, which has to write them — names the update service, the desktop licence or its causes, nor the frontmatter key that says in which deliverable a feature exists (scoping 2026-069): the extension that understands it reads it among a feature's unrecognised keys.
  */
 describe("what is sold", () => {
   const SOURCES = listFiles(ROOT, true).filter(
@@ -113,7 +113,7 @@ describe("what is sold", () => {
   });
 
   const DESKTOP_NAMES =
-    /Skaron|tauri|LicenceService|CoffreDeLicence|COFFRE_DE_LICENCE|Licence et mises à jour|licence du poste|sans-licence|licence-(refusee|invalide)/i;
+    /Skaron|tauri|LicenceService|CoffreDeLicence|COFFRE_DE_LICENCE|Licence et mises à jour|licence du poste|sans-licence|licence-(refusee|invalide)|\beditions\b/i;
 
   it("is named by no file", () => {
     const naming = SOURCES.filter((f) =>

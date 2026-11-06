@@ -20,6 +20,9 @@ export const specificationPageMessages = defineMessages({
     also: (domains: string) => `· aussi ${domains}`,
     ruleCount: (n: number) => `${n} règles`,
     noDomain: "Ce dépôt ne contient aucun domaine.",
+    allFeatures: "Toutes",
+    shownCount: (shown: number, total: number) =>
+      `${shown} fonctionnalité${shown > 1 ? "s" : ""} sur ${total}`,
   },
   en: {
     title: "Functional specification",
@@ -40,5 +43,8 @@ export const specificationPageMessages = defineMessages({
     also: (domains: string) => `· also ${domains}`,
     ruleCount: (n: number) => `${n} rule${n === 1 ? "" : "s"}`,
     noDomain: "This repository contains no domain.",
+    allFeatures: "All",
+    shownCount: (shown: number, total: number) =>
+      `${shown} feature${shown === 1 ? "" : "s"} of ${total}`,
   },
 });

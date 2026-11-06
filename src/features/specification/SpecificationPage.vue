@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { RouterLink } from "vue-router";
-import { useMessages } from "../../core/i18n/locale.service";
+import { LocaleService, useMessages } from "../../core/i18n/locale.service";
 import { inject } from "../../core/injection";
+import type { Feature } from "../../core/model/model";
 import { LinksService } from "../../core/repo/links.service";
 import { displayIdentifier } from "../../core/repo/scoping-reference";
 import { SpecificationStore } from "../../core/repo/specification.store";
 import { domainStyle } from "../../core/ui/domain-color";
+import { COMPOSITION } from "../../extension/composer";
 import UiIcon from "../../ui/UiIcon.vue";
+import UiSelect from "../../ui/UiSelect.vue";
 import ViewState from "../shared/ViewState.vue";
 import RenderedMarkdown from "../shared/RenderedMarkdown.vue";
 import StatusChip from "../shared/StatusChip.vue";
@@ -19,6 +22,9 @@ const LATEST_DELIVERED = 3;
 const store = inject(SpecificationStore);
 const links = inject(LinksService);
 const t = useMessages(specificationPageMessages);
+const locale = inject(LocaleService);
+/** The filters the deliverable contributes, without the page knowing what they read (ADR-extensions-commerciales). */
+const composition = inject(COMPOSITION);
 
 /** The complete list: a hue is computed relative to the whole. */
 const domainIds = computed(() => store.domains().map((d) => d.id));
@@ -45,6 +51,49 @@ function formatOtherDomains(
     .filter((id) => id !== current)
     .map((id) => store.findDomain(id)?.name ?? id)
     .join(", ");
+}
+
+const visibleFilters = computed(() =>
+  composition.featureFilters.filter((f) => f.visible?.() ?? true),
+);
+
+/** The option chosen in each filter, by identifier; none, or "", is « all ». */
+const choices = ref<Readonly<Record<string, string>>>({});
+
+/** What each visible filter keeps, for those that are not on « all »: a hidden filter stops applying. */
+const activeMatches = computed(() =>
+  visibleFilters.value.flatMap((filter) => {
+    const option = filter.options.find(
+      (o) => o.id === choices.value[filter.id],
+    );
+    return option ? [option.matches] : [];
+  }),
+);
+
+function isShown(feature: Feature): boolean {
+  return activeMatches.value.every((matches) => matches(feature));
+}
+
+/** Said only while a filter applies; the element stays so that the change is announced (RG-accessibilite-aa). */
+const shownCount = computed(() =>
+  activeMatches.value.length
+    ? t().shownCount(
+        store.features().filter(isShown).length,
+        store.features().length,
+      )
+    : "",
+);
+
+function filterOptions(filter: (typeof visibleFilters.value)[number]) {
+  const language = locale.language();
+  return [
+    { value: "", label: t().allFeatures },
+    ...filter.options.map((o) => ({ value: o.id, label: o.label[language] })),
+  ];
+}
+
+function choose(filterId: string, optionId: string): void {
+  choices.value = { ...choices.value, [filterId]: optionId };
 }
 
 function show(id: string): string {
@@ -141,6 +190,20 @@ function show(id: string): string {
         </div>
       </section>
 
+      <!-- The filters the deliverable contributes: it gives their choices and what each keeps, the page their form. -->
+      <div v-if="visibleFilters.length" class="filtres">
+        <UiSelect
+          v-for="filter in visibleFilters"
+          :key="filter.id"
+          :data-apport="filter.id"
+          :label="filter.label[locale.language()]"
+          :options="filterOptions(filter)"
+          :model-value="choices[filter.id] ?? ''"
+          @update:model-value="choose(filter.id, $event)"
+        />
+        <p class="compte" role="status">{{ shownCount }}</p>
+      </div>
+
       <div class="grille">
         <!-- An article and not a link: the card leads to the domain by its name, and to each of its features, with no mandatory step. -->
         <article
@@ -156,7 +219,10 @@ function show(id: string): string {
           </h2>
           <RenderedMarkdown class="desc md" :text="d.description" />
           <ul class="fonctionnalites">
-            <li v-for="f in store.listFeaturesByDomain(d.id)" :key="f.id">
+            <li
+              v-for="f in store.listFeaturesByDomain(d.id).filter(isShown)"
+              :key="f.id"
+            >
               <span>
                 <RouterLink
                   :to="links.path('referentiel', 'fonctionnalite', f.id)"
@@ -223,6 +289,13 @@ h1 {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
+}
+.filtres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 16px;
 }
 .grille {
   display: grid;

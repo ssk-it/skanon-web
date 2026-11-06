@@ -45,6 +45,20 @@ export function compose(extensions: readonly Extension[]): Composition {
         (e) => e.pages?.legalNotice?.ownership ?? [],
       ),
     },
+    featureSections: sortByRank(
+      extensions.flatMap((e) => e.pages?.featureSections ?? []),
+      "section de fonctionnalité",
+    ),
+    featureFilters: sortByRank(
+      extensions.flatMap((e) => e.pages?.featureFilters ?? []),
+      "filtre de fonctionnalités",
+    ).map((filter) => {
+      unique(
+        filter.options.map((o) => o.id),
+        `option du filtre ${filter.id}`,
+      );
+      return filter;
+    }),
   };
 }
 
