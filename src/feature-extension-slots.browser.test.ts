@@ -8,7 +8,8 @@ import {
   preloadMermaid,
   violations,
 } from "./accessibility-testing";
-import { provide } from "./core/injection";
+import { LocaleService } from "./core/i18n/locale.service";
+import { inject, provide } from "./core/injection";
 import { COMPOSITION, compose } from "./extension/composer";
 import type { Extension } from "./extension/extension";
 
@@ -48,7 +49,11 @@ const FAKE: Extension = {
 };
 
 async function openWithFake(address: string): Promise<HTMLElement> {
-  return open(address, () => provide(COMPOSITION, compose([FAKE])));
+  return open(address, () => {
+    provide(COMPOSITION, compose([FAKE]));
+    // The engine's language differs from one machine to the next: the texts checked here are French.
+    inject(LocaleService).choice.set("fr");
+  });
 }
 
 async function chooseFirstOption(root: HTMLElement): Promise<HTMLElement> {
@@ -63,7 +68,11 @@ async function chooseFirstOption(root: HTMLElement): Promise<HTMLElement> {
   return combobox;
 }
 
-afterEach(close);
+afterEach(() => {
+  // The choice is kept in storage: the files that follow read the engine's language again.
+  inject(LocaleService).choice.set("browser");
+  close();
+});
 
 beforeAll(async () => {
   await preloadMermaid();
