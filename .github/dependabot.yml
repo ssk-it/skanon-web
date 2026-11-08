@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Dependabot proposes a version only once it is seven days old, the `minimumReleaseAge` of pnpm-workspace.yaml. With its three-day default, its pull requests would carry versions the install refuses (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION). Security updates do not wait: if the install refuses one, exclude it in pnpm-workspace.yaml.
+    cooldown:
+      default-days: 7
     groups:
       # `typescript-eslint` bounds `typescript` (peerDependencies `>=4.8.4 <6.1.0`, checked in 8.71.2); pnpm only makes it a warning. Undo the group when the bound goes away.
       typescript:

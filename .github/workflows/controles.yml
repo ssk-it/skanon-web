@@ -32,6 +32,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # No shipped dependency (`dependencies`) carries a known high or critical vulnerability. The lockfile is the source of truth: nothing is installed to find out, hence this step before the install. A vulnerability without a fix is declared in `audit.ignore` of pnpm-workspace.yaml, by its GHSA, with a reason and a date (docs/practices.md). Development dependencies do not block: the repository's Dependabot alerts track them.
+      - name: Audit of shipped dependencies
+        run: pnpm audit --prod --audit-level high
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
