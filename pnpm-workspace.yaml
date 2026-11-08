@@ -2,3 +2,6 @@
 allowBuilds:
   # Checks at install time that its binary matches the machine.
   esbuild: true
+
+# A package is installed only seven days (10,080 minutes) after it was published, transitive dependencies included. The compromised packages published on npm — chalk and debug, then Shai-Hulud, in September 2025 — were pulled within hours to a few days: the delay gives detection that time. pnpm 12 applies one day by default; setting it here raises it to seven and makes the rule strict: a version that is too young fails the install (ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION), from the lockfile in CI too, instead of being approved silently in `minimumReleaseAgeExclude`. The `cooldown` in `.github/dependabot.yml` follows the same duration. A security fix that cannot wait is named in `minimumReleaseAgeExclude`, as `package@version`, with the date the line can go. Review if the delay blocks work more than once a month, or if pnpm changes its default.
+minimumReleaseAge: 10080
