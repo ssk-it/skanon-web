@@ -33,6 +33,11 @@ describe("LinkDialog", () => {
     expect(link?.tag).toBe("ticket_jira");
   });
 
+  it("suggests the form of an address in the address field", () => {
+    const [address] = mount(LinkDialog).findAll("input");
+    expect(address!.attributes("placeholder")).toBe("https://…");
+  });
+
   it("shows the label of the corrected link's kind", () => {
     const view = mount(LinkDialog, {
       props: {
