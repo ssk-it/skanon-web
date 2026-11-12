@@ -32,6 +32,11 @@ const initial = props.data ?? null;
 
 const modification = !!initial;
 
+/**
+ * Held here rather than written in the template: vue-tsc 3.3.12 to 3.3.14 read a `//` in a template attribute as the start of a comment and lose the types of the bindings that follow (vuejs/language-tools#6322).
+ */
+const urlPlaceholder = "https://…";
+
 const url = ref(initial?.url ?? "");
 const name = ref(initial?.name ?? "");
 
@@ -126,7 +131,7 @@ function validate(): void {
       v-model="url"
       class="champ"
       :label="t().address"
-      placeholder="https://…"
+      :placeholder="urlPlaceholder"
       autocomplete="off"
       data-focus-initial
     >
