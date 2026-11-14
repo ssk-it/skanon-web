@@ -1,5 +1,5 @@
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { provideHttpTesting } from "../../core/http/http-testing";
 import { GithubError } from "../../core/github/github-client";
@@ -302,6 +302,24 @@ describe("What would block delivery", () => {
     await button(w, m.add).trigger("click");
 
     expect(problems(w)).toEqual([m.withoutRule(1)]);
+  });
+
+  // ssk-it/ssk-canon, scoping 2026-074: a diagram Mermaid cannot read is refused by the check, and said here first.
+  it("includes a diagram Mermaid cannot read, once the engine has read it", async () => {
+    const w = await mountEditor();
+
+    await field(w, "enonce0").setValue(
+      "Texte.\n\n```mermaid\nflowchart LR\n    A -- B\n```",
+    );
+    await vi.waitFor(() =>
+      expect(problems(w).join("\n")).toContain("Mermaid ne sait pas le lire"),
+    );
+    expect(button(w, m.save).attributes("disabled")).toBeDefined();
+
+    await field(w, "enonce0").setValue(
+      "Texte.\n\n```mermaid\nflowchart LR\n    A --> B\n```",
+    );
+    await vi.waitFor(() => expect(problems(w)).toEqual([]));
   });
 
   it("drops an impact removed from the form", async () => {
