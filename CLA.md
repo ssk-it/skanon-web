@@ -20,7 +20,7 @@ This Contributor Licence Agreement (the "Agreement") states the terms under whic
 
 You keep the copyright in Your Contributions. You grant Us, and the recipients of software We distribute, a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable licence to reproduce, prepare derivative works of, publicly display, publicly perform, distribute and sublicense Your Contributions and such derivative works.
 
-This licence is granted **in addition to** the licence under which the Project is published, the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-Apache-2.0). It includes the right for Us to license Your Contributions, alone or as part of the Project, **under any terms of Our choosing, including open-source, source-available and proprietary licences**, and to include them in commercial products and services.
+This licence is granted **in addition to** the licence under which the Project is published, the Functional Source License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2). It includes the right for Us to license Your Contributions, alone or as part of the Project, **under any terms of Our choosing, including open-source, source-available and proprietary licences**, and to include them in commercial products and services.
 
 We may transfer this licence, together with Our rights in the Project, to any person.
 
