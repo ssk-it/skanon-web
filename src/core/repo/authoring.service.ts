@@ -816,28 +816,26 @@ export class AuthoringService {
     // The rules are those of the shared checker, which the Action runs before
     // each delivery: what is rejected here is exactly what would block
     // there, without any rule existing twice.
-    const { errors } = this.verification.checkScoping(
-      {
-        id,
-        title: scoping.title,
-        domains: scoping.domains,
-        impacts: scoping.impacts.map((i) => ({
-          target: i.target.trim(),
-          kind: i.kind ?? "regle",
-          operation: i.operation,
-        })),
-        statements: new Map(
-          scoping.impacts
-            .filter((i) => i.statement.trim())
-            .map((i) => [i.target.trim(), i.statement.trim()]),
-        ),
-      },
-      // The same context as on input: without it, saving rejects a
-      // domain or a rule the scoping creates on its branch, whereas the
-      // delivery check accepts them. Refusing to write is worse than
-      // flagging it — the work stays blocked.
-      context,
-    );
+    const input = {
+      id,
+      title: scoping.title,
+      domains: scoping.domains,
+      impacts: scoping.impacts.map((i) => ({
+        target: i.target.trim(),
+        kind: i.kind ?? "regle",
+        operation: i.operation,
+      })),
+      statements: new Map(
+        scoping.impacts
+          .filter((i) => i.statement.trim())
+          .map((i) => [i.target.trim(), i.statement.trim()]),
+      ),
+    };
+    // The same context as on input: without it, saving rejects a domain or a
+    // rule the scoping creates on its branch, whereas the delivery check
+    // accepts them. Refusing to write is worse than flagging it — the work
+    // stays blocked.
+    const { errors } = this.verification.checkScoping(input, context);
     if (errors.length) throw new Error(errors.join(" "));
 
     const { file } = await this.github.commitFile(

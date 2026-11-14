@@ -3,6 +3,7 @@ import {
   checkRepo,
   enTexte,
   formaterAnomalie,
+  verifierDiagrammes,
   type Anomalie,
 } from "@ssk-it/canon-check";
 import { LocaleService } from "../i18n/locale.service";
@@ -28,6 +29,9 @@ export interface Verdict {
   /** The same, coded: what is said again when the language changes (RG-anomalies-codees). */
   readonly anomalies: readonly Anomalie[];
 }
+
+/** Reads a diagram: resolves if the engine that draws can, rejects with its message otherwise. */
+export type DiagramParser = (text: string) => Promise<unknown>;
 
 /** A scoping as entered, not written yet. */
 export interface ScopingInput {
@@ -66,12 +70,49 @@ export class VerificationService {
 
   /**
    * Verifies the specification as it would be with this scoping.
+   */
+  checkScoping(input: ScopingInput, context?: Specification): Verdict {
+    const { repo, livres } = this.verifiable(input, context);
+    // `ignorerIndexDerives`: `cree_par` and `modifie_par` are written by
+    // propagation, after delivery. Requiring them correct during authoring
+    // would report as a fault what the scoping has not produced yet.
+    const { anomalies } = checkRepo(repo, {
+      ignorerIndexDerives: true,
+      livres,
+    });
+    return this.concerning(input, anomalies);
+  }
+
+  /**
+   * The diagrams of the scoping that the given parser cannot read — scoping 2026-074 of ssk-it/ssk-canon.
+   *
+   * Apart from `checkScoping` because the syntax needs the engine that draws, which loads asynchronously; the library extracts the blocks and owns the anomaly, the view gives the parser — the core imports no renderer (docs/practices.md, « Layers »). A scoping without a diagram does not call it: the engine is then never loaded, as for display (RG-diagrammes-rendus).
+   */
+  async checkDiagrams(
+    input: ScopingInput,
+    parse: DiagramParser,
+    context?: Specification,
+  ): Promise<Verdict> {
+    const hasDiagram = [...input.statements.values()].some((s) =>
+      s.includes("```mermaid"),
+    );
+    if (!hasDiagram) return { errors: [], warnings: [], anomalies: [] };
+    const { repo, livres } = this.verifiable(input, context);
+    const anomalies = await verifierDiagrammes(repo, {
+      analyser: parse,
+      livres,
+    });
+    return this.concerning(input, anomalies);
+  }
+
+  /**
+   * The specification as it would be with this scoping, under the format's names.
    *
    * The scoping being entered replaces its saved version: it is indeed the
    * effect of what is being written that we want to measure, not that of what
    * is already in the repo.
    */
-  checkScoping(input: ScopingInput, context?: Specification): Verdict {
+  private verifiable(input: ScopingInput, context?: Specification) {
     // The context of the edited branch, when it is known: a scoping often
     // creates the domain or the rules it declares, and these do not exist yet
     // on the main branch. Ignoring them would report as unknown what the
@@ -87,11 +128,8 @@ export class VerificationService {
       statements: input.statements,
     });
 
-    // `ignorerIndexDerives`: `cree_par` and `modifie_par` are written by
-    // propagation, after delivery. Requiring them correct during authoring
-    // would report as a fault what the scoping has not produced yet.
-    const { anomalies } = checkRepo(
-      {
+    return {
+      repo: {
         domains: ref.domains,
         features: mapValues(ref.features, (f) => ({
           id: f.id,
@@ -109,16 +147,19 @@ export class VerificationService {
         cadrages: mapValues(scopings, toCheckedScoping),
         errors: [],
       },
-      {
-        ignorerIndexDerives: true,
-        livres: new Set(
-          [...ref.scopings.values()]
-            .filter((c) => !c.provenance)
-            .map((c) => c.id),
-        ),
-      },
-    );
+      livres: new Set(
+        [...ref.scopings.values()]
+          .filter((c) => !c.provenance)
+          .map((c) => c.id),
+      ),
+    };
+  }
 
+  /** What concerns this scoping, said in the interface's language. */
+  private concerning(
+    input: ScopingInput,
+    anomalies: readonly Anomalie[],
+  ): Verdict {
     // What concerns this scoping is read in the library's French form, the one that names it the same way whatever the displayed language.
     const concerned = anomalies.filter((a) =>
       formaterAnomalie(a, "fr").includes(input.id),

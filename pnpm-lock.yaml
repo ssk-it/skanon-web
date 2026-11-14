@@ -136,7 +136,7 @@ importers:
         version: 10.0.1(eslint@10.14.0(jiti@2.7.0)(supports-color@8.1.1))
       '@ssk-it/canon-check':
         specifier: github:ssk-it/ssk-canon-action#main
-        version: https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/6bf25af9ef439573d31cfdc08bfdbf1ca2eb0fe5
+        version: https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/38af2b9cc4d2a8d853abc0c03432a66cbd0e1663
       '@types/node':
         specifier: ^26.6.6
         version: 26.6.6
@@ -698,8 +698,8 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@ssk-it/canon-check@https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/6bf25af9ef439573d31cfdc08bfdbf1ca2eb0fe5':
-    resolution: {gitHosted: true, integrity: sha512-ZDYodbjUQX3W/q9/2mlGjnicLaLt6GaoC3bs6OXdH2ErGe9NYNsr+XU7yDK3Sd5wxHzo6HMEEvHcm2fn2YWL4A==, tarball: https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/6bf25af9ef439573d31cfdc08bfdbf1ca2eb0fe5}
+  '@ssk-it/canon-check@https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/38af2b9cc4d2a8d853abc0c03432a66cbd0e1663':
+    resolution: {gitHosted: true, integrity: sha512-jmbFNL1kWrpgJUq/X9+IAs6ER3b9lRYla4iifE8TgYi1oC1JLsQ4mSNkMPInPk9lnx58m0ylspwc7XDCnTFG6Q==, tarball: https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/38af2b9cc4d2a8d853abc0c03432a66cbd0e1663}
     version: 2.0.0
 
   '@types/chai@5.2.3':
@@ -2608,7 +2608,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@ssk-it/canon-check@https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/6bf25af9ef439573d31cfdc08bfdbf1ca2eb0fe5':
+  '@ssk-it/canon-check@https://codeload.github.com/ssk-it/ssk-canon-action/tar.gz/38af2b9cc4d2a8d853abc0c03432a66cbd0e1663':
     dependencies:
       js-yaml: 5.5.0
 

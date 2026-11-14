@@ -40,6 +40,7 @@ import UiButton from "../../ui/UiButton.vue";
 import UiTextField from "../../ui/UiTextField.vue";
 import UiIcon from "../../ui/UiIcon.vue";
 import UiSelect from "../../ui/UiSelect.vue";
+import { parseDiagram } from "../shared/diagram-parser";
 import { editScopingMessages } from "./edit-scoping.messages";
 
 /**
@@ -279,23 +280,9 @@ const problems = computed(() => {
   const designated = impacts.value.filter((i) => i.target.trim());
   const withoutRule = impacts.value.length - designated.length;
 
+  // The specification of the edited branch: that is where the domain and rules this scoping creates live. Its errors are the checker's, the same anomalies as the pull request's check, said by the library in the displayed language.
   const { errors } = verification.checkScoping(
-    {
-      id: id.value,
-      title: title.value,
-      domains: enteredDomains(),
-      impacts: designated.map((i) => ({
-        target: i.target.trim(),
-        kind: i.kind ?? "regle",
-        operation: i.operation,
-      })),
-      statements: new Map(
-        designated
-          .filter((i) => i.statement.trim())
-          .map((i) => [i.target.trim(), i.statement.trim()]),
-      ),
-    },
-    // The specification of the edited branch: that is where the domain and rules this scoping creates live. Its errors are the checker's, the same anomalies as the pull request's check, said by the library in the displayed language.
+    checkedInput.value,
     context.value ?? undefined,
   );
 
@@ -303,8 +290,48 @@ const problems = computed(() => {
     ...missing,
     ...(withoutRule ? [m.withoutRule(withoutRule)] : []),
     ...errors,
+    ...diagramErrors.value,
   ];
 });
+
+/** The scoping as the checker reads it: impacts with no designated rule set aside, statements trimmed. */
+const checkedInput = computed(() => {
+  const designated = impacts.value.filter((i) => i.target.trim());
+  return {
+    id: id.value,
+    title: title.value,
+    domains: enteredDomains(),
+    impacts: designated.map((i) => ({
+      target: i.target.trim(),
+      kind: i.kind ?? "regle",
+      operation: i.operation,
+    })),
+    statements: new Map(
+      designated
+        .filter((i) => i.statement.trim())
+        .map((i) => [i.target.trim(), i.statement.trim()]),
+    ),
+  };
+});
+
+/**
+ * The diagrams Mermaid cannot read (ssk-it/ssk-canon, scoping 2026-074): what the check will refuse, reported while the author writes. Asynchronous, the engine loading only when a statement carries a diagram; a result that arrives after a newer input is dropped.
+ */
+const diagramErrors = ref<readonly string[]>([]);
+let diagramRound = 0;
+watch(
+  [checkedInput, context, () => locale.language()],
+  async ([input, ctx]) => {
+    const round = ++diagramRound;
+    const { errors } = await verification.checkDiagrams(
+      input,
+      parseDiagram,
+      ctx ?? undefined,
+    );
+    if (round === diagramRound) diagramErrors.value = errors;
+  },
+  { immediate: true },
+);
 
 /** The scoping already held by the form, so as not to re-read it for nothing. */
 let loadId: string | null = null;

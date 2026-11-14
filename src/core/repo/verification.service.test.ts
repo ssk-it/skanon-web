@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { LocaleService } from "../i18n/locale.service";
 import { inject, resetInjection } from "../injection";
 import type { Rule, Specification } from "../model/model";
+import mermaid from "mermaid";
 import { VerificationService, type ScopingInput } from "./verification.service";
 
 /**
@@ -151,5 +152,59 @@ describe("verifying a scoping being authored", () => {
       SPECIFICATION,
     );
     expect(anomalies.map((a) => a.code)).toContain("cible-inconnue");
+  });
+
+  /*
+   * Diagrams, scoping 2026-074 of ssk-it/ssk-canon: what the check will refuse is reported while the author writes. An HTML entity needs no renderer and comes with `checkScoping`; the syntax needs Mermaid, the engine that draws, which the view gives to `checkDiagrams`.
+   */
+  const parse = (text: string) => mermaid.parse(text);
+  const diagram = (text: string) => "Texte.\n\n```mermaid\n" + text + "\n```";
+
+  it("reports an HTML entity in a diagram of a statement", () => {
+    const { anomalies } = service.checkScoping(
+      input({
+        statements: new Map([
+          [
+            "RG-active",
+            diagram('flowchart LR\n    A["br-&lt;branche&gt;"] --> B'),
+          ],
+        ]),
+      }),
+      SPECIFICATION,
+    );
+    expect(anomalies.map((a) => a.code)).toContain("diagramme-entite-html");
+  });
+
+  it("reports a diagram Mermaid cannot read", async () => {
+    const { errors, anomalies } = await service.checkDiagrams(
+      input({
+        statements: new Map([
+          ["RG-active", diagram("flowchart LR\n    A -- B")],
+        ]),
+      }),
+      parse,
+      SPECIFICATION,
+    );
+    expect(anomalies.map((a) => a.code)).toEqual(["diagramme-illisible"]);
+    expect(errors.join("\n")).toContain("2026-070 → RG-active");
+  });
+
+  it("finds nothing to say about a readable diagram", async () => {
+    const verdict = await service.checkDiagrams(
+      input({
+        statements: new Map([
+          ["RG-active", diagram("flowchart LR\n    A --> B")],
+        ]),
+      }),
+      parse,
+      SPECIFICATION,
+    );
+    expect(verdict.anomalies).toEqual([]);
+  });
+
+  it("does not call the parser for a scoping without diagrams", async () => {
+    const never = () => Promise.reject(new Error("appelé"));
+    const verdict = await service.checkDiagrams(input(), never, SPECIFICATION);
+    expect(verdict).toEqual({ errors: [], warnings: [], anomalies: [] });
   });
 });
